@@ -1,18 +1,21 @@
-# איפיון ישות — עובד משרד (ישות 3 במודל המקורי)
+# טבלה: `office_employees` (עובד משרד — ישות 3 במודל המקורי)
 
-**סטטוס: שלד בסיסי.** נוצר כתלות-FK מ-`clients.responsible_employee_id` ו-`client_notes.created_by` — עדיין לא עבר איפיון מלא ברמת העומק של `client.md`. יורחב כשנגיע לתור שלו.
+**סטטוס: שלד בסיסי.** נוצרה כתלות-FK מ-`clients.responsible_employee_id` ו-`client_notes.created_by` — עדיין לא עברה איפיון מלא ברמת העומק של טבלאות הלקוח. תורחב כשנגיע לתור שלה.
 
-## מה שכבר ידוע (מהמסמך המקורי)
+מהמסמך המקורי: הצוות. עלות שעה פנימית (רגיש, מוגן הרשאות), תפקיד, התמחויות (הקצאה חכמה, עתידי).
 
-הצוות. עלות שעה פנימית (רגיש, מוגן הרשאות), תפקיד, התמחויות (הקצאה חכמה, עתידי).
+## שדות
 
-## שדות (שלד)
-
-| עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
+| עמודה (אנגלית) | תרגום השם | טיפוס | אילוצים | מה זה משרת |
 |---|---|---|---|---|
-| `id` | uuid | PK | — | מזהה |
-| `full_name` | text | NOT NULL | — | תצוגה/זיהוי |
-| `role` | text | nullable | חופשי בשלב זה | תפקיד |
-| `hourly_cost` | numeric(10,2) | CHECK ≥ 0, nullable | **רגיש** | RLS עתידי יגביל לבעלים/מנהל בלבד |
-| `specializations` | text[] | nullable | — | הקצאה חכמה (עתידי) |
-| `created_at` / `updated_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת |
+| `id` | מזהה | uuid | PK | מזהה ייחודי |
+| `full_name` | שם מלא | text | NOT NULL | תצוגה/זיהוי |
+| `role` | תפקיד | text | nullable | חופשי בשלב זה |
+| `hourly_cost` | עלות שעה | numeric(10,2) | CHECK ≥ 0, nullable | **רגיש** — RLS עתידי יגביל לבעלים/מנהל בלבד |
+| `specializations` | התמחויות | text[] | nullable | הקצאה חכמה (עתידי) |
+| `created_at` | תאריך יצירה | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
+| `updated_at` | תאריך עדכון אחרון | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
+
+## ר' גם
+
+[`clients.md`](clients.md) · [`client_notes.md`](client_notes.md) · [`clients_audit_log.md`](clients_audit_log.md)

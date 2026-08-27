@@ -5,12 +5,20 @@
 - [`status.md`](status.md) — מה הושלם, מה פתוח, מה הצעד הבא. הכי מתעדכן — פותחים ראשון.
 - [`log.md`](log.md) — יומן פעולות כרונולוגי.
 - [`access.md`](access.md) — מרשם הרשאות/גישות. **local-only, לא בגיט.**
-- `entities/` — איפיוני ישויות מפורטים (מושגי + מילון שדות), קובץ נפרד לכל ישות עצמאית, לקראת migrations:
-  - [`client.md`](entities/client.md) — לקוח + תת-הטבלאות המבניות שלו (לא ישויות עצמאיות: קרדנציאלים, חשבונות בנק, הערות, ערוצי קשר, audit log). האיפיון המלא — תרגום מלוגיקת אוריגמי ל-SQL, כולל שינויי עיצוב מכוונים.
-  - [`entity_types.md`](entities/entity_types.md) — שלד מינימלי (תלות FK מלקוח).
-  - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — שלד מינימלי (תלות FK מלקוח).
-  - [`office_employees.md`](entities/office_employees.md) — שלד בסיסי (תלות FK מלקוח).
-  - [`tags.md`](entities/tags.md) — שלד מינימלי (תלות FK מלקוח).
+- `entities/` — **כל טבלת SQL בקובץ נפרד משלה** (שם עמודה + תרגום השם לעברית + טיפוס + אילוצים + מה זה משרת). אין קובץ-על משותף — כל קובץ עצמאי, מקושר לקבצים קשורים בסוף:
+  - [`clients.md`](entities/clients.md) — הישות המרכזית.
+  - [`client_statuses.md`](entities/client_statuses.md) — lookup לשדה סטטוס (לא enum — יש התנהגות שונה בין סטטוסים).
+  - [`client_contact_channels.md`](entities/client_contact_channels.md) — ערוצי קשר (טלפון/מייל).
+  - [`client_bank_accounts.md`](entities/client_bank_accounts.md) — חשבונות בנק.
+  - [`client_professional_credentials.md`](entities/client_professional_credentials.md) — הזדהות מקצועית.
+  - [`client_financial_credentials.md`](entities/client_financial_credentials.md) — הזדהות פיננסית.
+  - [`client_notes.md`](entities/client_notes.md) — הערות מקצועיות (Bus Factor).
+  - [`client_tags.md`](entities/client_tags.md) — קישור M2M לקוח↔תגית.
+  - [`clients_audit_log.md`](entities/clients_audit_log.md) — יומן ביקורת שינויים.
+  - [`entity_types.md`](entities/entity_types.md) — סוג ישות/ייחוס (שלד מינימלי, תלות FK).
+  - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — תדירות דיווח (שלד מינימלי, תלות FK).
+  - [`office_employees.md`](entities/office_employees.md) — עובד משרד (שלד בסיסי, תלות FK).
+  - [`tags.md`](entities/tags.md) — תגיות (שלד מינימלי, תלות FK).
 - `decisions/` — Architecture Decision Records:
   - [`0001-self-hosted-supabase-on-existing-vps.md`](decisions/0001-self-hosted-supabase-on-existing-vps.md) — למה self-hosted במקום Supabase Cloud.
   - [`0002-network-isolation-and-routing.md`](decisions/0002-network-isolation-and-routing.md) — למה תת-דומיין יחיד, איך Traefik מגיע ל-Supabase.
