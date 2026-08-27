@@ -13,27 +13,20 @@
 
 ---
 
-## מילון שדות מלא
+## תלויות חיצוניות (ישויות עצמאיות במודל — לא כאן)
 
-### `entity_types` (סוג ישות / ייחוס)
+טבלת `clients` מצביעה (FK) לישויות עצמאיות שלהן קובץ איפיון משלהן, כרגע ברמת שלד בלבד:
 
-| עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
-|---|---|---|---|---|
-| `id` | uuid | PK | — | מזהה |
-| `code` | text | NOT NULL, UNIQUE | קוד יציב (`exempt_dealer`, `licensed_dealer`, `company`, `partnership`, `nonprofit`) | הפניה תוכניתית יציבה, לא תלוית-שפה |
-| `name` | text | NOT NULL | תווית לתצוגה בעברית | תצוגה למשתמש |
-| `created_at` / `updated_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת/מעקב |
+- [`entity_types.md`](entity_types.md) — סוג ישות/ייחוס (ישות 4)
+- [`reporting_frequencies.md`](reporting_frequencies.md) — תדירות דיווח (ישות 28)
+- [`office_employees.md`](office_employees.md) — עובד משרד (ישות 3)
+- [`tags.md`](tags.md) — תגיות לקוח (ישות 31)
 
-### `reporting_frequencies` (תדירות דיווח)
+## מילון שדות מלא — לקוח ותת-הטבלאות שלו בלבד
 
-| עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
-|---|---|---|---|---|
-| `id` | uuid | PK | — | מזהה |
-| `name` | text | NOT NULL, UNIQUE | 'חד-חודשי' / 'דו-חודשי' / 'שנתי' | תצוגה |
-| `months_interval` | integer | NOT NULL, CHECK > 0 | 1 / 2 / 12 | **נתון, לא רק תווית** — משמש בהמשך לחישוב תקופות (קבוצה ב') |
-| `created_at` / `updated_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת |
+הטבלאות הבאות **אינן** ישויות עצמאיות במודל המקורי — הן פירוק מבני של "לקוח" עצמו (קבוצות חוזרות שהפכו לטבלאות, או טבלת lookup פנימית לשדה סטטוס). לכן הן חיות כאן, לא בקובץ נפרד.
 
-### `client_statuses` (lookup — לא enum, ר' החלטת מפתח 3)
+### `client_statuses` (lookup פנימי לשדה סטטוס — לא enum, ר' החלטת מפתח 3)
 
 | עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
 |---|---|---|---|---|
@@ -41,27 +34,6 @@
 | `code` | text | NOT NULL, UNIQUE | `lead`/`onboarding`/`active`/`suspended_debt`/`frozen_temporary`/`retiring`/`departed` | הפניה תוכניתית |
 | `name` | text | NOT NULL | תווית עברית | תצוגה |
 | `continues_collection` | boolean | NOT NULL, DEFAULT false | `true` רק ל-`suspended_debt` | **דגל התנהגות** — קוד/Views בודקים דגל, לא משווים מחרוזת סטטוס |
-| `created_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת |
-
-### `office_employees` (עובד משרד)
-
-| עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
-|---|---|---|---|---|
-| `id` | uuid | PK | — | מזהה |
-| `full_name` | text | NOT NULL | — | תצוגה/זיהוי |
-| `role` | text | nullable | — | תפקיד חופשי בשלב זה |
-| `hourly_cost` | numeric(10,2) | CHECK ≥ 0, nullable | **רגיש** | RLS עתידי יגביל לבעלים/מנהל בלבד — לא נבנה עדיין בשלב זה |
-| `specializations` | text[] | nullable | — | הקצאה חכמה (עתידי) |
-| `created_at` / `updated_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת |
-
-### `tags` (תגיות)
-
-| עמודה | טיפוס | אילוצים | לוגיקה/מקור | מה זה משרת |
-|---|---|---|---|---|
-| `id` | uuid | PK | — | מזהה |
-| `category` | text | NOT NULL | אופי ושיתוף פעולה / ערך עסקי / מורכבות טיפול / סיכון / מאפיין תפעולי | כל קטגוריה מפעילה לוגיקה שונה (עתידי) |
-| `name` | text | NOT NULL | — | תווית התג |
-| — | | UNIQUE(`category`,`name`) | | מונע כפילות תגיות זהות |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() | — | ביקורת |
 
 ### `clients` (לקוח — הישות המרכזית)
