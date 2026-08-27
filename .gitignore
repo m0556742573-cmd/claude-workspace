@@ -6,6 +6,9 @@
 .env.*
 !.env.example
 
+# Access/credentials registry (metadata about secrets - local only, per project)
+**/docs/access.md
+
 # OS junk
 .DS_Store
 Thumbs.db
