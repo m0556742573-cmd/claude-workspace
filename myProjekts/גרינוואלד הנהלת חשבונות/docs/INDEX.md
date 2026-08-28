@@ -19,6 +19,9 @@
   - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — תדירות דיווח (שלד מינימלי, תלות FK).
   - [`office_employees.md`](entities/office_employees.md) — עובד משרד (שלד בסיסי, תלות FK).
   - [`tags.md`](entities/tags.md) — תגיות (שלד מינימלי, תלות FK).
+- `source-materials/` — עותקים פיזיים של מסמכי המקור (לא רק הפניה חיצונית):
+  - [`סיכום_איפיון_מלא_המערכת.md`](<source-materials/סיכום_איפיון_מלא_המערכת.md>) — המסמך המזוקק המלא, 33 ישויות.
+  - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — ייצוא גולמי מ-Origami.
 - `decisions/` — Architecture Decision Records:
   - [`0001-self-hosted-supabase-on-existing-vps.md`](decisions/0001-self-hosted-supabase-on-existing-vps.md) — למה self-hosted במקום Supabase Cloud.
   - [`0002-network-isolation-and-routing.md`](decisions/0002-network-isolation-and-routing.md) — למה תת-דומיין יחיד, איך Traefik מגיע ל-Supabase.
