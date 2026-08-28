@@ -27,3 +27,5 @@
   - [`0002-network-isolation-and-routing.md`](decisions/0002-network-isolation-and-routing.md) — למה תת-דומיין יחיד, איך Traefik מגיע ל-Supabase.
   - [`0003-vps-hardening-and-known-gap.md`](decisions/0003-vps-hardening-and-known-gap.md) — הקשחת SSH/fail2ban, ופער ידוע (פורט 3000).
   - [`0004-automated-backups-to-r2.md`](decisions/0004-automated-backups-to-r2.md) — גיבויים אוטומטיים ל-R2.
+  - [`0005-rls-enabled-no-policies-yet.md`](decisions/0005-rls-enabled-no-policies-yet.md) — RLS מופעל מהרגע הראשון, בלי policies עדיין (חסום כברירת מחדל).
+- `supabase-selfhost/migrations/20260828000000_client_entity.sql` — קוד ה-SQL בפועל (13 טבלאות), **הורץ בהצלחה על ה-DB החי**. עדיין לא בגיט.
