@@ -16,7 +16,9 @@
 | `legal_id_number` | מספר מזהה משפטי (ח.פ./ת.ז./עמותה) | text | NOT NULL, UNIQUE, **text לא integer** | מפתח עסקי — מזהה יחיד לכל סוגי הישות |
 | `legal_name` | שם משפטי רשמי | text | NOT NULL | השם המדויק מול הרשויות |
 | `trade_name` | שם מסחרי | text | nullable | איך הלקוח מוכר בפועל (יכול להיות שונה מהרשמי) |
-| `address` | כתובת | text | nullable | |
+| `street_address` | רחוב ומספר | text | nullable | כתובת (לא מפוצל הלאה — כתובות ישראליות לא תמיד "רחוב+מספר" נקי, יש מושבים/קיבוצים) |
+| `city` | עיר | text | nullable | מאפשר סינון/שאילתה לפי עיר |
+| `postal_code` | מיקוד | text | nullable, **text לא integer** (אפסים מובילים) | לדואר רשמי |
 | `industry` | תחום עיסוק / ענף | text | nullable | |
 | `vat_reporting_frequency_id` | מזהה תדירות דיווח מע"מ | uuid | FK → `reporting_frequencies.id`, nullable | תדירות מע"מ |
 | `annual_report_frequency_id` | מזהה תדירות דוח שנתי | uuid | FK → `reporting_frequencies.id`, nullable | **נפרד בכוונה מ-VAT** — חובה נפרדת, לא כפילות |
@@ -35,4 +37,4 @@
 
 ## ר' גם
 
-[`client.md`](client.md) — רציונל עיצוב מלא של כל משפחת טבלאות הלקוח.
+[`entity_types.md`](entity_types.md) · [`reporting_frequencies.md`](reporting_frequencies.md) · [`client_statuses.md`](client_statuses.md) · [`office_employees.md`](office_employees.md)
