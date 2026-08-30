@@ -18,6 +18,7 @@
   - [`entity_types.md`](entities/entity_types.md) — סוג ישות/ייחוס (שלד מינימלי, תלות FK).
   - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — תדירות דיווח (שלד מינימלי, תלות FK).
   - [`office_employees.md`](entities/office_employees.md) — עובד משרד (שלד בסיסי, תלות FK).
+  - [`employee_roles.md`](entities/employee_roles.md) — תפקידי עובדים (ישות 27), lookup פתוח.
   - [`tags.md`](entities/tags.md) — תגיות (שלד מינימלי, תלות FK).
   - [`contacts.md`](entities/contacts.md) — אנשי קשר (ישות 2), חוצת-לקוחות.
   - [`contact_channels.md`](entities/contact_channels.md) — ערוצי קשר של איש קשר (טלפון/מייל, ברמת האדם).

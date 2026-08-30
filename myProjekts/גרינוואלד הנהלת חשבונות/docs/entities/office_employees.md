@@ -12,7 +12,7 @@
 |---|---|---|---|---|
 | `id` | מזהה | uuid | PK | מזהה ייחודי |
 | `full_name` | שם מלא | text | NOT NULL | תצוגה/זיהוי |
-| `role` | תפקיד | text | nullable | חופשי בשלב זה |
+| `role_id` | מזהה תפקיד | uuid | FK → `employee_roles.id`, nullable | ר' `employee_roles.md` — לא טקסט חופשי, כדי שתבניות/הערות יוכלו להצביע לתפקיד בצורה מסודרת |
 | `hourly_cost` | עלות שעה | numeric(10,2) | CHECK ≥ 0, nullable | **רגיש** — RLS עתידי יגביל לבעלים/מנהל בלבד |
 | `specializations` | התמחויות | text[] | nullable | הקצאה חכמה (עתידי) |
 | `created_at` | תאריך יצירה | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
@@ -20,4 +20,4 @@
 
 ## ר' גם
 
-[`clients.md`](clients.md) · [`client_notes.md`](client_notes.md) · [`clients_audit_log.md`](clients_audit_log.md)
+[`employee_roles.md`](employee_roles.md) · [`clients.md`](clients.md) · [`client_notes.md`](client_notes.md) · [`clients_audit_log.md`](clients_audit_log.md)
