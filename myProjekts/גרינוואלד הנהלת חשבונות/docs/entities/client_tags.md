@@ -10,6 +10,9 @@
 |---|---|---|---|---|
 | `client_id` | מזהה לקוח | uuid | NOT NULL, FK → `clients.id`, ON DELETE CASCADE, חלק מ-PK מורכב | צד הלקוח בקשר |
 | `tag_id` | מזהה תגית | uuid | NOT NULL, FK → `tags.id`, ON DELETE CASCADE, חלק מ-PK מורכב | צד התגית בקשר |
+| `assigned_by` | הוצמד על ידי | uuid | FK → `office_employees.id`, nullable | מי הצמיד את התגית — `NULL` אם `is_automatic`=true |
+| `assigned_at` | תאריך הצמדה | timestamptz | NOT NULL, DEFAULT now() | מתי הוצמדה |
+| `is_automatic` | האם הוצמדה אוטומטית | boolean | NOT NULL, DEFAULT false | הצמדה ע"י אדם או ע"י המערכת. מוכן למנוע "תגיות אוטומטיות" עתידי (מהמסמך המקורי) — בלי לבנות את הלוגיקה עצמה עכשיו |
 
 ## ר' גם
 

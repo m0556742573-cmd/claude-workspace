@@ -22,3 +22,4 @@
   - `20260828030000_client_contacts_history.sql` — שדות היסטוריה ל-`client_contacts`.
   - `20260828040000_office_employees_full.sql` — איפיון ראשוני ל-`office_employees` (פרטי קשר, ת.ז., תאריכי עבודה, סטטוס).
   - `20260828050000_office_employees_refine.sql` — תיקון: פרטים אישיים עברו ל-`contacts` (לא כפילות), נוספו תנאי העסקה אמיתיים, ונוספה `employee_absences` (היעדרויות זמניות, כיסוי בהחלטה אנושית).
+  - `20260828060000_group_a_closeout.sql` — סגירת קבוצה א': `entity_types.turnover_threshold`, `tags.category`→`tag_categories` (lookup), שדות ביקורת ל-`client_tags`.
