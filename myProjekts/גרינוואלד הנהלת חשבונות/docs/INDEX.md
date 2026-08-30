@@ -25,6 +25,7 @@
   - [`client_contacts.md`](entities/client_contacts.md) — קישור לקוח↔איש קשר, עם תפקיד (חתום/אחראי ראשי/רו"ח מבקר/פקיד שומה/...).
   - [`responsibility_areas.md`](entities/responsibility_areas.md) — lookup פתוח לתחומי אחריות (חומר/גבייה/שכר/אישורים...).
   - [`client_contact_responsibilities.md`](entities/client_contact_responsibilities.md) — קישור M2M: קשר לקוח-איש-קשר ↔ תחום אחריות.
+  - [`client_turnover_history.md`](entities/client_turnover_history.md) — היסטוריית מחזור (בפועל/צפוי) לפי שנה — לא עמודה בודדת.
 - `source-materials/` — עותקים פיזיים של מסמכי המקור (לא רק הפניה חיצונית):
   - [`סיכום_איפיון_מלא_המערכת.md`](<source-materials/סיכום_איפיון_מלא_המערכת.md>) — המסמך המזוקק המלא, 33 ישויות.
   - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — ייצוא גולמי מ-Origami.

@@ -18,11 +18,10 @@
 
 ## מה לא הושלם / פתוח
 
-**שאלה אחת פתוחה ממתינה ליצחק:**
-- מחזור מע"מ / מחזור צפוי על `clients` — עמודה בודדת (ערך אחרון) מול טבלה היסטורית (מעקב לאורך זמן). יצחק אמר שיענה בנפרד.
+**אין שאלות פתוחות ממתינות ליצחק כרגע.**
 
 **איפיון הושלם, קוד SQL עדיין לא נכתב:**
-- 6 טבלאות: `contacts`, `contact_channels`, `client_contacts`, `responsibility_areas`, `client_contact_responsibilities`, `employee_roles`.
+- 7 טבלאות: `contacts`, `contact_channels`, `client_contacts`, `responsibility_areas`, `client_contact_responsibilities`, `employee_roles`, `client_turnover_history`.
 - שינויים בטבלאות קיימות שכבר בקוד: `office_employees.role`→`role_id`, `client_notes`+`relevant_role_id`, `clients`+`general_notes` (ו-12 שדות נוספים מהסבב הקודם).
 
 **פערי תשתית ידועים, לא דחופים:**
@@ -34,4 +33,4 @@
 
 ## הצעד הבא (כשיאושר)
 
-תשובת יצחק על מחזור מע"מ, ואז כתיבת SQL לכל השינויים שכבר אופיינו (6 טבלאות חדשות + 3 טבלאות מעודכנות).
+כתיבת SQL לכל השינויים שכבר אופיינו (7 טבלאות חדשות + 3 טבלאות מעודכנות) — ממתין לאישור יצחק להתחיל.
