@@ -5,27 +5,7 @@
 - [`status.md`](status.md) — מה הושלם, מה פתוח, מה הצעד הבא. הכי מתעדכן — פותחים ראשון.
 - [`log.md`](log.md) — יומן פעולות כרונולוגי.
 - [`access.md`](access.md) — מרשם הרשאות/גישות. **local-only, לא בגיט.**
-- `entities/` — **כל טבלת SQL בקובץ נפרד משלה** (שם עמודה + תרגום השם לעברית + טיפוס + אילוצים + מה זה משרת). אין קובץ-על משותף — כל קובץ עצמאי, מקושר לקבצים קשורים בסוף:
-  - [`clients.md`](entities/clients.md) — הישות המרכזית.
-  - [`client_statuses.md`](entities/client_statuses.md) — lookup לשדה סטטוס (לא enum — יש התנהגות שונה בין סטטוסים).
-  - [`client_contact_channels.md`](entities/client_contact_channels.md) — ערוצי קשר (טלפון/מייל).
-  - [`client_bank_accounts.md`](entities/client_bank_accounts.md) — חשבונות בנק.
-  - [`client_professional_credentials.md`](entities/client_professional_credentials.md) — הזדהות מקצועית.
-  - [`client_financial_credentials.md`](entities/client_financial_credentials.md) — הזדהות פיננסית.
-  - [`client_notes.md`](entities/client_notes.md) — הערות מקצועיות (Bus Factor).
-  - [`client_tags.md`](entities/client_tags.md) — קישור M2M לקוח↔תגית.
-  - [`clients_audit_log.md`](entities/clients_audit_log.md) — יומן ביקורת שינויים.
-  - [`entity_types.md`](entities/entity_types.md) — סוג ישות/ייחוס (שלד מינימלי, תלות FK).
-  - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — תדירות דיווח (שלד מינימלי, תלות FK).
-  - [`office_employees.md`](entities/office_employees.md) — עובד משרד (שלד בסיסי, תלות FK).
-  - [`employee_roles.md`](entities/employee_roles.md) — תפקידי עובדים (ישות 27), lookup פתוח.
-  - [`tags.md`](entities/tags.md) — תגיות (שלד מינימלי, תלות FK).
-  - [`contacts.md`](entities/contacts.md) — אנשי קשר (ישות 2), חוצת-לקוחות.
-  - [`contact_channels.md`](entities/contact_channels.md) — ערוצי קשר של איש קשר (טלפון/מייל, ברמת האדם).
-  - [`client_contacts.md`](entities/client_contacts.md) — קישור לקוח↔איש קשר, עם תפקיד (חתום/אחראי ראשי/רו"ח מבקר/פקיד שומה/...).
-  - [`responsibility_areas.md`](entities/responsibility_areas.md) — lookup פתוח לתחומי אחריות (חומר/גבייה/שכר/אישורים...).
-  - [`client_contact_responsibilities.md`](entities/client_contact_responsibilities.md) — קישור M2M: קשר לקוח-איש-קשר ↔ תחום אחריות.
-  - [`client_turnover_history.md`](entities/client_turnover_history.md) — היסטוריית מחזור (בפועל/צפוי) לפי שנה — לא עמודה בודדת.
+- `entities/` — **כל טבלת SQL בקובץ נפרד משלה**. **ר' [`entities/INDEX.md`](entities/INDEX.md) לרשימה המלאה** (טבלה עם תרגום + הסבר + סטטוס לכל ישות) — לא משוכפל כאן, כדי לא לתחזק שתי רשימות זהות.
 - `source-materials/` — עותקים פיזיים של מסמכי המקור (לא רק הפניה חיצונית):
   - [`סיכום_איפיון_מלא_המערכת.md`](<source-materials/סיכום_איפיון_מלא_המערכת.md>) — המסמך המזוקק המלא, 33 ישויות.
   - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — ייצוא גולמי מ-Origami.
@@ -38,4 +18,4 @@
 - `supabase-selfhost/migrations/` — קוד ה-SQL בפועל, כולם הורצו בהצלחה על ה-DB החי:
   - `20260828000000_client_entity.sql` — 13 הטבלאות הראשונות.
   - `20260828010000_client_structured_address.sql` — פיצול כתובת לשדות מובנים.
-  - **טרם נכתב:** migration ל-5 טבלאות אנשי הקשר (`contacts` וכו') — כרגע רק מאופיינות ב-`entities/`, לא בקוד.
+  - `20260828020000_contacts_architecture.sql` — 7 טבלאות ארכיטקטורת אנשי קשר + עדכוני clients/office_employees/client_notes.
