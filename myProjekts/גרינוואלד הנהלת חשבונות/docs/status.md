@@ -9,20 +9,16 @@
 - גיבויים אוטומטיים ל-R2 פועלים (cron יומי).
 - Git repo מאותחל, סדרת קומיטים בוצעה, כולל כל ה-migrations שהורצו.
 - מערכת התיעוד (docs/) פעילה, עברה ביקורת שלמות.
-- **13 טבלאות ליבה של הלקוח בנויות ורצות בפועל על ה-DB** (`clients` + תת-טבלאות), RLS מופעל עם policies ריקים (חסום כברירת מחדל ל-anon/authenticated).
-- שדה כתובת פוצל לשדות מובנים (רחוב/עיר/מיקוד).
-- **איפיון (לא קוד) לארכיטקטורת אנשי קשר מלאה** — 5 טבלאות חדשות: `contacts`, `contact_channels`, `client_contacts` (עם `role`), `responsibility_areas` (lookup פתוח), `client_contact_responsibilities`. שדות signatory הוסרו מ-`clients.md` והועברו לשם.
-- 12 שדות נוספים אופיינו ונוספו ל-`clients.md` (תיקי רשויות, פרטי עסק, תאריכים).
-
-- נוספה `employee_roles` (ישות 27), `office_employees.role_id` (FK, במקום טקסט חופשי), `client_notes.relevant_role_id` (תוקף לתפקיד), `clients.general_notes` (חופשי, לצד `client_notes`).
+- **20 טבלאות בפועל על ה-DB החי**, כולן עם RLS מופעל (בלי policies עדיין — חסום כברירת מחדל ל-anon/authenticated):
+  - 13 טבלאות ליבה של הלקוח (`clients` + תת-טבלאות).
+  - 7 טבלאות ארכיטקטורת אנשי קשר: `contacts`, `contact_channels`, `client_contacts`, `responsibility_areas`, `client_contact_responsibilities`, `employee_roles`, `client_turnover_history`.
+- `clients`: כתובת מובנית (רחוב/עיר/מיקוד), שדות signatory הוסרו (עברו ל-`contacts`), נוספו ~13 שדות (תיקי רשויות, פרטי עסק, תאריכים, הערות כלליות).
+- `office_employees.role` הוחלף ב-`role_id` (FK ל-`employee_roles`). `client_notes` קיבלה `relevant_role_id`.
+- **תובנה תפעולית חדשה:** הרצת migration דרך SSH/psql **לא** מפעילה RLS אוטומטית (בניגוד ל-Studio UI) — תוקן, ותועד ב-`decisions/0005` כדי לא לחזור על הטעות.
 
 ## מה לא הושלם / פתוח
 
 **אין שאלות פתוחות ממתינות ליצחק כרגע.**
-
-**איפיון הושלם, קוד SQL עדיין לא נכתב:**
-- 7 טבלאות: `contacts`, `contact_channels`, `client_contacts`, `responsibility_areas`, `client_contact_responsibilities`, `employee_roles`, `client_turnover_history`.
-- שינויים בטבלאות קיימות שכבר בקוד: `office_employees.role`→`role_id`, `client_notes`+`relevant_role_id`, `clients`+`general_notes` (ו-12 שדות נוספים מהסבב הקודם).
 
 **פערי תשתית ידועים, לא דחופים:**
 - פורט 3000 (Easypanel) עדיין חשוף לאינטרנט — מחכה לחלון זמן נוח.
@@ -30,7 +26,8 @@
 - ישויות `entity_types`, `reporting_frequencies`, `tags` עדיין שלד מינימלי (לא באיפיון מלא).
 - סיסמת ה-Dashboard לא הוחלפה (יצחק ביקש לא לגעת).
 - `changed_by` ב-`clients_audit_log` לא ממולא — תלוי ב-Auth שעדיין לא קיים.
+- קובץ ה-migration האחרון (`20260828020000`) עדיין לא בגיט.
 
 ## הצעד הבא (כשיאושר)
 
-כתיבת SQL לכל השינויים שכבר אופיינו (7 טבלאות חדשות + 3 טבלאות מעודכנות) — ממתין לאישור יצחק להתחיל.
+לא הוסכם. אפשרויות: (א) איפיון מלא לישות "איש קשר" הבא בתור (`entity_types`/`reporting_frequencies`/`tags` עדיין שלד), (ב) מעבר לישות הבאה בקבוצת הליבה (עסקה/שירותים — קבוצה ב'), או (ג) כתיבת RLS policies אמיתיים.
