@@ -14,16 +14,24 @@
 - **איפיון (לא קוד) לארכיטקטורת אנשי קשר מלאה** — 5 טבלאות חדשות: `contacts`, `contact_channels`, `client_contacts` (עם `role`), `responsibility_areas` (lookup פתוח), `client_contact_responsibilities`. שדות signatory הוסרו מ-`clients.md` והועברו לשם.
 - 12 שדות נוספים אופיינו ונוספו ל-`clients.md` (תיקי רשויות, פרטי עסק, תאריכים).
 
+- נוספה `employee_roles` (ישות 27), `office_employees.role_id` (FK, במקום טקסט חופשי), `client_notes.relevant_role_id` (תוקף לתפקיד), `clients.general_notes` (חופשי, לצד `client_notes`).
+
 ## מה לא הושלם / פתוח
 
-- **טבלאות אנשי הקשר מאופיינות אבל לא בקוד SQL עדיין** — `clients` בפועל עדיין בלי `client_contacts` וכו'.
-- **שאלות פתוחות שממתינות ליצחק:** אילו שדות נוספים ל-`role='primary'` ב-`client_contacts`; מחזור מע"מ/צפוי (עמודה בודדת מול טבלה היסטורית); האם `client_contact_channels` (ברמת עסק) עדיין נחוץ לצד `contact_channels` (ברמת אדם); "הערות כלליות" על לקוח (שדה נפרד או שמספיק `client_notes`).
-- **פורט 3000 (Easypanel) עדיין חשוף לאינטרנט** — מחכה לחלון זמן נוח.
-- **RLS policies בפועל לא נכתבו** — הכל חסום כברירת מחדל דרך anon/authenticated.
-- ישויות התלות (`entity_types`, `reporting_frequencies`, `office_employees`, `tags`) עדיין שלד מינימלי.
+**שאלה אחת פתוחה ממתינה ליצחק:**
+- מחזור מע"מ / מחזור צפוי על `clients` — עמודה בודדת (ערך אחרון) מול טבלה היסטורית (מעקב לאורך זמן). יצחק אמר שיענה בנפרד.
+
+**איפיון הושלם, קוד SQL עדיין לא נכתב:**
+- 6 טבלאות: `contacts`, `contact_channels`, `client_contacts`, `responsibility_areas`, `client_contact_responsibilities`, `employee_roles`.
+- שינויים בטבלאות קיימות שכבר בקוד: `office_employees.role`→`role_id`, `client_notes`+`relevant_role_id`, `clients`+`general_notes` (ו-12 שדות נוספים מהסבב הקודם).
+
+**פערי תשתית ידועים, לא דחופים:**
+- פורט 3000 (Easypanel) עדיין חשוף לאינטרנט — מחכה לחלון זמן נוח.
+- RLS policies בפועל לא נכתבו — הכל חסום כברירת מחדל דרך anon/authenticated (מכוון, ר' `decisions/0005`).
+- ישויות `entity_types`, `reporting_frequencies`, `tags` עדיין שלד מינימלי (לא באיפיון מלא).
 - סיסמת ה-Dashboard לא הוחלפה (יצחק ביקש לא לגעת).
 - `changed_by` ב-`clients_audit_log` לא ממולא — תלוי ב-Auth שעדיין לא קיים.
 
 ## הצעד הבא (כשיאושר)
 
-תלוי בתשובות יצחק לשאלות הפתוחות למעלה. לאחר מכן: כתיבת SQL ל-5 טבלאות אנשי הקשר.
+תשובת יצחק על מחזור מע"מ, ואז כתיבת SQL לכל השינויים שכבר אופיינו (6 טבלאות חדשות + 3 טבלאות מעודכנות).
