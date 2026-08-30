@@ -12,6 +12,9 @@
 | `first_name` | שם פרטי | text | NOT NULL | |
 | `last_name` | שם משפחה | text | nullable | ריק עבור מוסדות/גורמים לא-אישיים |
 | `id_number` | תעודת זהות | text | nullable, **text לא integer** (אפסים מובילים) | PII, לא תמיד רלוונטי (למשל למוסד) |
+| `street_address` | רחוב ומספר | text | nullable | כתובת פרטית של האדם — לא כתובת העסק (זו על `clients`) |
+| `city` | עיר | text | nullable | |
+| `postal_code` | מיקוד | text | nullable, **text לא integer** | |
 | `created_at` | תאריך יצירה | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
 | `updated_at` | תאריך עדכון אחרון | timestamptz | NOT NULL, DEFAULT now(), טריגר | ביקורת |
 
