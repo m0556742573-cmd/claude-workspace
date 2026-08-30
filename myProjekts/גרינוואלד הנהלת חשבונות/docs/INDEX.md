@@ -19,6 +19,11 @@
   - [`reporting_frequencies.md`](entities/reporting_frequencies.md) — תדירות דיווח (שלד מינימלי, תלות FK).
   - [`office_employees.md`](entities/office_employees.md) — עובד משרד (שלד בסיסי, תלות FK).
   - [`tags.md`](entities/tags.md) — תגיות (שלד מינימלי, תלות FK).
+  - [`contacts.md`](entities/contacts.md) — אנשי קשר (ישות 2), חוצת-לקוחות.
+  - [`contact_channels.md`](entities/contact_channels.md) — ערוצי קשר של איש קשר (טלפון/מייל, ברמת האדם).
+  - [`client_contacts.md`](entities/client_contacts.md) — קישור לקוח↔איש קשר, עם תפקיד (חתום/אחראי ראשי/רו"ח מבקר/פקיד שומה/...).
+  - [`responsibility_areas.md`](entities/responsibility_areas.md) — lookup פתוח לתחומי אחריות (חומר/גבייה/שכר/אישורים...).
+  - [`client_contact_responsibilities.md`](entities/client_contact_responsibilities.md) — קישור M2M: קשר לקוח-איש-קשר ↔ תחום אחריות.
 - `source-materials/` — עותקים פיזיים של מסמכי המקור (לא רק הפניה חיצונית):
   - [`סיכום_איפיון_מלא_המערכת.md`](<source-materials/סיכום_איפיון_מלא_המערכת.md>) — המסמך המזוקק המלא, 33 ישויות.
   - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — ייצוא גולמי מ-Origami.
@@ -28,4 +33,7 @@
   - [`0003-vps-hardening-and-known-gap.md`](decisions/0003-vps-hardening-and-known-gap.md) — הקשחת SSH/fail2ban, ופער ידוע (פורט 3000).
   - [`0004-automated-backups-to-r2.md`](decisions/0004-automated-backups-to-r2.md) — גיבויים אוטומטיים ל-R2.
   - [`0005-rls-enabled-no-policies-yet.md`](decisions/0005-rls-enabled-no-policies-yet.md) — RLS מופעל מהרגע הראשון, בלי policies עדיין (חסום כברירת מחדל).
-- `supabase-selfhost/migrations/20260828000000_client_entity.sql` — קוד ה-SQL בפועל (13 טבלאות), **הורץ בהצלחה על ה-DB החי**. עדיין לא בגיט.
+- `supabase-selfhost/migrations/` — קוד ה-SQL בפועל, כולם הורצו בהצלחה על ה-DB החי:
+  - `20260828000000_client_entity.sql` — 13 הטבלאות הראשונות.
+  - `20260828010000_client_structured_address.sql` — פיצול כתובת לשדות מובנים.
+  - **טרם נכתב:** migration ל-5 טבלאות אנשי הקשר (`contacts` וכו') — כרגע רק מאופיינות ב-`entities/`, לא בקוד.
