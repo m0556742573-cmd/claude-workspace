@@ -20,4 +20,5 @@
   - `20260828010000_client_structured_address.sql` — פיצול כתובת לשדות מובנים.
   - `20260828020000_contacts_architecture.sql` — 7 טבלאות ארכיטקטורת אנשי קשר + עדכוני clients/office_employees/client_notes.
   - `20260828030000_client_contacts_history.sql` — שדות היסטוריה ל-`client_contacts`.
-  - `20260828040000_office_employees_full.sql` — איפיון מלא ל-`office_employees` (פרטי קשר, ת.ז., תאריכי עבודה, סטטוס).
+  - `20260828040000_office_employees_full.sql` — איפיון ראשוני ל-`office_employees` (פרטי קשר, ת.ז., תאריכי עבודה, סטטוס).
+  - `20260828050000_office_employees_refine.sql` — תיקון: פרטים אישיים עברו ל-`contacts` (לא כפילות), נוספו תנאי העסקה אמיתיים, ונוספה `employee_absences` (היעדרויות זמניות, כיסוי בהחלטה אנושית).
