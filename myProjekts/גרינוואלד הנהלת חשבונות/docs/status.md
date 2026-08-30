@@ -24,7 +24,7 @@
 **פערי תשתית ידועים, לא דחופים:**
 - פורט 3000 (Easypanel) עדיין חשוף לאינטרנט — מחכה לחלון זמן נוח.
 - RLS policies בפועל לא נכתבו — הכל חסום כברירת מחדל דרך anon/authenticated (מכוון, ר' `decisions/0005`).
-- ישויות `entity_types`, `reporting_frequencies`, `tags` עדיין שלד מינימלי (לא באיפיון מלא).
+- ישויות `entity_types`, `reporting_frequencies`, `tags` עדיין שלד מינימלי (לא באיפיון מלא). `office_employees` הושלם.
 - סיסמת ה-Dashboard לא הוחלפה (יצחק ביקש לא לגעת).
 - `changed_by` ב-`clients_audit_log` לא ממולא — תלוי ב-Auth שעדיין לא קיים.
 - הצפנת PII (`legal_id_number`, `contacts.id_number`) — שאלה כללית פתוחה, לא חוסמת.
