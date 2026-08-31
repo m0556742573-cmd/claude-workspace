@@ -8,13 +8,17 @@
 - `entities/` — **כל טבלת SQL בקובץ נפרד משלה**. **ר' [`entities/INDEX.md`](entities/INDEX.md) לרשימה המלאה** (טבלה עם תרגום + הסבר + סטטוס לכל ישות) — לא משוכפל כאן, כדי לא לתחזק שתי רשימות זהות.
 - `source-materials/` — עותקים פיזיים של מסמכי המקור (לא רק הפניה חיצונית):
   - [`סיכום_איפיון_מלא_המערכת.md`](<source-materials/סיכום_איפיון_מלא_המערכת.md>) — המסמך המזוקק המלא, 33 ישויות.
-  - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — ייצוא גולמי מ-Origami.
+  - [`עותק של מנהל_גיליונות1.xlsx`](<source-materials/עותק של מנהל_גיליונות1.xlsx>) — **מסמך האיפיון המקורי** (לא ייצוא נתונים). 20 גיליונות, ישות לכל גיליון, ברמת שדה: סוג שדה, חובה/רשות, ערכים אפשריים, הרשאות צפייה ועריכה לפי תפקיד, וטבלת תהליכים עם טריגרים. גיליון "לקוחות" לבדו מגדיר 82 שדות.
+    **מעמד המסמך:** מקור סמכות ל**מה שהמשרד צריך להחזיק** — מלאי השדות, המשמעות העסקית, וכוונת ההרשאות. **אינו** מקור סמכות ל**מבנה**: הוא נכתב עבור אוריגמי, ולכן טיפוסי השדה, השדות המחושבים והצורה השטוחה שלו הם ארטיפקטים של אותה פלטפורמה — ר' `status.md`, סעיף "איך קוראים את גיליון האיפיון".
 - `decisions/` — Architecture Decision Records:
   - [`0001-self-hosted-supabase-on-existing-vps.md`](decisions/0001-self-hosted-supabase-on-existing-vps.md) — למה self-hosted במקום Supabase Cloud.
   - [`0002-network-isolation-and-routing.md`](decisions/0002-network-isolation-and-routing.md) — למה תת-דומיין יחיד, איך Traefik מגיע ל-Supabase.
   - [`0003-vps-hardening-and-known-gap.md`](decisions/0003-vps-hardening-and-known-gap.md) — הקשחת SSH/fail2ban, ופער ידוע (פורט 3000).
   - [`0004-automated-backups-to-r2.md`](decisions/0004-automated-backups-to-r2.md) — גיבויים אוטומטיים ל-R2.
   - [`0005-rls-enabled-no-policies-yet.md`](decisions/0005-rls-enabled-no-policies-yet.md) — RLS מופעל מהרגע הראשון, בלי policies עדיין (חסום כברירת מחדל).
+  - [`0006-lookup-table-vs-check-constraint.md`](decisions/0006-lookup-table-vs-check-constraint.md) — מתי רשימת ערכים היא טבלת lookup ומתי אילוץ CHECK.
+  - [`0007-deletion-policy-restrict-and-soft-delete.md`](decisions/0007-deletion-policy-restrict-and-soft-delete.md) — restrict כברירת מחדל, ומחיקה רכה ללקוח.
+  - [`0008-unified-channels-table.md`](decisions/0008-unified-channels-table.md) — איחוד שתי טבלאות הערוצים לאחת, ותיוג הערוץ הרשמי.
 - `supabase-selfhost/migrations/` — קוד ה-SQL בפועל, כולם הורצו בהצלחה על ה-DB החי:
   - `20260828000000_client_entity.sql` — 13 הטבלאות הראשונות.
   - `20260828010000_client_structured_address.sql` — פיצול כתובת לשדות מובנים.
@@ -24,3 +28,4 @@
   - `20260828050000_office_employees_refine.sql` — תיקון: פרטים אישיים עברו ל-`contacts` (לא כפילות), נוספו תנאי העסקה אמיתיים, ונוספה `employee_absences` (היעדרויות זמניות, כיסוי בהחלטה אנושית).
   - `20260828060000_group_a_closeout.sql` — סגירת קבוצה א': `entity_types.turnover_threshold`, `tags.category`→`tag_categories` (lookup), שדות ביקורת ל-`client_tags`.
   - `20260830000000_periods_and_services_skeleton.sql` — התחלת קבוצה ב': `periods` (מלא), `services` (שלד מינימלי בלבד — יועמק בהמשך).
+  - `20260831000000_audit_remediation.sql` — תיקון הביקורת הארכיטקטונית: RLS על 13 טבלאות שלא קיבלו אותו בקוד, איחוד ערוצים והזדהויות, יומן ביקורת גנרי, `restrict` + מחיקה רכה, המרות lookup, אילוצי תקינות. הורצה בטרנזקציה אחת אחרי dry-run.

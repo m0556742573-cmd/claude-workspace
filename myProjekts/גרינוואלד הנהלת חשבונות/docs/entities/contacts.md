@@ -20,4 +20,4 @@
 
 ## ר' גם
 
-[`contact_channels.md`](contact_channels.md) — אמצעי הקשר של כל איש קשר. [`client_contacts.md`](client_contacts.md) — הקשר בין איש קשר ללקוח ספציפי (תפקיד, שדות מיוחדים).
+[`channels.md`](channels.md) — אמצעי הקשר, בטבלה מאוחדת: ערוץ של איש קשר מסומן ב-`contact_id` (ולא ב-`client_id`). החליף את `contact_channels` הנפרדת — ר' `decisions/0008`. [`client_contacts.md`](client_contacts.md) — הקשר בין איש קשר ללקוח ספציפי (תפקיד, שדות מיוחדים).

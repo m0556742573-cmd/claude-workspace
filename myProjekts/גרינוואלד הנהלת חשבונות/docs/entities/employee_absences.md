@@ -9,10 +9,10 @@
 | עמודה (אנגלית) | תרגום השם | טיפוס | אילוצים | מה זה משרת |
 |---|---|---|---|---|
 | `id` | מזהה | uuid | PK | מזהה ייחודי |
-| `employee_id` | מזהה עובד | uuid | NOT NULL, FK → `office_employees.id`, ON DELETE CASCADE | מי נעדר |
+| `employee_id` | מזהה עובד | uuid | NOT NULL, FK → `office_employees.id`, **ON DELETE RESTRICT** | מי נעדר. שונה מ-CASCADE — ר' `decisions/0007` |
 | `start_date` | תאריך התחלה | date | NOT NULL | |
-| `end_date` | תאריך סיום | date | nullable | ריק = היעדרות פתוחה (עוד לא ידוע מתי חוזר) |
-| `absence_type` | סוג היעדרות | text | nullable, ערכים סגורים (`vacation`/`sick`/`other`) | |
+| `end_date` | תאריך סיום | date | nullable, CHECK: `end_date >= start_date` | ריק = היעדרות פתוחה (עוד לא ידוע מתי חוזר) |
+| `absence_type_id` | סוג היעדרות | uuid | FK → `absence_types.id`, nullable | **הומר מ-`CHECK` ל-lookup** — "מילואים" הוא דוגמה מיידית לערך שנדרש ולא היה ברשימה הסגורה. ר' `decisions/0006` |
 | `covering_employee_id` | מי מכסה | uuid | FK → `office_employees.id`, nullable | **הוכרע: לא אוטומטי** — מנהל ממלא לכל היעדרות בנפרד. ריק = "אין עדיין כיסוי מוחלט" — מידע שימושי בפני עצמו |
 | `created_at` | תאריך יצירה | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
 
