@@ -19,6 +19,9 @@
   - [`0006-lookup-table-vs-check-constraint.md`](decisions/0006-lookup-table-vs-check-constraint.md) — מתי רשימת ערכים היא טבלת lookup ומתי אילוץ CHECK.
   - [`0007-deletion-policy-restrict-and-soft-delete.md`](decisions/0007-deletion-policy-restrict-and-soft-delete.md) — restrict כברירת מחדל, ומחיקה רכה ללקוח.
   - [`0008-unified-channels-table.md`](decisions/0008-unified-channels-table.md) — איחוד שתי טבלאות הערוצים לאחת, ותיוג הערוץ הרשמי.
+- `supabase-selfhost/seeds/` — נתוני ייחוס ובדיקה, נפרד מהסכימה:
+  - `0001_lookups.sql` — ערכי כל 11 טבלאות ה-lookup. **idempotent**, בטוח להרצה חוזרת. כל רשימה מסומנת במקורה: [מתועד] / [מקור] / [הצעה — לאישור יצחק].
+  - `9001_scenario_smoke_test.sql` — חמישה תרחישי לקוח שמפעילים את הסכימה מקצה לקצה. **לא נתוני אמת ולא נזרע לצמיתות** — מיועד להרצה בטרנזקציה עם rollback.
 - `supabase-selfhost/migrations/` — קוד ה-SQL בפועל, כולם הורצו בהצלחה על ה-DB החי:
   - `20260828000000_client_entity.sql` — 13 הטבלאות הראשונות.
   - `20260828010000_client_structured_address.sql` — פיצול כתובת לשדות מובנים.
