@@ -57,9 +57,21 @@ miss=$(comm -23 /tmp/_gw_db.txt /tmp/_gw_docs.txt)
 [ -z "$miss" ] && ok "every DB object has an entity doc" \
   || { bad "DB objects with no doc:"; echo "$miss" | sed 's/^/      /'; }
 
-extra=$(comm -13 /tmp/_gw_db.txt /tmp/_gw_docs.txt)
-[ -z "$extra" ] && ok "no entity doc describes a dropped object" \
-  || { bad "docs with no DB object:"; echo "$extra" | sed 's/^/      /'; }
+# A doc with no DB object is legitimate while an entity is characterized but not
+# yet built — that is the project's workflow, characterization always precedes SQL.
+# So this only fails when entities/INDEX.md claims the object is "בקוד" (in code)
+# and it is not actually there. Docs marked 📝 מאופיין are expected to have no object.
+unbuilt=""
+for name in $(comm -13 /tmp/_gw_db.txt /tmp/_gw_docs.txt); do
+  row=$(grep -F "($name.md)" docs/entities/INDEX.md | head -1)
+  if echo "$row" | grep -q 'בקוד'; then
+    unbuilt="$unbuilt\n      $name — INDEX says it is in code, but it is not in the DB"
+  elif [ -z "$row" ]; then
+    unbuilt="$unbuilt\n      $name — not listed in entities/INDEX.md at all"
+  fi
+done
+[ -z "$unbuilt" ] && ok "no entity doc contradicts the DB (characterized-but-unbuilt is fine)" \
+  || { bad "docs out of step with the DB:"; printf "$unbuilt\n"; }
 
 echo
 echo "── repo internal consistency ──"
