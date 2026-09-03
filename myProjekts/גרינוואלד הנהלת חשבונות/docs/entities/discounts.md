@@ -1,6 +1,6 @@
 # discounts — הנחות והטבות
 
-> **תלוי בעסקה.** הטבלה מעוגנת ב-`deals` וב-`deal_services`, שטרם אופיינו. האיפיון נכתב עכשיו כי ההכרעות התקבלו בדיון של 31/08/2026, ואין טעם לאבד אותן. שמות ה-FK ייסגרו סופית עם איפיון העסקה.
+> מעוגן ב-[`deals`](deals.md) וב-[`deal_services`](deal_services.md), ששניהם אופיינו ונבנו ב-31/08/2026 יחד עם הטבלה הזו.
 
 ## מה זה ולמה זה משרת
 
@@ -58,8 +58,12 @@
 
 1. **`conflict_resolution` חובה כאשר `deal_service_id` ריק, וחייב להיות ריק כאשר הוא מלא.** להנחה ספציפית אין קונפליקט לפתור — היא הצד שנפתר. ניתן לביטוי ב-`CHECK` אחד.
 2. **`value <= 100` כאשר `calculation = 'percent'`.** הנחה של 150% אינה טעות שמתגלה מעצמה.
-3. **הנחה פעילה אחת לכל שורת שירות בכל רגע** — אינדקס ייחודי חלקי, אותו דפוס כמו "אחראי פעיל אחד לתפקיד" ב-`client_contacts`.
+3. **הנחה אחת בתוקף בכל רגע** — נאכף בשני אילוצי `EXCLUDE` על טווחי תאריכים, ולא באינדקס ייחודי:
+   - להנחות **ספציפיות**: על `(deal_service_id, טווח תוקף)`, מסונן ל-`deal_service_id is not null`
+   - להנחות **כלליות**: על `(deal_id, טווח תוקף)`, מסונן ל-`deal_service_id is null`
+
+   **למה שניים ולא אחד:** אילוץ `EXCLUDE` מתעלם משורות שבהן אחד האופרנדים ריק, בדיוק כמו אילוץ ייחוד. אילוץ בודד על `deal_service_id` היה מאפשר שתי הנחות כלליות חופפות על אותו חשבון בלי להתריע, כי `deal_service_id` בהן ריק. הפיצול לשני אילוצים מסוננים סוגר את הפער.
 
 ## ר' גם
 
-`deals` · `deal_services` (טרם אופיינו) · [`services`](services.md) · [`office_employees`](office_employees.md)
+[`deals`](deals.md) · [`deal_services`](deal_services.md) · [`deal_service_terms`](deal_service_terms.md) · [`services`](services.md) · [`office_employees`](office_employees.md)

@@ -35,3 +35,4 @@
   - `20260828060000_group_a_closeout.sql` — סגירת קבוצה א': `entity_types.turnover_threshold`, `tags.category`→`tag_categories` (lookup), שדות ביקורת ל-`client_tags`.
   - `20260830000000_periods_and_services_skeleton.sql` — התחלת קבוצה ב': `periods` (מלא), `services` (שלד מינימלי בלבד — יועמק בהמשך).
   - `20260831000000_audit_remediation.sql` — תיקון הביקורת הארכיטקטונית: RLS על 13 טבלאות שלא קיבלו אותו בקוד, איחוד ערוצים והזדהויות, יומן ביקורת גנרי, `restrict` + מחיקה רכה, המרות lookup, אילוצי תקינות. הורצה בטרנזקציה אחת אחרי dry-run.
+  - `20260901000000_catalog_and_deal_model.sql` — העמקת קטלוג השירותים ומודל העסקה: `services` מלא, קטגוריות, תדירויות חיוב, מחירון ומדרגות, `deals`/`deal_services`/`deal_service_terms`, `discounts`, וה-View `deal_services_current`. מתקינה `btree_gist` לאילוצי EXCLUDE על טווחי תוקף. הורצה בטרנזקציה אחת אחרי dry-run, ואומתה ב-22 בדיקות תפקודיות.

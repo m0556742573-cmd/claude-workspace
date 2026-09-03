@@ -121,3 +121,27 @@ insert into bank_account_purposes (code, name) values
   ('refunds',    'החזרים מרשויות'),
   ('general',    'כללי')
 on conflict (code) do nothing;
+
+-- ── service_categories [הצעה — לאישור יצחק] ──
+-- Derived from the domain discussion of 31/08/2026, not from a source document.
+insert into service_categories (code, name, display_order) values
+  ('bookkeeping',    'הנהלת חשבונות',      1),
+  ('payroll',        'שכר',                 2),
+  ('filings',        'דיווחים שוטפים',     3),
+  ('annual',         'דוחות שנתיים',       4),
+  ('advisory',       'ייעוץ',               5),
+  ('formation',      'הקמה וסגירה',        6),
+  ('representation', 'ייצוג מול רשויות',   7)
+on conflict (code) do nothing;
+
+-- ── billing_frequencies [מתועד: docs/entities/billing_frequencies.md] ──
+-- months_interval is NULL for the last two on purpose: they have no cycle, which
+-- is why this table is separate from reporting_frequencies.
+insert into billing_frequencies (code, name, months_interval) values
+  ('monthly',        'חודשי',      1),
+  ('bi_monthly',     'דו-חודשי',   2),
+  ('quarterly',      'רבעוני',     3),
+  ('annual',         'שנתי',       12),
+  ('one_off',        'חד-פעמי',    null),
+  ('per_occurrence', 'לפי מקרה',   null)
+on conflict (code) do nothing;
