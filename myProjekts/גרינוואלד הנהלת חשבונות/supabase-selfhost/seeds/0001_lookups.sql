@@ -11,9 +11,11 @@
 -- Origami, not in the spec. Where a list is marked [הצעה] it is a starting point.
 
 -- ── entity_types [מתועד] ──
--- turnover_threshold deliberately left NULL: the legal exempt-dealer ceiling
--- changes yearly and is not documented anywhere in our materials. Filling in a
--- wrong legal number is worse than leaving it empty — Yitzhak to supply.
+-- The turnover ceiling is NOT here. It moved to entity_type_thresholds on
+-- 08/09/2026, keyed by year: the ceiling is set annually and client_turnover_history
+-- records turnover per year, so one undated value would have answered every
+-- historical "did they cross the threshold" question against today's number.
+-- That table is deliberately still empty — Yitzhak to supply the figures.
 insert into entity_types (code, name) values
   ('exempt_dealer',    'עוסק פטור'),
   ('licensed_dealer',  'עוסק מורשה'),

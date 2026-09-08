@@ -13,7 +13,7 @@
 | `id` | מזהה | uuid | PK | מזהה ייחודי |
 | `code` | קוד סוג הישות | text | NOT NULL, UNIQUE | `exempt_dealer`/`licensed_dealer`/`company`/`partnership`/`nonprofit` — הפניה תוכניתית יציבה |
 | `name` | שם סוג הישות | text | NOT NULL | תווית עברית לתצוגה |
-| `turnover_threshold` | תקרת מחזור | numeric(12,2) | nullable | רלוונטי בעיקר ל"עוסק פטור" — התקרה החוקית. מאפשר להשוות מול `client_turnover_history.actual_turnover` ולזהות לקוח שמתקרב/חצה סף (מטרה 8 — "עוסק שחצה סף וכדאי לו להתאגד") |
+| `turnover_threshold` | ~~תקרת מחזור~~ | — | **הוסרה 08/09/2026** | עברה לטבלה נפרדת **לפי שנה**: [`entity_type_thresholds`](entity_type_thresholds.md). הסיבה: התקרה משתנה שנתית, וערך בודד בלי שנה היה מחזיר תשובה שגויה לכל בדיקה היסטורית |
 | `created_at` | תאריך יצירה | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
 | `updated_at` | תאריך עדכון אחרון | timestamptz | NOT NULL, DEFAULT now() | ביקורת |
 
