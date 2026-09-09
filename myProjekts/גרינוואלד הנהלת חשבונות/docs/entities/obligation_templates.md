@@ -55,6 +55,7 @@
 | `due_day_of_month` | יום בחודש למועד | `integer` | `not null`, `between 1 and 31` | היום עצמו |
 | `relation_type` | יחס לחובה אחרת | `text` | `not null`, `CHECK` בארבעה ערכים | ר' הטבלה למעלה |
 | `linked_template_id` | חובה מקושרת | `uuid` | FK → `obligation_templates(id)`, nullable | ההפניה העצמית שמחזיקה את הזוג |
+| `form_number` | מספר טופס | `text` | nullable | 102, 126, 856 — הצוות עובד לפי המספרים האלה, וכל אינטגרציה עתידית תזדקק להם. ריק בחובת תשלום, שאין לה טופס |
 | `requires_payroll_run` | דורש הרצת שכר? | `boolean` | `not null`, ברירת מחדל `false` | חובות ניכויים ושכר חסומות עד שהרצת השכר בוצעה |
 | `applies_to_all_entity_types` | חלה על כל סוגי הישות? | `boolean` | **`not null`, בלי ברירת מחדל** | ר' "האכיפה" למטה — חוסך הגדרה חוזרת, בלי לאפשר אי-החלטה |
 | `allows_amendments` | מאפשר הגשה מתקנת? | `boolean` | `not null`, ברירת מחדל `false` | עובדה רגולטורית: מע"מ מאפשר דוח מתקן, לא כל חובה מאפשרת |
