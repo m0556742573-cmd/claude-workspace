@@ -2,7 +2,7 @@
 
 טבלה אחת לכל טבלת SQL שאופיינה עד כה (בין אם כבר בקוד או עדיין רק מאופיינת). לפרטי שדות מלאים — לחצו על שם הטבלה.
 
-**37 טבלאות ושני Views ב-DB החי, כל הטבלאות עם RLS מופעל.**
+**42 טבלאות ושני Views ב-DB החי, כל הטבלאות עם RLS מופעל.** בנוסף — ישות אחת מאופיינת שטרם נבנתה, ר' [`client_obligation_overrides`](client_obligation_overrides.md).
 
 ## קבוצה א' — ליבה (לקוח, אנשי קשר, צוות)
 
@@ -71,6 +71,7 @@
 | [`authorities`](authorities.md) | רשויות | lookup — מע"מ / מס הכנסה / ביטוח לאומי / פנסיה. העבודה מאורגנת לפי רשות | ✅ בקוד |
 | [`service_obligation_templates`](service_obligation_templates.md) | קישור שירות↔תבנית חובה | **מה שהופך את הקטלוג ממחירון למתכון** | ✅ בקוד |
 | [`obligation_template_entity_types`](obligation_template_entity_types.md) | קישור תבנית↔סוג ישות | רשת ביטחון רגולטורית — עוסק פטור לא יקבל מע"מ תקופתי | ✅ בקוד |
+| [`client_obligation_overrides`](client_obligation_overrides.md) | דריסות חובה פר-לקוח (ישות 11) | **המקום היחיד שאומר "אצל הלקוח הזה זה אחרת"** — מחריג / תדירות אחרת / כולל. דלילה בכוונה, והרשימה המלאה נגזרת ב-View | 📝 מאופיין חלקית |
 
 ## Views
 

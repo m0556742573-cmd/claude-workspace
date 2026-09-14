@@ -73,6 +73,17 @@ done
 [ -z "$unbuilt" ] && ok "no entity doc contradicts the DB (characterized-but-unbuilt is fine)" \
   || { bad "docs out of step with the DB:"; printf "$unbuilt\n"; }
 
+# The header of entities/INDEX.md still claimed 37 tables while the file itself
+# listed 42 -- it drifted when the deal model and the obligation templates landed.
+# None of the checks above catch it: they verify that every object has a doc and
+# every doc has an object, never that the stated total is right. Extracted with an
+# ASCII-only pattern (the line begins "**42 טבלאות") so the Hebrew stays out of the
+# shell quoting.
+claimed=$(grep -oE '^\*\*[0-9]+' docs/entities/INDEX.md | head -1 | tr -d '*')
+actual=$(psql_q "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r';")
+[ "$claimed" = "$actual" ] && ok "entities/INDEX.md states the right table count ($actual)" \
+  || bad "entities/INDEX.md claims $claimed tables, the DB has $actual"
+
 echo
 echo "── repo internal consistency ──"
 
