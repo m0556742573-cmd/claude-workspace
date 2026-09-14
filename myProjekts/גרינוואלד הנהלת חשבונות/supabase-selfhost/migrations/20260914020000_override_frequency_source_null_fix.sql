@@ -1,6 +1,6 @@
 -- Corrective migration: frequency_source could be left empty.
 --
--- The constraint written in 20260915000000 was:
+-- The constraint written in 20260914010000 was:
 --
 --   check ((override_frequency_id is null  and frequency_source is null)
 --       or (override_frequency_id is not null
