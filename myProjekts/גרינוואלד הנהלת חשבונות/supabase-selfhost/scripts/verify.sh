@@ -15,8 +15,19 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 
+# The server address is NOT committed. It comes from the environment, or from
+# scripts/.env.local (gitignored). Hardcoding it would publish the origin IP
+# that Cloudflare exists to hide — and this repo is backed up to GitHub.
+[ -f supabase-selfhost/scripts/.env.local ] && . supabase-selfhost/scripts/.env.local
+
 SSH_KEY="${GREENWALD_SSH_KEY:-$HOME/.ssh/greenwald_vps}"
-SSH_HOST="${GREENWALD_SSH_HOST:-root@158.220.113.140}"
+SSH_HOST="${GREENWALD_SSH_HOST:-}"
+if [ -z "$SSH_HOST" ]; then
+  printf 'GREENWALD_SSH_HOST is not set.\n' >&2
+  printf 'Set it in the environment, or create supabase-selfhost/scripts/.env.local with:\n' >&2
+  printf '  GREENWALD_SSH_HOST=root@<server-ip>\n' >&2
+  exit 2
+fi
 FAIL=0
 
 psql_q() {
