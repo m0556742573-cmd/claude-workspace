@@ -23,12 +23,12 @@
 | `id` | מזהה | `uuid` | PK | — |
 | `entity_type_id` | סוג ישות | `uuid` | `not null`, FK → `entity_types(id)`, `on delete restrict` | שורה נוצרת **רק** לסוג ישות שיש לו תקרה — אין רעש של `NULL` על חברות ושותפויות |
 | `threshold_kind` | סוג התקרה | `text` | `not null`, `CHECK` בשני ערכים | **איזו** תקרה — ר' הטבלה למטה |
-| `year` | שנת מס | `integer` | `not null`, `between 1990 and 2100` | מצטלב ישירות מול `client_turnover_history.year` |
+| `period_id` | תקופה | `uuid` | `not null`, FK → `periods(id)`, `on delete restrict`, **טריגר: תקופה שנתית בלבד** | מצטלב ישירות מול `client_turnover_history.period_id` — אותו עוגן, לא שני מספרים שצריך לקוות שיתאימו |
 | `amount` | סכום | `numeric(12,2)` | `not null`, `>= 0` | הסכום החוקי לאותה שנה |
 | `notes` | הערות | `text` | — | מקור הנתון, או שינוי חקיקה שהוביל לעדכון |
 | `created_at` / `updated_at` | — | `timestamptz` | `not null`, טריגר | — |
 
-**אילוץ:** `unique (entity_type_id, threshold_kind, year)` — תקרה אחת מכל סוג לכל סוג ישות לכל שנה.
+**אילוץ:** `unique (entity_type_id, threshold_kind, period_id)` — תקרה אחת מכל סוג לכל סוג ישות לכל תקופה.
 
 ## שני סוגי התקרה (10/09/2026)
 
@@ -52,3 +52,11 @@
 ## ר' גם
 
 [`entity_types`](entity_types.md) · [`client_turnover_history`](client_turnover_history.md)
+
+## מ-`year integer` ל-`period_id` (14/09/2026)
+
+הטבלה נבנתה ב-08/09 עם `year integer`, ובאותו יום עצמו הוכרע עקרונית שזו כפילות — `periods` כבר קיימת כקלסר המשותף. **בוצע היום**, יחד עם [`client_turnover_history`](client_turnover_history.md), כי שתיהן מצטלבות וחייבות לדבר באותה שפה.
+
+**הטבלה הייתה ריקה, ולכן לא נדרשה המרת נתונים.** נוסף טריגר שאוכף **תקופה שנתית** (`months_interval = 12`) — בלעדיו ה-FK היה ערובה חלשה יותר מה-`CHECK` שהוסר, ואפשר תקרה שמוצמדת ל"ינואר 2026".
+
+**מה שזה פותח:** שנת מס לא-קלנדרית. תקרה לחברה שעובדת ביולי–יוני היא עכשיו שורה לגיטימית, ולא הייתה ניתנת לביטוי קודם.
