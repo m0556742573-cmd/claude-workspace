@@ -33,8 +33,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-if ($ahead -eq '0' -and -not $dirty) {
-    Write-Log 'ok       already up to date'
+if ($ahead -eq '0') {
+    # Only say "up to date" when it is the whole truth. If files are sitting
+    # uncommitted, the warning above already said so, and an "ok" line under
+    # it would contradict it — which is how people learn to stop reading logs.
+    if (-not $dirty) { Write-Log 'ok       already up to date' }
     exit 0
 }
 
