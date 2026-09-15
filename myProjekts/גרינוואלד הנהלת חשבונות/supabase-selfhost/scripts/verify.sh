@@ -37,6 +37,11 @@ psql_q() {
 
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL=1; }
+# A note never fails the run. Some findings are legitimately ambiguous -- a client
+# with no obligations may be correct (consulting only) or may be a data hole, and
+# only a person can tell which. Reporting those as failures would train everyone
+# to ignore the output.
+note() { printf '  \033[33m•\033[0m %s\n' "$1"; }
 
 echo "── DB invariants ──"
 
@@ -57,6 +62,24 @@ a=$(psql_q "select count(*) from information_schema.columns where table_schema='
 b=$(psql_q "select count(*) from information_schema.columns where table_schema='public' and table_name='active_clients';")
 [ "$a" = "$b" ] && ok "active_clients is in sync with clients ($a columns)" \
   || bad "active_clients is stale: clients has $a columns, the view has $b — run create or replace view"
+
+# A dead exclude: an override that removes an obligation the chain never produced
+# for that client. It excludes nothing and hides its own intent -- somebody
+# recorded "this client does not owe X" and the system has no X to remove, so the
+# day the deal changes and X does appear, the row silently starts biting.
+# Only applies=false qualifies. applies=true on a template outside the chain is
+# the include direction working exactly as designed.
+n=$(psql_q "select count(*) from client_obligation_overrides o where o.applies = false and not exists (select 1 from deals d join deal_services ds on ds.deal_id=d.id join service_obligation_templates sot on sot.service_id=ds.service_id where d.client_id=o.client_id and d.closed_at is null and sot.obligation_template_id=o.obligation_template_id);")
+[ "$n" = "0" ] && ok "no override excludes an obligation the chain never produced" \
+  || bad "$n dead exclude(s) — an override removing something the client does not derive"
+
+# Active clients whose resolved obligation list is empty. This is the silent hole
+# behind goal 1: a client who owes VAT but was never given a bookkeeping service
+# never appears in any list -- not late, simply absent. It cannot be a failure,
+# because consulting-only clients legitimately owe nothing.
+empty=$(psql_q "select string_agg(c.legal_name, ', ') from clients c join client_statuses s on s.id=c.status_id where c.deleted_at is null and s.code='active' and not exists (select 1 from client_obligations_current v where v.client_id=c.id);")
+[ -z "$empty" ] && ok "every active client resolves to at least one obligation" \
+  || note "active clients with no obligations at all — correct, or a missing service: $empty"
 
 echo
 echo "── repo against DB ──"
