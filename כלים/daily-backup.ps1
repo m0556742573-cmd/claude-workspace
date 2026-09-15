@@ -46,11 +46,17 @@ if ($ahead -eq '0') {
     exit 0
 }
 
+# Check git's exit code, NOT $?. git writes its progress to stderr even on a
+# clean push, and Windows PowerShell turns any stderr from a native command
+# into an error record - so $? reports failure on a push that worked. That
+# produced a log line reading "ERROR push failed" directly above git's own
+# success message. A false alarm is worse than a silent one: it teaches you
+# to ignore the log, and then the real failure goes past unread.
 $out = & git -C $Repo push 2>&1
-if ($?) {
+if ($LASTEXITCODE -eq 0) {
     Write-Log "ok       pushed $ahead commit(s)"
     exit 0
 } else {
-    Write-Log "ERROR    push failed: $($out -join ' ')"
+    Write-Log "ERROR    push failed (exit $LASTEXITCODE): $($out -join ' ')"
     exit 1
 }
