@@ -15,3 +15,7 @@ Thumbs.db
 
 # Node (in case tooling gets added later)
 node_modules/
+
+# Runtime log of the daily backup - local, changes on every run.
+# Tracked, it would make the doc checker fail forever and teach you to ignore it.
+כלים/backup.log
