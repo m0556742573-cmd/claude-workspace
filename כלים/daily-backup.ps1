@@ -1,22 +1,27 @@
-# Daily off-machine backup — pushes what is already committed to GitHub.
+﻿# Daily off-machine backup - pushes what is already committed to GitHub.
 #
 # Deliberately does NOT commit anything. Automatic commits would turn a
 # readable history into thousands of meaningless entries, and the value of
 # this history is the "why", not the snapshots. Committing stays deliberate;
 # only the copying out is automated.
 #
-# Register it once (run as the normal user, no admin needed):
-#   see כלים/README-גיבוי.md
+# Paths are DERIVED, never written down. $PSScriptRoot is the folder this
+# script sits in, so the whole thing keeps working if the folder is renamed,
+# moved, or cloned onto another machine - and it avoids non-ASCII path
+# literals, which Windows PowerShell mis-reads and which broke the first
+# version of this script.
 #
-# Writes a line per run to כלים/backup.log so a silent failure is visible.
+# Writes one line per run to backup.log beside this file, so a silent
+# failure is visible.
 
 $ErrorActionPreference = 'Continue'
-$Repo    = 'C:\Users\user\claude'
-$LogFile = Join-Path $Repo 'כלים\backup.log'
+$Here    = $PSScriptRoot
+$Repo    = Split-Path $Here -Parent
+$LogFile = Join-Path $Here 'backup.log'
 $Stamp   = Get-Date -Format 'yyyy-MM-dd HH:mm'
 
 function Write-Log($msg) {
-    Add-Content -Path $LogFile -Value "$Stamp  $msg" -Encoding utf8
+    Add-Content -LiteralPath $LogFile -Value "$Stamp  $msg" -Encoding utf8
 }
 
 # Anything uncommitted cannot be backed up. Say so rather than reporting
@@ -36,7 +41,7 @@ if ($LASTEXITCODE -ne 0) {
 if ($ahead -eq '0') {
     # Only say "up to date" when it is the whole truth. If files are sitting
     # uncommitted, the warning above already said so, and an "ok" line under
-    # it would contradict it — which is how people learn to stop reading logs.
+    # it would contradict it - which is how people learn to stop reading logs.
     if (-not $dirty) { Write-Log 'ok       already up to date' }
     exit 0
 }

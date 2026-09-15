@@ -13,7 +13,7 @@
 להעתיק את השורה, להדביק בטרמינל, Enter. **לא דורש הרשאות מנהל.**
 
 ```
-$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden -File "C:\Users\user\claude\כלים\daily-backup.ps1"'; $t = New-ScheduledTaskTrigger -Daily -At 18:00; $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries; Register-ScheduledTask -TaskName 'claude-workspace-backup' -Action $a -Trigger $t -Settings $s -Description 'Daily push of the claude workspace to GitHub'
+$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Users\user\claude\כלים\daily-backup.ps1"'; $t = New-ScheduledTaskTrigger -Daily -At 18:00; $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries; Register-ScheduledTask -TaskName 'claude-workspace-backup' -Action $a -Trigger $t -Settings $s -Description 'Daily push of the claude workspace to GitHub'
 ```
 
 **מה זה קובע:** רץ כל יום ב-18:00. אם המחשב היה כבוי — רץ בהפעלה הבאה (`StartWhenAvailable`). עובד גם על סוללה.
@@ -55,3 +55,17 @@ Unregister-ScheduledTask -TaskName 'claude-workspace-backup' -Confirm:$false
 כדאי להציץ בו פעם בשבוע-שבועיים. אם השורה האחרונה ישנה או אומרת `ERROR` — משהו נשבר.
 
 **זה בדיוק אותו שיקול שרשום ב-`overview.md` של גרינוואלד:** *"אמינות מנוע התזכורות עצמו היא שיקול מפורש — יידרש ניטור על המנגנון עצמו, לא רק על מה שהוא מזכיר."* חל גם כאן.
+
+## אם המשימה מסתיימת בכישלון
+
+**הסימן:** `LastTaskResult` שונה מ-0, או ש-`backup.log` לא גדל.
+
+**הסיבה שכבר נתקלנו בה (15/09):** בלי `-ExecutionPolicy Bypass` בפקודת ההרשמה, ווינדוס מסרב להריץ קובץ סקריפט מתוך משימה מתוזמנת — ונכשל **בשקט**, בלי לכתוב שורה ליומן. הדגל חל על ההרצה הבודדת הזו בלבד; הוא אינו משנה שום הגדרה במחשב.
+
+**לבדוק את הסטטוס:**
+
+```
+Get-ScheduledTaskInfo -TaskName 'claude-workspace-backup' | Select-Object LastRunTime, LastTaskResult
+```
+
+**וטעות שעשיתי באבחון, ששווה לזכור:** הנחתי שהאשם הוא שם התיקייה בעברית, ורציתי לשנות אותו. **בדקתי לפני** — והרצתי את אותה משימה מנתיב באנגלית. גם הוא נכשל. ההשערה הייתה שגויה, והבדיקה חסכה שינוי מיותר בכל הפרויקט.
