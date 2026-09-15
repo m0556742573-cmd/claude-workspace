@@ -81,6 +81,34 @@ empty=$(psql_q "select string_agg(c.legal_name, ', ') from clients c join client
 [ -z "$empty" ] && ok "every active client resolves to at least one obligation" \
   || note "active clients with no obligations at all — correct, or a missing service: $empty"
 
+# Running the generators is the automation layer's job. Noticing that they did not
+# run is this one's: an automation that silently stops looks exactly like an
+# automation with nothing to do, and the cost of not noticing is that obligations
+# stop appearing without an error -- the goal 1 failure one level up.
+# The horizon is declared in office_settings, not hardcoded here.
+# Compared against the last period that ENDS inside the horizon, not against the
+# horizon date itself. Obligations are produced per period, so a period straddling
+# the boundary is legitimately absent -- comparing to the raw date reports a gap
+# that is not one, and a check that cries wolf is a check people turn off.
+short=$(psql_q "with h as (select (current_date + (generation_horizon_months || ' months')::interval)::date as target from office_settings), e as (select max(p.end_date) as expected from periods p where p.end_date <= (select target from h)) select string_agg(layer || ' reaches ' || reach || ', needs ' || (select expected from e)::text, '; ') from (select 'calendar' as layer, max(p.end_date) as reach from regulatory_calendar rc join periods p on p.id=rc.period_id union all select 'obligations', max(p.end_date) from obligations o join regulatory_calendar rc on rc.id=o.regulatory_calendar_id join periods p on p.id=rc.period_id) t where reach < (select expected from e);")
+[ -z "$short" ] && ok "calendar and obligations cover the declared horizon" \
+  || bad "a generated layer is running out — the automation has not run: $short"
+
+# Reminders are checked by coverage rather than by reach: their dates lag the
+# deadlines they announce, so "how far do they stretch" answers the wrong question.
+# What matters is whether any open obligation inside the horizon has none.
+nored=$(psql_q "with h as (select (current_date + (generation_horizon_months || ' months')::interval)::date as target from office_settings) select count(*) from obligations o join obligation_statuses os on os.id=o.status_id join regulatory_calendar rc on rc.id=o.regulatory_calendar_id where not os.is_closed and rc.effective_due_date between current_date and (select target from h) and not exists (select 1 from reminders r where r.obligation_id = o.id);")
+[ "$nored" = "0" ] && ok "every open obligation inside the horizon has a reminder" \
+  || bad "$nored open obligation(s) inside the horizon have no reminder"
+
+# Frequency is resolved in TWO places: client_obligations_at, and the used-pairs
+# CTE inside generate_regulatory_calendar. They must agree. When they did not --
+# on 15/09, over the anchor-inherited cadence -- a client's obligations vanished
+# silently rather than erroring. Nothing was checking, so nothing said so.
+mismatch=$(psql_q "select string_agg(distinct v.client_name || ' / ' || v.obligation_name || ' (' || v.reporting_frequency || ')', '; ') from client_obligations_current v where not exists (select 1 from regulatory_calendar rc join periods p on p.id = rc.period_id where rc.obligation_template_id = v.obligation_template_id and p.reporting_frequency_id = v.reporting_frequency_id);")
+[ -z "$mismatch" ] && ok "every resolved cadence has calendar entries to hang off" \
+  || bad "the view and the calendar disagree on cadence — these resolve to a frequency the calendar never generated: $mismatch"
+
 echo
 echo "── repo against DB ──"
 
