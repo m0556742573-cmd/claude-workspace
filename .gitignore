@@ -19,3 +19,8 @@ node_modules/
 # Runtime log of the daily backup - local, changes on every run.
 # Tracked, it would make the doc checker fail forever and teach you to ignore it.
 כלים/backup.log
+
+# Generated from the book HTML on demand. Rule 2: what is derived is
+# not stored - and a 1MB binary that changes wholesale on every render
+# makes every diff useless.
+*.pdf
