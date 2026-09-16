@@ -11,17 +11,35 @@
 # (.git/hooks is not versioned, so hooks placed there travel nowhere.)
 
 root=$(git rev-parse --show-toplevel)
-checker="$root/כלים/verify-docs.sh"
 
-[ -f "$checker" ] || exit 0
+# The checker lives in the toolkit. Look for it under either name, since
+# the toolkit directory is Hebrew here and ASCII in the published book.
+checker=""
+for candidate in "$root/כלים/verify-docs.sh" "$root/tools/verify-docs.sh"; do
+  [ -f "$candidate" ] && { checker="$candidate"; break; }
+done
 
-# Staged files are dirty by definition here, so that check is skipped.
-VERIFY_SKIP_DIRTY=1 bash "$checker"
+# A missing checker is a failure, not a pass. The previous version exited
+# 0 here - the same "green means I did not look" that was just removed
+# from the checker itself, reintroduced one level up.
+if [ -z "$checker" ]; then
+  printf 'pre-commit: no checker found. Looked for:\n'
+  printf '  %s/כלים/verify-docs.sh\n  %s/tools/verify-docs.sh\n' "$root" "$root"
+  printf 'Commit blocked. Restore the checker, or pass --no-verify and say why.\n'
+  exit 1
+fi
+
+# VERIFY_STAGED makes the client-data check read the index rather than the
+# working tree. Without it, a file can be staged carrying an ID number and
+# then cleaned up on disk: the check passes and the commit still has it.
+# VERIFY_SKIP_DIRTY silences the uncommitted-files check, which is
+# meaningless here - staged files are dirty by definition.
+VERIFY_SKIP_DIRTY=1 VERIFY_STAGED=1 bash "$checker"
 status=$?
 
 if [ $status -ne 0 ]; then
   printf '\n\033[31mCommit blocked: documentation checks failed.\033[0m\n'
   printf 'Fix the findings above, or commit with --no-verify if this is\n'
-  printf 'deliberate — but then say so in the commit message.\n'
+  printf 'deliberate - but then say so in the commit message.\n'
   exit 1
 fi

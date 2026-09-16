@@ -24,3 +24,5 @@ node_modules/
 # not stored - and a 1MB binary that changes wholesale on every render
 # makes every diff useless.
 *.pdf
+מתודולוגיה/ספר/ספר.html
+מתודולוגיה/ספר/print.tmp.html

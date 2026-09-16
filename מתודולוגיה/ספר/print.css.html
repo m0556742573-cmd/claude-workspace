@@ -1,0 +1,78 @@
+
+<style>
+/* ===== print stylesheet — forces light, fixes breaks, lightens code ===== */
+@page { size: A4; margin: 17mm 15mm 16mm; }
+
+@media print {
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+    --paper:#FFFFFF !important; --card:#F7F9F8 !important;
+    --ink:#141A18 !important; --ink-2:#3A4642 !important; --ink-3:#66746F !important;
+    --rule:#C9D1CE !important; --rule-2:#DFE5E2 !important;
+    --seal:#0B5C53 !important; --seal-soft:#E2EFEC !important;
+    --warn:#845104 !important; --warn-soft:#F7EDDC !important;
+    --alert:#8E3124 !important; --alert-soft:#F8E8E4 !important;
+    --code-bg:#F2F5F4 !important; --code-ink:#1B2422 !important; --code-dim:#6B7A75 !important;
+    --shadow:none !important;
+  }
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body { font-size: 10.5pt; line-height: 1.6; padding-inline: 0; background:#fff !important; }
+  .wrap { max-width: none; }
+  a { color: inherit !important; text-decoration: none; }
+
+  /* chrome that has no meaning on paper */
+  .copy { display: none !important; }
+  .cb-head { background:#E9EEEC !important; border-bottom:1px solid var(--rule) !important; }
+  .cb { border:1px solid var(--rule) !important; }
+  .cb code { color:#1B2422 !important; font-size: 8.6pt; line-height:1.5; }
+  .thesis { box-shadow:none !important; }
+
+  /* the table of contents is navigation; on paper it is a contents page */
+  nav.toc { page-break-after: always; }
+
+  /* each division opens a new page */
+  .divider { page-break-before: always; padding-block: 0 8px; }
+  .mast { page-break-after: avoid; }
+
+  /* nothing that reads as one object may be split across a page */
+  .call, .thesis, .tblwrap, .cb, .rows, .figs, .growth, .cmp,
+  .row, .fig, tr, li { page-break-inside: avoid; break-inside: avoid; }
+  h1, h2, h3, h4, .s-no, .lede { page-break-after: avoid; break-after: avoid; }
+  section.s { border-bottom: none; padding-block: 26px; }
+
+  /* a heading must never be the last thing on a page */
+  .s > h2 + .lede, .s > h2 + .body { page-break-before: avoid; }
+
+  footer { page-break-before: always; }
+}
+</style>
+
+<style>
+/* ===== print typography =====
+   Chrome's PDF writer will not embed the web fonts here, so instead of
+   shipping a document set in silent fallbacks, print deliberately in the
+   Hebrew faces Windows already carries. FrankRuehl is the metal ancestor
+   of Frank Ruhl Libre, so the display voice survives the substitution. */
+@media print {
+  h1, h2, h3, h4.serif,
+  .thesis .t, .divider .dt, .mast .sub {
+    font-family: 'FrankRuehl', 'David', Georgia, serif !important;
+    font-weight: 700 !important;
+  }
+  .mast h1 { font-weight: 700 !important; letter-spacing: 0 !important; }
+  body, .lede, p, td, th, li, .call, .row, .fig, .cmp,
+  .b, .kicker, .s-no, .part-no, .cb-name, .copy {
+    font-family: 'Segoe UI', 'Arial', sans-serif !important;
+  }
+  code, .cb code, .mono, .num, .fig .v, .gbar .gv {
+    font-family: 'Consolas', 'Courier New', monospace !important;
+  }
+  /* FrankRuehl runs light at display sizes; give the headings air back */
+  .mast h1 { font-size: 46pt !important; line-height: 1.15 !important; }
+  .divider .dt { font-size: 26pt !important; }
+  .s > h2 { font-size: 19pt !important; }
+  .thesis .t { font-size: 15pt !important; line-height: 1.45 !important; }
+}
+</style>

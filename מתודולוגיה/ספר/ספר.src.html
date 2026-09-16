@@ -1,0 +1,1847 @@
+<title>מה שנבדק מחזיק</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --paper:#EEF0EE; --card:#F9FAF9; --ink:#171E1C; --ink-2:#3C4A46; --ink-3:#6B7A75;
+  --rule:#D3D9D6; --rule-2:#E2E7E4; --seal:#0E6E63; --seal-soft:#DCEAE7;
+  --warn:#9A6206; --warn-soft:#F3E7D2; --alert:#A33B2C; --alert-soft:#F4E2DE;
+  --code-bg:#1B2422; --code-ink:#D6DEDB; --code-dim:#7E918C;
+  --shadow:0 1px 2px rgba(23,30,28,.05),0 8px 24px -12px rgba(23,30,28,.18);
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme:dark){
+    --paper:#101413; --card:#171D1B; --ink:#E8EDEA; --ink-2:#B4C0BC; --ink-3:#7E8D88;
+    --rule:#2A3331; --rule-2:#202826; --seal:#4FBFAF; --seal-soft:#15302C;
+    --warn:#D8A040; --warn-soft:#2E2617; --alert:#E08272; --alert-soft:#331E1A;
+    --code-bg:#080B0A; --code-ink:#C8D2CE; --code-dim:#6A7B76;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101413; --card:#171D1B; --ink:#E8EDEA; --ink-2:#B4C0BC; --ink-3:#7E8D88;
+  --rule:#2A3331; --rule-2:#202826; --seal:#4FBFAF; --seal-soft:#15302C;
+  --warn:#D8A040; --warn-soft:#2E2617; --alert:#E08272; --alert-soft:#331E1A;
+  --code-bg:#080B0A; --code-ink:#C8D2CE; --code-dim:#6A7B76;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:'Assistant',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:17px; line-height:1.72; margin:0; padding-inline:20px; padding-block:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:740px;margin:0 auto}
+h1,h2,h3,h4.serif{font-family:'Frank Ruhl Libre',Georgia,serif;text-wrap:balance;margin:0;line-height:1.28}
+p{margin:0}
+strong{font-weight:700}
+em{font-style:normal;color:var(--seal);font-weight:600}
+a{color:var(--seal)}
+code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.85em;background:var(--rule-2);padding:.1em .38em;border-radius:3px;color:var(--ink-2);direction:ltr;unicode-bidi:isolate}
+
+/* masthead */
+.mast{padding-block:70px 40px}
+.kicker{font-size:12px;letter-spacing:.15em;font-weight:700;color:var(--ink-3);text-transform:uppercase;margin-bottom:24px}
+.mast h1{font-size:clamp(42px,9vw,72px);font-weight:900;letter-spacing:-.015em}
+.mast .sub{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:clamp(19px,3.4vw,25px);color:var(--ink-2);margin-top:18px;font-weight:500;line-height:1.5}
+.mast .meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:32px;font-size:13px;color:var(--ink-3);padding-top:22px;border-top:1px solid var(--rule)}
+.mast .meta span{display:flex;align-items:center;gap:7px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--seal);flex:none}
+
+/* toc */
+.toc{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:26px 28px;margin-bottom:8px}
+.toc h4{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0 0 16px;font-weight:700}
+.toc ol{margin:0;padding:0;list-style:none;counter-reset:t;display:flex;flex-direction:column;gap:2px}
+.toc li{counter-increment:t}
+.toc a{display:flex;gap:12px;padding:5px 0;text-decoration:none;color:var(--ink-2);font-size:15.5px;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--seal)}
+.toc a::before{content:counter(t,decimal-leading-zero);font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-3);flex:none;padding-top:4px}
+.toc .grp{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--seal);font-weight:700;margin:16px 0 6px;padding-top:12px;border-top:1px solid var(--rule-2)}
+.toc .grp:first-of-type{margin-top:0;padding-top:0;border-top:none}
+
+/* part divider */
+.divider{padding-block:72px 8px;text-align:center}
+.divider .dl{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--seal);font-weight:700}
+.divider .dt{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:clamp(28px,5.5vw,40px);font-weight:700;margin-top:8px}
+.divider .dd{color:var(--ink-3);font-size:15.5px;margin-top:8px}
+.divider .rule{height:1px;background:var(--rule);margin-top:28px}
+
+/* sections */
+section.s{padding-block:46px;border-bottom:1px solid var(--rule)}
+.s-no{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--seal);letter-spacing:.1em;margin-bottom:10px}
+.s > h2{font-size:clamp(25px,4.6vw,31px);font-weight:700;letter-spacing:-.01em}
+.lede{font-size:18.5px;color:var(--ink-2);margin-top:13px;line-height:1.62}
+.body{margin-top:22px;display:flex;flex-direction:column;gap:17px}
+h3{font-size:19.5px;font-weight:700;margin-top:12px}
+h4{font-size:16.5px;font-weight:700;margin:8px 0 0;font-family:'Assistant',sans-serif}
+
+/* thesis */
+.thesis{background:var(--card);border:1px solid var(--rule);border-inline-start:4px solid var(--seal);border-radius:3px;padding:24px 26px;box-shadow:var(--shadow)}
+.thesis .t{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:24px;font-weight:700;line-height:1.42}
+.thesis .n{margin-top:11px;color:var(--ink-2);font-size:16px}
+
+/* tables */
+.tblwrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:15.5px;min-width:340px}
+th{text-align:start;font-weight:700;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);padding:11px 15px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:12px 15px;border-bottom:1px solid var(--rule-2);vertical-align:top;color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+td strong{color:var(--ink)}
+
+/* badges */
+.b{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:2px;white-space:nowrap}
+.b-ok{background:var(--seal-soft);color:var(--seal)}
+.b-warn{background:var(--warn-soft);color:var(--warn)}
+.b-alert{background:var(--alert-soft);color:var(--alert)}
+
+/* callouts */
+.call{border-radius:3px;padding:19px 21px;border:1px solid;display:flex;flex-direction:column;gap:9px}
+.call-warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.call-alert{background:var(--alert-soft);border-color:color-mix(in srgb,var(--alert) 30%,transparent)}
+.call-ok{background:var(--seal-soft);border-color:color-mix(in srgb,var(--seal) 30%,transparent)}
+.call h4{margin:0;font-size:14.5px;font-weight:700}
+.call-warn h4{color:var(--warn)} .call-alert h4{color:var(--alert)} .call-ok h4{color:var(--seal)}
+.call p{font-size:16px;color:var(--ink-2)}
+
+/* lists */
+ul.plain{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:9px;color:var(--ink-2)}
+ul.plain strong{color:var(--ink)}
+ol.rules{margin:0;padding:0;list-style:none;counter-reset:r;display:flex;flex-direction:column;gap:14px}
+ol.rules li{counter-increment:r;display:flex;gap:14px;align-items:baseline}
+ol.rules li::before{content:counter(r);font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--seal);border:1px solid var(--rule);border-radius:2px;width:23px;height:23px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--card)}
+ol.rules .rt{font-weight:700}
+ol.rules .rn{color:var(--ink-2);font-size:15.5px;display:block;margin-top:3px}
+
+/* stacked rows */
+.rows{border:1px solid var(--rule);border-radius:3px;background:var(--card);overflow:hidden}
+.row{display:flex;gap:15px;padding:17px 19px;border-bottom:1px solid var(--rule-2);align-items:baseline}
+.row:last-child{border-bottom:none}
+.row .rn2{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--seal);flex:none;padding-top:2px;min-width:22px}
+.row .rt2{font-weight:700;font-size:16.5px}
+.row .rd2{color:var(--ink-2);font-size:15.5px;margin-top:3px}
+.row .rb{margin-top:7px}
+
+/* code */
+.cb{border-radius:4px;overflow:hidden;border:1px solid var(--rule);background:var(--code-bg)}
+.cb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.cb-name{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--code-dim);direction:ltr;unicode-bidi:isolate}
+.copy{background:transparent;border:1px solid rgba(255,255,255,.18);color:var(--code-dim);font-family:'Assistant',sans-serif;font-size:12px;font-weight:600;padding:3px 11px;border-radius:2px;cursor:pointer;flex:none}
+.copy:hover{color:var(--code-ink);border-color:rgba(255,255,255,.4)}
+.copy:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+.cb pre{margin:0;padding:15px 16px;overflow-x:auto}
+.cb code{background:none;padding:0;border-radius:0;color:var(--code-ink);font-size:13px;line-height:1.65;display:block;white-space:pre}
+
+/* figures */
+.figs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.fig{background:var(--card);padding:19px 17px}
+.fig .v{font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1}
+.fig .k{font-size:13.5px;color:var(--ink-3);margin-top:6px;line-height:1.45}
+
+/* growth bars */
+.growth{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:20px}
+.gbar{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.gbar:last-child{margin-bottom:0}
+.gbar .gl{font-size:13.5px;color:var(--ink-3);width:82px;flex:none}
+.gtrack{flex:1;height:20px;background:var(--rule-2);border-radius:2px;overflow:hidden}
+.gfill{height:100%;background:var(--seal);opacity:.3}
+.gfill.hot{background:var(--alert);opacity:.5}
+.gbar .gv{font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--ink-2);width:46px;flex:none;font-variant-numeric:tabular-nums}
+
+/* compare */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.cmp > div{border:1px solid var(--rule);border-radius:3px;padding:19px;background:var(--card)}
+.cmp h4{margin:0 0 11px;font-size:14.5px}
+.cmp ul{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;color:var(--ink-2)}
+.cmp-bad h4{color:var(--alert)} .cmp-good h4{color:var(--seal)}
+
+footer{padding-block:44px 70px;border-top:2px solid var(--ink);color:var(--ink-3);font-size:14.5px;display:flex;flex-direction:column;gap:12px}
+
+@media (max-width:620px){
+  body{font-size:16px}
+  .cmp,.figs{grid-template-columns:1fr}
+  .row{flex-direction:column;gap:5px}
+  .gbar .gl{width:66px;font-size:12.5px}
+  .cb code{font-size:12px}
+}
+</style>
+
+<div dir="rtl" lang="he" class="wrap">
+
+<header class="mast">
+  <div class="kicker">ספר שיטה · גרסה 2 · 2026</div>
+  <h1>מה שנבדק מחזיק</h1>
+  <div class="sub">שיטה לנהל פרויקטים, מידע ושיחות עם סוכני AI — ולמה כל מה שאתה מבטיח לעצמך יישבר, ומה לעשות במקום.</div>
+  <div class="meta">
+    <span><i class="dot"></i>לקריאה מרוכזת · שעה עד שעה וחצי</span>
+    <span><i class="dot"></i>כולל ערכת תבניות מלאה</span>
+    <span><i class="dot"></i>ליבה ניתנת לאימוץ ביום אחד</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h4>תוכן</h4>
+  <div class="grp">חטיבה א · הרעיון</div>
+  <ol>
+    <li><a href="#s1">הבעיה — למה תיעוד טוב מתיישן</a></li>
+    <li><a href="#s2">מקרה מבחן, ומה שנמצא בו</a></li>
+    <li><a href="#s3">העיקרון</a></li>
+    <li><a href="#s4">למה זה נוגע דווקא לעבודה עם AI</a></li>
+  </ol>
+  <div class="grp">חטיבה ב · השיטה</div>
+  <ol start="5">
+    <li><a href="#s5">ארבעת סוגי המידע</a></li>
+    <li><a href="#s6">עובדה יציבה מול עובדה מתכלה</a></li>
+    <li><a href="#s7">שלוש רמות הטעינה</a></li>
+    <li><a href="#s8">שמונת הכללים</a></li>
+    <li><a href="#s9">מרעיון לפרויקט — ארבעה שלבים</a></li>
+    <li><a href="#s10">רשימת ההמתנה</a></li>
+    <li><a href="#s11">שכבת הגילוי — לעבוד מול לקוח</a></li>
+    <li><a href="#s12">שכבת הנכסים ולולאת הלמידה</a></li>
+    <li><a href="#s13">מחזור חיי שיחה ושני מבחני בריאות</a></li>
+  </ol>
+  <div class="grp">חטיבה ג · היישום</div>
+  <ol start="14">
+    <li><a href="#s14">מבנה התיקיות</a></li>
+    <li><a href="#s15">מה סקיל, מה פקודה, מה טריגר</a></li>
+  </ol>
+  <div class="grp">חטיבה ד · ערכת הכלים</div>
+  <ol start="16">
+    <li><a href="#s16">תבניות המסמכים</a></li>
+    <li><a href="#s17">קובץ הכללים</a></li>
+    <li><a href="#s18">שני הסקריפטים</a></li>
+  </ol>
+  <div class="grp">חטיבה ה · הערכה כנה</div>
+  <ol start="19">
+    <li><a href="#s19">מה מוכח ומה השערה</a></li>
+    <li><a href="#s20">כמה זה עולה</a></li>
+    <li><a href="#s21">איפה זה עלול להיכשל</a></li>
+  </ol>
+  <div class="grp">חטיבה ו · אימוץ</div>
+  <ol start="22">
+    <li><a href="#s22">מסלול אימוץ</a></li>
+  </ol>
+  <div class="grp">נספחים</div>
+  <ol start="23">
+    <li><a href="#s23">מה כבר קיים, ומה כאן חדש</a></li>
+    <li><a href="#s24">מה השתנה בגרסה 2</a></li>
+  </ol>
+</nav>
+
+<!-- ══════════ חטיבה א ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה א</div>
+  <div class="dt">הרעיון</div>
+  <div class="dd">הבעיה, והתובנה האחת שפותרת אותה</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s1">
+  <div class="s-no">פרק 1</div>
+  <h2>הבעיה — למה תיעוד טוב מתיישן</h2>
+  <p class="lede">לא מדובר בתיעוד מוזנח. הבעיה הזו מתרחשת דווקא בפרויקטים שבהם מישהו באמת השקיע — וזה מה שהופך אותה למסוכנת.</p>
+
+  <div class="body">
+    <p>הדפוס תמיד זהה. מישהו בונה מערכת ומתעד אותה היטב: מסמך על כל החלטה, הסבר לכל טבלה, יומן מסודר. חודשיים אחר כך, חלק מהמסמכים אומרים דברים שכבר לא נכונים — <strong>ואיש לא יודע אילו.</strong></p>
+
+    <p>וזה לא נובע מעצלות. זה נובע ממבנה. <strong>אותה עובדה נכתבה ביותר ממקום אחד, ועודכנה באחד.</strong></p>
+
+    <p>קח דוגמה פשוטה: מספר הטבלאות במערכת. הוא נכתב באינדקס, בקובץ הסטטוס, וביומן. נוספה טבלה — מישהו עדכן שניים מהשלושה. <strong>עכשיו שני מסמכים סותרים זה את זה, ואין שום דבר שיצעק.</strong></p>
+
+    <div class="thesis">
+      <div class="t">תיעוד לא נשבר כשלא כותבים אותו.<br>הוא נשבר כשכותבים אותו פעמיים.</div>
+      <div class="n">ולכן שיטה שמנסה לפתור את זה בעוד משמעת — נכשלת. המשמעת כבר שם.</div>
+    </div>
+
+    <h3>ולמה לא פשוט "להיות זהירים יותר"</h3>
+    <p>כי זה בדיוק מה שכבר ניסית. בכל פרויקט שנכשל בזה היה כלל כתוב שאמר לעדכן. <strong>הכלל היה שם. הוא פשוט לא נאכף.</strong></p>
+    <p>וזה מוביל ישר לתובנה שעליה השיטה הזו בנויה — אבל לפני התובנה, שווה לראות מה בדיוק קורה בשטח.</p>
+  </div>
+</section>
+
+<section class="s" id="s2">
+  <div class="s-no">פרק 2</div>
+  <h2>מקרה מבחן, ומה שנמצא בו</h2>
+  <p class="lede">כל הראיות בספר הזה מגיעות מפרויקט אחד אמיתי. הוא מתואר כאן ללא שמות, אבל המספרים הם כפי שהם.</p>
+
+  <div class="body">
+    <h3>הפרויקט</h3>
+    <p>מערכת ניהול למשרד הנהלת חשבונות — <strong>כ-90 לקוחות, 6 עובדים.</strong> המערכת עוקבת אחרי מה שכל לקוח חייב לדווח לרשויות, מתי, ומה עוד לא נעשה. נבנתה מאפס על מסד נתונים, בעבודה משותפת עם סוכן AI לאורך כחודש.</p>
+
+    <div class="figs">
+      <div class="fig"><div class="v">54</div><div class="k">ישויות מאופיינות, לכל אחת קובץ משלה</div></div>
+      <div class="fig"><div class="v">27</div><div class="k">מיגרציות שהורצו על מסד הנתונים</div></div>
+      <div class="fig"><div class="v">9</div><div class="k">מסמכי החלטה ארכיטקטונית</div></div>
+    </div>
+
+    <p><strong>זה תיעוד טוב מהממוצע בהרבה.</strong> כל טבלה בקובץ נפרד עם מילון שדות, כל הכרעה במסמך משלה, יומן כרונולוגי, ואפילו עותקים פיזיים של מסמכי המקור מהלקוח.</p>
+
+    <h3>מה נמצא בביקורת</h3>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>הממצא</th><th>כמה זמן עבר</th></tr></thead>
+        <tbody>
+          <tr><td><strong>מסמך שמתאר את הארכיטקטורה אומר "מסד הנתונים ריק"</strong> — בזמן שיש בו 42 טבלאות. ובקובץ הכללים הוא מוגדר במפורש כ"מסמך חי"</td><td>שבועיים</td></tr>
+          <tr><td><strong>תיאור שגוי של קובץ מקור מהלקוח.</strong> התיאור השגוי הוא הסיבה שאיש לא פתח את הקובץ לאורך כל האיפיון — ומכאן שדות חסרים אמיתיים במערכת</td><td>חודש</td></tr>
+          <tr><td><strong>שני מסמכים סופרים את אותן טבלאות</strong> ומגיעים למספרים שונים</td><td>שבוע</td></tr>
+          <tr><td><strong>קובץ הסטטוס תפח ל-267 שורות</strong> ואיבד את תפקידו — צריך לגלול 240 שורות כדי להגיע ל"מה הצעד הבא"</td><td>מתמשך</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>ועכשיו החלק החשוב</h3>
+    <p>באותו פרויקט הייתה <strong>בדיקה אוטומטית אחת</strong>: סקריפט שמוודא שכל מיגרציה מופיעה באינדקס.</p>
+
+    <div class="call call-ok">
+      <h4>באותה בדיקה: אפס סטיות. אף פעם.</h4>
+      <p>כל 27 המיגרציות רשומות, כולל זו שנוספה באותו בוקר.</p>
+      <p><strong>ארבע הסטיות קרו בדיוק ורק במקומות שאף אחד לא בודק</strong> — פרוזה, ספירות, וחותמות תאריך.</p>
+    </div>
+
+    <p><strong>זו תצפית שתומכת, לא ניסוי מבוקר</strong> — וההבחנה חשובה. הבדיקה היחידה שהייתה רצה על <em>רשימה מובנית</em> (מיגרציה מול שורה באינדקס), בעוד שלוש הסטיות האחרות קרו בפרוזה, בספירות ובתאריכים. ייתכן שרשימות מובנות נשברות פחות גם בלי בדיקה, פשוט כי קל לסרוק אותן בעין.</p>
+
+    <p>המסקנה כנראה נכונה, <strong>אבל היא נשענת על אירוע אחד בפרויקט אחד</strong>, והמשתנה "יש בדיקה" חופף למשתנה "סוג המידע". <strong>הניסוח המדויק: התצפית תומכת בעיקרון ואינה מוכיחה אותו.</strong></p>
+  </div>
+</section>
+
+<section class="s" id="s3">
+  <div class="s-no">פרק 3</div>
+  <h2>העיקרון</h2>
+
+  <div class="body">
+    <div class="thesis">
+      <div class="t">כלל שנבדק — מחזיק.<br>כלל שמובטח — נשבר.</div>
+      <div class="n">ההפרש אינו במשמעת. הוא במנגנון.</div>
+    </div>
+
+    <p>מי שבונה מסדי נתונים מיישם את זה כבר היום, בלי לחשוב. הוא לא כותב בנוהל "לא לשכוח למלא מספר זהות" — הוא שם אילוץ שחוסם. הוא לא מבקש מאנשים לא למחוק לקוח עם היסטוריה — הוא מגדיר את הקשר כך שהמחיקה תיכשל.</p>
+
+    <p><strong>אותו אדם בדיוק חוזר לתיעוד וכותב "צריך לעדכן מיד אחרי כל שינוי" — ומקווה.</strong></p>
+
+    <h3>שלושת הכללים שכבר ידועים, מוחלים על מידע</h3>
+    <ol class="rules">
+      <li><div><span class="rt">נרמול</span><span class="rn">כל עובדה במקום אחד; מכל מקום אחר מפנים אליה.</span></div></li>
+      <li><div><span class="rt">מה שנגזר לא נשמר</span><span class="rn">"כמה טבלאות יש" אינו שדה. סופרים אותו.</span></div></li>
+      <li><div><span class="rt">אוכפים במקום להבטיח</span><span class="rn">אילוץ, לא נוהל.</span></div></li>
+    </ol>
+
+    <p><strong>זו כל השיטה.</strong> כל השאר בספר הזה הוא הפירוט של איך מחילים את שלושת אלה על ידע במקום על נתונים — ואיזה מנגנונים קיימים לעשות את זה.</p>
+  </div>
+</section>
+
+<section class="s" id="s4">
+  <div class="s-no">פרק 4</div>
+  <h2>למה זה נוגע דווקא לעבודה עם AI</h2>
+  <p class="lede">התיעוד שלך כבר לא נכתב רק בשביל בני אדם. הוא נכתב בשביל שותף עבודה שקורא אותו אחרת לגמרי.</p>
+
+  <div class="body">
+    <p>אדם שקורא תיעוד מדלג, זוכר מה נאמר בשיחה אתמול, ושואל כשמשהו לא ברור. סוכן AI לא עושה אף אחד משלושת אלה:</p>
+
+    <div class="rows">
+      <div class="row"><div class="rn2">01</div><div><div class="rt2">מתחיל כל שיחה מאפס</div><div class="rd2">אין לו זיכרון מאתמול. מה שלא כתוב — לא קיים.</div></div></div>
+      <div class="row"><div class="rn2">02</div><div><div class="rt2">יש לו תקציב</div><div class="rd2">הוא לא יכול לטעון הכל. כל מסמך שנטען דוחק מסמך אחר.</div></div></div>
+      <div class="row"><div class="rn2">03</div><div><div class="rt2">אינו יודע מה הוא לא יודע</div><div class="rd2">מסמך ששקר לא מעורר בו חשד. <strong>הוא פשוט פועל לפיו.</strong></div></div></div>
+    </div>
+
+    <p>השלישי הוא המסוכן. במקרה המבחן, תיאור שגוי של קובץ אחד גרם לכך שהקובץ לא נפתח לאורך כל האיפיון — <strong>והתוצאה הייתה שדות חסרים במערכת שנבנתה.</strong> אדם היה אולי פותח בכל זאת, מסקרנות. סוכן קיבל את התיאור כעובדה.</p>
+
+    <div class="thesis">
+      <div class="t">מדד האיכות משתנה</div>
+      <div class="n">לא <strong>כמה מידע יש</strong>, אלא <strong>כמה מידע נכון נטען, ביחס למקום שתפס.</strong><br><br>מסמך של 300 שורות שנטען בכל שיחה ורק 20 שורות ממנו רלוונטיות הוא <strong>הפסד</strong> — הוא דחק 280 שורות של משהו שכן היה נחוץ.</div>
+    </div>
+
+    <p>וזה גם אומר שהשיטה הזו <strong>לא נועדה להחליף תיעוד לאנשים</strong>. היא מוסיפה עליו ממד: לכל מסמך יש עכשיו לא רק תוכן, אלא גם <strong>עלות ומועד טעינה</strong>. פרק 7 מטפל בזה במלואו.</p>
+  </div>
+</section>
+
+<!-- ══════════ חטיבה ב ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה ב</div>
+  <div class="dt">השיטה</div>
+  <div class="dd">תשעה פרקים — מהמבנה ועד העבודה מול הלקוח</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s5">
+  <div class="s-no">פרק 5</div>
+  <h2>ארבעת סוגי המידע</h2>
+  <p class="lede">כל פיסת מידע בפרויקט עונה על שאלה אחת בדיוק מארבע. זהו "סוג הישות" של התיעוד, והוא קובע התנהגות.</p>
+
+  <div class="body">
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>השאלה</th><th>דוגמה</th><th>קצב שינוי</th><th>מתי נטען</th></tr></thead>
+        <tbody>
+          <tr><td><strong>למה</strong><br>הסיבות</td><td>למה בחרנו את הארכיטקטורה הזו</td><td>כמעט אף פעם</td><td>רק בהחלטה שנוגעת בזה</td></tr>
+          <tr><td><strong>מה קיים</strong><br>המצב</td><td>אילו טבלאות יש, מה כל שדה עושה</td><td>עם כל שינוי</td><td>בחיפוש</td></tr>
+          <tr><td><strong>מה הלאה</strong><br>הכיוון</td><td>הצעד הבא, מה חסום</td><td>כל שיחה</td><td><strong>תמיד, בפתיחה</strong></td></tr>
+          <tr><td><strong>מה קרה</strong><br>ההיסטוריה</td><td>יומן: מה נעשה ומה התגלה</td><td>מצטבר</td><td>כמעט אף פעם</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="thesis">
+      <div class="t">מסמך עונה על שאלה אחת. לא שתיים.</div>
+      <div class="n">ברגע שמסמך עונה על שתיים, הוא מקבל שני קצבי שינוי סותרים — <strong>והאיטי שבהם מת.</strong></div>
+    </div>
+
+    <h3>איך זה נראה כשזה נשבר</h3>
+    <p>במקרה המבחן, קובץ הסטטוס התחיל כ"מה הלאה". בהדרגה הוא בלע גם את "מה קיים" (כי שם עדכנו ממילא) וגם את "מה קרה" (כי נוח לכתוב במקום אחד).</p>
+
+    <p><strong>התוצאה כפולה:</strong> קובץ הסטטוס תפח ל-267 שורות ואיבד את תפקידו — <em>ובמקביל</em>, מסמך הארכיטקטורה שעבודתו נלקחה ממנו קפא על 36 שורות ומת.</p>
+
+    <div class="call call-warn">
+      <h4>וזה תמיד קורה בזוגות</h4>
+      <p>מסמך שתופח לא צומח מכלום — הוא צומח על חשבון מסמך אחר שמתייבש. <strong>כשאתה רואה קובץ סטטוס ענק, חפש מיד את המסמך שהוא בלע.</strong></p>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s6">
+  <div class="s-no">פרק 6</div>
+  <h2>עובדה יציבה מול עובדה מתכלה</h2>
+  <p class="lede">הבחנה שכמעט אף אחד לא עושה, והיא מנבאת בדיוק אילו מסמכים ירקבו.</p>
+
+  <div class="body">
+    <div class="cmp">
+      <div class="cmp-good"><h4>עובדה יציבה</h4><ul><li>נכונה גם בעוד שנתיים</li><li><em>"בחרנו בפתרון הזה כי התשתית כבר קיימת"</em></li><li>אפשר לכתוב בפרוזה בלי סיכון</li></ul></div>
+      <div class="cmp-bad"><h4>עובדה מתכלה</h4><ul><li><strong>מובטח</strong> שתהפוך לשקר</li><li><em>"אין עדיין טבלאות" · "42 טבלאות" · "טרם בוצע"</em></li><li>נולדה עם תאריך תפוגה</li></ul></div>
+    </div>
+
+    <p>המסמך שמת במקרה המבחן לא "התיישן". הוא הכיל את המשפט <em>"מסד הנתונים ריק ומוכן"</em> — משפט שנולד כדי למות, משולב בפרוזה כאילו הוא עובדה יציבה. <strong>וכשהוא הפך לשקר, הוא לקח איתו את אמינות המסמך כולו.</strong></p>
+
+    <h3>הכלל, בגרסתו המתוקנת</h3>
+    <p>הניסוח הראשון היה איסור מוחלט: "עובדה מתכלה לעולם לא במסמך יציב". <strong>הוא הופר מיד, כולל במסמך שקבע אותו</strong> — כי לפעמים חייבים לצטט מצב.</p>
+
+    <div class="thesis">
+      <div class="t">עובדה מתכלה מותרת — אם היא מבודדת בבלוק מסומן ומתוארכת.</div>
+      <div class="n">לעולם לא משולבת בפרוזה כאילו היא תמידית.</div>
+    </div>
+
+    <p>בפועל: בסוף כל מסמך, סעיף בשם <strong>"עובדות מתכלות — נכון לתאריך X"</strong>. קורא שמגיע אליו יודע מיד מה מעמדו. וכשהתאריך ישן, <strong>הסעיף מסמן את עצמו כחשוד</strong> — במקום להטעות בשקט.</p>
+  </div>
+</section>
+
+<section class="s" id="s7">
+  <div class="s-no">פרק 7</div>
+  <h2>שלוש רמות הטעינה</h2>
+  <p class="lede">החלק שאין בשום שיטת תיעוד רגילה. רמת הטעינה של מסמך היא שקובעת איך הוא נכתב.</p>
+
+  <div class="body">
+    <div class="rows">
+      <div class="row"><div class="rn2">01</div><div><div class="rt2">תמיד טעון</div><div class="rd2">נכנס לכל שיחה אוטומטית: כללי העבודה, וקובץ מצב קצר. <strong>זה החלק היקר ביותר</strong> — הוא משלם מחיר בכל שיחה.</div><div class="rb"><span class="b b-alert">תקרה: 12–15 כללים</span></div></div></div>
+      <div class="row"><div class="rn2">02</div><div><div class="rt2">נטען לפי טריגר</div><div class="rd2">נהלים שנטענים רק כשהמשימה תואמת: איך מאפיינים ישות, צ'קליסט לפני שינוי מבני, איך מנהלים פגישת גילוי.</div><div class="rb"><span class="b b-warn">חייב לעמוד בפני עצמו</span></div></div></div>
+      <div class="row"><div class="rn2">03</div><div><div class="rt2">נמצא בחיפוש</div><div class="rd2">הגוף העיקרי: הידע, ההחלטות, היומן, חומרי המקור. <strong>אף פעם לא נטען אוטומטית.</strong></div><div class="rb"><span class="b b-ok">עובדה אחת לקובץ</span></div></div></div>
+    </div>
+
+    <h3>הפורמט נגזר מהרמה</h3>
+    <p><strong>רמה 1 — ציווי קצר, בלי הסברים.</strong> "כל טבלה בקובץ נפרד" — ולא פסקה שמסבירה למה. ההסבר שייך לרמה 3. <strong>מבחן:</strong> אם שורה לא משנה התנהגות בשיחה הממוצעת, היא לא שייכת לשם.</p>
+
+    <p><strong>רמה 2 — עומד בפני עצמו לחלוטין.</strong> מסמך רמה 2 נטען באמצע משימה, לפעמים על ידי תת-סוכן שלא ראה כלום מהשיחה. הוא חייב להסביר את עצמו מאפס.</p>
+
+    <p><strong>רמה 3 — עובדה אחת לקובץ, ושם הקובץ הוא העובדה.</strong></p>
+
+    <div class="call call-ok">
+      <h4>למה שם הקובץ כל כך חשוב</h4>
+      <p><code>clients.md</code> — לא <code>entities-part-2.md</code>, לא <code>spec-v3.md</code>.</p>
+      <p><strong>שם הקובץ הוא הכתובת.</strong> מי שמחפש "מה יש בטבלת לקוחות" מגיע בקפיצה אחת ומשלם רק על הקובץ הזה. הכלל מתרחב: <strong>החלטה אחת לקובץ · שאלה פתוחה אחת לשורה · יום אחד לרשומת יומן.</strong></p>
+    </div>
+
+    <h3>ושתי מלכודות ברמה 1</h3>
+    <p><strong>הראשונה:</strong> תקרה במספר שורות היא מדד גרוע — 200 שורות פרוזה שונות מ-200 שורות תבליטים. <strong>המדד הנכון הוא מספר הכללים שבאמת משנים התנהגות.</strong> מעבר ל-12–15, התחתונים שבהם דקורטיביים.</p>
+    <p><strong>השנייה, והיא חשובה יותר:</strong> הנטייה היא לתחוב לרמה 1 כל כלל חשוב. <strong>וזו בדיוק הטעות</strong> — ר' פרק 8, כלל 8.</p>
+  </div>
+</section>
+
+<section class="s" id="s8">
+  <div class="s-no">פרק 8</div>
+  <h2>שמונת הכללים</h2>
+  <p class="lede">כל אחד נולד מכשל מתועד, לא מתיאוריה. מי שיקרא רק את הרשימה יראה כללים שרירותיים — הנימוקים הם מה שמחזיק אותם.</p>
+
+  <div class="body">
+    <ol class="rules">
+      <li><div><span class="rt">עובדה אחת, מקום אחד</span><span class="rn">בכל מקום אחר — קישור. זו הסיבה לשלוש מתוך ארבע הסטיות במקרה המבחן.</span></div></li>
+      <li><div><span class="rt">מה שנגזר לא נכתב ביד</span><span class="rn">ספירות, סטטוסים, רשימות. מספר שנכתב ביד הוא הבטחה שמישהו יזכור לעדכן אותו.</span></div></li>
+      <li><div><span class="rt">אינדקס נוצר, לא נכתב</span><span class="rn">מקרה פרטי של כלל 2, ומספיק חשוב כדי לעמוד בנפרד: אינדקס ידני הוא כפילות מובנית — הוא מעתיק פרטים שכבר קיימים בקבצים שהוא מפנה אליהם.</span></div></li>
+      <li><div><span class="rt">עובדה מתכלה — מבודדת ומתוארכת</span><span class="rn">לעולם לא משולבת בפרוזה. ר' פרק 6.</span></div></li>
+      <li><div><span class="rt">מה שנדחה מתועד יחד עם מה שנבחר</span><span class="rn">וחשוב ממנו. בעוד חצי שנה, החלטה בלי החלופות שנדחו נראית שרירותית — ומישהו יציע מחדש בדיוק את מה שכבר נדחה, והדיון יתחיל מהתחלה.</span></div></li>
+      <li><div><span class="rt">כותבים ברגע ההחלטה, לא בסוף השיחה</span><span class="rn">נוגד את האינטואיציה, ולכן ההסבר: בסוף שיחה ארוכה הזיכרון של תחילתה הוא החלש ביותר. סיכום מסוף שיחה הוא <strong>סיכום של סיכום</strong>, ומה שנושר ראשון הוא הנימוק — החלק היקר.</span></div></li>
+      <li><div><span class="rt">כל מסמך מצהיר על רמת הטעינה שלו</span><span class="rn">כי הרמה קובעת את הפורמט. בלי הצהרה הכל נוטה למרכז, ואף מסמך לא מתאים לשום שימוש.</span></div></li>
+      <li><div><span class="rt">כלל שאפשר לאכוף מכנית — אסור לו לשבת ב"תמיד טעון"</span><span class="rn">מקומו בבדיקה. ר' למטה — זה הכלל שנוסף אחרון, והוא החשוב ביותר.</span></div></li>
+    </ol>
+
+    <div class="call call-alert">
+      <h4>הכלל השמיני — ולמה הוא נוסף רק אחרי ביקורת</h4>
+      <p>במקרה המבחן, קובץ הכללים הכיל את המשפט: <em>"עדכן את הקבצים הרלוונטיים מיד אחרי כל פעולה משמעותית."</em> הוא נטען בכל שיחה, מנוסח בתקיפות. <strong>ונשבר ארבע פעמים.</strong></p>
+      <p>זו לא בעיה של ניסוח. <strong>כלל שנטען הוא הטיה, לא חוזה</strong> — הוא משנה סיכוי, לא מבטיח תוצאה. וככל שהקובץ ארוך, כך כלל בשורה 150 חלש מכלל בשורה 10.</p>
+      <p><strong>המסקנה המעשית:</strong> "תמיד טעון" שמור אך ורק למה שאי אפשר לבדוק — סגנון, מתי לעצור, איך לדבר איתך. כל השאר עובר לבדיקה אוטומטית.</p>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s9">
+  <div class="s-no">פרק 9</div>
+  <h2>מרעיון לפרויקט — ארבעה שלבים</h2>
+  <p class="lede">רוב מה שאתה חושב עליו לא יהפוך לפרויקט. שיטה שמתחילה רק כשהפרויקט קיים מפספסת את הרגע היקר ביותר.</p>
+
+  <div class="body">
+    <div class="thesis">
+      <div class="t">המבנה גדל עם המחויבות, לא עם הפוטנציאל.</div>
+      <div class="n">רעיון שאתה בטוח בו ב-5% צריך לעלות דקה. פרויקט שהתחייבת אליו מרוויח את המבנה המלא.</div>
+    </div>
+
+    <p>הטעות הרווחת היא להחיל מבנה אחד על שניהם. אז או שהרעיונות המוקדמים נחנקים ולא נרשמים כלל, או שהפרויקטים רופפים.</p>
+
+    <div class="rows">
+      <div class="row"><div class="rn2">0</div><div><div class="rt2">רעיון גולמי</div><div class="rd2">עשר שניות. אולי כלום.<br><strong>מה נשמר: לא הרעיון — מה שגרם לך לחשוב עליו.</strong></div></div></div>
+      <div class="row"><div class="rn2">1</div><div><div class="rt2">רעיון שחוזר</div><div class="rd2">חזרת אליו מעצמך.<br><strong>מה נשמר: על מה הוא עומד</strong> — אילו הנחות חייבות להיות נכונות כדי שישתלם.</div></div></div>
+      <div class="row"><div class="rn2">2</div><div><div class="rt2">תכנון</div><div class="rd2">החלטת שזה אמיתי, עדיין לא בונה. הצורה, מה לא ידוע, ובאיזה סדר.</div></div></div>
+      <div class="row"><div class="rn2">3</div><div><div class="rt2">פרויקט</div><div class="rd2">התחייבת. כאן חי כל שאר הספר.</div></div></div>
+    </div>
+
+    <div class="call call-ok">
+      <h4>הכלל שהכי קל לפספס בשלב 0</h4>
+      <p>בעוד שלושה חודשים, <em>"מערכת לניהול הגשות"</em> לא מחזירה לך כלום.</p>
+      <p>אבל <em>"לקוחה שאלה אותי מי לא הגיש החודש ולא הייתה לי תשובה"</em> — <strong>מחזירה את כל הרעיון, ובנוסף את הראיה שהוא אמיתי.</strong></p>
+      <p>התצפית מחזיקה שנים. הפתרון הוא הניחוש הראשון שלך, וסביר שהוא שגוי. <strong>שומרים את התצפית.</strong></p>
+    </div>
+
+    <h3>מעברים — ומוות</h3>
+    <ul class="plain">
+      <li><strong>0 ← 1:</strong> חזרת אליו פעם שנייה מעצמך</li>
+      <li><strong>1 ← 2:</strong> ההנחות נבדקו והחזיקו</li>
+      <li><strong>2 ← 3:</strong> החלטת להשקיע זמן אמיתי</li>
+      <li><strong>מוות:</strong> הנחה שהתבדתה, או שנה בלי מגע → <strong>ארכיון עם הסיבה</strong></li>
+    </ul>
+
+    <p><strong>הסיבה היא החלק היקר.</strong> <em>"ניסיתי, מת כי X"</em> מונע ממך לחשוב את זה מחדש בעוד שנתיים — ולפעמים הוא בדיוק מה שהופך רעיון אחר לאפשרי.</p>
+
+    <div class="thesis">
+      <div class="t">אין רעיון מבוזבז. יש רעיון שלא תיעדת למה נעצר.</div>
+    </div>
+
+    <h3>כלל החיכוך — והפרה מכוונת</h3>
+    <p><strong>כל רעיונות שלב 0 יושבים בקובץ אחד.</strong> לא קובץ לרעיון. רעיון חדש = שורה אחת. קובץ משלו רק בשלב 1; מבנה מלא רק בשלב 3.</p>
+    <p>זו <strong>הפרה מודעת</strong> של הכלל "עובדה אחת לקובץ". והיא נכונה: הכלל ההוא משרת <strong>אחזור</strong>; בשלב 0 אין מה לאחזר, יש מה <strong>לתפוס</strong>. ותפיסה מנצחת אחזור כשהסיכון הוא אובדן מוחלט.</p>
+
+    <h3>ומשהו על תפקיד הסוכן</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>שלב</th><th>מה הסוכן עושה</th></tr></thead>
+        <tbody>
+          <tr><td><strong>0</strong></td><td><strong>רושם. לא מעריך.</strong> לכל היותר שואל: "מה גרם לך לחשוב על זה?"</td></tr>
+          <tr><td><strong>1</strong></td><td>מחדד — עוזר לנסח על מה זה עומד</td></tr>
+          <tr><td><strong>2</strong></td><td><strong>מאתגר</strong> — כאן זה מועיל, כי יש מה לאתגר</td></tr>
+          <tr><td><strong>3</strong></td><td>בונה בזהירות, עוצר בנקודות שסוכמו</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-warn">
+      <h4>המערכת לא שואלת שאלה שהרעיון עוד לא מוכן לה</h4>
+      <p>הנחיה נפוצה לסוכן היא "אתגר, אל תסכים סתם". <strong>היא אינה חלה על שלב 0.</strong> אם תזרוק רעיון בן עשר דקות ותקבל "איזו בעיה זה פותר ומי משלם" — הרגת אותו. לא כי הוא רע, אלא כי נשאלה שאלה נכונה בשלב הלא נכון.</p>
+      <p><strong>חצי מהרעיונות הטובים נשמעים רע ביום הראשון.</strong></p>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s10">
+  <div class="s-no">פרק 10</div>
+  <h2>רשימת ההמתנה</h2>
+  <p class="lede">בכל פרויקט יש דברים שמחכים. הם נראים כמו שלושה סוגים שונים — ומתנהגים אחרת — אבל הם דבר אחד עם שדה סוג.</p>
+
+  <div class="body">
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>הסוג</th><th>מה חוסם</th><th>מי משחרר</th><th>איך תדע שהגיע הזמן</th></tr></thead>
+        <tbody>
+          <tr><td><strong>שאלה פתוחה</strong></td><td>שיקול דעת</td><td>אתה / הלקוח</td><td>תראה ברשימה</td></tr>
+          <tr><td><strong>פריט מתוכנן</strong></td><td>תלות</td><td>הסדר</td><td>תגיע לתור</td></tr>
+          <tr><td><strong>חוב דחוי</strong></td><td>תנאי חיצוני</td><td>אירוע</td><td><strong>רק אם מישהו זוכר</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>השורה השלישית היא המסוכנת.</strong> חוב דחוי הוא הדבר היחיד מהשלושה שלא בא לחפש אותך. ביום שהתנאי יתקיים, שום דבר לא יזכיר שמשהו חיכה לו.</p>
+
+    <h3>למה רשימה אחת ולא שלוש</h3>
+    <p>ההצעה הראשונה הייתה שלושה קבצים נפרדים. <strong>היא נדחתה, ומהנימוק שכבר הוכרע פעמיים בתוך אותו פרויקט עצמו:</strong> כשהיה צריך להחליט אם שתי ישויות דומות הן שתי טבלאות או אחת עם שדה סוג — נבחרה תמיד האחת. <em>"תחזוקה שוטפת של שתי טבלאות שצריך לתאם ביניהן חשובה יותר ממורכבות בנייה."</em></p>
+
+    <div class="call call-alert">
+      <h4>והראיה שהפיצול היה נכשל מיד</h4>
+      <p>בפרויקט הייתה ישות שהייתה <strong>בו-זמנית</strong> שאלה פתוחה (לבנות אותה בכלל?), פריט מתוכנן (מקומה בסדר נקבע), וחוב (שתי עמודות היו יורדות איתה).</p>
+      <p><strong>בשלושה קבצים היא הייתה מופיעה שלוש פעמים</strong> — הכפילות שהשיטה כולה באה למנוע, כבר בפריט הראשון.</p>
+    </div>
+
+    <h3>השדות</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>שדה</th><th>למה</th></tr></thead>
+        <tbody>
+          <tr><td><strong>מה חוסם</strong></td><td>הכרעה / תלות / טריגר — השדה שמחליף שלוש טבלאות</td></tr>
+          <tr><td><strong>משוחרר ע"י</strong></td><td>אתה / הלקוח / אירוע מוגדר</td></tr>
+          <tr><td><strong>תלוי ב</strong></td><td>הפניה לשורות אחרות ברשימה — הפניה עצמית, כמו מפתח זר לאותה טבלה</td></tr>
+          <tr><td><strong>מחיר המתנה</strong></td><td>מה קורה בינתיים. <em>"עולה עם כל טבלה שנבנית מעליה"</em></td></tr>
+          <tr><td><strong>עלות טעות</strong></td><td>נמוכה (שדה) / גבוהה (מבנה שיצריך מיגרציה)</td></tr>
+          <tr><td><strong>זמן לענות</strong></td><td>דקה / רבע שעה / דיון</td></tr>
+          <tr><td><strong>סטטוס תשובה</strong></td><td>לא נשאל / <strong>נשאל ולא נענה</strong> / נענה</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>שני השדות האחרונים בטבלה העליונה</strong> — עלות טעות וזמן לענות — הם מה שמאפשר את השאלה <em>"נשארו לי עשר דקות מול הלקוח, מה הכי כדאי לסגור?"</em> כחישוב במקום כניחוש.</p>
+
+    <div class="call call-ok">
+      <h4>דוגמה מהשטח</h4>
+      <p>בפרויקט נבנה שדה שמחזיק ערך רגולטורי, <strong>בלי מימד של שנה</strong>. התברר חודשיים מאוחר שהערך משתנה שנתית — כלומר כל בדיקה היסטורית הייתה שגויה בשקט. תוקן במיגרציה.</p>
+      <p><strong>השאלה שהייתה מונעת את זה — "הערך הזה משתנה משנה לשנה?" — לוקחת חמש שניות.</strong> עלות טעות: גבוהה. זמן לענות: אפסי. היא הייתה קופצת ראשונה בכל שאילתת "עשר דקות".</p>
+    </div>
+
+    <h3>האילוץ</h3>
+    <div class="thesis">
+      <div class="t">אי אפשר לסמן פריט כבוצע אם משהו שהוא תלוי בו עדיין פתוח.</div>
+      <div class="n">במקרה המבחן, אותה טעות סדר — בניית צומת לפני שהצדדים שלו קיימים — חזרה <strong>שלוש פעמים</strong>. כל פעם נתפסה ותוקנה, ובכל זאת חזרה, כי המידע שהיה מונע אותה לא ישב בשום מסמך.</div>
+    </div>
+
+    <h3>ו"נשאל ולא נענה" אינו "לא הספקנו"</h3>
+    <p>כשלקוח לא עונה על שאלה, יש שלוש אפשרויות: זה רגיש, הוא לא יודע, <strong>או שמישהו אחר מחליט.</strong></p>
+    <p>האפשרות השלישית היא זהב — <strong>היא מגלה בעל החלטה שלא היה במפה.</strong> בפרויקט התגלה כך שגורם חיצוני קובע פרמטר מרכזי פר-לקוח, עובדה שלא היה לה מקום בשום מקום במודל.</p>
+  </div>
+</section>
+
+<section class="s" id="s11">
+  <div class="s-no">פרק 11</div>
+  <h2>שכבת הגילוי — לעבוד מול לקוח</h2>
+  <p class="lede">אם אתה בונה מערכות עבור אחרים, זה הפרק שמחזיר הכי הרבה. הרגע שבו הפרויקט באמת נקבע הוא פגישת האיפיון — וברוב המקרים אין לה שיטה בכלל.</p>
+
+  <div class="body">
+    <h3>הבעיה</h3>
+    <p>במקרה המבחן, מנגנון מרכזי במערכת נבנה על סמך ארבעה מקרים שהלקוחה תיארה. חודשיים אחר כך התגלו <strong>שלושה מקרים נוספים שמעולם לא עלו.</strong> כולם היו חריגים.</p>
+
+    <div class="thesis">
+      <div class="t">לקוח מתאר את המקרה הרגיל. תמיד.<br>והכסף נמצא בחריג.</div>
+      <div class="n">לא מהסתרה — אלא כי המקרה הרגיל הוא מה שהוא חושב עליו כשאתה שואל.</div>
+    </div>
+
+    <h3>הכלל שקובע את כל העיצוב</h3>
+    <p><strong>בפגישה חיה יש שניות, לא דקות.</strong> הלקוח מדבר, אתה מסתכל עליו. אם תשתוק שלושים שניות כדי לקרוא משהו — הפגישה נפגעת, והוא מרגיש את זה.</p>
+
+    <div class="call call-alert">
+      <h4>ומכאן המסקנה שהופכת את התפיסה</h4>
+      <p><strong>כל דבר שנוצר תוך כדי הפגישה — מאוחר מדי.</strong> העבודה האמיתית קורית לפני; מה שנדרש בזמן אמת הוא <strong>ניווט</strong> במשהו שכבר מוכן, לא ייצור.</p>
+      <p>החובבן נכנס לפגישה עם כלי שיעזור לו לחשוב. המקצוען נכנס עם תשובות שכבר חשב עליהן, וכלי שעוזר לו למצוא אותן.</p>
+    </div>
+
+    <h3>ולכן ההכנה לא מייצרת סדר יום</h3>
+    <p>סדר יום ליניארי. הלקוח לא. הוא יתחיל בנושא אחד, יקפוץ לשני באמצע משפט, וייזכר במשהו שלישי. <strong>סדר יום נשבר בדקה השלישית וממילא לא תסתכל בו שוב.</strong></p>
+    <p><strong>מה שצריך הוא מפה שאפשר להיכנס אליה מכל נקודה.</strong> הוא אומר "אגב, בנושא השכר" — ותוך שתי שניות יש מולך מה ידוע על שכר, מה פתוח בשכר, ומה בשכר עוד לא נגעתם בו.</p>
+
+    <h4>דף הפגישה — לפי תחום, לא לפי סדר</h4>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>הבלוק</th><th>למה הוא שם</th></tr></thead>
+        <tbody>
+          <tr><td><strong>מה כבר ידוע</strong></td><td>כדי שלא תשאל שוב. <strong>שאלה חוזרת פוגעת באמון יותר מכל דבר אחר</strong> — היא אומרת "לא הקשבתי"</td></tr>
+          <tr><td><strong>מה פתוח</strong></td><td><strong>שלוש שאלות. לא חמש-עשרה.</strong> יותר מזה לא תקרא בפגישה</td></tr>
+          <tr><td><strong>מה מעולם לא נאמר</strong></td><td>בדיקת הכיסוי — ר' למטה</td></tr>
+          <tr><td><strong>דגלים</strong></td><td>"אם הוא אומר X — לחפור"</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>מה הופך שאלה לשאלה טובה</h3>
+    <ol class="rules">
+      <li><div><span class="rt">נגזרת ממה שכבר ידוע</span><span class="rn"><em>"אמרת שהדיווח דו-חודשי — זה אצל כל הלקוחות, או שיש חריגים?"</em> שאלה כזו אפשרית רק אם התשובה הקודמת נשמרה. <strong>זה מה שהופך תמלולים לשווים משהו.</strong></span></div></li>
+      <li><div><span class="rt">רודפת אחרי החריג</span><span class="rn">לא אחרי הכלל.</span></div></li>
+      <li><div><span class="rt">מסודרת לפי מה יעלה אם נטעה</span><span class="rn">לא לפי מה מעניין, ולא לפי מה הגיוני — אלא לפי <strong>מה יקר לתקן מאוחר.</strong></span></div></li>
+    </ol>
+
+    <div class="call call-warn">
+      <h4>מילות הדק — כל אחת מסמנת חריג שלא יסופר מיוזמתו</h4>
+      <p style="font-size:18px;color:var(--ink)"><strong>"בדרך כלל" · "רוב הזמן" · "פחות או יותר" · "בעיקרון" · "חוץ ממקרים בודדים" · "אצל רוב הלקוחות"</strong></p>
+      <p>כשאחת מהן נאמרת, יש שם משהו. שאל מיד.</p>
+    </div>
+
+    <h4>שלוש השאלות שמחזירות הכי הרבה</h4>
+    <ul class="plain">
+      <li><strong>"תן לי דוגמה אמיתית מהשבוע שעבר."</strong> הטובה מכולן. תשובות מופשטות מתארות איך זה <em>אמור</em> לעבוד; מקרה קונקרטי ניתן לאימות ומכיל את כל הפרטים המלוכלכים.</li>
+      <li><strong>"מה קורה כשזה לא הולך כרגיל?"</strong> ישירות אל החריג, במקום לקוות שיעלה.</li>
+      <li><strong>"מי מחליט?"</strong> כמעט אף אחד לא שואל, וזה שדה במודל הנתונים.</li>
+    </ul>
+
+    <h3>מפת הכיסוי — ו"שתיקה אינה תשובה"</h3>
+    <p>עשרה תחומים שבמערכת עסקית חייבים להיסגר:</p>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>#</th><th>התחום</th><th>מה קל לפספס בו</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>מה הוא מוכר</strong></td><td>מה נמכר בנפרד ומה מובלע בתוך משהו אחר</td></tr>
+          <tr><td>2</td><td><strong>למי</strong></td><td>איך הלקוחות שלו נחלקים, ולמה החלוקה משנה התנהגות</td></tr>
+          <tr><td>3</td><td><strong>המחזור התפעולי</strong></td><td>מה קורה כל שבוע/חודש/שנה בלי שאף אחד מבקש</td></tr>
+          <tr><td>4</td><td><strong>חובות חיצוניות</strong></td><td>מי מכתיב מועדים, ומה קורה כשמפספסים</td></tr>
+          <tr><td>5</td><td><strong>כסף</strong></td><td>מתי גובים, ממי, ומה קורה כשלא משלמים</td></tr>
+          <tr><td>6</td><td><strong>אנשים</strong></td><td>מי עושה מה, ומה קורה כשמישהו לא שם</td></tr>
+          <tr><td>7</td><td><strong>חומר ומסמכים</strong></td><td>מה נכנס, ממי, ואיך יודעים שהגיע</td></tr>
+          <tr><td>8</td><td><strong>תקשורת</strong></td><td>באילו ערוצים, ומי מדבר עם מי</td></tr>
+          <tr><td>9</td><td><strong>מה שבור היום</strong></td><td>הכאב, העקיפות, מה עושים ביד</td></tr>
+          <tr><td>10</td><td><strong>מה הוא רוצה לדעת</strong></td><td>אילו שאלות הוא שואל את עצמו ואין לו תשובה</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>9 ו-10 הם היקרים והנדחקים החוצה</strong>, כי הם לא נשמעים "איפיון". אבל 9 הוא מאיפה מגיעות הדרישות האמיתיות, ו-10 הוא מה שהופך מערכת למשהו שמשתמשים בו.</p>
+
+    <div class="call call-ok">
+      <h4>ראיה</h4>
+      <p>המשפט שמנחה את כל הפרויקט במקרה המבחן — מה שבעל המשרד באמת רצה — היה: <em>"ללכת הביתה בערב בלי לחשב בראש מי נשכח ומה יתפוצץ מחר."</em></p>
+      <p><strong>זו תשובה לשאלה 10.</strong> היא לא הייתה מגיעה משום שאלה על מבנה נתונים.</p>
+    </div>
+
+    <div class="thesis">
+      <div class="t">שתיקה אינה תשובה.</div>
+      <div class="n">אם תחום לא עלה — זה או שהוא לא קיים אצל הלקוח, או שאף אחד לא שאל. <strong>שתי האפשרויות דורשות בירור, והן נראות זהות.</strong></div>
+    </div>
+
+    <h3>שלושת הסבבים — מסגרת, לא תסריט</h3>
+    <div class="rows">
+      <div class="row"><div class="rn2">01</div><div><div class="rt2">רוחב</div><div class="rd2">למפות את כל השטח, רדוד. המטרה: <strong>לדעת מה קיים</strong>, לא איך זה עובד. מי שצולל לעומק כאן מסיים עם תחום אחד מצוין ותשעה ריקים.</div></div></div>
+      <div class="row"><div class="rn2">02</div><div><div class="rt2">עומק</div><div class="rd2">תחום אחד בכל פעם, עד הסוף. כאן רודפים אחרי החריגים.</div></div></div>
+      <div class="row"><div class="rn2">03</div><div><div class="rt2">אימות</div><div class="rd2"><em>"הנה איך הבנתי שזה עובד — תקן אותי."</em></div></div></div>
+    </div>
+
+    <div class="call call-ok">
+      <h4>סבב 3 הוא זה שמדלגים עליו, והוא מחזיר הכי הרבה</h4>
+      <p><strong>אנשים גרועים בלתאר את העבודה שלהם ומצוינים בלתקן תיאור שגוי.</strong></p>
+      <p>תיאור שגוי מוציא מהם תגובה מיידית — <em>"לא לא, זה לא ככה, כי..."</em> — וה<strong>"כי"</strong> הזה הוא בדיוק מה שלא היית מקבל משאלה ישירה.</p>
+    </div>
+
+    <h3>שלוש שכבות לכל פגישה</h3>
+    <p>הטעות הרווחת היא לרשום "סיכום פגישה" אחד. הוא מערבב שלושה דברים עם אמינות שונה לגמרי, וברגע שהם מעורבבים אי אפשר להפריד אותם בחזרה.</p>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>השכבה</th><th>מה יש בה</th><th>המעמד</th></tr></thead>
+        <tbody>
+          <tr><td><strong>מה נאמר</strong></td><td>תמלול, מילה במילה</td><td><strong>עובדה.</strong> לא נערך, לא מסוכם במקומו</td></tr>
+          <tr><td><strong>מה הבנת</strong></td><td>החילוץ: דרישות, ישויות, כללים</td><td><strong>פרשנות שלך.</strong> עלולה להיות שגויה</td></tr>
+          <tr><td><strong>מה נוצר</strong></td><td>החלטות, התחייבויות, שאלות</td><td>מזין את רשימת ההמתנה ואת תיק הלקוח</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>ושתי דרישות נלוות:</p>
+    <ul class="plain">
+      <li><strong>כל דרישה מצביעה למקום בתמלול שממנו באה.</strong> אז השאלה <em>"האם היא בכלל הזכירה את הנושא הזה?"</em> הופכת משאלה לשאילתה של עשר שניות.</li>
+      <li><strong>ההערות שלך תוך כדי הן שכבה נפרדת, מסומנת כשלך.</strong> <em>"היא התחמקה מהשאלה על גבייה"</em> — זה לעולם לא יהיה בתמלול, ולפעמים זה הדבר החשוב ביותר שיצא מהפגישה.</li>
+    </ul>
+
+    <div class="call call-warn">
+      <h4>העיקרון שמאחורי ההפרדה</h4>
+      <p>מסמך איפיון שהלקוח נתן לך הוא <strong>מסגרת ורעיון, לא סמכות עליונה</strong> — הוא נכתב בהקשר אחר, ולעיתים חלק ממנו הוא מנגנון של מערכת קודמת ולא צורך עסקי.</p>
+      <p><strong>אותו דבר בדיוק חל על מילות הלקוח בפגישה.</strong> מה שהוא אמר = חומר גלם. מה שאתה בנית מזה = שיקול דעת הנדסי. שני דברים, שני מקומות.</p>
+    </div>
+
+    <h3>מילון הלקוח</h3>
+    <p>לכל בעל עסק יש מילים משלו. הן לא מונחים טכניים — <strong>הן איך הוא חושב.</strong> אוסף אותן מהתמלול, ומתרגם: המונח שלו ↔ המונח במערכת.</p>
+    <p>זה מה שהופך מערכת למשהו שהצוות מזהה במקום נוטש. <strong>וזה גם מקור אמין לשמות שאתה נותן לשדות</strong>, במקום ניחוש.</p>
+
+    <h3>תשאול בזמן אמת</h3>
+    <p>שתי משפחות של שאלות, והן שונות בעלות:</p>
+    <ul class="plain">
+      <li><strong>שליפה</strong> — התשובה כבר קיימת. <em>"מה סיכמנו על גבייה?"</em> · <em>"על מה עוד לא דיברנו?"</em> · <em>"מה שאלנו ולא נענה?"</em> <strong>מיידי.</strong></li>
+      <li><strong>ייצור</strong> — עלה נושא לא מתוכנן, צריך לחשוב. <strong>איטי, ולכן חייב להיות מוגבל בתוצר.</strong></li>
+    </ul>
+
+    <div class="call call-alert">
+      <h4>מגבלה שחייבת להיות מובנית בכלי, לא במשמעת</h4>
+      <p>תשובה חיה מוגבלת ל<strong>שלוש שאלות</strong>. לא כקמצנות — <strong>תשובה חיה שהיא קיר טקסט היא תשובה שלא תיקרא.</strong> הכלי חייב להיות בנוי כך שהוא <em>לא מסוגל</em> להחזיר יותר, אחרת ברגע האמת הוא יחזיר עשר ותפספס את כולן.</p>
+    </div>
+
+    <p><strong>ותפיסה בזמן פגישה — שלוש פעולות בלבד:</strong> לסמן שאלה כנענתה · להוסיף שאלה חדשה · לסמן סתירה. כל דבר מעבר לזה גונב את תשומת הלב שלך מהלקוח, וזה הפסד נטו. <strong>בפגישה לא מתעדים — תופסים.</strong> התיעוד קורה אחריה.</p>
+
+    <h3>ומה שקורה מחוץ לכלי</h3>
+    <p>ההקלטה והתמלול דורשים שירות חיצוני. <strong>מרגע שיש קובץ טקסט</strong> — החילוץ לשלוש השכבות, בדיקת הכיסוי, ההצלבה מול פגישות קודמות וייצור סדר היום הבא — הכל בפנים.</p>
+    <p><strong>והכלי הראשי בזמן הפגישה עצמה הוא הדף המוכן, לא הסוכן.</strong> הסוכן שווה לשני דברים: ההפתעה, ותפיסת הערה מיידית.</p>
+  </div>
+</section>
+
+<section class="s" id="s12">
+  <div class="s-no">פרק 12</div>
+  <h2>שכבת הנכסים ולולאת הלמידה</h2>
+  <p class="lede">החלק שהופך פרויקט חמישי לזול מהראשון. בלעדיו, כל לקוח עולה כמו הקודם.</p>
+
+  <div class="body">
+    <h3>שלושה סוגי נכס — וההבדל ביניהם מסחרי</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>הסוג</th><th>מה זה</th><th>מה זה חוסך</th></tr></thead>
+        <tbody>
+          <tr><td><strong>דפוס</strong></td><td>ידע הנדסי כללי</td><td>טעות</td></tr>
+          <tr><td><strong>מלכודת</strong></td><td>משהו שנראה נכון והיה שגוי</td><td>טעות <strong>שתיפול בה שוב</strong></td></tr>
+          <tr><td><strong>מודול</strong></td><td>מבנה מוכן ובדוק</td><td><strong>שבועיים</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>ולמלכודות יש ערך גבוה מלדפוסים.</strong> פתרון תמצא לבד בפעם הבאה; מלכודת תיפול בה שוב, כי היא נראית נכונה. במקרה המבחן נאספו כאלה: שם שדה שהבטיח הצפנה שלא קיימת · נוסחה שנכונה כתיאור ושגויה כאילוץ · ערך חמישי שהוצע ברמה הלא נכונה.</p>
+
+    <div class="thesis">
+      <div class="t">דפוס נכנס לספרייה רק אחרי שימוש שני.</div>
+      <div class="n">הפעם הראשונה היא פתרון. השנייה היא דפוס. בלי הכלל הזה הספרייה הופכת למחסן זבל של הכללות ספקולטיביות.</div>
+    </div>
+
+    <h3>לולאת הלמידה</h3>
+    <p>זה המנגנון שסוגר את המעגל, והוא הזול ביותר לבנות:</p>
+
+    <div class="thesis">
+      <div class="t">כל דבר שהתגלה מאוחר ועלה בעבודה חוזרת — הופך לשאלה קבועה במפת הכיסוי.</div>
+      <div class="n">כך שבלקוח הבא הוא נתפס בפגישה הראשונה, בחמש שניות.</div>
+    </div>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>מה עלה ימים</th><th>השאלה שתעלה חמש שניות</th></tr></thead>
+        <tbody>
+          <tr><td>ערך רגולטורי נבנה בלי מימד שנה</td><td><strong>"הערך הזה משתנה משנה לשנה?"</strong></td></tr>
+          <tr><td>שדה מחיר חסם שירות שמתומחר לפי נפח</td><td><strong>"יש שירות שמחירו נגזר מכמות ולא קבוע?"</strong></td></tr>
+          <tr><td>צומת נבנה לפני צדדיו — שלוש פעמים</td><td><strong>"מה חייב להתקיים לפני זה?"</strong></td></tr>
+          <tr><td>גורם חיצוני קובע פרמטר פר-לקוח</td><td><strong>"מי מחליט — אתם או גורם חיצוני?"</strong></td></tr>
+          <tr><td>שנת כספים לא תמיד קלנדרית</td><td><strong>"לכולם אותה שנת דיווח?"</strong></td></tr>
+          <tr><td>דיווח שנתי מסכם 12 דיווחים חודשיים</td><td><strong>"יש דיווח שמסכם דיווחים אחרים?"</strong></td></tr>
+          <tr><td>שדה טקסט חופשי חסם את השאילתה שרצו</td><td><strong>"על מה תרצה לשאול שאילתה בעתיד?"</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-ok">
+      <h4>כלל הניסוח — והוא מה שעושה את ההבדל</h4>
+      <p>השאלה מנוסחת כך ש<strong>לקוח יכול לענות עליה</strong>, לא כך שמהנדס יבין אותה.</p>
+      <p>לא <em>"האם השדה הזה צריך מימד זמן"</em> — אלא <em>"הערך הזה משתנה משנה לשנה?"</em></p>
+      <p><strong>שאלה שהלקוח לא יכול לענות עליה אינה שאלת גילוי.</strong></p>
+    </div>
+
+    <h3>ובעיית ההתנעה — שצריך להכיר מראש</h3>
+    <p>"שתיקה אינה תשובה" שווה בדיוק כמו המפה שמולה בודקים. <strong>ובלקוח הראשון המפה כמעט ריקה</strong> — כלומר המנגנון היקר ביותר חלש בדיוק כשטעות עולה הכי הרבה.</p>
+    <p><strong>המיתון:</strong> המפה נזרעת מראש מעשרת התחומים שבפרק 11, ומהשאלות הכלליות. <strong>לא מתחילים מאפס.</strong> ואחרי שלושה לקוחות היא כבר נכס אמיתי שאיש אחר לא יכול לתת לך.</p>
+
+    <div class="call call-warn">
+      <h4>ושדה אחד להוסיף מהיום, למרות שערכו רחוק</h4>
+      <p>לכל תחום במפה — <strong>כמה זמן הוא באמת לקח</strong>, כבר בלקוח הראשון.</p>
+      <p>בלי הנתון הזה, בעוד שנה כשתצטרך לתמחר פרויקט דומה — <strong>עדיין תנחש.</strong> זו התוספת הזולה ביותר עם התשואה הרחוקה ביותר.</p>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s13">
+  <div class="s-no">פרק 13</div>
+  <h2>מחזור חיי שיחה ושני מבחני בריאות</h2>
+
+  <div class="body">
+    <div class="rows">
+      <div class="row"><div class="rn2">א</div><div><div class="rt2">פתיחה — תדריך</div><div class="rd2">שלושה דברים, אוטומטית: <strong>איפה אנחנו · מה מחכה להכרעה שלך · מה עוד לא נשמר.</strong><br>הפריט השלישי נראה טכני והוא השימושי ביותר — הוא תופס עבודה שקיימת בעותק אחד <strong>ביום שנוצרה</strong>, לא בעוד שבועיים.</div></div></div>
+      <div class="row"><div class="rn2">ב</div><div><div class="rt2">תוך כדי — נקודות עצירה</div><div class="rd2">מוגדר מראש מתי הסוכן עוצר לפני שהוא פועל: שינוי במודל הנתונים · שינוי מבני · החלטה ארכיטקטונית · תלות חדשה · מחיקה.<br><strong>ובכל נקודת עצירה ההחלטה נכתבת מיד</strong>, כולל החלופות שנדחו.</div></div></div>
+      <div class="row"><div class="rn2">ג</div><div><div class="rt2">סגירה — טקס</div><div class="rd2">ליומן → <strong>לגזום</strong> → בדיקות → להראות בדיוק מה השתנה → ורק אז לשמור.</div></div></div>
+    </div>
+
+    <div class="thesis">
+      <div class="t">סגירה היא לא "לסכם". היא לגזום.</div>
+      <div class="n">מערכת תיעוד מתה מהצטברות, לא מחוסר כתיבה. במקרה המבחן קובץ הסטטוס הגיע ל-267 שורות <strong>לא</strong> כי לא עדכנו אותו — אלא כי עדכנו ולא גזמו אף פעם.</div>
+    </div>
+
+    <h3>מינימום חירום</h3>
+    <p>שיטה בלי מצב מנוון נזנחת בפעם הראשונה שאין זמן — בנסיעה, אחרי פגישה, בין דברים. ולכן:</p>
+
+    <div class="call call-ok">
+      <h4>אם לא עשית כלום אחר</h4>
+      <p style="font-size:19px;color:var(--ink)"><strong>שורה אחת ליומן, ושמירה.</strong></p>
+      <p>זה תמיד אפשרי, ותמיד עדיף על אפס.</p>
+    </div>
+
+    <h3>שני מבחנים שאומרים אם זה עובד</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>המבחן</th><th>הקריטריון</th><th>מתי רץ</th></tr></thead>
+        <tbody>
+          <tr><td><strong>פתיחה קרה</strong></td><td>שיחה חדשה, בלי זיכרון, בלי מילה ממך — אומרת נכון מה הצעד הבא <strong>אחרי קריאת קובץ אחד</strong></td><td>בסוף כל שלב עבודה</td></tr>
+          <tr><td><strong>חזרה</strong></td><td>אחרי חודשיים, <strong>חמש דקות</strong> קריאה מחזירות אותך לתמונה</td><td>בכל חזרה לפרויקט אחרי הפסקה</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>שניים, כי יש שני צרכנים:</strong> הסוכן צריך <strong>דיוק</strong>, אתה צריך <strong>התמצאות</strong>. מסמך שמושלם לאחד לא בהכרח משרת את השני.</p>
+
+    <p><strong>וכישלון במבחן הראשון הוא תמיד אחד משלושה:</strong> קובץ המצב תפח · מסמך יציב הכיל עובדה מתכלה · ידע נשאר בשיחה ולא נכתב.</p>
+
+    <div class="call call-warn">
+      <h4>ומבחן שמוגדר בלי מועד הוא הבטחה</h4>
+      <p>בגרסה הראשונה של השיטה שני המבחנים הוגדרו — <strong>ולא נאמר מי מריץ אותם ומתי.</strong> כלומר הם היו בדיוק הדבר שהשיטה פוסלת. העמודה השלישית בטבלה נוספה אחרי ביקורת.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ חטיבה ג ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה ג</div>
+  <div class="dt">היישום</div>
+  <div class="dd">מהמבנה בתיקיות ועד המנגנונים שרצים לבד</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s14">
+  <div class="s-no">פרק 14</div>
+  <h2>מבנה התיקיות</h2>
+  <p class="lede">שתי הפרדות מבניות שחייבות להיות מפורשות — אחרת הכל מתערבב בחזרה תוך חודשיים.</p>
+
+  <div class="body">
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">structure</span><button class="copy">העתק</button></div>
+      <pre><code>ארגז-הכלים/                    ← רמת המשתמש, פעיל בכל פרויקט
+├── כללי-עבודה.md              ← רמה 1 · 12-15 כללים בלבד
+├── מתודולוגיה/                ← השיטה עצמה
+├── רעיונות.md                 ← קובץ אחד, שורה לרעיון
+├── ארכיון-רעיונות.md          ← מה מת ולמה
+├── נכסים/
+│   ├── מפת-כיסוי.md
+│   ├── דפוסים/
+│   ├── מלכודות/
+│   └── מודולים/
+├── כלים/
+│   ├── verify-docs.sh
+│   └── daily-backup.ps1
+└── תבנית-פרויקט/              ← עם מספר גרסה
+
+פרויקט-או-לקוח/               ← ריפו נפרד לכל אחד
+├── תיק-התקשרות.md            ← מה הובטח, מה תומחר, scope
+├── מילון-לקוח.md
+├── פגישות/
+│   └── 2026-09-14/
+│       ├── 1-תמלול.md        ← גולמי, לא נערך לעולם
+│       ├── 2-הערות-שלי.md
+│       ├── 3-מה-חולץ.md
+│       └── 4-מה-נוצר.md
+├── waiting.md                 ← רשימת ההמתנה
+└── docs/
+    ├── INDEX.md               ← נוצר, לא נכתב
+    ├── overview.md            ← "למה" · כמעט קפוא
+    ├── architecture.md        ← "מה קיים" · רק עובדות יציבות
+    ├── status.md              ← "מה הלאה" · מסך אחד, נגזם
+    ├── log.md                 ← "מה קרה" · append-only
+    ├── entities/              ← קובץ לכל ישות + INDEX נוצר
+    ├── decisions/             ← קובץ לכל החלטה
+    └── source-materials/      ← עותקים פיזיים + קישור מקורי</code></pre>
+    </div>
+
+    <h3>הפרדה ראשונה — ארגז כלים מול פרויקט</h3>
+    <div class="thesis">
+      <div class="t">בארגז הכלים — רק כללים התנהגותיים. לעולם לא מבניים.</div>
+      <div class="n">ארגז הכלים הוא תלות משותפת שכל הפרויקטים מצביעים אליה.</div>
+    </div>
+
+    <p><strong>למה זה קריטי:</strong> אם תשפר כלל בפרויקט השביעי, שינית בשקט את ההתנהגות בפרויקטים 1–6.</p>
+    <ul class="plain">
+      <li><strong>כלל התנהגותי</strong> — <em>"הצג חלופות עם המלצה"</em>. בטוח רטרואקטיבית; פרויקט ישן רק מרוויח.</li>
+      <li><strong>כלל מבני</strong> — <em>"כל ישות בקובץ נפרד"</em>. שינוי כזה <strong>שובר</strong> פרויקטים קיימים.</li>
+    </ul>
+    <p><strong>מבני יושב בתבנית שפרויקט נולד ממנה</strong> — עם מספר גרסה, כדי שיהיה ברור באיזה מבנה כל פרויקט נולד. תבנית מוחלת פעם אחת בלידה; כלל מוחל תמיד.</p>
+
+    <h3>הפרדה שנייה — זיכרון הסוכן מול הריפו</h3>
+    <div class="thesis">
+      <div class="t">הזיכרון = עובדות עליך ועל איך לעבוד איתך. נוסע בין פרויקטים.<br>הריפו = עובדות על הפרויקט. נוסע עם הקוד.<br><strong>אף עובדה לא בשניהם.</strong></div>
+      <div class="n">מבחן ההכרעה: <strong>אם תמסור את התיקייה למישהו אחר — מה הוא חייב לקבל?</strong></div>
+    </div>
+
+    <h3>ולמה ריפו נפרד לכל לקוח</h3>
+    <p>חומר של לקוח אחד לא צריך לשבת ליד חומר של אחר, ויום אחד תרצה למסור פרויקט <strong>בלי למסור את ארגז הכלים</strong> — שהוא הנכס המקצועי שלך.</p>
+  </div>
+</section>
+
+<section class="s" id="s15">
+  <div class="s-no">פרק 15</div>
+  <h2>מה סקיל, מה פקודה, מה טריגר</h2>
+  <p class="lede">כאן השיטה הופכת ממסמך למשהו שרץ. ובחירת המנגנון הלא נכון היא ההבדל בין שיטה שעובדת לשיטה שנשכחת.</p>
+
+  <div class="body">
+    <div class="thesis">
+      <div class="t">מתודולוגיה שכתובה כמסמך היא מסמך.</div>
+      <div class="n">מישהו צריך לזכור לפתוח אותה — ובשיחה עמוסה, בדיוק כשהיא הכי נחוצה, זה לא קורה. <strong>זו הסיבה שרוב המתודולוגיות מתות: לא כי הן שגויות, אלא כי הן פסיביות.</strong></div>
+    </div>
+
+    <h3>ארבעה מנגנונים, ומה מתאים לכל אחד</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>המנגנון</th><th>מתי פועל</th><th>מתאים ל</th></tr></thead>
+        <tbody>
+          <tr><td><strong>כללי בסיס</strong></td><td>נטען בכל שיחה</td><td>סגנון · מתי לעצור · איך לדבר איתך. <strong>רק מה שאי אפשר לבדוק</strong></td></tr>
+          <tr><td><strong>סקיל</strong></td><td>נטען כשהמשימה תואמת — <strong>הסתברותי</strong></td><td>ידע רחב לפי תחום</td></tr>
+          <tr><td><strong>פקודה</strong></td><td>אתה מקליד אותה — <strong>יורה תמיד</strong></td><td>כל נוהל שחייב לרוץ</td></tr>
+          <tr><td><strong>טריגר</strong></td><td>אוטומטי, באירוע מוגדר</td><td><strong>האכיפה</strong></td></tr>
+          <tr><td><strong>תת-סוכן</strong></td><td>לפי בקשה, בהקשר נפרד</td><td>עבודה ארוכה שלא צריכה לזהם את השיחה</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-alert">
+      <h4>הטעות שקל ליפול בה — וזו הייתה טעות בגרסה הראשונה של השיטה</h4>
+      <p>התוכנית המקורית הקצתה <strong>שבעה סקילים ושלוש פקודות.</strong> זו הייתה <strong>סתירה עצמית.</strong></p>
+      <p>סקיל נטען לפי <strong>התאמה</strong> בין התיאור שלו לבין איך שניסחת את הבקשה. שבעה סקילים בתחומים חופפים יתנגשו זה בזה, או שאף אחד לא ייטען.</p>
+      <p><strong>מתודולוגיה שהתזה שלה היא דטרמיניזם לא יכולה להישען על מנגנון הסתברותי בליבה שלה.</strong> היחס תוקן ל<strong>שלושה סקילים ואחת עשרה פקודות.</strong></p>
+    </div>
+
+    <h3>החלוקה בפועל</h3>
+
+    <h4>שלושה סקילים — רחבים, בלי חפיפה</h4>
+    <ul class="plain">
+      <li><strong>איפיון</strong> — איך מאפיינים ישות, הפורמט הקבוע, איך קוראים חומר מקור, בדיקת שבירות</li>
+      <li><strong>מבנה</strong> — צ'קליסט לפני שינוי מבני, והדפוסים ההנדסיים החוזרים</li>
+      <li><strong>גילוי</strong> — מבנה השאלות, מפת הכיסוי, שלושת הסבבים</li>
+    </ul>
+
+    <h4>פקודות — נקודת כניסה מפורשת לכל נוהל שחייב לרוץ</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">commands</span><button class="copy">העתק</button></div>
+      <pre><code>/רעיון          תופס רעיון גולמי בשורה אחת
+/המתנה          מציג / מסנן / מוסיף לרשימת ההמתנה
+/פתיחה          תדריך: איפה אנחנו, מה פתוח, מה לא נשמר
+/סגירה          הטקס: יומן, גיזום, בדיקות, אישור
+/לקח            מוסיף שאלה למפת הכיסוי (לולאת הלמידה)
+/ישות           יוצר קובץ ישות + שורת אינדקס באותה פעולה
+/החלטה          מסמך החלטה חדש, מספר הבא, תבנית מלאה
+/פרויקט         פרויקט חדש מהתבנית
+/פגישה-הכנה     בונה את דף הפגישה
+/פגישה-עיבוד    תמלול → שלוש שכבות + מה לא נאמר
+/שאל            תשאול חי — מוגבל לשלוש שאלות</code></pre>
+    </div>
+
+    <p><strong>שים לב ל-<code>/ישות</code> ו-<code>/החלטה</code>:</strong> הם יוצרים את הקובץ <strong>ומוסיפים את שורת האינדקס באותה פעולה.</strong> שכחה הופכת לבלתי אפשרית — לא ל"אסור".</p>
+
+    <div class="call call-alert">
+      <h4>⚠️ תיקון מהותי מגרסה 1: אין באמת אירוע "סגירת שיחה"</h4>
+      <p>גרסה 1 בנתה את האכיפה על טקס סגירה. <strong>אנשים לא סוגרים שיחה — הם סוגרים חלון.</strong> וטריגר שרץ אחרי כל תגובה מייצר בדיוק את הרעש שהספר מזהיר ממנו, בעוד טריגר שרץ בסוף הסשן מגיע כשכבר אין מי שיטפל בממצא.</p>
+      <p><strong>נקודת האכיפה האמיתית היא ה-commit.</strong> זה אירוע שאדם באמת מבצע, והוא הרגע האחרון לפני שעבודה הופכת להיסטוריה.</p>
+    </div>
+
+    <div class="cb" data-src=".githooks/pre-commit">
+      <div class="cb-head"><span class="cb-name">.githooks/pre-commit</span><button class="copy">העתק</button></div>
+      <pre><code>root=$(git rev-parse --show-toplevel)
+checker="$root/tools/verify-docs.sh"
+[ -f "$checker" ] || exit 0
+
+# Staged files are dirty by definition here, so that check is skipped.
+VERIFY_SKIP_DIRTY=1 bash "$checker" || {
+  echo "Commit blocked: documentation checks failed."
+  exit 1
+}</code></pre>
+    </div>
+
+    <p><strong>ונייד, בניגוד למה שרוב האנשים מגלים מאוחר:</strong> <code>.git/hooks</code> אינו נשמר בגיט, ולכן hook שמונח שם לא נוסע לשום מקום. <code>git config core.hooksPath .githooks</code> מעביר אותו לתוך הריפו עצמו — בדיוק אותה מלכודת ניידות שתוארה למעלה לגבי הגדרות הכלי.</p>
+
+    <p><strong>ו-CI מעליו.</strong> הוא האכיפה היחידה שאינה תלויה במכונה שלך כלל, והוא תופס את שני המקרים שה-hook מחמיץ: <code>--no-verify</code>, ומכונה שבה <code>core.hooksPath</code> לא הוגדר.</p>
+
+    <div class="call call-warn">
+      <h4>וכלל שנובע מכך ישירות: hook חוסם מייקר כל אזעקת שווא</h4>
+      <p>בלי hook, ממצא שגוי הוא שורה אדומה שמתעלמים ממנה. <strong>אחרי ה-hook הוא commit חסום</strong>, והתגובה הטבעית היא <code>--no-verify</code>. ברגע שזה הופך להרגל, ה-hook מת.</p>
+      <p><strong>ולכן: בדיקה שנכשלת כי עבר זמן — מזהירה, לעולם לא חוסמת.</strong> בלוק עובדות מתכלות שהתיישן לא נשבר בגלל השינוי הנוכחי, ואסור לו לחסום commit שאינו קשור אליו.</p>
+    </div>
+
+    <h4>ושלושה טריגרים — לנוחות, לא לאכיפה</h4>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>מתי</th><th>מה קורה</th></tr></thead>
+        <tbody>
+          <tr><td><strong>פתיחת שיחה</strong></td><td>תדריך: איפה אנחנו · מה פתוח · <strong>מה לא נשמר</strong></td></tr>
+          <tr><td><strong>סגירת שיחה</strong></td><td>מריץ את בדיקות התיעוד ומציג כשלים</td></tr>
+          <tr><td><strong>עריכת קובץ מבני</strong></td><td>תזכורת מיידית שהאינדקס דורש שורה</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-warn">
+      <h4>מלכודת ניידות שקל לפספס</h4>
+      <p>בהרבה סביבות, קובץ ההגדרות שמחזיק את הטריגרים הוא <strong>מקומי ואינו נשמר בגיט.</strong> כלומר במכונה חדשה הסקילים והפקודות יגיעו — <strong>והטריגרים, החלק היחיד שבאמת אוכף, לא.</strong></p>
+      <p><strong>הפרד הגדרות משותפות (טריגרים — נכנסות לגיט) מהגדרות מקומיות (הרשאות, נתיבים — נשארות בחוץ).</strong></p>
+    </div>
+
+    <h3>ושני תת-סוכנים</h3>
+    <ul class="plain">
+      <li><strong>ביקורת תיעוד</strong> — קורא את כל עץ התיעוד ומדווח על סתירות בפרוזה, שאף סקריפט לא יתפוס. <strong>זה מה שהניב 18 ממצאים במקרה המבחן</strong> — וראוי שיהיה כלי קבוע, לא בקשה חד-פעמית.</li>
+      <li><strong>ביקורת מבנה</strong> — משווה את התיעוד למערכת החיה.</li>
+    </ul>
+    <p>שניהם בהקשר נפרד, כדי שעבודה ארוכה לא תדחק את השיחה עצמה.</p>
+  </div>
+</section>
+
+<!-- ══════════ חטיבה ד ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה ד</div>
+  <div class="dt">ערכת הכלים</div>
+  <div class="dd">כל התבניות והקוד, מוכנים להעתקה</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s16">
+  <div class="s-no">פרק 16</div>
+  <h2>תבניות המסמכים</h2>
+  <p class="lede">כל תבנית עם הצהרת רמת טעינה בראשה, כי הרמה קובעת איך כותבים אותה.</p>
+
+  <div class="body">
+    <h4>סקירה — "למה" · כמעט קפוא</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/overview.md</span><button class="copy">העתק</button></div>
+      <pre><code># סקירה — &lt;שם הפרויקט&gt;
+
+**רמת טעינה: 3**
+
+## הכוכב הצפוני
+&lt;משפט אחד: מה המצב שהפרויקט הזה מביא אליו.
+לא פיצ'ר — מצב. מה ישתנה בחיים של מישהו.&gt;
+
+## מה בפנים ומה בחוץ
+&lt;תיחום מפורש. מה במכוון לא בתוך ה-scope, ולמה.&gt;
+
+## מטרות-העל
+| # | המטרה | יעד מדיד |
+|---|---|---|
+| 1 | | |
+
+## מקורות מידע
+- `source-materials/&lt;קובץ&gt;` — &lt;מה זה, ומה מעמדו: מקור סמכות
+  לְמה בדיוק, ולְמה הוא **אינו** מקור סמכות&gt;
+  קישור מקורי: &lt;URL&gt;</code></pre>
+    </div>
+
+    <h4>ארכיטקטורה — "מה קיים" · רק עובדות יציבות</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/architecture.md</span><button class="copy">העתק</button></div>
+      <pre><code># ארכיטקטורה — מצב נוכחי
+
+**רמת טעינה: 3** · מסמך חי, נערך במקום
+
+## &lt;שכבה&gt;
+&lt;תיאור מבני בלבד. בלי מספרים, בלי "עדיין לא",
+בלי "טרם". כל אלה עובדות מתכלות — מקומן למטה.&gt;
+
+## החלטות שמעצבות את המבנה
+&lt;קישור למסמכי ההחלטה. לא שכפול שלהם.&gt;
+
+---
+
+## עובדות מתכלות — נכון ל-&lt;תאריך&gt;
+&lt;כאן, ורק כאן, מה שיתיישן.&gt;</code></pre>
+    </div>
+
+    <h4>סטטוס — "מה הלאה" · מסך אחד</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/status.md</span><button class="copy">העתק</button></div>
+      <pre><code># סטטוס
+
+**רמת טעינה: 1** · ⚠️ תקרה: 60 שורות. נגזם בכל סגירה.
+
+## איפה אנחנו
+&lt;פסקה אחת. לא היסטוריה — מצב.&gt;
+
+## הצעד הבא
+1. &lt;פעולה קונקרטית&gt;
+2. &lt;פעולה קונקרטית&gt;
+
+## מה מחכה
+ר' `waiting.md` — **לא מפרטים כאן.**
+
+---
+## עובדות מתכלות — נכון ל-&lt;תאריך&gt;</code></pre>
+    </div>
+
+    <div class="call call-alert">
+      <h4>התקרה היא החלק החשוב בתבנית הזו</h4>
+      <p>בלי תקרה מפורשת, הקובץ הזה יתפח — תמיד. <strong>במקרה המבחן הוא חצה 650 שורות</strong>, פי אחת-עשרה מהתקרה, בקובץ שנטען בכל שיחה.</p>
+      <p><strong>והתקרה נקבעת כמחגר, לא כצוק:</strong> על המצב הנוכחי, כך שהקובץ לא יכול לגדול בעוד הגיזום עצמו ממתין לזמן שיהיה לו. כל גיזום מוריד את המספר.</p>
+    </div>
+
+    <h4>יומן — "מה קרה" · append-only</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/log.md</span><button class="copy">העתק</button></div>
+      <pre><code># יומן
+
+**רמת טעינה: 3** · מצטבר, לעולם לא נערך אחורה
+
+## &lt;תאריך&gt;
+- **&lt;מה נעשה&gt;** — &lt;ולמה. הנימוק הוא החלק היקר.&gt;
+- **&lt;מה התגלה&gt;** — &lt;כולל טעויות. במיוחד טעויות.&gt;
+- **&lt;מה הוכרע&gt;** — &lt;ומה נדחה, ולמה נדחה.&gt;</code></pre>
+    </div>
+
+    <p><strong>היומן הוא אזור נחיתה, לא ארכיון.</strong> עובדה שרלוונטית גם בעוד שלושה חודשים חייבת להיות <strong>מקודמת</strong> ממנו החוצה — למסמך החלטה, לקובץ ישות, או לספריית הנכסים. <strong>ואם מצאת את עצמך מחפש ביומן — משהו לא קודם בזמן.</strong></p>
+
+    <h4>רשימת המתנה</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">waiting.md</span><button class="copy">העתק</button></div>
+      <pre><code># רשימת המתנה
+
+**רמת טעינה: 1**
+
+❗ **אילוץ: אי אפשר לסמן פריט כבוצע אם משהו
+שהוא תלוי בו עדיין פתוח.**
+
+**סוג:** 🔷 הכרעה · 🔗 תלות · ⏳ טריגר · 🔨 ביצוע
+
+| # | סוג | מה | חוסם / משוחרר ע"י | מחיר המתנה | עלות טעות |
+|---|---|---|---|---|---|
+| W-001 | 🔷 | | &lt;מי מכריע&gt; | | גבוהה / בינונית |
+| W-002 | 🔗 | | W-001 | | — |
+| W-003 | ⏳ | | &lt;האירוע המדויק&gt; | &lt;מה קורה בינתיים&gt; | |
+| W-004 | 🔨 | | — | | — |</code></pre>
+
+      <div class="call call-alert" style="margin-top:14px">
+        <h4>⚠️ טבלה אחת, ומזהה שאינו מקודד סוג</h4>
+        <p>גרסה 1 של התבנית פיצלה את הרשימה לארבע טבלאות, עם מזהים כמו <code>ה-01</code> ו-<code>ט-01</code> — <strong>וסתרה בכך את פרק 10, שמסביר בדיוק למה לא.</strong></p>
+        <p><strong>והנזק מעשי:</strong> פריט שמשנה סוג — ושאלה פתוחה הופכת לחוב דחוי כל הזמן — מקבל מזהה חדש, <strong>וכל הפניה אליו בעמודת "חוסם" נשברת.</strong> <code>W-###</code> ניטרלי וקבוע לכל חיי הפריט.</p>
+      </div>
+    </div>
+
+    <h4>קובץ ישות — עובדה אחת לקובץ</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/entities/&lt;name&gt;.md</span><button class="copy">העתק</button></div>
+      <pre><code># &lt;name&gt; — &lt;השם בשפת הלקוח&gt;
+
+**רמת טעינה: 3**
+
+## מה זה ולמה זה משרת
+&lt;פסקה. לא מילון שדות — תיאור ראשי:
+מה הישות הזו מחזיקה, ואיזו שאלה עסקית היא עונה.&gt;
+
+## שדות
+| עמודה | תרגום השם | טיפוס | אילוצים | מה זה משרת |
+|---|---|---|---|---|
+| | | | | |
+
+## החלטות עיצוב
+&lt;מה נבחר, **ומה נדחה ולמה**.&gt;
+
+## ר' גם
+&lt;קישורים לישויות קשורות&gt;</code></pre>
+    </div>
+
+    <p><strong>עמודת "תרגום השם" אינה קישוט.</strong> היא מה שמחבר את המודל לשפה שהלקוח מזהה — ומקורה הנכון הוא מילון הלקוח מפרק 11, לא הניחוש שלך.</p>
+
+    <h4>מסמך החלטה</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">docs/decisions/NNNN-&lt;title&gt;.md</span><button class="copy">העתק</button></div>
+      <pre><code># NNNN — &lt;כותרת&gt;
+
+**סטטוס:** תקף | בוטל ע"י NNNN
+**תאריך:**
+
+## ההקשר
+&lt;מה הצריך החלטה. מה היה כואב.&gt;
+
+## ההחלטה
+&lt;מה נקבע.&gt;
+
+## מה נדחה  ← החלק היקר
+| החלופה | למה נדחתה |
+|---|---|
+| | |
+
+## התוצאות
+&lt;מה זה מאפשר, ומה זה מקשה. כולל הרע.&gt;</code></pre>
+    </div>
+
+    <div class="call call-warn">
+      <h4>שדה הסטטוס אינו פורמליות</h4>
+      <p>עם 60 מסמכי החלטה אחרי שלוש שנים, <strong>"מה הכלל התקף היום" ידרוש לקרוא את כולם ולדעת מי ביטל את מי.</strong></p>
+      <p>וההפרדה שפותרת: <strong>מסמך ההחלטה מחזיק רק את ה"למה", פעם אחת ולתמיד. מה שתקף עכשיו יושב במסמך החי.</strong></p>
+    </div>
+
+    <h4>רעיונות · ומפת כיסוי</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">רעיונות.md</span><button class="copy">העתק</button></div>
+      <pre><code># רעיונות
+
+**רמת טעינה: 3** · שורה אחת לרעיון. אפס חיכוך.
+
+| תאריך | מה גרם לי לחשוב על זה | הרעיון | שלב |
+|---|---|---|---|
+| | &lt;התצפית — זה מה שמחזיק&gt; | &lt;הניחוש&gt; | 0 |</code></pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">נכסים/מפת-כיסוי.md</span><button class="copy">העתק</button></div>
+      <pre><code># מפת כיסוי
+
+**רמת טעינה: 2** · נטענת בהכנה לפגישה ובעיבוד אחריה
+
+&gt; **שתיקה אינה תשובה.**
+
+## עשרת התחומים
+| # | תחום | נדון? | כמה זמן לקח בפועל |
+|---|---|---|---|
+| 1 | מה הוא מוכר | | |
+| ... | | | |
+
+## השאלות שנלמדו בכאב
+| # | השאלה | המקרה שהוליד אותה |
+|---|---|---|
+| ש-01 | &lt;מנוסחת כך שהלקוח יכול לענות&gt; | |</code></pre>
+    </div>
+
+    <h4>שלוש שכבות הפגישה</h4>
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">פגישות/&lt;date&gt;/</span><button class="copy">העתק</button></div>
+      <pre><code>1-תמלול.md        גולמי. לא נערך. לא מסוכם. **עובדה.**
+
+2-הערות-שלי.md    מה הרגשת, לא מה נאמר.
+                  "התחמק מהשאלה על גבייה"
+                  לעולם לא יהיה בתמלול.
+
+3-מה-חולץ.md      דרישות · ישויות · כללים.
+                  **כל שורה עם הפניה לתמלול.**
+                  זו **פרשנות שלך** — עלולה להיות שגויה.
+
+4-מה-נוצר.md      החלטות · התחייבויות · שאלות חדשות
+                  → נכנסות ל-waiting.md
+                  → ומשם לסדר היום של הפגישה הבאה.</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s17">
+  <div class="s-no">פרק 17</div>
+  <h2>קובץ הכללים</h2>
+  <p class="lede">הקובץ היקר ביותר בשיטה — הוא משלם מחיר בכל שיחה. ולכן הוא גם היחיד עם תקרה קשיחה.</p>
+
+  <div class="body">
+    <div class="cb">
+      <div class="cb-head"><span class="cb-name">כללי-עבודה.md</span><button class="copy">העתק</button></div>
+      <pre><code># כללי עבודה
+
+**רמת טעינה: 1** — נטען בכל שיחה.
+⚠️ **תקרה: 15 כללים.** כלל שאפשר לבדוק אוטומטית
+   **אינו שייך לכאן** — מקומו בבדיקה.
+
+## סגנון
+1. יועץ, לא מריץ־קוד. להסביר **מה** ו**למה** לפני
+   כל פעולה לא טריוויאלית.
+2. בבקשה מעורפלת — לשאול, לא לנחש בשקט.
+3. להציג חלופות עם המלצה מנומקת.
+4. להבחין במפורש בין "יודע" · "מניח" · "צריך לבדוק".
+5. לאתגר גם רעיונות שלי — **אבל לא בשלב רעיון גולמי.**
+
+## מתי לעצור לפני ביצוע
+6. שינוי במודל הנתונים או במבנה
+7. תלות חיצונית חדשה
+8. יותר משלושה קבצים בפעולה אחת
+9. כל מחיקה
+10. כסף · מסמכי חובה · נתוני לקוח אמיתיים
+
+## מבנה העצירה
+11. מה עומד לקרות · למה · מה נדחה · מה הסיכון ·
+    מה נדרש ממך
+
+## כתיבה
+12. החלטה נכתבת **ברגע שהתקבלה**, לא בסוף השיחה.
+13. כל החלטה כוללת את מה שנדחה.
+14. עובדה מתכלה — רק בבלוק מתוארך.
+
+## סגירה
+15. סגירה = **לגזום**, לא לסכם.</code></pre>
+    </div>
+
+    <div class="call call-alert">
+      <h4>ומה שאסור שייכנס לכאן</h4>
+      <p>כללים כמו <em>"לעדכן את האינדקס"</em> · <em>"לוודא שאין קישורים שבורים"</em> · <em>"לרשום כל מיגרציה"</em> — <strong>כולם ניתנים לבדיקה אוטומטית, ולכן אסור להם לשבת כאן.</strong></p>
+      <p>כלל כזה בקובץ הכללים הוא <strong>אשליה של אכיפה</strong>: הוא מרגיש כמו הגנה, ואינו מספק אותה. במקרה המבחן היה בדיוק כלל כזה — והוא נשבר ארבע פעמים.</p>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s18">
+  <div class="s-no">פרק 18</div>
+  <h2>שני הסקריפטים</h2>
+  <p class="lede">שני קבצים. יחד הם כל ההבדל בין שיטה למסמך על שיטה.</p>
+
+  <div class="body">
+    <h3>1 · בודק התיעוד</h3>
+    <p><strong>עיקרון מרכזי: בלי רשת, בלי מסד נתונים, בשנייה אחת.</strong></p>
+
+    <div class="call call-warn">
+      <h4>למה הפיצול מבדיקות המערכת הוא הכרחי</h4>
+      <p>במקרה המבחן היה סקריפט בדיקה יחיד שהתחבר בין היתר לשרת. כשאין רשת — <strong>גם ארבע הבדיקות שכלל אינן צריכות שרת נכשלו.</strong></p>
+      <p>התוצאה: הוא רץ רק כשנזכרו. <strong>בדיקה שלוקחת דקה ויכולה להיכשל מסיבות שלא קשורות לה — אי אפשר לחווט לסוף כל שיחה.</strong> בדיקה של שנייה שלא תלויה בכלום — אפשר תמיד.</p>
+    </div>
+
+    <div class="cb" data-src="כלים/verify-docs.sh">
+      <div class="cb-head"><span class="cb-name">כלים/verify-docs.sh</span><button class="copy">העתק</button></div>
+      <pre><code>#!/usr/bin/env bash
+# Documentation checks. No network, no database, read-only.
+# Exits non-zero so it can be wired into a session-close hook.
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." &amp;&amp; pwd)"
+FAIL=0
+ok(){ printf '  \033[32m✓\033[0m %s\n' "$1"; }
+bad(){ printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL=1; }
+
+# A subdirectory with its own INDEX.md owns its files;
+# everything else answers to the docs/ index.
+index_for(){
+  [ -f "$1/INDEX.md" ] &amp;&amp; printf '%s' "$1/INDEX.md" \
+                       || printf '%s' "$2/INDEX.md"
+}
+
+check_project(){
+  proj="$1"; docs="$proj/docs"
+  [ -d "$docs" ] || return
+  printf '\n\033[1m── %s ──\033[0m\n' "$(basename "$proj")"
+
+  # 1. every doc is listed in the index that owns it
+  missing=""
+  while IFS= read -r f; do
+    base="$(basename "$f")"
+    [ "$base" = "INDEX.md" ] &amp;&amp; continue
+    idx="$(index_for "$(dirname "$f")" "$docs")"
+    [ -f "$idx" ] || continue
+    grep -qF "$base" "$idx" || missing="$missing\n      ${f#$proj/}"
+  done &lt; &lt;(find "$docs" -name '*.md' -type f)
+  [ -z "$missing" ] &amp;&amp; ok "every doc is listed in its index" \
+    || { bad "missing from their index:"; printf "$missing\n"; }
+
+  # 2. internal links resolve
+  broken=""
+  while IFS= read -r f; do
+    d="$(dirname "$f")"
+    while IFS= read -r l; do
+      t="${l//\%20/ }"
+      [ -e "$d/$t" ] || broken="$broken\n      ${f#$proj/} -&gt; $l"
+    done &lt; &lt;(grep -oE '\]\(&lt;?[^)#][^)]*\.md&gt;?\)' "$f" 2&gt;/dev/null \
+             | sed 's/^](//; s/)$//; s/^&lt;//; s/&gt;$//' \
+             | grep -v '^http')
+  done &lt; &lt;(find "$docs" -name '*.md' -type f)
+  [ -z "$broken" ] &amp;&amp; ok "no broken internal links" \
+    || { bad "broken links:"; printf "$broken\n"; }
+}
+
+printf '\033[1m═══ documentation checks ═══\033[0m\n'
+if [ $# -ge 1 ]; then check_project "$(cd "$1" &amp;&amp; pwd)"
+else
+  while IFS= read -r p; do check_project "$p"; done \
+    &lt; &lt;(find "$ROOT/projects" -mindepth 1 -maxdepth 1 -type d 2&gt;/dev/null)
+fi
+
+# Work that exists in exactly one copy is the failure this
+# whole method was written to stop. Reported last, so it is
+# the line left on screen.
+printf '\n\033[1m── not yet saved ──\033[0m\n'
+unsaved="$(git -C "$ROOT" status --porcelain 2&gt;/dev/null)"
+[ -z "$unsaved" ] &amp;&amp; ok "working tree is clean" \
+  || { bad "uncommitted — these exist in one copy only:";
+       printf '%s\n' "$unsaved" | sed 's/^/      /'; }
+
+printf '\n'
+[ "$FAIL" = "0" ] &amp;&amp; printf '\033[32mAll checks passed.\033[0m\n' \
+                  || printf '\033[31mSome checks failed.\033[0m\n'
+exit $FAIL</code></pre>
+    </div>
+
+    <h3>2 · גיבוי יומי</h3>
+    <p><strong>ההבחנה שקובעת את כל העיצוב שלו:</strong></p>
+    <div class="thesis">
+      <div class="t">גיבוי אוטומטי — כן. רישום אוטומטי — לא.</div>
+      <div class="n"><strong>דחיפה אוטומטית</strong> של מה שכבר רשום = בטוח לגמרי; רק שולח עותק החוצה.<br><strong>רישום אוטומטי</strong> של כל שינוי = הורס. ההיסטוריה שלך שווה משהו כי כל רשומה מסבירה <em>למה</em>. רישום אוטומטי כל שעה יהפוך מאה רשומות משמעותיות לאלפי רשומות חסרות מובן — וההיסטוריה תהיה שם, אבל בלתי שמישה.</div>
+    </div>
+
+    <div class="cb" data-src="כלים/daily-backup.ps1">
+      <div class="cb-head"><span class="cb-name">כלים/daily-backup.ps1</span><button class="copy">העתק</button></div>
+      <pre><code># Daily off-machine backup. Pushes what is already committed.
+# Never commits: that stays a deliberate act.
+#
+# Paths are DERIVED, never written down. $PSScriptRoot is the
+# folder this file sits in, so it survives being renamed, moved
+# or cloned to another machine - and it avoids non-ASCII path
+# literals, which Windows PowerShell mis-reads.
+
+$ErrorActionPreference = 'Continue'
+$Here    = $PSScriptRoot
+$Repo    = Split-Path $Here -Parent
+$LogFile = Join-Path $Here 'backup.log'
+$Stamp   = Get-Date -Format 'yyyy-MM-dd HH:mm'
+
+function Write-Log($msg){
+  Add-Content -LiteralPath $LogFile -Value "$Stamp  $msg" -Encoding utf8
+}
+
+# Uncommitted work cannot be backed up. Say so, rather than
+# reporting success while it sits in a single copy.
+$dirty = &amp; git -C $Repo status --porcelain
+if ($dirty) {
+  $n = ($dirty | Measure-Object -Line).Lines
+  Write-Log "WARNING  $n file(s) not committed - NOT backed up"
+}
+
+$ahead = &amp; git -C $Repo rev-list --count '@{u}..HEAD' 2&gt;$null
+if ($LASTEXITCODE -ne 0) {
+  Write-Log 'ERROR    no upstream configured'; exit 1
+}
+
+if ($ahead -eq '0') {
+  # Only say "up to date" when it is the whole truth.
+  if (-not $dirty) { Write-Log 'ok       already up to date' }
+  exit 0
+}
+
+# Check git's EXIT CODE, not $?. git writes progress to stderr
+# even on a clean push, and PowerShell turns that into an error
+# record - so $? reports failure on a push that worked.
+$out = &amp; git -C $Repo push 2&gt;&amp;1
+if ($LASTEXITCODE -eq 0) {
+  Write-Log "ok       pushed $ahead commit(s)"; exit 0
+} else {
+  Write-Log "ERROR    push failed ($LASTEXITCODE): $($out -join ' ')"
+  exit 1
+}</code></pre>
+    </div>
+
+    <div class="call call-alert">
+      <h4>⚠️ ומה שביקורת חיצונית מצאה בבודק של גרסה 1</h4>
+      <p><strong>הוא לא תפס אף אחת מארבע הסטיות שהספר הזה בנוי עליהן.</strong> הוא בדק שקבצים רשומים באינדקס ושאין קישורים שבורים — ואף אחת מהסטיות לא הייתה מסוג הזה.</p>
+      <p><strong>וגרוע מכך: כשלא מצא אף פרויקט לבדוק, הוא הדפיס "All checks passed" בירוק והחזיר הצלחה.</strong> תוצאה ירוקה שמשמעותה "לא הסתכלתי" היא בדיוק הכשל שכל השיטה קיימת כדי למנוע.</p>
+      <p>נוספו לו שש בדיקות שהתבניות רק ביקשו בפרוזה: <strong>תקרת הסטטוס · תקרת קובץ הכללים · בלוק עובדות מתכלות שהתיישן · תלות פתוחה תחת פריט סגור · ונתוני לקוח אמיתיים בקבצים מקובעים.</strong></p>
+    </div>
+
+    <div class="call call-alert">
+      <h4>⭐ הבדיקה שאסור לוותר עליה: נתוני לקוח</h4>
+      <p>זו הבדיקה היחידה ברשימה <strong>שהכישלון בה בלתי הפיך.</strong> כל השאר הוא קובץ שעורכים ומקבעים מחדש; מספר זהות של לקוח שנדחף לשרת נמצא בהיסטוריה, על מכונה של מישהו אחר, והסרתו דורשת שכתוב היסטוריה בכל מקום שבו הריפו שוכפל אי פעם.</p>
+      <p><strong>ולכן היא נבדקת לפני ה-commit, לא אחריו.</strong> מסמכי איפיון מתארים שדות; אסור להם לשאת שורות.</p>
+      <p><strong>חריגים מוצהרים אחד-אחד</strong> בקובץ היתר, עם נימוק. תבנית רחבה שמתירה "כל תשע ספרות בקובץ זריעה" מתירה גם את המספר האמיתי הראשון שמישהו ידביק.</p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>ומחגר במקום צוק</h4>
+      <p>תקרה שנקבעת על היעד (60 שורות) חוסמת כל עבודה בקובץ שכבר עומד על 658. <strong>תקרה שנקבעת על המצב הנוכחי אוכפת "לא יותר גרוע" — וזה זמין היום</strong>, בעוד "חייב להיות 60" דורש עבודה שטרם נעשתה. כל גיזום מוריד את המספר.</p>
+    </div>
+
+    <div class="call call-alert">
+      <h4>שלוש התקלות שהיו בסקריפט הגיבוי — וכולן היו שקטות</h4>
+      <p><strong>1.</strong> נתיב כתוב כטקסט, שהסביבה קראה בקידוד שגוי → היומן לא נכתב מעולם. <strong>תוקן בגזירת הנתיב במקום כתיבתו.</strong></p>
+      <p><strong>2.</strong> המתזמן סירב להריץ את הקובץ בלי דגל מסוים — <strong>ונכשל בלי לומר דבר.</strong></p>
+      <p><strong>3.</strong> דחיפה שהצליחה דווחה כשגיאה, כי נבדק הסימן הלא נכון.</p>
+      <p><strong>אף אחת מהשלוש לא הייתה מתגלה בלי היומן.</strong> וזו בדיוק הסיבה שיש בו יומן: <strong>גיבוי שנכשל בשקט גרוע מגיבוי שאין, כי אתה מאמין שאתה מגובה.</strong></p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>וסדר החומרה, שהוא נגד האינטואיציה</h4>
+      <p>התקלה השלישית הייתה <strong>הגרועה מכולן.</strong> כשל שקט משאיר אותך לא מוגן. <strong>אזעקת שווא מאמנת אותך להפסיק לקרוא את היומן — ואז גם הכשל האמיתי עובר לידך.</strong></p>
+      <p>מכאן כלל כללי: <strong>רעש בכלי בקרה אינו מטרד. הוא הרס הכלי.</strong></p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ חטיבה ה ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה ה</div>
+  <div class="dt">הערכה כנה</div>
+  <div class="dd">מה מוכח, כמה זה עולה, ואיפה זה עלול להיכשל</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s19">
+  <div class="s-no">פרק 19</div>
+  <h2>מה מוכח ומה השערה</h2>
+  <p class="lede">כל הראיות מגיעות מפרויקט אחד. חלק ממה שנראה כחוק עלול להיות תכונה של אותו פרויקט.</p>
+
+  <div class="body">
+    <div class="cmp">
+      <div class="cmp-good"><h4>מוכח — נמדד</h4><ul>
+        <li>ארבע הסטיות והמנגנון שהוליד אותן</li>
+        <li><strong>אכיפה מחזיקה, הבטחה נשברת</strong> — הבדיקה האחת מול שלוש הסטיות</li>
+        <li>עובדה מתכלה בפרוזה הורגת מסמך</li>
+        <li>מסמך שעונה על שתי שאלות — האיטית מתה</li>
+        <li>אין בית לתלויות → אותה טעות סדר חוזרת</li>
+        <li>לקוח מתאר את הרגיל; החריג נשמט</li>
+        <li><strong>כלי בקרה בלי יומן מסתיר כשלים</strong></li>
+      </ul></div>
+      <div class="cmp-bad"><h4>השערה — לא נבדק</h4><ul>
+        <li>מפת עשרת התחומים היא החלוקה הנכונה</li>
+        <li>מבנה שלושת הסבבים</li>
+        <li>ארבעת השלבים מרעיון לפרויקט</li>
+        <li>תקורת הפגישה משתלמת</li>
+        <li>"רק אחרי שימוש שני" הוא הסף הנכון</li>
+        <li>"עלות טעות" ו"זמן לענות" ניתנים להערכה מראש</li>
+        <li><strong>כל המספרים:</strong> 12–15 כללים · 60 שורות · שלוש שאלות בפגישה</li>
+      </ul></div>
+    </div>
+
+    <div class="call call-warn">
+      <h4>למה הסימון הזה חשוב יותר ממה שהוא מסמן</h4>
+      <p>בגרסה הראשונה של השיטה <strong>הכל הוצג באותו ביטחון.</strong> זו הייתה הטעיה — <strong>והנזק אינו בקורא שיאמין לטעות, אלא בכך שהשערה שמוצגת כחוק לא נבדקת לעולם.</strong></p>
+      <p>מי שמאמץ את השיטה מוזמן לסמן בעצמו: כל טענה שלא מדד — <strong>השערה</strong>, עד שתימדד.</p>
+    </div>
+
+    <p><strong>המסקנה המעשית:</strong> הליבה שבפרק 22 נשענת <strong>רק</strong> על העמודה השמאלית. כל מה שנשען על הימנית מחכה לטריגר.</p>
+  </div>
+</section>
+
+<section class="s" id="s20">
+  <div class="s-no">פרק 20</div>
+  <h2>כמה זה עולה</h2>
+  <p class="lede">שיטה שלא שואלת את השאלה הזו אינה ראויה לאימוץ. כל המספרים כאן הערכה, לא מדידה.</p>
+
+  <div class="body">
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>מה</th><th>עלות</th></tr></thead>
+        <tbody>
+          <tr><td><strong>הליבה</strong> — בדיקות, רשימת המתנה, מפת כיסוי, גיבוי</td><td><strong>יום עבודה אחד</strong></td></tr>
+          <tr><td>המערכת המלאה — סקילים, פקודות, שכבת גילוי</td><td>3–5 ימים</td></tr>
+          <tr><td>תקורה לכל שיחת עבודה (טקס סגירה)</td><td>5–10 דקות</td></tr>
+          <tr><td><strong>תקורה לכל פגישת לקוח</strong> (הכנה + עיבוד)</td><td><strong>שעה עד שעתיים</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-alert">
+      <h4>המספר המדאיג</h4>
+      <p><strong>תקורת הפגישה.</strong> אם פגישת איפיון נמשכת שעה, הוספת שעתיים סביבה היא <strong>הכפלה עד שילוש.</strong></p>
+      <p>סביר שזה משתלם — <strong>טעות אחת שנתפסה בפגישה חסכה במקרה המבחן ימים</strong> — אבל זו הנחה שלא נמדדה, והיא מוצגת כאן כהנחה.</p>
+    </div>
+
+    <h3>מה למדוד על הלקוח הראשון</h3>
+    <ul class="plain">
+      <li>כמה זמן <strong>באמת</strong> לקחו ההכנה והעיבוד</li>
+      <li>כמה פערים נתפסו שלא היו נתפסים אחרת</li>
+      <li>כמה מהדף המוכן באמת נעשה בו שימוש בפגישה</li>
+    </ul>
+
+    <div class="thesis">
+      <div class="t">אם התקורה גבוהה מהחיסכון — לצמצם, לא להתעקש.</div>
+      <div class="n">שיטה שלא משתלמת היא שיטה שגויה, גם אם היא אלגנטית.</div>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s21">
+  <div class="s-no">פרק 21</div>
+  <h2>איפה זה עלול להיכשל</h2>
+
+  <div class="body">
+    <div class="call call-alert">
+      <h4>1 · משקל — סכנת המוות המרכזית</h4>
+      <p>הספר הזה מכיל שש שכבות, ארבעה סוגי מידע, שלוש רמות טעינה, שמונה כללים, ארבעה שלבים, שבעה שדות, עשרה תחומים. <strong>אף אחד לא מאמץ את כל זה.</strong></p>
+      <p><strong>מתודולוגיות לא מתות מטעויות. הן מתות ממשקל.</strong> לכן פרק 22 מגדיר ליבה של ארבעה פריטים — וכל השאר <strong>גדל לתוכה לפי כאב, לא לפי תוכנית.</strong></p>
+    </div>
+
+    <div class="call call-alert">
+      <h4>2 · הבעיה עלולה לגדול מהר יותר מהפתרון</h4>
+      <p>במהלך השבוע שבו נבנתה השיטה, קובץ הסטטוס במקרה המבחן גדל כך:</p>
+      <div class="growth" style="margin-top:12px">
+        <div class="gbar"><div class="gl">יום 1</div><div class="gtrack"><div class="gfill" style="width:42%"></div></div><div class="gv">267</div></div>
+        <div class="gbar"><div class="gl">יום 6</div><div class="gtrack"><div class="gfill" style="width:48%"></div></div><div class="gv">303</div></div>
+        <div class="gbar"><div class="gl">יום 7</div><div class="gtrack"><div class="gfill hot" style="width:100%"></div></div><div class="gv">631</div></div>
+      </div>
+      <p style="margin-top:12px"><strong>267 ל-631 לאורך שבוע, עם קפיצה של 328 שורות ביום אחד</strong> — היום שבו נבנו ארבע ישויות חדשות. <em>(גרסה 1 של הספר תיארה זאת כ"הכפיל את עצמו ביומיים". זה היה מנופח, וזו אותה חולשה שהספר מזהה בעצמו כמה שורות למעלה.)</em></p>
+      <p><strong>והגידול הוא מעבודת הפרויקט, לא מתיעוד השיטה</strong> — נבדק מול ההיסטוריה. ככל שקצב הבנייה גבוה יותר, כך משמעת ידנית מחזיקה פחות. <strong>זה טיעון בעד השיטה, לא נגדה — והוא גם אומר שדחייה מייקרת אותה.</strong></p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>3 · מעגליות</h4>
+      <p>במקרה המבחן, ארבע הסטיות קרו <strong>בשיחות עם אותו סוכן שכתב אחר כך את השיטה שאמורה למנוע אותן — ואת הבדיקות.</strong></p>
+      <p>התשובה של השיטה נכונה — <strong>אל תסמוך על ציות, תבדוק</strong>. אבל היא לא שלמה: מי שבודק את הבודק?</p>
+      <p><strong>המסקנה המעשית: אל תסמוך על בדיקה שלא ראית נכשלת.</strong> אחרי שכתבת בדיקה, השתל כשל בכוונה וודא שהיא תופסת אותו. בדיקה שלא הודגמה היא עוד הבטחה.</p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>4 · הכלים עלולים להפוך לעבודה</h4>
+      <p>המלכודת הקלאסית: לבנות תשתית במקום לספק. <strong>הליבה היא יום אחד ומשתלמת מיד; כל מה שמעבר לה צריך להיות החלטה מודעת, לא גלישה.</strong></p>
+      <p>הכלל שמגן: <strong>כל רכיב מעבר לליבה מקבל טריגר שאומר מתי הוא הופך לרלוונטי</strong> — "כשיהיה לקוח שני", "כשתיקבע פגישה". ובלי הטריגר, לא בונים.</p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>5 · n=1</h4>
+      <p>פרויקט אחד, סולו, כבד־מסד־נתונים, עם שלב איפיון ארוך במיוחד. <strong>שיטה שנבנתה על צוות של חמישה, או על פרויקט תחזוקה של מערכת קיימת, הייתה נראית אחרת.</strong></p>
+      <p>מה שכן: <strong>העיקרון עצמו</strong> — אכיפה מול הבטחה — אינו תלוי בגודל צוות או בסוג פרויקט. הפירוט כן.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ חטיבה ו ══════════ -->
+<div class="divider">
+  <div class="dl">חטיבה ו</div>
+  <div class="dt">אימוץ</div>
+  <div class="dd">מאיפה מתחילים, ומה מחכה</div>
+  <div class="rule"></div>
+</div>
+
+<section class="s" id="s22">
+  <div class="s-no">פרק 22</div>
+  <h2>מסלול אימוץ</h2>
+  <p class="lede">לא לאמץ את הכל. לאמץ ליבה שעובדת, ולתת לשאר לגדול לתוכה לפי כאב.</p>
+
+  <div class="body">
+    <h3>תנאי מקדים — לא שיטה, הישרדות</h3>
+    <div class="call call-ok">
+      <h4>גיבוי מחוץ למכונה</h4>
+      <p>לפני כל דבר אחר. <strong>את הקוד אפשר לשחזר; את הסיבות — לא.</strong> מסמכי ההחלטה, קבצי הישויות והיומן הם מה שאי אפשר לבנות מחדש, והם בדרך כלל היחידים שלא מגובים.</p>
+    </div>
+
+    <h3>הליבה — חמישה פריטים, יום אחד</h3>
+    <div class="rows">
+      <div class="row"><div class="rn2">1</div><div><div class="rt2">בדיקות, ו-hook על ה-commit</div><div class="rd2">שש בדיקות: אינדקסים · קישורים · תקרת הסטטוס · תאריך שהתיישן · תלות פתוחה תחת פריט סגור · <strong>נתוני לקוח</strong>. חוסמות ב-commit, ו-CI מעליהן.<br><strong>וכל בדיקה נחשבת גמורה רק אחרי שכשל מושתל נתפס בה.</strong></div></div></div>
+      <div class="row"><div class="rn2">2</div><div><div class="rt2">שחזור אחד מהגיבוי</div><div class="rd2">עשרים דקות. <strong>גיבוי שלא נבדק בשחזור הוא הבטחה</strong> — וזה הכלל שהספר הזה לא החיל על עצמו עד שנבדק.</div></div></div>
+      <div class="row"><div class="rn2">3</div><div><div class="rt2">רשימת ההמתנה</div><div class="rd2">סוגרת את חור התכנון, ומשמשת בסיס לשכבת הגילוי כשתגיע.</div></div></div>
+      <div class="row"><div class="rn2">4</div><div><div class="rt2">מפת כיסוי + לולאת למידה</div><div class="rd2">הדבר היחיד שמצטבר. <strong>וזול במיוחד — רוב השאלות כבר כתובות ביומן שלך, רק פזורות.</strong></div></div></div>
+      <div class="row"><div class="rn2">5</div><div><div class="rt2">קובץ כללים מזוקק</div><div class="rd2">12–15 כללים, וכל כלל שניתן לאכיפה <strong>יורד ממנו והופך לבדיקה.</strong></div></div></div>
+    </div>
+
+    <h3>ומה מחכה — כל אחד עם טריגר</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>מה</th><th>מתי לבנות</th></tr></thead>
+        <tbody>
+          <tr><td><strong>⚠️ פרק אבטחה ופרטיות מלא</strong></td><td><strong>לפני ההקלטה הראשונה של לקוח</strong> — מה נכנס לריפו ומה לא, הצפנה, הרשאות, שמירה ומחיקה, הסכמה להקלטה, וחומר לקוח כ<em>מידע</em> ולא כהוראות לסוכן. <strong>הטריגר הזה קרוב, וטריגר שלא נכתב הוא הבטחה</strong></td></tr>
+          <tr><td><strong>שכבת הגילוי המלאה</strong></td><td><strong>כשנקבעה פגישת איפיון אמיתית.</strong> לא לפני — אחרת היא תעוצב לפי דמיון במקום לפי מפגש</td></tr>
+          <tr><td>ספריית מודולים</td><td>לקוח שני בפועל</td></tr>
+          <tr><td>הערכת תמחור מהמפה</td><td>לקוח שני — <strong>אבל שדה "כמה זמן לקח" נכנס מהיום</strong></td></tr>
+          <tr><td>שלבי הרעיון (0–2)</td><td>כשרעיון ראשון ילך לאיבוד</td></tr>
+          <tr><td>מדד בריאות חוצה-פרויקטים</td><td>שלושה פרויקטים פעילים</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>השבוע הראשון</h3>
+    <ul class="plain">
+      <li><strong>יום 1 —</strong> גיבוי חיצוני. בנה את הבודק. הרץ אותו, <strong>והשתל בו כשל כדי לראות שהוא תופס.</strong></li>
+      <li><strong>יום 2 —</strong> אסוף את כל הפריטים הפתוחים מכל מקום שהם מפוזרים בו לרשימה אחת.</li>
+      <li><strong>יום 3 —</strong> עבור על היומן שלך והוצא ממנו כל דבר שהתגלה מאוחר. <strong>נסח כל אחד כשאלה שלקוח יכול לענות עליה.</strong> זו מפת הכיסוי הראשונה שלך.</li>
+      <li><strong>יום 4 —</strong> גזום את קובץ הסטטוס. ההיסטוריה ליומן, הפתוח לרשימה, הנהלים למסמכי החלטה.</li>
+      <li><strong>יום 5 —</strong> חבר את הבדיקות ל-hook על ה-commit, ו-CI מעליו. <strong>וזה השלב שהופך את כל השאר ממסמכים לשיטה.</strong> הטריגרים בכלי הם נוחות; האכיפה היא כאן.</li>
+    </ul>
+
+    <div class="call call-warn">
+      <h4>ומה שהשחזור הראשון מצא, תוך עשרים דקות</h4>
+      <p>שכפול נקי מהשרת, והרצת הבדיקות על העותק המשוחזר. <strong>שני ממצאים שאף בדיקה מקומית לא יכולה למצוא:</strong></p>
+      <p><strong>1.</strong> האינדקס הראשי קישר לקובץ שמוחרג מגיט במכוון — מרשם ההרשאות. <strong>אצל הבעלים הקישור עובד; בכל שכפול הוא שבור.</strong> הקובץ לא אמור להיות שם, אז הקישור אליו היה טעות מלכתחילה.</p>
+      <p><strong>2.</strong> שלושה קומיטים מעולם לא הגיעו לשרת, כולל מיגרציה שנכתבה באותו יום. <strong>הגיבוי דיווח "הצלחה" והיה צודק</strong> — הוא דחף את מה שהיה מקובע בזמנו. פער בין "הגיבוי עובד" ל"הכל מגובה" נראה רק כשמשחזרים.</p>
+    </div>
+
+    <div class="call call-ok">
+      <h4>ואיך תדע שזה עבד</h4>
+      <p>לא לפי כמה סעיפים סימנת. לפי <strong>שני מבחנים:</strong></p>
+      <p><strong>1.</strong> שיחה חדשה, בלי זיכרון — אומרת נכון מה הצעד הבא אחרי קריאת קובץ אחד.<br><strong>2.</strong> הבדיקה שהשתלת בה כשל — תפסה אותו והחזירה שגיאה.</p>
+      <p>אפשר לסמן את כל הסעיפים ולהיכשל בשניהם.</p>
+    </div>
+
+    <div class="thesis">
+      <div class="t">ואם תיקח מכאן דבר אחד בלבד</div>
+      <div class="n">קח את זה: <strong>כל כלל שכתבת לעצמך ואפשר לבדוק אותו אוטומטית — תעביר אותו לבדיקה עוד היום.</strong><br><br>לא כי המשמעת שלך חלשה. אלא כי היא לא הכלי הנכון לעבודה הזו, ומעולם לא הייתה.</div>
+    </div>
+  </div>
+</section>
+
+<section class="s" id="s23">
+  <div class="s-no">נספח א</div>
+  <h2>מה כבר קיים, ומה כאן חדש</h2>
+  <p class="lede">כמעט שום רעיון בספר הזה אינו חסר תקדים. מה שכאן חדש הוא הצירוף ונקודת ההחלה — וראוי לומר את זה במפורש, כי שיטה שמתעלמת ממה שקיים מזמינה חשד.</p>
+
+  <div class="body">
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>הרעיון כאן</th><th>איפה הוא כבר קיים</th></tr></thead>
+        <tbody>
+          <tr><td><strong>אכיפה במקום הבטחה</strong></td><td><em>Poka-yoke</em> בייצור — לתכנן כך שהטעות בלתי אפשרית, במקום להדריך לא לטעות</td></tr>
+          <tr><td><strong>מסמך החלטה עם מה שנדחה</strong></td><td><em>ADR</em> — Architecture Decision Records. תבניות מוכנות, עם שדה "חלופות שנשקלו"</td></tr>
+          <tr><td><strong>תיעוד שנגזר מהמקור</strong></td><td><em>Living Documentation</em>, ו-<em>docs as code</em></td></tr>
+          <tr><td><strong>חלוקת תיעוד לפי צורך</strong></td><td><em>Diátaxis</em> — מחלקת לפי סוג הצורך (מדריך / הסבר / הפניה / משימה)</td></tr>
+          <tr><td><strong>שאלות ראיון שרודפות אחרי החריג</strong></td><td><em>The Mom Test</em> — לשאול על מה שקרה, לא על מה שיקרה</td></tr>
+          <tr><td><strong>חלוקה לפי קצב שינוי</strong></td><td><em>Shearing layers</em> — רעיון מאדריכלות: שכבות שמשתנות בקצב שונה חייבות להיות נפרדות</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>ומה כן חדש כאן</h3>
+    <ul class="plain">
+      <li><strong>חלוקת מסמכים לפי קצב שינוי במקום לפי קהל או נושא.</strong> Diátaxis מחלקת לפי צורך; החלוקה כאן מסבירה למה מסמך שעונה על שתי שאלות <em>מת</em>, וזו תחזית שאפשר לבדוק.</li>
+      <li><strong>רמות טעינה כתכונה של מסמך.</strong> לכל מסמך יש עלות ומועד, לא רק תוכן. זה נובע ישירות מכך שהקורא הוא סוכן עם תקציב.</li>
+      <li><strong>ההבחנה בין עובדה יציבה למתכלה</strong>, והתבנית שנגזרת ממנה.</li>
+      <li><strong>לולאת הלמידה</strong> — שכל טעות יקרה הופכת לשאלה שנשאלת בפגישה הראשונה של הלקוח הבא.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="s" id="s24">
+  <div class="s-no">נספח ב</div>
+  <h2>מה השתנה בגרסה 2</h2>
+  <p class="lede">גרסה 1 פורסמה, נקראה בעיון, ונמצאו בה כשלים בשני סבבים. <strong>מה שנוגע לעקביות הפנימית ולבטיחות נכנס; האבטחה המלאה והשלמות אחרות נדחו עם טריגר מוצהר.</strong> זהו הרישום.</p>
+
+  <div class="body">
+    <div class="call call-alert">
+      <h4>הממצא המרכזי: הספר הפר את העיקרון של עצמו</h4>
+      <p><strong>הבודק ששוחרר עם גרסה 1 לא תפס אף אחת מארבע הסטיות שהספר מביא כראיה</strong>, והדפיס "הכל עבר" אחרי שבדק אפס קבצים. וכל "תקרה" ו"אילוץ" בתבניות היו הערות בפרוזה — כלומר הבטחות, בדיוק מה שכלל 8 אוסר.</p>
+    </div>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>מה השתנה</th><th>למה</th></tr></thead>
+        <tbody>
+          <tr><td><strong>שש בדיקות חדשות בבודק</strong> — אינדקסים · קישורים · תקרת סטטוס · תקרת כללים · תאריך שהתיישן · תלות פתוחה · נתוני לקוח</td><td>כל תקרה שהייתה כתובה בתבנית הפכה לבדיקה</td></tr>
+          <tr><td><strong>נקודת האכיפה עברה לטקס סגירה → ל-commit</strong></td><td>אין באמת אירוע "סגירת שיחה"</td></tr>
+          <tr><td><strong>בדיקות תלויות-זמן מזהירות ולא חוסמות</strong></td><td>hook שמייצר אזעקות שווא מלמד לעקוף אותו, ואז הוא מת</td></tr>
+          <tr><td><strong>תקרה כמחגר ולא כצוק</strong></td><td>"לא יותר גרוע" זמין היום; "חייב להיות 60" דורש עבודה שטרם נעשתה</td></tr>
+          <tr><td><strong>בדיקת נתוני לקוח</strong></td><td>הכשל היחיד ברשימה שבלתי הפיך</td></tr>
+          <tr><td><strong>תרגיל שחזור נכנס לליבה</strong></td><td>הכלל של הספר, שלא הוחל על הספר</td></tr>
+          <tr><td><strong>רשימת ההמתנה אוחדה לטבלה אחת</strong></td><td>מזהה שמקודד סוג נשבר כשהסוג משתנה</td></tr>
+          <tr><td><strong>"ניסוי מבוקר" → "תצפית שתומכת"</strong></td><td>המשתנים חופפים</td></tr>
+          <tr><td><strong>המספרים סומנו כהשערה</strong></td><td>12–15, 60, שלוש — אף אחד לא נמדד</td></tr>
+          <tr><td><strong>נוסף נספח מקורות</strong></td><td>שיטה שמתעלמת ממה שקיים מזמינה חשד</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call call-ok">
+      <h4>מה שזה כן מראה</h4>
+      <p>המבקר סיכם: <em>"הספר צודק שמה שנבדק מחזיק, והוא פשוט עוד לא בודק מספיק את עצמו."</em></p>
+      <p><strong>כמעט כל תיקון ברשימה הוא יישום נוסף של העיקרון</strong> — הביקורת נגזרה מתוך הספר ולא נגדו.</p>
+    </div>
+
+    <div class="call call-warn">
+      <h4>⚠️ ומה שזה אינו — לפי המשמעת של פרק 19</h4>
+      <p><strong>זו אינה ראיה בלתי תלויה.</strong> הביקורת נכתבה בעזרת מודל AI נוסף, שקרא את אותו טקסט. היא מצאה כשלים אמיתיים ובדיקים — ה-hook באמת חסם, הבודק באמת לא תפס — <strong>אבל אישוש של שיטה אינו בא מקריאה חוזרת, אלא מהפעלתה על פרויקט שני.</strong></p>
+      <p>העמודה השמאלית בפרק 19 עדיין נשענת על <strong>n=1</strong>. זה לא השתנה בגרסה 2, ולא ישתנה עד שמישהו יריץ את זה במקום אחר.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><strong>מה שנבדק מחזיק</strong> — גרסה 2, 2026.</p>
+  <p>הספר נכתב מתוך פרויקט אחד אמיתי, ומתואר כאן ללא שמות. כל המספרים כפי שהם.</p>
+  <p>הוא מיועד להיקרא, להיחלק עליו, ולהיות מוחלף בגרסה טובה יותר — <strong>רצוי על ידי מי שמדד את מה שכאן עדיין מסומן כהשערה.</strong></p>
+</footer>
+
+</div>
+
+<script>
+document.querySelectorAll('.cb').forEach(function(block){
+  var btn = block.querySelector('.copy');
+  var code = block.querySelector('code');
+  if(!btn || !code) return;
+  btn.addEventListener('click', function(){
+    var text = code.innerText;
+    var done = function(){
+      btn.textContent = 'הועתק ✓';
+      setTimeout(function(){ btn.textContent = 'העתק'; }, 1800);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        btn.textContent = 'בחר והעתק ידנית';
+        setTimeout(function(){ btn.textContent = 'העתק'; }, 2400);
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch(e){}
+      document.body.removeChild(ta);
+    }
+  });
+});
+</script>

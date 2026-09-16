@@ -175,20 +175,41 @@ check_project() {
   # Add deliberate exceptions to docs/.pii-allow, one regex per line.
   local pii=""
   local allow="$docs/.pii-allow"
-  local scan
-  # Only files git actually tracks. Local-only files (an access register,
-  # a transcript kept off the remote) are excluded by definition, which is
-  # the whole reason they are gitignored.
-  scan=$(git -C "$proj" ls-files -- '*.md' '*.sql' '*.csv' '*.json' 2>/dev/null \
-         | while IFS= read -r rel; do printf '%s/%s\n' "$proj" "$rel"; done)
-  if [ -n "$scan" ]; then
-    local hits
-    hits=$(printf '%s\n' "$scan" | while IFS= read -r f; do
-      # Every pattern is bounded by non-digits on both sides. Without that,
-      # a migration stamp like 20260901010000 reads as a phone number, and
-      # a check that cries wolf is a check people learn to bypass.
-      grep -HnE '(^|[^0-9])([0-9]{9}|0(5[0-9]|[2-48-9])-?[0-9]{7})([^0-9]|$)|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$f" 2>/dev/null
-    done)
+  local PII_RE='(^|[^0-9])([0-9]{9}|0(5[0-9]|[2-48-9])-?[0-9]{7})([^0-9]|$)|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+  local hits=""
+
+  # Patterns are bounded by non-digits on both sides. Without that, a
+  # migration stamp like 20260901010000 reads as a phone number, and a
+  # check that cries wolf is a check people learn to bypass.
+  if [ "${VERIFY_STAGED:-0}" = "1" ]; then
+    # Inside a pre-commit hook, the working tree is the wrong thing to
+    # look at. A file can be staged carrying an ID number and then edited
+    # clean afterwards: the working tree passes, and the commit still
+    # contains it. --cached reads what is actually about to be committed.
+    hits=$(git -C "$proj" grep --cached -nIE "$PII_RE" -- '*.md' '*.sql' '*.csv' '*.json' 2>/dev/null || true)
+  else
+    local scan
+    # Only files git tracks. Local-only files (an access register, a
+    # transcript kept off the remote) are excluded by definition, which is
+    # the whole reason they are gitignored.
+    scan=$(git -C "$proj" ls-files -- '*.md' '*.sql' '*.csv' '*.json' 2>/dev/null \
+           | while IFS= read -r rel; do printf '%s/%s\n' "$proj" "$rel"; done)
+    if [ -n "$scan" ]; then
+      hits=$(printf '%s\n' "$scan" | while IFS= read -r f; do
+        grep -HnE "$PII_RE" "$f" 2>/dev/null
+      done)
+    fi
+  fi
+
+  if [ -f "$allow" ]; then
+    # A pattern file that is present but yields no usable pattern must not
+    # be treated as "allow nothing" silently - say so, because an allow
+    # file that quietly does nothing looks exactly like one that works.
+    if ! grep -qvE '^[[:space:]]*(#|$)' "$allow"; then
+      note "$(basename "$allow") contains no patterns - nothing is being allowed"
+    fi
+  fi
+  if true; then
     if [ -n "$hits" ] && [ -f "$allow" ]; then
       # Strip comments and blank lines first. An empty line in a pattern
       # file matches everything, so a single stray newline would silently
