@@ -1,0 +1,13 @@
+# Per-project ceilings, read by כלים/verify-docs.sh
+#
+# STATUS_MAX is a RATCHET, not a target. It is set to the file's current
+# size so the check is live today without blocking work: status.md cannot
+# grow from here, and every prune lowers this number.
+#
+# The target is 60. Lower this line as the file shrinks; the conversion
+# session takes it the rest of the way.
+#
+# A ceiling set to today's reality still enforces something real - it
+# enforces "no worse" - and that is available immediately, where "must
+# be 60" requires work that has not happened yet.
+STATUS_MAX=658

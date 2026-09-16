@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Blocks a commit whose documentation checks fail.
+#
+# This is the real enforcement point. A "closing ritual" depends on
+# someone typing it, and an end-of-session hook fires when nobody is
+# left to act on the result. A commit is a real event that a person
+# actually performs, and it is the last moment before work becomes
+# history.
+#
+# Portable because the repo carries it: git config core.hooksPath .githooks
+# (.git/hooks is not versioned, so hooks placed there travel nowhere.)
+
+root=$(git rev-parse --show-toplevel)
+checker="$root/כלים/verify-docs.sh"
+
+[ -f "$checker" ] || exit 0
+
+# Staged files are dirty by definition here, so that check is skipped.
+VERIFY_SKIP_DIRTY=1 bash "$checker"
+status=$?
+
+if [ $status -ne 0 ]; then
+  printf '\n\033[31mCommit blocked: documentation checks failed.\033[0m\n'
+  printf 'Fix the findings above, or commit with --no-verify if this is\n'
+  printf 'deliberate — but then say so in the commit message.\n'
+  exit 1
+fi

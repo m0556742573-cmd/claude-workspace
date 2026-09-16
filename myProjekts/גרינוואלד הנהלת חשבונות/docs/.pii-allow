@@ -1,0 +1,42 @@
+# Declared exceptions to the client-data check in כלים/verify-docs.sh
+# One extended regex per line, matched against "file:line:content".
+#
+# These are the pinned identifiers used by the scenario fixtures. They are
+# synthetic by construction - repeating digits, or sequential company
+# numbers - and they exist so the constraints can be exercised without a
+# single real client ever entering the repository.
+#
+# Each value is listed explicitly on purpose. A pattern broad enough to
+# cover "any nine digits in a seed file" would also cover the first real
+# client number someone pastes in, and that is the one failure on this
+# list that cannot be undone once it reaches a remote.
+#
+# Adding a line here is a decision. Write down why.
+
+# Scenario clients - repeating-digit national ID numbers
+0111111112?
+022222222
+033333333
+044444444
+055555555
+066666666
+077777777
+088888888
+
+# Scenario companies - sequential registration numbers
+51400000[0-9]
+55700000[0-9]
+
+# Artefacts of migration timestamps read as identifiers
+914000003
+934000003
+
+# Scenario contact channels - synthetic phone numbers in the smoke tests
+053987654[0-9]
+05[0-9]{8}.*תרחיש
+
+# Yitzhak's own GitHub account name, which appears in project notes.
+# NOTE: the account name embeds his phone number. That is his own data,
+# not a client's, and it is already public on GitHub - but it is worth
+# knowing that the username reveals it.
+m0556742573

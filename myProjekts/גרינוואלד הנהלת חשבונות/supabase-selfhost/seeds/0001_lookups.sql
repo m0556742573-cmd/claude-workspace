@@ -147,3 +147,5 @@ insert into billing_frequencies (code, name, months_interval) values
   ('one_off',        'חד-פעמי',    null),
   ('per_occurrence', 'לפי מקרה',   null)
 on conflict (code) do nothing;
+
+

@@ -602,7 +602,7 @@ check ((freq is null and src is null) or (freq is not null and src in (...)))
 
 ## תשע ההכרעות שממתינות לך (15/09/2026)
 
-**הרשימה המלאה והמסווגת: [`waiting.md`](waiting.md).** כאן רק מה שחוסם עליך:
+**הרשימה המלאה והמסווגת: [`waiting.md`](../waiting.md).** כאן רק מה שחוסם עליך:
 
 | # | מה | מחיר ההמתנה |
 |---|---|---|

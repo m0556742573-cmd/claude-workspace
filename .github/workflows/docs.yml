@@ -1,0 +1,22 @@
+name: documentation checks
+
+# The only enforcement that does not depend on this machine at all.
+# A pre-commit hook can be skipped with --no-verify and is absent on a
+# fresh clone until core.hooksPath is set; this cannot be skipped.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove the checker can fail
+        # A check nobody has seen fail is still a promise. This runs the
+        # checker against a fixture with known defects and requires a
+        # non-zero exit before trusting the real run below.
+        run: bash כלים/selftest/run.sh
+      - name: Documentation checks
+        run: bash כלים/verify-docs.sh
