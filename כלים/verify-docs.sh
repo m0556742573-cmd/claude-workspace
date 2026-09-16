@@ -224,8 +224,20 @@ check_project() {
       pii=$(printf '%s\n' "$hits" | head -20 | sed "s|^$proj/||")
     fi
   fi
+  # Binary files are not searched by grep, so a spreadsheet or a PDF can
+  # carry a client's details past this check. Saying nothing would make
+  # this the same silent pass the check exists to prevent: report the gap
+  # every time, so the green line is never read as "everything was seen".
+  local bins bincount
+  bins=$(git -C "$proj" ls-files -- '*.xlsx' '*.xls' '*.pdf' '*.docx' '*.zip' '*.png' '*.jpg' 2>/dev/null)
+  bincount=$(printf '%s' "$bins" | grep -c . 2>/dev/null || echo 0)
+
   if [ -z "$pii" ]; then
-    ok "no personal or financial data found in tracked files"
+    ok "no personal or financial data found in tracked text files"
+    if [ "$bincount" -gt 0 ]; then
+      warn "$bincount binary file(s) NOT searched - a spreadsheet can carry rows past this check:"
+      list "$(printf '%s' "$bins" | head -5)"
+    fi
   else
     bad "possible real client data - this cannot be undone once pushed:"
     list "$pii"
