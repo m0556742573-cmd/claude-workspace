@@ -244,7 +244,34 @@ check_project() {
     note "if a match is deliberate, add a regex to docs/.pii-allow"
   fi
 
-  # 8. remember which repo this project actually lives in.
+  # 8. every entity row carries a type.
+  #
+  # The type answers a question that was being re-argued from scratch every
+  # time: who writes this table, and does it need a screen of its own. A row
+  # added without one is a table nobody has decided that about -- which is
+  # exactly how "22 admin screens" became a guess rather than a count.
+  #
+  # Axis one is who writes: הגדרה (the office), חוק (seeded from a source,
+  # a person may override), חי (people type it), מיוצר (the system writes it,
+  # nobody types). Axis two is whether it stands on its own: מרכזית has its
+  # own screen, מערכת is a lookup or junction living inside another screen,
+  # View is derived.
+  local eidx="$docs/entities/INDEX.md"
+  if [ -f "$eidx" ]; then
+    local untyped
+    untyped=$(grep -E '^\| \[`[a-z_]+`\]' "$eidx" \
+              | grep -vE '\| (הגדרה|חוק|חי|מיוצר)/(מרכזית|מערכת|View) \|' \
+              | grep -oE '\[`[a-z_]+`\]' | tr -d '[]`' | tr '\n' ' ')
+    if [ -z "$untyped" ]; then
+      ok "every entity row carries a type (who writes it, does it need a screen)"
+    else
+      bad "entity rows with no type in entities/INDEX.md:"
+      list "$untyped"
+      note "types: הגדרה|חוק|חי|מיוצר / מרכזית|מערכת|View - see the legend in that file"
+    fi
+  fi
+
+  # 9. remember which repo this project actually lives in.
   # The previous version checked the toolkit repo for every project.
   local top
   if top=$(git -C "$proj" rev-parse --show-toplevel 2>/dev/null); then
