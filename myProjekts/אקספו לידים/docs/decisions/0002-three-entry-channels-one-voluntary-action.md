@@ -1,6 +1,6 @@
 # 0002 — שלוש דרכי כניסה, פעולה אחת מרצון, ושתי נגיעות למציג
 
-**Status:** Accepted (18/09/2026). **מחליפה את סעיף 1 ב-[`0001`](0001-exhibitor-captures-no-volume-incentive.md).**
+**Status:** Proposed (18/09/2026). **ממתינה לאישור של יצחק (W-014).** אם תאושר, היא תחליף את סעיף 1 ב-[`0001`](0001-exhibitor-captures-no-volume-incentive.md). הכיוון הוא של יצחק, והניסוח וההשלכות הם הצעה של Claude.
 
 ## Context
 

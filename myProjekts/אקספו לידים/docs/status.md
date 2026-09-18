@@ -4,7 +4,7 @@
 
 ## איפה אנחנו
 
-**שלב האפיון. שום דבר עוד לא נבנה, ובמכוון.** ההשערה: המבקר נכנס בפעולה אחת (חיוג מטלפון כשר, QR או טאבלט), המציג מתייג בשתי נגיעות, ואחר כך יש רשימה ותזכורות מעקב. שלוש הכרעות: [`0001`](decisions/0001-exhibitor-captures-no-volume-incentive.md), [`0002`](decisions/0002-three-entry-channels-one-voluntary-action.md), [`0003`](decisions/0003-no-private-community-list.md). **ההשערה עוד לא נבדקה מול אף מציג.**
+**שלב האפיון. שום דבר עוד לא נבנה, ובמכוון.** ההשערה: המבקר נכנס בפעולה אחת (חיוג מטלפון כשר, QR או טאבלט), המציג מתייג בשתי נגיעות, ואחר כך יש רשימה ותזכורות מעקב. הכרעה אחת בתוקף: [`0001`](decisions/0001-exhibitor-captures-no-volume-incentive.md). **שתי הצעות שממתינות לאישורך (W-014):** [`0002`](decisions/0002-three-entry-channels-one-voluntary-action.md) ו-[`0003`](decisions/0003-no-private-community-list.md). **ההשערה עוד לא נבדקה מול אף מציג.**
 
 ר' [`overview.md`](overview.md) לאפיון המלא.
 

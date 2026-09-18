@@ -1,6 +1,6 @@
 # 0001 — המציג אוסף, המבקר לא עושה כלום, ואין תמריץ לכמות
 
-**Status:** Accepted (18/09/2026). **סעיף 1 הוחלף ב-[`0002`](0002-three-entry-channels-one-voluntary-action.md)** באותו יום: המבקר עושה פעולה אחת מרצונו. סעיפים 2 ו-3 בתוקף.
+**Status:** Accepted (18/09/2026). **ההצעה [`0002`](0002-three-entry-channels-one-voluntary-action.md) תחליף את סעיף 1 אם תאושר** (W-014).
 
 ## Context
 
