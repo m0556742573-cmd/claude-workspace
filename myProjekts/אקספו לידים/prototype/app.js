@@ -473,7 +473,8 @@
 
   // ---------------- Booth ----------------
   let openLeadId = null;
-  let moreOpen = false;
+  let moreOpenId = null;  // which lead has its extra fields open
+  let eveId = null;       // the lead being worked on in the evening
   let idleTimer = null;
   let countTimer = null;
   let lastAction = null;
@@ -487,7 +488,7 @@
   const NOTE_IDLE_MS = 25000; // a note is being written, counted from the last keystroke
   function idleMs() {
     const l = leadById(openLeadId);
-    if (moreOpen) return IDLE_DEEP;
+    if (moreOpenId && moreOpenId === openLeadId) return IDLE_DEEP;
     if (l && (l.warmth || l.interests.length || l.sendMaterial)) return IDLE_BUSY;
     return IDLE_DONE;
   }
@@ -584,7 +585,7 @@
     openLeadId = id;
     const l = leadById(id);
     // Leads that already carry detail open with the extra fields showing.
-    moreOpen = !!(l && (l.ask || l.when || l.note));
+    moreOpenId = l && (l.ask || l.when || l.note) ? l.id : null;
     if (l && !l.touched) { l.touched = true; save(); }
     viewBooth();
   }
@@ -614,35 +615,52 @@
             </div>
           </div>
         </div>
-        <div class="warmth" role="group" aria-label="כמה חם">
-          ${Object.entries(WARMTH).map(([k, v]) => `<button class="w-btn ${k}" data-warm="${k}" aria-pressed="${l.warmth === k}">${k === 'hot' ? '🔥 ' : ''}${v}</button>`).join('')}
-        </div>
-        ${S.business.offerings.length ? `
-          <div><div class="field-label">מה עניין אותו</div>
-          <div class="chips">${S.business.offerings.map((o) => `<button class="chip" data-int="${esc(o)}" aria-pressed="${l.interests.includes(o)}">${esc(o)}</button>`).join('')}</div></div>` : ''}
-        <div class="inline">
-          <button class="more-toggle" data-act="more" aria-expanded="${moreOpen}">${moreOpen ? '− פחות' : '+ עוד: ' + [t.ask ? t.ask.label : null, 'מתי', 'הערה'].filter(Boolean).join(' · ')}</button>
-          ${S.business.catalog ? `<button class="chip" data-act="send" aria-pressed="${l.sendMaterial}">📎 ${l.sendMaterial ? 'החומר יישלח' : 'שלח חומר'}</button>` : ''}
-        </div>
-        ${moreOpen ? `
-          <div class="more">
-            ${t.ask ? `<div><div class="field-label">${esc(t.ask.label)}</div><div class="chips">${t.ask.options.map((o) => `<button class="chip" data-ask="${esc(o)}" aria-pressed="${l.ask === o}">${esc(o)}</button>`).join('')}</div></div>` : ''}
-            <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
-            <div><label class="field-label" for="note">הערה</label><textarea id="note" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
-          </div>` : ''}
+        ${editFields(l)}
         <div class="next-line">
           <span>הלאה: <b>${esc(nx.label)}</b>${nx.due ? ' · ' + esc(relDay(new Date(nx.due), NOW())) : ''}${l.next ? '' : ' <span class="optional">(הצעה)</span>'}</span>
           <button class="next-btn" data-act="next-cycle">לשנות</button>
         </div>
       </section>`;
-    const note = $('#note');
+    const note = $('[data-note]');
     if (note) {
-      // While writing, the clock waits longer, but never forever: 15 seconds after the last keystroke.
+      // While writing, the clock waits longer, but never forever: from the last keystroke.
       note.addEventListener('focus', () => pauseIdle(NOTE_IDLE_MS));
-      note.addEventListener('input', () => { l.note = note.value; save(); pauseIdle(NOTE_IDLE_MS); });
       note.addEventListener('blur', () => startIdle());
     }
     startIdle();
+  }
+
+  /** The same fields wherever a lead is edited: the booth, the evening, the day after.
+   *  Every control carries its lead id, so no screen needs its own copy of the logic. */
+  function editFields(l) {
+    const t = tpl();
+    const open = moreOpenId === l.id;
+    return `
+      <div class="warmth" role="group" aria-label="כמה חם">
+        ${Object.entries(WARMTH).map(([k, v]) => `<button class="w-btn ${k}" data-warm="${k}" data-id="${l.id}" aria-pressed="${l.warmth === k}">${k === 'hot' ? '🔥 ' : ''}${v}</button>`).join('')}
+      </div>
+      ${S.business.offerings.length ? `
+        <div><div class="field-label">מה עניין אותו</div>
+        <div class="chips">${S.business.offerings.map((o) => `<button class="chip" data-int="${esc(o)}" data-id="${l.id}" aria-pressed="${l.interests.includes(o)}">${esc(o)}</button>`).join('')}</div></div>` : ''}
+      <div class="inline">
+        <button class="more-toggle" data-act="more" data-id="${l.id}" aria-expanded="${open}">${open ? '− פחות' : '+ עוד: ' + [t.ask ? t.ask.label : null, 'מתי', 'הערה'].filter(Boolean).join(' · ')}</button>
+        ${S.business.catalog ? `<button class="chip" data-act="send" data-id="${l.id}" aria-pressed="${l.sendMaterial}">📎 ${l.sendMaterial ? 'החומר יישלח' : 'שלח חומר'}</button>` : ''}
+      </div>
+      ${open ? `
+        <div class="more">
+          ${t.ask ? `<div><div class="field-label">${esc(t.ask.label)}</div><div class="chips">${t.ask.options.map((o) => `<button class="chip" data-ask="${esc(o)}" data-id="${l.id}" aria-pressed="${l.ask === o}">${esc(o)}</button>`).join('')}</div></div>` : ''}
+          <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" data-id="${l.id}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
+          <div><label class="field-label" for="note-${l.id}">הערה</label><textarea id="note-${l.id}" data-note="${l.id}" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
+        </div>` : ''}`;
+  }
+
+  /** Redraw whichever screen is showing, after a field was edited. On the day-after
+   *  screen the edited lead is pinned, so it cannot slip out from under the finger
+   *  when the change reorders the list. */
+  function rerender(l) {
+    if (S.stage === 'booth' && openLeadId) return renderPanel();
+    if (S.stage === 'today' && l) focusLead = l.id;
+    return render();
   }
 
   function startIdle(ms) {
@@ -751,16 +769,23 @@
       </div></div>`;
       return;
     }
-    const l = todo[0];
+    // The lead stays on screen after it is tagged, so interests and the extra
+    // fields can still be filled in. "הבא" is what moves on.
+    const l = (eveId && leadById(eveId)) || todo[0];
+    eveId = l.id;
+    const left = todo.filter((x) => x.id !== l.id).length;
     main().innerHTML = `<div class="stack">
-      <div><h1>חמש דקות של ערב</h1><p class="lead-text">מי שלא הספקת לתייג בדוכן. נגיעה אחת לכל אחד, כל עוד אתה זוכר.</p></div>
+      <div><h1>חמש דקות של ערב</h1><p class="lead-text">מי שלא הספקת לתייג בדוכן. נגיעה אחת לכל אחד, כל עוד אתה זוכר, ואפשר גם להוסיף פרטים.</p></div>
       <div class="card">
-        <div class="card-count num">${todo.length === 1 ? 'האחרון' : 'נשארו ' + todo.length}</div>
+        <div class="card-count num">${left ? 'נשארו עוד ' + left : 'האחרון'}</div>
         <div><div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span></div>
           <div class="person-meta">${esc(leadMeta(l))}</div></div>
-        <div class="optional">היה בדוכן ב-<span class="num">${hhmm(new Date(l.createdAt))}</span> · ${l.source === 'dial' ? 'חייג' : 'נקלט בחיפוש'}${l.interests.length ? ' · התעניין ב' + esc(l.interests.join(', ')) : ''}</div>
-        <div class="warmth">${Object.entries(WARMTH).map(([k, v]) => `<button class="w-btn ${k}" data-eve="${k}" data-id="${l.id}">${k === 'hot' ? '🔥 ' : ''}${v}</button>`).join('')}</div>
-        <button class="btn ghost" data-eve="skip" data-id="${l.id}">לא זוכר, לדלג</button>
+        <div class="optional">היה בדוכן ב-<span class="num">${hhmm(new Date(l.createdAt))}</span> · ${l.source === 'dial' ? 'חייג' : 'נקלט בחיפוש'}${l.visits.length > 1 ? ' · חזר ' + l.visits.length + ' פעמים' : ''}</div>
+        ${editFields(l)}
+        <div class="inline">
+          <button class="btn primary big" data-eve="next" data-id="${l.id}">${l.warmth ? 'הבא ←' : 'לדלג, לא זוכר'}</button>
+          ${l.warmth ? `<button class="btn ghost" data-eve="skip" data-id="${l.id}">לדלג</button>` : ''}
+        </div>
       </div></div>`;
   }
 
@@ -790,7 +815,7 @@
         <div><div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span></div>
           <div class="person-meta">${esc(leadMeta(l))}</div></div>
         <div class="why">למה עכשיו: ${esc(whyNow(l, now))}</div>
-        ${l.note ? `<div>"${esc(l.note)}"</div>` : ''}
+        ${editFields(l)}
         <div class="next-line"><span>הלאה: <b>${esc(nextOf(l).label)}</b>${nextOf(l).due ? ' · ' + esc(relDay(new Date(nextOf(l).due), now)) : ''}${l.calls.length ? ' · ניסיונות קודמים: ' + l.calls.length : ''}${l.pid != null ? '' : l.custom && l.custom.phone ? ' · ' + esc(l.custom.phone) : ''}</span>
           <button class="next-btn" data-act="next-cycle" data-id="${l.id}">לשנות</button></div>
         ${asking ? `
@@ -981,7 +1006,7 @@
 
   function setStage(id) {
     stopIdle();
-    openLeadId = null; callStep = null; focusLead = null;
+    openLeadId = null; callStep = null; focusLead = null; eveId = null; moreOpenId = null;
     S.stage = id;
     save(); render();
     window.scrollTo(0, 0);
@@ -1009,17 +1034,20 @@
     if (d.pick) return pickPerson(parseInt(d.pick, 10));
     if (d.open) return openLead(parseInt(d.open, 10));
 
-    const l = openLeadId ? leadById(openLeadId) : null;
+    // Field edits work on every screen: the id on the control says which lead.
+    const l = d.id ? leadById(parseInt(d.id, 10)) : (openLeadId ? leadById(openLeadId) : null);
     // A warmth tap refreshes the machine's proposal, never a next step the person chose.
-    if (d.warm && l) { l.warmth = l.warmth === d.warm ? null : d.warm; if (!l.next || l.next.by !== 'person') l.next = null; save(); return renderPanel(); }
-    if (d.int && l) { const k = l.interests.indexOf(d.int); if (k >= 0) l.interests.splice(k, 1); else l.interests.push(d.int); save(); return renderPanel(); }
-    if (d.ask && l) { l.ask = l.ask === d.ask ? null : d.ask; save(); return renderPanel(); }
-    if (d.when && l) { l.when = l.when === d.when ? null : d.when; save(); return renderPanel(); }
+    if (d.warm && l) { l.warmth = l.warmth === d.warm ? null : d.warm; if (!l.next || l.next.by !== 'person') l.next = null; save(); return rerender(l); }
+    if (d.int && l) { const k = l.interests.indexOf(d.int); if (k >= 0) l.interests.splice(k, 1); else l.interests.push(d.int); save(); return rerender(l); }
+    if (d.ask && l) { l.ask = l.ask === d.ask ? null : d.ask; save(); return rerender(l); }
+    if (d.when && l) { l.when = l.when === d.when ? null : d.when; save(); return rerender(l); }
 
     if (d.eve) {
       const x = leadById(parseInt(d.id, 10));
       if (x && d.eve === 'skip') { x.warmth = 'cold'; x.skipped = true; }
-      else if (x) x.warmth = d.eve;
+      else if (x && d.eve === 'next' && !x.warmth) { x.warmth = 'cold'; x.skipped = true; }
+      eveId = null;          // move on to the next untagged visitor
+      moreOpenId = null;
       save(); return viewEvening();
     }
     if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return viewToday(); }
@@ -1027,8 +1055,8 @@
     if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; viewToday(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
     switch (d.act) {
-      case 'more': moreOpen = !moreOpen; return renderPanel();
-      case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); renderPanel(); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
+      case 'more': { const id = d.id ? parseInt(d.id, 10) : openLeadId; moreOpenId = moreOpenId === id ? null : id; return rerender(leadById(id)); }
+      case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); rerender(l); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
       case 'next-cycle': {
         // Works in the booth and in the day-after card. The person's choice is marked as theirs.
         const target = d.id ? leadById(parseInt(d.id, 10)) : l;
@@ -1068,6 +1096,17 @@
   });
 
   // Typing anywhere on the booth screen goes to the search box.
+  // The note saves as it is typed, on whichever screen it is being written.
+  document.addEventListener('input', (e) => {
+    const ta = e.target.closest('[data-note]');
+    if (!ta) return;
+    const l = leadById(parseInt(ta.dataset.note, 10));
+    if (!l) return;
+    l.note = ta.value;
+    save();
+    if (S.stage === 'booth' && openLeadId === l.id) pauseIdle(NOTE_IDLE_MS);
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeModal(); const m = $('#menu'); if (m) m.remove(); if (openLeadId) closePanel(); return; }
     if (S.stage !== 'booth' || $('#scrim')) return;
