@@ -235,3 +235,8 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 button.row { width: 100%; text-align: start; font: inherit; }
 button.row:hover { border-color: var(--accent); }
 button.row[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+
+.wrong-btn { border: 0; background: transparent; color: var(--hot); font-weight: 700; text-decoration: underline; padding: 6px 4px; min-height: 40px; }
+
+.badges { display: flex; gap: 6px; align-items: center; flex: none; }
+.badge.spell { background: var(--good-soft); color: var(--good); }

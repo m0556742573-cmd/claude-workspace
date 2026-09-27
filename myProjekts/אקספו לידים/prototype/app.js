@@ -88,7 +88,12 @@
     const pick = (a) => a[Math.floor(rnd() * a.length)];
     // Weighted towards the common names, so duplicates occur about as often as in a real list.
     const firsts = ['משה', 'משה', 'יעקב', 'יעקב', 'אברהם', 'יצחק', 'יוסף', 'יוסף', 'דוד', 'חיים', 'חיים', 'ישראל', 'שמואל', 'אהרן', 'מרדכי', 'שלמה', 'מנחם', 'אליעזר', 'יהודה', 'נפתלי', 'שמעון', 'בנימין', 'יחזקאל', 'פנחס', 'אלימלך', 'זאב', 'צבי', 'אריה', 'מאיר', 'נחום', 'יהושע', 'ברוך', 'גדליה', 'עזריאל', 'שלום', 'יואל', 'מנשה', 'אליהו', 'יחיאל', 'חנוך', 'זלמן', 'שבתי', 'יששכר', 'ראובן', 'לוי', 'שרגא', 'עמרם', 'חזקיהו', 'משה יוסף', 'יעקב יצחק', 'חיים מאיר', 'אברהם יהושע', 'שמואל דוד', 'מנחם מענדל'];
-    const lasts = ['כהן', 'לוי', 'ווייס', 'גרינפלד', 'פרידמן', 'שוורץ', 'רוזנברג', 'קליין', 'הורוביץ', 'רובינשטיין', 'גולדשטיין', 'פרלמן', 'לנדאו', 'הלברשטאם', 'טייטלבוים', 'שפירא', 'רבינוביץ', 'ברגר', 'אייזנבך', 'גליק', 'הירש', 'קאופמן', 'לרנר', 'מרגליות', 'נויבירט', 'פולק', 'קרויס', 'רוט', 'שטרן', 'זילבר', 'טננבוים', 'ליכטנשטיין', 'מנדלבוים', 'פישר', 'קנר', 'רייך', 'שלזינגר', 'ביננפלד', 'גוטליב', 'דייטש', 'הופמן', 'ויזל', 'זוסמן', 'חיון', 'יאקאב', 'כץ', 'לעבוביץ', 'מושקוביץ', 'נוסבוים', 'סגל', 'עקשטיין', 'פאלק', 'צוקר', 'קעסלער', 'רענד', 'שיינבערגער', 'תאומים', 'ברייער', 'גרוס', 'דאנציגער', 'הערש', 'וועבער', 'זאנענפעלד', 'טויב', 'יונגרייז', 'לאנדא', 'מילער', 'נאכמאן', 'סאמעט', 'פריינד', 'קליינמאן', 'רוזנטל', 'שווימער', 'אונגר', 'בלוי', 'גלאנץ', 'דרוק', 'האס', 'ווידער', 'זייף', 'טירנויער', 'יעגער', 'לעווי', 'מאשקאוויטש', 'נייהויז', 'ספרא', 'פעלדמאן', 'קאהן', 'ראזענבוים', 'שפיץ'];
+    // Every pair is one family name written both ways, Hebrew and Yiddish, so the
+    // cross-spelling search can be shown on demo data and not only on the real list.
+    const PAIRS = [['ברגר', 'בערגער'], ['מילר', 'מיללער'], ['שוורץ', 'שווארץ'], ['וייס', 'ווייס'],
+      ['כץ', 'קאץ'], ['לבוביץ', 'לעבאוויטש'], ['פרידמן', 'פריעדמאן'], ['גרוס', 'גראס'],
+      ['שטרן', 'שטערן'], ['הירש', 'הערש'], ['גליק', 'גליק'], ['רוט', 'ראטה']];
+    const lasts = [].concat.apply([], PAIRS).concat(['כהן', 'לוי', 'גרינפלד', 'רוזנברג', 'קליין', 'הורוביץ', 'רובינשטיין', 'גולדשטיין', 'פרלמן', 'לנדאו', 'הלברשטאם', 'טייטלבוים', 'שפירא', 'רבינוביץ', 'ברגר', 'אייזנבך', 'גליק', 'הירש', 'קאופמן', 'לרנר', 'מרגליות', 'נויבירט', 'פולק', 'קרויס', 'רוט', 'שטרן', 'זילבר', 'טננבוים', 'ליכטנשטיין', 'מנדלבוים', 'פישר', 'קנר', 'רייך', 'שלזינגר', 'ביננפלד', 'גוטליב', 'דייטש', 'הופמן', 'ויזל', 'זוסמן', 'חיון', 'יאקאב', 'כץ', 'לעבוביץ', 'מושקוביץ', 'נוסבוים', 'סגל', 'עקשטיין', 'פאלק', 'צוקר', 'קעסלער', 'רענד', 'שיינבערגער', 'תאומים', 'ברייער', 'גרוס', 'דאנציגער', 'הערש', 'וועבער', 'זאנענפעלד', 'טויב', 'יונגרייז', 'לאנדא', 'מילער', 'נאכמאן', 'סאמעט', 'פריינד', 'קליינמאן', 'רוזנטל', 'שווימער', 'אונגר', 'בלוי', 'גלאנץ', 'דרוק', 'האס', 'ווידער', 'זייף', 'טירנויער', 'יעגער', 'לעווי', 'מאשקאוויטש', 'נייהויז', 'ספרא', 'פעלדמאן', 'קאהן', 'ראזענבוים', 'שפיץ']);
     const towns = ['בני ברק', 'בני ברק', 'בני ברק', 'ירושלים', 'ירושלים', 'ירושלים', 'בית שמש', 'בית שמש', 'ביתר עילית', 'מודיעין עילית', 'אלעד', 'אשדוד', 'בני ברק', 'חיפה', 'צפת', 'טבריה', 'קרית גת', 'ערד', 'נתניה', 'חריש'];
     const out = [];
     for (let i = 0; i < 6000; i++) {
@@ -205,12 +210,13 @@
       if (ix.woman) continue;
       let score = 0;
       let ok = true;
+      let variant = false;
       for (let t = 0; t < toks.length; t++) {
         const m = tokenMatches(toks[t], ix);
         if (m) {
           score += m.exact ? 3 : 2;
-          if (m.how === 'skel') score -= 1;                  // a spelling variant ranks below a direct hit
-          if (m.how === 'deep') score -= 2;
+          if (m.how === 'skel') { score -= 1; variant = true; } // a spelling variant ranks below a direct hit
+          if (m.how === 'deep') { score -= 2; variant = true; }
           if (t === 0 && m.w === 0) score += 2;              // first typed word hits the first name
           if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
           continue;
@@ -218,10 +224,17 @@
         if (t > 0 && ix.town.some((w) => w.startsWith(toks[t]))) { score += 1; continue; } // "משה כהן בני"
         ok = false; break;
       }
-      if (ok) hits.push({ i, score });
+      if (ok) hits.push({ i, score, variant });
     }
     hits.sort((a, b) => b.score - a.score || fullName(person(a.i)).length - fullName(person(b.i)).length);
-    return { hits: hits.slice(0, limit), total: hits.length };
+    // Names spelled the other way must stay visible, or a common surname fills the
+    // whole list and the exhibitor never sees that the other spelling exists.
+    const plain = hits.filter((h) => !h.variant);
+    const other = hits.filter((h) => h.variant);
+    const shown = other.length && plain.length > limit - 2
+      ? plain.slice(0, limit - 2).concat(other.slice(0, 2))
+      : hits.slice(0, limit);
+    return { hits: shown, total: hits.length };
   }
 
   // ------------------------------------------------------------------
@@ -464,8 +477,20 @@
   let idleTimer = null;
   let countTimer = null;
   let lastAction = null;
-  const IDLE_MS = 12000;        // long enough to think, short enough not to block the next visitor
-  const NOTE_IDLE_MS = 25000;   // while writing a note, from the last keystroke
+  let lastQuery = '';   // what was typed, so a wrong tap can go straight back to it
+  /* How long the panel waits before going back to search. The lead is saved the
+   * moment the name is tapped, so this is only about the screen, never the data.
+   * The wait follows what the exhibitor is doing: done means gone, busy means wait. */
+  const IDLE_DONE = 5000;    // the name was tapped and nothing else: he is finished
+  const IDLE_BUSY = 8000;    // warmth or an interest was tapped: he may add more
+  const IDLE_DEEP = 15000;   // the extra fields are open: this is a lead worth detail
+  const NOTE_IDLE_MS = 25000; // a note is being written, counted from the last keystroke
+  function idleMs() {
+    const l = leadById(openLeadId);
+    if (moreOpen) return IDLE_DEEP;
+    if (l && (l.warmth || l.interests.length || l.sendMaterial)) return IDLE_BUSY;
+    return IDLE_DONE;
+  }
 
   function viewBooth() {
     if (!S.boothEnteredAt) { S.boothEnteredAt = Date.now(); save(); }
@@ -487,9 +512,26 @@
         <div id="slot"></div>
       </div>`;
     const q = $('#q');
-    q.addEventListener('input', () => { openLeadId = null; stopIdle(); renderResults(q.value); });
+    q.value = lastQuery;
+    q.addEventListener('input', () => { lastQuery = q.value; openLeadId = null; stopIdle(); renderResults(q.value); });
     renderRecent();
-    if (openLeadId && leadById(openLeadId)) renderPanel(); else { renderResults(''); q.focus(); }
+    if (openLeadId && leadById(openLeadId)) renderPanel();
+    else { renderResults(lastQuery); q.focus(); }
+  }
+
+  /** Wrong name tapped: undo it and go straight back to the same search. */
+  function wrongPerson() {
+    stopIdle();
+    const l = leadById(openLeadId);
+    const act = lastAction && l && lastAction.id === l.id ? lastAction : null;
+    openLeadId = null;
+    lastAction = null;
+    if (act && act.type === 'create') S.leads = S.leads.filter((x) => x.id !== act.id);
+    else if (l) { if (l.visits.length > 1) l.visits.pop(); l.touched = false; }
+    save();
+    viewBooth();
+    const q = $('#q');
+    if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
   }
 
   function renderResults(query) {
@@ -505,7 +547,7 @@
       slot.innerHTML = `<div class="empty-hint">לא נמצא ברשימה. <button class="btn" data-act="new-person" style="margin-inline-start:8px">להוסיף כחדש</button></div>`;
       return;
     }
-    slot.innerHTML = `<div class="results">${hits.map(({ i }) => {
+    slot.innerHTML = `<div class="results">${hits.map(({ i, variant }) => {
       const p = person(i);
       const existing = S.leads.find((l) => l.pid === i);
       return `<button class="result" data-pick="${i}">
@@ -513,7 +555,10 @@
           <span class="person-main"><span class="person-title">${esc(p[0])}</span><span class="person-name">${esc(fullName(p))}</span><span class="person-city">${esc(p[5])}</span></span>
           <span class="person-meta">${esc(metaLine(p))}</span>
         </span>
-        ${existing ? `<span class="badge again">ביקר כבר</span>` : ''}
+        <span class="badges">
+          ${variant ? `<span class="badge spell">כתיב אחר</span>` : ''}
+          ${existing ? `<span class="badge again">ביקר כבר</span>` : ''}
+        </span>
       </button>`;
     }).join('')}${total > hits.length ? `<div class="results-more">ועוד ${total - hits.length}. להקליד עוד אות או את העיר.</div>` : ''}</div>`;
   }
@@ -558,13 +603,14 @@
             <div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span>
               ${again ? `<span class="badge again">ביקור ${l.visits.length}, קודם ב-${hhmm(new Date(l.visits[l.visits.length - 2]))}</span>` : ''}</div>
             <div class="person-meta">${esc(leadMeta(l))}</div>
-            <div class="saved-note">✓ נשמר. כל השאר רשות</div>
+            <div class="saved-note">✓ נשמר. כל השאר רשות ·
+              <button class="wrong-btn" data-act="wrong">לא זה, חזרה לחיפוש</button></div>
           </div>
           <div class="panel-timer">
             <button class="btn ghost" data-act="close-now">✓ סיום</button>
-            <div class="ring running" id="ring" style="--ring-ms:${IDLE_MS}ms" title="חוזר לחיפוש לבד. כל נגיעה מאריכה">
+            <div class="ring running" id="ring" style="--ring-ms:${idleMs()}ms" title="חוזר לחיפוש לבד. כל נגיעה מאריכה">
               <svg width="44" height="44" viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="bar" cx="22" cy="22" r="18"/></svg>
-              <span id="ring-n">${Math.round(IDLE_MS / 1000)}</span>
+              <span id="ring-n">${Math.round(idleMs() / 1000)}</span>
             </div>
           </div>
         </div>
@@ -601,7 +647,7 @@
 
   function startIdle(ms) {
     stopIdle();
-    const total = ms || IDLE_MS;
+    const total = ms || idleMs();
     const ring = $('#ring');
     if (ring) {
       ring.style.setProperty('--ring-ms', total + 'ms');
@@ -998,6 +1044,7 @@
       case 'np-save': return saveNewPerson();
       case 'close-modal': return closeModal();
       case 'close-now': return closePanel();
+      case 'wrong': return wrongPerson();
       case 'sim-dial': return simulateDial();
       case 'add-offer': return addOffer();
       case 'setup-done': S.business.setupDone = true; return setStage('booth');
