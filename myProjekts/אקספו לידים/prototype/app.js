@@ -102,7 +102,15 @@
     return out;
   }
 
-  const PEOPLE = REAL ? window.EXPO_PEOPLE : makeDemoPeople();
+  // Guard: a real row must have the stripped shape and no contact data in any cell.
+  const CONTACT_RE = /0\d{1,2}-?\d{7}|[\w.+-]+@[\w-]+\.[\w.]+/;
+  function validRow(r) {
+    return Array.isArray(r) && r.length <= 7 && !r.some((c) => CONTACT_RE.test(String(c)));
+  }
+  const PEOPLE = REAL ? window.EXPO_PEOPLE.filter(validRow) : makeDemoPeople();
+  if (REAL && PEOPLE.length !== window.EXPO_PEOPLE.length) {
+    console.warn((window.EXPO_PEOPLE.length - PEOPLE.length) + ' rows dropped: wrong shape or contact data');
+  }
   const person = (i) => PEOPLE[i];
   const fullName = (p) => (p[1] + ' ' + p[2]).trim();
 
@@ -219,9 +227,20 @@
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) { S = JSON.parse(raw); return; }
+      if (raw) { S = JSON.parse(raw); relinkPeople(); return; }
     } catch (e) { /* storage unavailable: run in memory */ }
     S = freshState();
+  }
+  /** Leads point at a row by position. If the list was re-exported in another order,
+   *  find each person again by the name saved with the lead, rather than show someone else. */
+  function relinkPeople() {
+    S.leads.forEach((l) => {
+      if (l.pid == null || !l.snap) return;
+      if (person(l.pid) && fullName(person(l.pid)) + '|' + person(l.pid)[5] === l.snap) return;
+      const k = PEOPLE.findIndex((p) => fullName(p) + '|' + p[5] === l.snap);
+      if (k >= 0) l.pid = k;
+      else { const [name, town] = l.snap.split('|'); l.custom = { first: name, last: '', town }; l.pid = null; }
+    });
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* in memory only */ }
@@ -259,8 +278,18 @@
       warmth: null, interests: [], ask: null, when: null, note: '', sendMaterial: false,
       visits: [NOW().getTime()], next: null, calls: [], status: 'open', tagger: 'טאבלט הדוכן',
     }, fields);
+    if (l.pid != null) l.snap = fullName(person(l.pid)) + '|' + person(l.pid)[5];
     S.leads.push(l);
     return l;
+  }
+
+  /** A new visit counts only if the last one was a while ago: a double tap or a re-search is not a return. */
+  const REVISIT_GAP = 15 * 60000;
+  function addVisit(l) {
+    const now = NOW().getTime();
+    if (now - l.visits[l.visits.length - 1] < REVISIT_GAP) return false;
+    l.visits.push(now);
+    return true;
   }
 
   // ------------------------------------------------------------------
@@ -292,12 +321,12 @@
     l.calls.push({ at: now.getTime(), outcome });
     if (outcome === 'won') { l.status = 'won'; l.next = { label: 'נסגרה עסקה', due: null, kind: 'done' }; }
     else if (outcome === 'lost') { l.status = 'lost'; l.next = { label: 'לא רלוונטי', due: null, kind: 'done' }; }
-    else if (outcome === 'meeting') { l.next = { label: 'פגישה', due: daysFrom(now, 2, 18).getTime(), kind: 'task' }; }
-    else if (outcome === 'quote') { l.next = { label: 'לבדוק מה עם ההצעה', due: daysFrom(now, 3, 10).getTime(), kind: 'task' }; }
+    else if (outcome === 'meeting') { l.next = { label: 'פגישה', due: daysFrom(now, 2, 18).getTime(), kind: 'task', by: 'machine' }; }
+    else if (outcome === 'quote') { l.next = { label: 'לבדוק מה עם ההצעה', due: daysFrom(now, 3, 10).getTime(), kind: 'task', by: 'machine' }; }
     else if (outcome === 'noanswer') {
       const tries = l.calls.filter((c) => c.outcome === 'noanswer').length;
       if (tries >= 3) { l.status = 'audience'; l.next = { label: 'לא ענה 3 פעמים, עבר לקהל', due: null, kind: 'audience' }; }
-      else l.next = { label: 'לנסות שוב (' + (tries + 1) + ')', due: daysFrom(now, 1, 11).getTime(), kind: 'task' };
+      else l.next = { label: 'לנסות שוב (' + (tries + 1) + ')', due: daysFrom(now, 1, 11).getTime(), kind: 'task', by: 'machine' };
     }
   }
 
@@ -400,10 +429,11 @@
   let idleTimer = null;
   let lastAction = null;
   const IDLE_MS = 5000;
+  const NOTE_IDLE_MS = 15000;
 
   function viewBooth() {
     if (!S.boothEnteredAt) { S.boothEnteredAt = Date.now(); save(); }
-    const waiting = S.leads.filter((l) => l.source === 'dial' && !l.touched && l.status === 'open');
+    const waiting = S.leads.filter((l) => !l.touched && l.status === 'open');
     main().innerHTML = `
       <div class="booth">
         <div class="search-wrap">
@@ -453,25 +483,28 @@
   }
 
   function pickPerson(i) {
+    const t = $('#toast'); if (t) t.remove();   // an old toast must not undo this new pick
     let l = S.leads.find((x) => x.pid === i);
     if (l) {
-      l.visits.push(NOW().getTime());
-      lastAction = { type: 'revisit', id: l.id };
+      addVisit(l);
+      lastAction = null;                        // only a brand-new capture can be undone
     } else {
       l = newLead({ pid: i, source: 'search' });
       lastAction = { type: 'create', id: l.id };
     }
     l.touched = true;
     save();
-    openLead(l.id);
+    openLead(l.id, true);
   }
 
-  function openLead(id) {
+  /** keepAction: the caller has just set lastAction for this lead. Reopening from a chip never offers undo. */
+  function openLead(id, keepAction) {
+    if (!keepAction) lastAction = null;
     openLeadId = id;
     const l = leadById(id);
-    // Business and institution leads deserve the extra fields open from the start.
+    // Leads that already carry detail open with the extra fields showing.
     moreOpen = !!(l && (l.ask || l.when || l.note));
-    if (l && l.source === 'dial' && !l.touched) { l.touched = true; lastAction = { type: 'tag', id }; save(); }
+    if (l && !l.touched) { l.touched = true; save(); }
     viewBooth();
   }
 
@@ -519,8 +552,9 @@
       </section>`;
     const note = $('#note');
     if (note) {
-      note.addEventListener('focus', pauseIdle);
-      note.addEventListener('input', () => { l.note = note.value; save(); pauseIdle(); });
+      // While writing, the clock waits longer, but never forever: 15 seconds after the last keystroke.
+      note.addEventListener('focus', () => pauseIdle(NOTE_IDLE_MS));
+      note.addEventListener('input', () => { l.note = note.value; save(); pauseIdle(NOTE_IDLE_MS); });
       note.addEventListener('blur', () => startIdle());
     }
     startIdle();
@@ -532,10 +566,11 @@
     if (ring) { ring.classList.remove('running', 'paused'); void ring.offsetWidth; ring.classList.add('running'); }
     idleTimer = setTimeout(closePanel, IDLE_MS);
   }
-  function pauseIdle() {
+  function pauseIdle(ms) {
     stopIdle();
     const ring = $('#ring');
     if (ring) { ring.classList.remove('running'); void ring.offsetWidth; ring.classList.add('running', 'paused'); }
+    if (ms) idleTimer = setTimeout(closePanel, ms);
   }
   function stopIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
 
@@ -546,21 +581,19 @@
     if (S.stage !== 'booth') return;
     viewBooth();
     if (l) {
-      const undoable = lastAction && lastAction.id === l.id;
-      toast('✓ נשמר: ' + leadName(l) + (l.warmth ? ' · ' + WARMTH[l.warmth] : ''), undoable ? 'ביטול' : null, undoable ? undo : null);
+      // The toast carries its own action, so a later pick can never be undone by an earlier toast.
+      const act = lastAction && lastAction.id === l.id && lastAction.type === 'create' ? lastAction : null;
+      lastAction = null;
+      toast('✓ נשמר: ' + leadName(l) + (l.warmth ? ' · ' + WARMTH[l.warmth] : ''), act ? 'ביטול' : null, act ? () => undo(act) : null);
     }
   }
 
-  function undo() {
-    if (!lastAction) return;
-    const l = leadById(lastAction.id);
-    if (l) {
-      if (lastAction.type === 'create') S.leads = S.leads.filter((x) => x.id !== l.id);
-      else if (lastAction.type === 'revisit') l.visits.pop();
-      else if (lastAction.type === 'tag') l.touched = false;
-    }
-    lastAction = null;
+  function undo(act) {
+    if (!act || act.type !== 'create') return;
+    S.leads = S.leads.filter((x) => x.id !== act.id);
+    if (openLeadId === act.id) { openLeadId = null; stopIdle(); }
     save(); render();
+    toast('בוטל');
   }
 
   function renderRecent() {
@@ -580,7 +613,7 @@
       <label><span class="field-label">שם פרטי</span><input id="np-first" class="text-input" value="${esc(q[0] || '')}" autocomplete="off"></label>
       <label><span class="field-label">שם משפחה</span><input id="np-last" class="text-input" value="${esc(q.slice(1).join(' '))}" autocomplete="off"></label>
       <label><span class="field-label">עיר <span class="optional">רשות</span></span><input id="np-town" class="text-input" autocomplete="off"></label>
-      <label><span class="field-label">טלפון <span class="optional">כדי שאפשר יהיה לחזור אליו</span></span><input id="np-phone" class="text-input num" inputmode="tel" autocomplete="off"></label>
+      <label><span class="field-label">טלפון <span class="optional">כדי לחזור אליו. בדוגמית נשמר רק במכשיר הזה</span></span><input id="np-phone" class="text-input num" inputmode="tel" autocomplete="off"></label>
       <div class="inline"><button class="btn primary" data-act="np-save">שמירה</button><button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
     setTimeout(() => $('#np-first') && $('#np-first').focus(), 30);
   }
@@ -591,7 +624,7 @@
     const l = newLead({ source: 'new', custom: { first, last, town: $('#np-town').value.trim(), phone: $('#np-phone').value.trim() } });
     l.touched = true;
     lastAction = { type: 'create', id: l.id };
-    save(); closeModal(); openLead(l.id);
+    save(); closeModal(false); openLead(l.id, true);
   }
 
   function simulateDial() {
@@ -601,7 +634,7 @@
       if (!isWoman(person(i))) break;
     }
     const existing = S.leads.find((l) => l.pid === i);
-    if (existing) { existing.visits.push(NOW().getTime()); existing.touched = false; }
+    if (existing) { addVisit(existing); existing.touched = false; }
     else newLead({ pid: i, source: 'dial' });
     save();
     toast('📞 ' + fullName(person(i)) + ' חייג לדוכן. מחכה לתיוג, מתי שנוח.');
@@ -723,9 +756,12 @@
       if (l.status !== 'open') return;
       const start = new Date(l.createdAt);
       if (!l.warmth) { l.warmth = rnd() < 0.7 ? 'cold' : 'warm'; }
-      if (l.warmth === 'cold') return;
-      const delay = l.warmth === 'hot' ? (rnd() < 0.8 ? 1 : 3) : 3 + Math.floor(rnd() * 3);
-      const at = daysFrom(start, delay, 11);
+      // Follow the plan the lead already has, including anything the person chose.
+      const nx = nextOf(l);
+      if (nx.kind !== 'task' || !nx.due) return;
+      // Most hot calls happen on time; some slip by two days, which is what the speed measure is for.
+      const slip = l.warmth === 'hot' && rnd() < 0.2 ? 2 * DAY : 0;
+      const at = new Date(Math.max(nx.due, start.getTime()) + slip);
       const r = rnd();
       const outcome = l.warmth === 'hot' ? (r < 0.35 ? 'meeting' : r < 0.6 ? 'quote' : r < 0.75 ? 'won' : 'noanswer') : (r < 0.2 ? 'quote' : r < 0.3 ? 'won' : r < 0.6 ? 'noanswer' : 'lost');
       recordOutcome(l, outcome, at);
@@ -785,7 +821,7 @@
       <nav class="stages" aria-label="מכונת זמן">
         ${STAGES.map((s, n) => `<button class="stage" data-stage="${s.id}" ${S.stage === s.id ? 'aria-current="step"' : ''}><span class="dot num">${n + 1}</span><span class="label">${s.label}</span></button>`).join('')}
       </nav>
-      <div class="clock"><span class="clock-date">${esc(hebDate(now))}</span><span class="clock-time num">${S.stage === 'setup' ? 'שבוע לפני' : hhmm(now)}</span></div>
+      <div class="clock"><span class="clock-date" id="clock-date">${esc(hebDate(now))}</span><span class="clock-time num" id="clock-time">${S.stage === 'setup' ? 'שבוע לפני' : hhmm(now)}</span></div>
       <button class="icon-btn" data-act="menu" aria-haspopup="true" aria-label="כלי הדגמה">⋯</button>
     </div>`;
   }
@@ -818,14 +854,19 @@
   }
 
   function modal(html) {
-    closeModal();
+    closeModal(false);
     const s = document.createElement('div');
     s.id = 'scrim'; s.className = 'scrim';
     s.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
     s.addEventListener('click', (e) => { if (e.target === s) closeModal(); });
     document.body.appendChild(s);
   }
-  function closeModal() { const s = $('#scrim'); if (s) s.remove(); }
+  /** restart: a closed window hands the five-second clock back to the open panel. */
+  function closeModal(restart) {
+    const s = $('#scrim'); if (!s) return;
+    s.remove();
+    if (restart !== false && openLeadId && S.stage === 'booth') startIdle();
+  }
 
   function confirmReset() {
     modal(`<h2>להתחיל מחדש?</h2><p class="lead-text">כל הלידים וההגדרות בדוגמית יימחקו מהמכשיר הזה.</p>
@@ -863,7 +904,8 @@
     if (d.open) return openLead(parseInt(d.open, 10));
 
     const l = openLeadId ? leadById(openLeadId) : null;
-    if (d.warm && l) { l.warmth = l.warmth === d.warm ? null : d.warm; l.next = null; save(); return renderPanel(); }
+    // A warmth tap refreshes the machine's proposal, never a next step the person chose.
+    if (d.warm && l) { l.warmth = l.warmth === d.warm ? null : d.warm; if (!l.next || l.next.by !== 'person') l.next = null; save(); return renderPanel(); }
     if (d.int && l) { const k = l.interests.indexOf(d.int); if (k >= 0) l.interests.splice(k, 1); else l.interests.push(d.int); save(); return renderPanel(); }
     if (d.ask && l) { l.ask = l.ask === d.ask ? null : d.ask; save(); return renderPanel(); }
     if (d.when && l) { l.when = l.when === d.when ? null : d.when; save(); return renderPanel(); }
@@ -879,19 +921,19 @@
 
     switch (d.act) {
       case 'more': moreOpen = !moreOpen; return renderPanel();
-      case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); renderPanel(); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' יישלח למייל של ' + leadName(l) + ' (בדוגמית לא נשלח באמת)'); } return;
+      case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); renderPanel(); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
       case 'next-cycle': {
         if (!l) return;
         const cur = l.next ? OVERRIDES.findIndex((o) => o.label === l.next.label) : -1;
         const o = OVERRIDES[cur + 1];
         if (!o) l.next = null;
-        else if (o.audience) l.next = { label: o.label, due: null, kind: 'audience' };
-        else l.next = { label: o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task' };
+        else if (o.audience) l.next = { label: o.label, due: null, kind: 'audience', by: 'person' };
+        else l.next = { label: o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task', by: 'person' };
         save(); return renderPanel();
       }
       case 'new-person': return newPersonModal();
       case 'np-save': return saveNewPerson();
-      case 'close-modal': closeModal(); if (openLeadId) startIdle(); return;
+      case 'close-modal': return closeModal();
       case 'sim-dial': return simulateDial();
       case 'add-offer': return addOffer();
       case 'setup-done': S.business.setupDone = true; return setStage('booth');
@@ -909,7 +951,7 @@
         return $('#menu') && $('#menu').remove();
       }
       case 'reset': $('#menu') && $('#menu').remove(); return confirmReset();
-      case 'reset-yes': S = freshState(); save(); closeModal(); return render();
+      case 'reset-yes': S = freshState(); save(); closeModal(false); lastAction = null; return setStage('setup');
     }
   });
 
@@ -935,5 +977,9 @@
   load();
   render();
   // Keep the booth clock moving while the screen is open.
-  setInterval(() => { if (S.stage === 'booth') renderTopbar(); }, 30000);
+  // Only the clock text changes, so an open menu is never redrawn away.
+  setInterval(() => {
+    if (S.stage !== 'booth') return;
+    const t = $('#clock-time'); if (t) t.textContent = hhmm(NOW());
+  }, 30000);
 })();

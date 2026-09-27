@@ -86,7 +86,7 @@ h2 { font-size: 21px; }
 /* ---------- Booth ---------- */
 .booth { display: grid; gap: 16px; }
 .search-wrap { position: relative; }
-.search { width: 100%; box-sizing: border-box; font-size: 28px; font-weight: 700; padding: 18px 22px 18px 150px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+.search { width: 100%; box-sizing: border-box; font-size: 28px; font-weight: 700; padding-block: 18px; padding-inline-start: 22px; padding-inline-end: 200px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
 .search:focus { border-color: var(--accent); outline: none; }
 .search-actions { position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
 .icon-btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
@@ -198,8 +198,8 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 /* ---------- Modal + toast ---------- */
 .scrim { position: fixed; inset: 0; background: rgba(10, 16, 26, .45); z-index: 40; display: grid; place-items: center; padding: 16px; }
 .modal { background: var(--surface); border-radius: 20px; padding: 22px; width: min(480px, 100%); box-sizing: border-box; display: grid; gap: 12px; box-shadow: var(--shadow); }
-.toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); inset-inline-start: 50%; transform: translateX(50%); z-index: 50; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 12px 16px; display: flex; gap: 16px; align-items: center; font-weight: 700; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
-.toast button { border: 0; background: transparent; color: var(--bg); text-decoration: underline; font-weight: 800; }
+.toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; z-index: 50; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 12px 16px; display: flex; gap: 16px; align-items: center; font-weight: 700; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.toast button { border: 0; background: transparent; color: var(--bg); text-decoration: underline; font-weight: 800; min-height: 44px; padding-inline: 10px; }
 .menu { position: absolute; top: 100%; inset-inline-end: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 6px; display: grid; min-width: 240px; z-index: 30; }
 .menu button { border: 0; background: transparent; text-align: start; padding: 10px 12px; border-radius: 10px; font-weight: 600; }
 .menu button:hover { background: var(--surface-2); }
@@ -208,8 +208,13 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 @media (max-width: 720px) {
   .topbar-inner { padding: 8px 16px; gap: 8px; }
   .stage .label { display: none; }
+  .stages { order: 3; flex-basis: 100%; flex-wrap: nowrap; justify-content: space-between; }
+  .brand { flex: 1; }
   main { padding-inline: 16px; }
-  .search { font-size: 22px; padding-inline-start: 22px; padding-inline-end: 118px; }
+  .search-wrap { display: grid; gap: 8px; }
+  .search { font-size: 22px; padding-inline-end: 22px; }
+  .search-actions { position: static; transform: none; }
+  .search-actions .icon-btn { flex: 1; min-height: 48px; }
   .two-col { grid-template-columns: 1fr; }
   .person-name { font-size: 21px; }
   .headline-big { font-size: 26px; }
@@ -217,3 +222,7 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 @media (prefers-reduced-motion: reduce) {
   .ring.running .bar { animation: none; }
 }
+
+/* Tap targets: nothing a thumb needs is under 44px. */
+.next-btn, .more-toggle, .r-chip, .stage, .icon-btn, .chip, .tab { min-height: 44px; }
+.next-btn, .more-toggle { padding-inline: 10px; }
