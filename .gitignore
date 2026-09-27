@@ -30,3 +30,6 @@ node_modules/
 # Real people data (expo organisers list) - never commit, see expo decisions/0007
 **/*.real.*
 expo-data/
+
+# Preview launcher: points at a session scratchpad, machine-specific
+.claude/launch.json
