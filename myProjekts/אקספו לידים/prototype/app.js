@@ -128,8 +128,26 @@
       .replace(/[ךםןףץ]/g, (c) => FINALS[c])
       .replace(/\s+/g, ' ').trim().toLowerCase();
   }
-  // Loose form: also ignores vav and yud, which are written inconsistently.
-  const loose = (s) => s.replace(/[וי]/g, '');
+  /* Sound skeleton: Yiddish and Hebrew spellings of the same name reach the same key.
+   *
+   * Yiddish written in Hebrew letters carries its vowels as letters (ע, א), doubles
+   * consonants (מיללער), and writes /v/ as וו and /tsh/ as טש. Hebrew spelling drops
+   * all of that. Stripping the vowel letters and collapsing doubles brings the two
+   * together: בערגער and ברגר both become ברגר, מיללער and מילר become מילר.
+   *
+   * Two depths, because one size over- or under-matches:
+   *   skel(w)       keeps vav and yud   — precise:  שווארץ = שוורץ
+   *   skel(w, true) drops them too      — broad:    לעבאוויטש = לבוביץ
+   */
+  function skel(w, deep) {
+    let s = w
+      .replace(/וו/g, 'ו').replace(/יי/g, 'י')   // doubled letters carry one sound
+      .replace(/דזש/g, 'ז').replace(/טש/g, 'צ')  // Yiddish digraphs
+      .replace(/[אהע]/g, '');                    // vowel letters: בערגער -> ברגר
+    if (deep) s = s.replace(/[וי]/g, '');
+    s = s.replace(/ת/g, 'ט').replace(/ק/g, 'כ').replace(/ש/g, 'ס'); // same sound, either letter
+    return s.replace(/(.)\1+/g, '$1');           // מיללער -> מילר, לבבצ -> לבצ
+  }
 
   const ALIASES = {
     'יודא': 'יהודה', 'יהודה': 'יודא', 'ליבוש': 'אריה', 'לייבוש': 'אריה', 'שמולי': 'שמואל', 'שמעלקא': 'שמואל',
@@ -143,10 +161,14 @@
   const INDEX = PEOPLE.map((p) => {
     const words = (norm(p[1]) + ' ' + norm(p[2])).split(' ').filter(Boolean);
     const town = norm(p[5]).split(' ').filter(Boolean);
-    return { words, town, firstLen: norm(p[1]).split(' ').length, looseWords: words.map(loose), woman: isWoman(p) };
+    return {
+      words, town, firstLen: norm(p[1]).split(' ').length, woman: isWoman(p),
+      skelWords: words.map((w) => skel(w)), deepWords: words.map((w) => skel(w, true)),
+    };
   });
 
-  function tokenMatches(tok, words, looseWords) {
+  function tokenMatches(tok, ix) {
+    const words = ix.words;
     for (let w = 0; w < words.length; w++) {
       if (words[w].startsWith(tok)) return { w, exact: words[w] === tok, how: 'prefix' };
     }
@@ -155,9 +177,21 @@
       const a = norm(alias);
       for (let w = 0; w < words.length; w++) if (words[w] === a) return { w, exact: true, how: 'alias' };
     }
-    if (tok.length >= 3) {
-      const lt = loose(tok);
-      for (let w = 0; w < looseWords.length; w++) if (lt && looseWords[w].startsWith(lt)) return { w, exact: false, how: 'loose' };
+    // Spelling variants, Yiddish against Hebrew. Short keys must match whole, or
+    // everything matches everything.
+    const sk = skel(tok);
+    if (sk.length >= 2) {
+      for (let w = 0; w < ix.skelWords.length; w++) {
+        const c = ix.skelWords[w];
+        if (sk.length >= 3 ? c.startsWith(sk) : c === sk) return { w, exact: c === sk, how: 'skel' };
+      }
+    }
+    const dp = skel(tok, true);
+    if (dp.length >= 3) {
+      for (let w = 0; w < ix.deepWords.length; w++) {
+        const c = ix.deepWords[w];
+        if (c.startsWith(dp)) return { w, exact: c === dp, how: 'deep' };
+      }
     }
     return null;
   }
@@ -172,10 +206,11 @@
       let score = 0;
       let ok = true;
       for (let t = 0; t < toks.length; t++) {
-        const m = tokenMatches(toks[t], ix.words, ix.looseWords);
+        const m = tokenMatches(toks[t], ix);
         if (m) {
           score += m.exact ? 3 : 2;
-          if (m.how === 'loose') score -= 1;
+          if (m.how === 'skel') score -= 1;                  // a spelling variant ranks below a direct hit
+          if (m.how === 'deep') score -= 2;
           if (t === 0 && m.w === 0) score += 2;              // first typed word hits the first name
           if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
           continue;
@@ -427,9 +462,10 @@
   let openLeadId = null;
   let moreOpen = false;
   let idleTimer = null;
+  let countTimer = null;
   let lastAction = null;
-  const IDLE_MS = 5000;
-  const NOTE_IDLE_MS = 15000;
+  const IDLE_MS = 12000;        // long enough to think, short enough not to block the next visitor
+  const NOTE_IDLE_MS = 25000;   // while writing a note, from the last keystroke
 
   function viewBooth() {
     if (!S.boothEnteredAt) { S.boothEnteredAt = Date.now(); save(); }
@@ -524,9 +560,12 @@
             <div class="person-meta">${esc(leadMeta(l))}</div>
             <div class="saved-note">✓ נשמר. כל השאר רשות</div>
           </div>
-          <div class="ring running" id="ring" style="--ring-ms:${IDLE_MS}ms" title="חוזר לחיפוש אחרי 5 שניות בלי נגיעה">
-            <svg width="44" height="44" viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="bar" cx="22" cy="22" r="18"/></svg>
-            <span>5</span>
+          <div class="panel-timer">
+            <button class="btn ghost" data-act="close-now">✓ סיום</button>
+            <div class="ring running" id="ring" style="--ring-ms:${IDLE_MS}ms" title="חוזר לחיפוש לבד. כל נגיעה מאריכה">
+              <svg width="44" height="44" viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="bar" cx="22" cy="22" r="18"/></svg>
+              <span id="ring-n">${Math.round(IDLE_MS / 1000)}</span>
+            </div>
           </div>
         </div>
         <div class="warmth" role="group" aria-label="כמה חם">
@@ -560,19 +599,33 @@
     startIdle();
   }
 
-  function startIdle() {
+  function startIdle(ms) {
     stopIdle();
+    const total = ms || IDLE_MS;
     const ring = $('#ring');
-    if (ring) { ring.classList.remove('running', 'paused'); void ring.offsetWidth; ring.classList.add('running'); }
-    idleTimer = setTimeout(closePanel, IDLE_MS);
+    if (ring) {
+      ring.style.setProperty('--ring-ms', total + 'ms');
+      ring.classList.remove('running', 'soon'); void ring.offsetWidth; ring.classList.add('running');
+    }
+    const until = Date.now() + total;
+    countTick(until);
+    countTimer = setInterval(() => countTick(until), 250);
+    idleTimer = setTimeout(closePanel, total);
   }
-  function pauseIdle(ms) {
-    stopIdle();
+  /** The number in the ring is the honest one: it counts the seconds that are actually left. */
+  function countTick(until) {
+    const n = $('#ring-n');
+    if (!n) return;
+    const left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+    n.textContent = left;
     const ring = $('#ring');
-    if (ring) { ring.classList.remove('running'); void ring.offsetWidth; ring.classList.add('running', 'paused'); }
-    if (ms) idleTimer = setTimeout(closePanel, ms);
+    if (ring) ring.classList.toggle('soon', left <= 4);
   }
-  function stopIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
+  const pauseIdle = (ms) => startIdle(ms);
+  function stopIdle() {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    if (countTimer) { clearInterval(countTimer); countTimer = null; }
+  }
 
   function closePanel() {
     stopIdle();
@@ -667,7 +720,8 @@
 
   // ---------------- Today ----------------
   let todayTab = 'todo';
-  let callStep = null; // id of lead whose outcome is being asked
+  let callStep = null;   // id of the lead whose outcome is being asked
+  let focusLead = null;  // a lead tapped in the list takes over the card
 
   function viewToday() {
     const now = NOW();
@@ -675,19 +729,24 @@
     const openTasks = S.leads.filter((l) => l.status === 'open' && nextOf(l).kind === 'task');
     const audience = S.leads.filter((l) => (l.status === 'audience' || (l.status === 'open' && nextOf(l).kind === 'audience')));
     const untagged = S.leads.filter((l) => l.status === 'open' && !l.warmth).length;
+    // A name tapped in the list below takes over the card, so any lead can be called out of order.
+    const picked = focusLead ? leadById(focusLead) : null;
     let card;
-    if (!calls.length) {
-      card = `<div class="card done"><h2>אין שיחות להיום</h2><p class="lead-text" style="margin-inline:auto">${S.leads.length ? 'מה שצריך לקרות קרה, והשאר מתוזמן לימים הבאים.' : 'עוד אין לידים. אפשר לטעון יום לדוגמה מהתפריט.'}</p></div>`;
+    if (!calls.length && !picked) {
+      card = `<div class="card done"><h2>אין שיחות להיום</h2><p class="lead-text" style="margin-inline:auto">${S.leads.length ? 'מה שצריך לקרות קרה, והשאר מתוזמן לימים הבאים. אפשר לגעת בכל שם ברשימה שלמטה ולהתקשר אליו עכשיו.' : 'עוד אין לידים. אפשר לטעון יום לדוגמה מהתפריט.'}</p></div>`;
     } else {
-      const l = calls[0];
+      const l = picked || calls[0];
       const asking = callStep === l.id;
+      const pos = calls.findIndex((c) => c.id === l.id);
       card = `<div class="card">
-        <div class="card-count num">שיחה 1 מתוך ${calls.length} להיום</div>
+        <div class="card-count num">${picked ? 'נבחר מהרשימה' : 'שיחה ' + (pos + 1) + ' מתוך ' + calls.length + ' להיום'}
+          ${picked ? '<button class="next-btn" data-act="unfocus">חזרה לסדר של היום</button>' : ''}</div>
         <div><div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span></div>
           <div class="person-meta">${esc(leadMeta(l))}</div></div>
         <div class="why">למה עכשיו: ${esc(whyNow(l, now))}</div>
         ${l.note ? `<div>"${esc(l.note)}"</div>` : ''}
-        <div class="optional">הלאה: ${esc(nextOf(l).label)}${l.calls.length ? ' · ניסיונות קודמים: ' + l.calls.length : ''}${l.pid != null ? '' : l.custom && l.custom.phone ? ' · ' + esc(l.custom.phone) : ''}</div>
+        <div class="next-line"><span>הלאה: <b>${esc(nextOf(l).label)}</b>${nextOf(l).due ? ' · ' + esc(relDay(new Date(nextOf(l).due), now)) : ''}${l.calls.length ? ' · ניסיונות קודמים: ' + l.calls.length : ''}${l.pid != null ? '' : l.custom && l.custom.phone ? ' · ' + esc(l.custom.phone) : ''}</span>
+          <button class="next-btn" data-act="next-cycle" data-id="${l.id}">לשנות</button></div>
         ${asking ? `
           <div class="field-label">איך הלך?</div>
           <div class="outcomes">
@@ -709,10 +768,11 @@
       <button class="tab" role="tab" data-tab="todo" aria-selected="${todayTab === 'todo'}">לטיפול <span class="num">(${openTasks.length})</span></button>
       <button class="tab" role="tab" data-tab="aud" aria-selected="${todayTab === 'aud'}">קהל <span class="num">(${audience.length})</span></button>
     </div>
+    <div class="rows-head optional">${todayTab === 'todo' ? 'לפי תאריך הצעד הבא, הדחוף קודם. לגעת בשם כדי להתקשר אליו עכשיו.' : 'מי שהתעניין בלי צורך עכשיו. לגעת בשם כדי לפתוח אותו.'}</div>
     <div class="rows">${(todayTab === 'todo' ? openTasks.sort((a, b) => (nextOf(a).due || 0) - (nextOf(b).due || 0)) : audience).map((l) => {
       const nx = nextOf(l);
-      return `<div class="row"><span><span class="w-dot ${l.warmth || ''}" style="display:inline-block;margin-inline-end:8px"></span><span class="person-name">${esc(leadName(l))}</span> <span class="row-side">${esc(leadTown(l))}</span></span>
-        <span class="row-side">${todayTab === 'todo' ? esc(nx.label) + (nx.due ? ' · ' + esc(relDay(new Date(nx.due), now)) : '') : esc(l.interests.join(', ') || 'כללי')}</span></div>`;
+      return `<button class="row" data-lead="${l.id}" ${focusLead === l.id ? 'aria-current="true"' : ''}><span><span class="w-dot ${l.warmth || ''}" style="display:inline-block;margin-inline-end:8px"></span><span class="person-name">${esc(leadName(l))}</span> <span class="row-side">${esc(leadTown(l))}</span></span>
+        <span class="row-side">${todayTab === 'todo' ? esc(nx.label) + (nx.due ? ' · ' + esc(relDay(new Date(nx.due), now)) : '') : esc(l.interests.join(', ') || 'כללי')}</span></button>`;
     }).join('') || '<div class="empty-hint">ריק.</div>'}</div>`;
   }
 
@@ -875,7 +935,7 @@
 
   function setStage(id) {
     stopIdle();
-    openLeadId = null; callStep = null;
+    openLeadId = null; callStep = null; focusLead = null;
     S.stage = id;
     save(); render();
     window.scrollTo(0, 0);
@@ -916,30 +976,35 @@
       else if (x) x.warmth = d.eve;
       save(); return viewEvening();
     }
-    if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; save(); return viewToday(); }
+    if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return viewToday(); }
     if (d.tab) { todayTab = d.tab; return viewToday(); }
+    if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; viewToday(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
     switch (d.act) {
       case 'more': moreOpen = !moreOpen; return renderPanel();
       case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); renderPanel(); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
       case 'next-cycle': {
-        if (!l) return;
-        const cur = l.next ? OVERRIDES.findIndex((o) => o.label === l.next.label) : -1;
+        // Works in the booth and in the day-after card. The person's choice is marked as theirs.
+        const target = d.id ? leadById(parseInt(d.id, 10)) : l;
+        if (!target) return;
+        const cur = target.next ? OVERRIDES.findIndex((o) => o.label === target.next.label) : -1;
         const o = OVERRIDES[cur + 1];
-        if (!o) l.next = null;
-        else if (o.audience) l.next = { label: o.label, due: null, kind: 'audience', by: 'person' };
-        else l.next = { label: o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task', by: 'person' };
-        save(); return renderPanel();
+        if (!o) target.next = null;
+        else if (o.audience) target.next = { label: o.label, due: null, kind: 'audience', by: 'person' };
+        else target.next = { label: o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task', by: 'person' };
+        save(); return d.id ? viewToday() : renderPanel();
       }
       case 'new-person': return newPersonModal();
       case 'np-save': return saveNewPerson();
       case 'close-modal': return closeModal();
+      case 'close-now': return closePanel();
       case 'sim-dial': return simulateDial();
       case 'add-offer': return addOffer();
       case 'setup-done': S.business.setupDone = true; return setStage('booth');
       case 'setup-skip': S.business.template = 'general'; S.business.offerings = []; S.business.setupDone = false; return setStage('booth');
       case 'call': callStep = parseInt(d.id, 10); return viewToday();
       case 'call-cancel': callStep = null; return viewToday();
+      case 'unfocus': focusLead = null; return viewToday();
       case 'sim-two-weeks': $('#menu') && $('#menu').remove(); simulateTwoWeeks(); return setStage('day14');
       case 'demo-day': $('#menu') && $('#menu').remove(); return loadDemoDay();
       case 'menu': return toggleMenu();

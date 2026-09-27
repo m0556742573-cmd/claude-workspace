@@ -226,3 +226,12 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 /* Tap targets: nothing a thumb needs is under 44px. */
 .next-btn, .more-toggle, .r-chip, .stage, .icon-btn, .chip, .tab { min-height: 44px; }
 .next-btn, .more-toggle { padding-inline: 10px; }
+
+.panel-timer { display: flex; align-items: center; gap: 6px; flex: none; }
+.ring.soon .bar { stroke: var(--warm); }
+.ring.soon span { color: var(--warm); }
+
+.rows-head { margin-bottom: 8px; }
+button.row { width: 100%; text-align: start; font: inherit; }
+button.row:hover { border-color: var(--accent); }
+button.row[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
