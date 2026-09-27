@@ -11,6 +11,7 @@
   - [`0003-no-private-community-list.md`](decisions/0003-no-private-community-list.md) — לא משתמשים ברשימת הקהילה הפרטית. הזיהוי לפי רשימה רשמית של המארגנים, והרשמה עצמית כגיבוי.
   - [`0004-one-system-three-screens.md`](decisions/0004-one-system-three-screens.md) — מערכת אחת, שלושה סוגי מסכים עם הרשאות, וכולם פעילים ביום התערוכה.
   - [`0005-crm-free-limited-to-expo-leads.md`](decisions/0005-crm-free-limited-to-expo-leads.md) — ה-CRM חינמי ומוגבל ללידים של התערוכה. המכירה היא של פרויקטים אחרים.
-  - [`0006-build-mode-for-expo.md`](decisions/0006-build-mode-for-expo.md) — מצב בנייה לאקספו: אפיון בשיטה הרגילה, בנייה משוחררת מול תרחישים, ואב-טיפוס לזריקה לפני הראיונות.
+  - [`0006-build-mode-for-expo.md`](decisions/0006-build-mode-for-expo.md) — מצב בנייה לאקספו: אפיון בשיטה הרגילה, בנייה משוחררת מול תרחישים, ואב-טיפוס לזריקה לפני הראיונות. שני סעיפים שונו ב-0007.
+  - [`0007-prototype-real-names-and-hosting.md`](decisions/0007-prototype-real-names-and-hosting.md) — הדוגמית: שמות אמיתיים מרשימה מזוקקת בלי פרטי קשר, מחוץ לריפו. דף פרטי לעת עתה. תצוגה: שם ועיר בגדול, אב וחותן בקטן.
   - **הצעה, ממתינה לאישור (W-014):** [`0002-three-entry-channels-one-voluntary-action.md`](decisions/0002-three-entry-channels-one-voluntary-action.md) — שלוש דרכי כניסה (ימות המשיח, QR, טאבלט), פעולה אחת מרצון, ושתי נגיעות למציג.
 - [`../waiting.md`](../waiting.md) — כל מה שמחכה, עם מזהי `W-###`.
