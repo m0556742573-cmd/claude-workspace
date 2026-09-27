@@ -5,6 +5,7 @@
 - [`scenarios.md`](scenarios.md) — התרחישים שמגדירים "עובד". החוזה של הבנייה. טיוטה עד W-022.
 - [`log.md`](log.md) — יומן פעולות כרונולוגי.
 - [`prototype-plan.md`](prototype-plan.md) — תוכנית הדוגמית הראשונה: איפה בונים, מה גיליתי ברשימת המארגנים, ומה יש בכל מסך.
+- [`prototype-findings.md`](prototype-findings.md) — **מה נלמד מהדוגמית והוראות למערכת האמיתית:** מה נמדד, מה הוכרע, ומה נאסור להעביר.
 - [`../CLAUDE.md`](../CLAUDE.md) — מצב בנייה: כללים מקומיים שגוברים על 4 ו-10 של הקובץ הראשי, רק בפרויקט הזה.
 - `decisions/`:
   - [`0001-exhibitor-captures-no-volume-incentive.md`](decisions/0001-exhibitor-captures-no-volume-incentive.md) — המציג אוסף, אין תמריץ לכמות, והמערכת לא פונה למבקר בעצמה.
