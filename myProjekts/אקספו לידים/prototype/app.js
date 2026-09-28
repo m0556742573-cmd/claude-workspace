@@ -297,8 +297,11 @@
   /** The simulated "now" for each stage of the time machine. */
   function nowFor(stage) {
     if (stage === 'booth') {
+      // The expo day restarts at 10:00 every time the booth is opened, so the hours
+      // stay believable instead of everyone arriving at the same minute.
       const entered = S.boothEnteredAt || Date.now();
-      return new Date(EXPO_DAY.getTime() + Math.min(Date.now() - entered, 10 * 3600000));
+      const elapsed = Date.now() - entered;
+      return new Date(EXPO_DAY.getTime() + (elapsed > 10 * 3600000 ? 0 : elapsed));
     }
     if (stage === 'evening') return new Date(EXPO_DAY.getFullYear(), EXPO_DAY.getMonth(), EXPO_DAY.getDate(), 21, 0);
     if (stage === 'today') return daysFrom(EXPO_DAY, 1, 9);
@@ -507,12 +510,11 @@
           <input id="q" class="search" type="search" placeholder="שם של מי שעומד מולך…" autocomplete="off" aria-label="חיפוש מבקר">
           <div class="search-actions">
             <button class="icon-btn" data-act="new-person" title="מי שלא ברשימה">+ חדש</button>
-            <button class="icon-btn" data-act="sim-dial" title="מדמה מבקר שמחייג לדוכן">📞 חיוג</button>
           </div>
         </div>
         ${waiting.length ? `
           <div class="waiting" role="status">
-            <span class="waiting-label">חייגו לדוכן, ממתינים לתיוג:</span>
+            <span class="waiting-label">חייגו לדוכן, ממתינים לתיוג:</span><span class="optional">(בדוגמית: מהתפריט ⋯)</span>
             ${waiting.map((l) => `<button class="r-chip" data-open="${l.id}">${esc(leadName(l))} <span class="num" style="color:var(--faint)">${hhmm(new Date(l.createdAt))}</span></button>`).join('')}
           </div>` : ''}
         <div id="slot"></div>
@@ -609,10 +611,10 @@
             <div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span>
               ${again ? `<span class="badge again">ביקור ${l.visits.length}, קודם ב-${hhmm(new Date(l.visits[l.visits.length - 2]))}</span>` : ''}</div>
             <div class="person-meta">${esc(leadMeta(l))}</div>
-            <div class="saved-note">✓ נשמר. כל השאר רשות ·
-              <button class="wrong-btn" data-act="wrong">לא זה, חזרה לחיפוש</button></div>
+            <div class="saved-note">✓ נשמר. כל השאר רשות</div>
           </div>
           <div class="panel-timer">
+            <button class="btn cancel" data-act="wrong">✕ ביטול</button>
             <button class="btn ghost" data-act="close-now">✓ סיום</button>
             <div class="ring running" id="ring" style="--ring-ms:${idleMs()}ms" title="חוזר לחיפוש לבד. כל נגיעה מאריכה">
               <svg width="44" height="44" viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="bar" cx="22" cy="22" r="18"/></svg>
@@ -709,6 +711,9 @@
     const l = leadById(openLeadId);
     openLeadId = null;
     if (S.stage !== 'booth') return;
+    // Saved and done, so the box is cleared and the next name can be typed straight
+    // away. The typed text is kept only when the pick is taken back ("לא זה").
+    lastQuery = '';
     viewBooth();
     if (l) {
       // The toast carries its own action, so a later pick can never be undone by an earlier toast.
@@ -776,13 +781,14 @@
   /* "מי היה אצלי" — not only for the evening. This is where every visitor who came
    * to the booth can be found at any time, opened and changed. */
   let leadsFilter = 'todo';
+  let eveAutoOpen = true;   // false after the card is closed, so it does not reopen by itself
 
   function viewEvening() {
     const all = S.leads.slice().sort((a, b) => b.createdAt - a.createdAt);
     const todo = S.leads.filter((l) => l.status === 'open' && !l.warmth);
     if (leadsFilter === 'todo' && !todo.length) leadsFilter = 'all';
     const list = leadsFilter === 'todo' ? todo : all;
-    const l = (eveId && leadById(eveId)) || (leadsFilter === 'todo' ? todo[0] : null);
+    const l = (eveId && leadById(eveId)) || (leadsFilter === 'todo' && eveAutoOpen ? todo[0] : null);
     eveId = l ? l.id : null;
     const left = todo.filter((x) => !l || x.id !== l.id).length;
 
@@ -855,7 +861,7 @@
     }
     main().innerHTML = `<div class="stack">
       <div class="section-head"><div><h1>לטיפול</h1><p class="lead-text">ניהול הלידים אחרי התערוכה. כרטיס אחד בכל פעם, ואחרי כל שיחה נגיעה אחת שמתזמנת את ההמשך.</p></div></div>
-      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא תויגו.</span><button class="btn" data-stage="evening">לתייג עכשיו</button></div>` : ''}
+      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא תויגו.</span><button class="btn" data-stage="evening" data-filter="todo">לתייג עכשיו</button></div>` : ''}
       ${card}
     </div>
     <div class="tabs" role="tablist">
@@ -989,6 +995,7 @@
     const m = document.createElement('div');
     m.id = 'menu'; m.className = 'menu';
     m.innerHTML = `
+      <button data-act="sim-dial">📞 הדמיית מבקר שמחייג לדוכן</button>
       <button data-act="demo-day">טעינת יום תערוכה לדוגמה (36 אנשים)</button>
       <button data-act="sim-two-weeks">הדמיית שבועיים של מעקב</button>
       <hr>
@@ -1030,9 +1037,14 @@
       <div class="inline"><button class="btn primary" data-act="reset-yes">כן, מחדש</button><button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
   }
 
-  function setStage(id) {
+  function setStage(id, filter) {
     stopIdle();
     openLeadId = null; callStep = null; focusLead = null; eveId = null; moreOpenId = null;
+    lastQuery = '';
+    eveAutoOpen = true;
+    if (filter) leadsFilter = filter;
+    // Entering the booth starts the expo day at 10:00 again.
+    if (id === 'booth' && S.stage !== 'booth') S.boothEnteredAt = Date.now();
     S.stage = id;
     save(); render();
     window.scrollTo(0, 0);
@@ -1054,7 +1066,7 @@
     // Any touch inside the open panel restarts the five-second clock.
     if (openLeadId && b.closest('.panel')) startIdle();
 
-    if (d.stage) return setStage(d.stage);
+    if (d.stage) return setStage(d.stage, d.filter);
     if (d.tpl) { S.business.template = d.tpl; S.business.offerings = SUGGESTED_OFFERINGS[d.tpl].slice(0, 5); save(); return viewSetup(); }
     if (d.offer) { const o = S.business.offerings; const k = o.indexOf(d.offer); if (k >= 0) o.splice(k, 1); else if (o.length < 8) o.push(d.offer); save(); return viewSetup(); }
     if (d.pick) return pickPerson(parseInt(d.pick, 10));
@@ -1079,17 +1091,17 @@
 
     if (d.eve) {
       const x = leadById(parseInt(d.id, 10));
-      if (d.eve === 'close') { eveId = null; moreOpenId = null; return viewEvening(); }
+      if (d.eve === 'close') { eveId = null; moreOpenId = null; eveAutoOpen = false; return viewEvening(); }
       if (x && d.eve === 'skip') { x.warmth = 'cold'; x.skipped = true; }
       else if (x && d.eve === 'next' && !x.warmth) { x.warmth = 'cold'; x.skipped = true; }
-      eveId = null;          // move on to the next untagged visitor
+      eveId = null; eveAutoOpen = true;   // move on to the next untagged visitor
       moreOpenId = null;
       save(); return viewEvening();
     }
     if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return viewToday(); }
     if (d.tab) { todayTab = d.tab; return viewToday(); }
-    if (d.lfilter) { leadsFilter = d.lfilter; eveId = null; return viewEvening(); }
-    if (d.eveopen) { eveId = parseInt(d.eveopen, 10); moreOpenId = null; viewEvening(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (d.lfilter) { leadsFilter = d.lfilter; eveId = null; eveAutoOpen = true; return viewEvening(); }
+    if (d.eveopen) { eveId = parseInt(d.eveopen, 10); moreOpenId = null; eveAutoOpen = true; viewEvening(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
     if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; viewToday(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
     switch (d.act) {
@@ -1100,7 +1112,7 @@
       case 'close-modal': return closeModal();
       case 'close-now': return closePanel();
       case 'wrong': return wrongPerson();
-      case 'sim-dial': return simulateDial();
+      case 'sim-dial': $('#menu') && $('#menu').remove(); return simulateDial();
       case 'add-offer': return addOffer();
       case 'setup-done': S.business.setupDone = true; return setStage('booth');
       case 'setup-skip': S.business.template = 'general'; S.business.offerings = []; S.business.setupDone = false; return setStage('booth');
