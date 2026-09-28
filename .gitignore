@@ -33,3 +33,6 @@ expo-data/
 
 # Preview launcher: points at a session scratchpad, machine-specific
 .claude/launch.json
+
+# Built copy of the prototype - regenerate with build-dist.sh
+myProjekts/*/prototype/dist/
