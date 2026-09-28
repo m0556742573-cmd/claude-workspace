@@ -6,6 +6,7 @@
 - [`log.md`](log.md) — יומן פעולות כרונולוגי.
 - [`prototype-plan.md`](prototype-plan.md) — תוכנית הדוגמית הראשונה: איפה בונים, מה גיליתי ברשימת המארגנים, ומה יש בכל מסך.
 - [`prototype-findings.md`](prototype-findings.md) — **מה נלמד מהדוגמית והוראות למערכת האמיתית:** מה נמדד, מה הוכרע, ומה נאסור להעביר.
+- [`build-v2.md`](build-v2.md) — תוכנית הבנייה של גרסה 2 של הדוגמית. ממתינה לאישור.
 - [`../CLAUDE.md`](../CLAUDE.md) — מצב בנייה: כללים מקומיים שגוברים על 4 ו-10 של הקובץ הראשי, רק בפרויקט הזה.
 - `decisions/`:
   - [`0001-exhibitor-captures-no-volume-incentive.md`](decisions/0001-exhibitor-captures-no-volume-incentive.md) — המציג אוסף, אין תמריץ לכמות, והמערכת לא פונה למבקר בעצמה.
