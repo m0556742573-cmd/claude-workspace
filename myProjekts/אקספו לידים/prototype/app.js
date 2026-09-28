@@ -357,11 +357,16 @@
   }
   const nextOf = (l) => l.next || suggestNext(l, NOW());
 
-  const OVERRIDES = [
-    { label: 'להתקשר מחר', days: 1 },
-    { label: 'להתקשר בעוד שבוע', days: 7 },
-    { label: 'לקהל, בלי משימה', audience: true },
+  /* The next step is chosen from buttons, not cycled through. "לפי המערכת" is the
+   * machine's own proposal; anything else is the person's word and outranks it. */
+  const NEXT_OPTIONS = [
+    { key: 'auto', label: 'לפי המערכת' },
+    { key: 'today', label: 'היום', days: 0 },
+    { key: 'tomorrow', label: 'מחר', days: 1 },
+    { key: 'week', label: 'בעוד שבוע', days: 7 },
+    { key: 'audience', label: 'לקהל, בלי משימה', audience: true },
   ];
+  const isCurrentNext = (l, o) => (o.key === 'auto' ? !l.next : !!l.next && l.next.key === o.key);
 
   /** After a call: record it and schedule what comes next. */
   function recordOutcome(l, outcome, at) {
@@ -616,10 +621,6 @@
           </div>
         </div>
         ${editFields(l)}
-        <div class="next-line">
-          <span>הלאה: <b>${esc(nx.label)}</b>${nx.due ? ' · ' + esc(relDay(new Date(nx.due), NOW())) : ''}${l.next ? '' : ' <span class="optional">(הצעה)</span>'}</span>
-          <button class="next-btn" data-act="next-cycle">לשנות</button>
-        </div>
       </section>`;
     const note = $('[data-note]');
     if (note) {
@@ -651,7 +652,19 @@
           ${t.ask ? `<div><div class="field-label">${esc(t.ask.label)}</div><div class="chips">${t.ask.options.map((o) => `<button class="chip" data-ask="${esc(o)}" data-id="${l.id}" aria-pressed="${l.ask === o}">${esc(o)}</button>`).join('')}</div></div>` : ''}
           <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" data-id="${l.id}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
           <div><label class="field-label" for="note-${l.id}">הערה</label><textarea id="note-${l.id}" data-note="${l.id}" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
-        </div>` : ''}`;
+        </div>` : ''}
+      ${nextBlock(l)}`;
+  }
+
+  /** The next step, as buttons, on every screen where a lead is open. */
+  function nextBlock(l) {
+    const nx = nextOf(l);
+    return `
+      <div class="next-block">
+        <div class="field-label">הצעד הבא</div>
+        <div class="chips">${NEXT_OPTIONS.map((o) => `<button class="chip" data-next="${o.key}" data-id="${l.id}" aria-pressed="${isCurrentNext(l, o)}">${esc(o.label)}</button>`).join('')}</div>
+        <div class="next-line"><span>${esc(nx.label)}${nx.due ? ' · ' + esc(relDay(new Date(nx.due), NOW())) : ''}${l.next ? '' : ' <span class="optional">(הצעה של המערכת)</span>'}</span></div>
+      </div>`;
   }
 
   /** Redraw whichever screen is showing, after a field was edited. On the day-after
@@ -719,7 +732,8 @@
     if (!bar) { bar = document.createElement('div'); bar.id = 'recent'; bar.className = 'recent'; document.body.appendChild(bar); }
     const recent = S.leads.slice().sort((a, b) => b.visits[b.visits.length - 1] - a.visits[a.visits.length - 1]).slice(0, 10);
     bar.innerHTML = `<div class="recent-inner"><span class="recent-label">אחרונים</span>${recent.length ? recent.map((l) => `
-      <button class="r-chip" data-open="${l.id}"><span class="w-dot ${l.warmth || ''}"></span>${esc(leadName(l))}${l.visits.length > 1 ? ' ↺' : ''}</button>`).join('') : '<span class="optional">עוד אין. מי שייקלט יופיע כאן.</span>'}</div>`;
+      <button class="r-chip" data-open="${l.id}"><span class="w-dot ${l.warmth || ''}"></span>${esc(leadName(l))}${l.visits.length > 1 ? ' ↺' : ''}</button>`).join('')
+      + `<button class="r-chip" data-stage="evening">כל מי שהיה אצלי ←</button>` : '<span class="optional">עוד אין. מי שייקלט יופיע כאן.</span>'}</div>`;
   }
 
   function newPersonModal() {
@@ -759,34 +773,44 @@
   }
 
   // ---------------- Evening ----------------
+  /* "מי היה אצלי" — not only for the evening. This is where every visitor who came
+   * to the booth can be found at any time, opened and changed. */
+  let leadsFilter = 'todo';
+
   function viewEvening() {
+    const all = S.leads.slice().sort((a, b) => b.createdAt - a.createdAt);
     const todo = S.leads.filter((l) => l.status === 'open' && !l.warmth);
-    if (!todo.length) {
-      main().innerHTML = `<div class="stack"><div class="card done">
-        <h2>הכול מתויג</h2>
-        <p class="lead-text" style="margin-inline:auto">${S.leads.length ? `<span class="num">${S.leads.length}</span> אנשים נקלטו היום, וכולם קיבלו חום. מחר בבוקר תראה את השיחות של היום.` : 'עוד לא נקלט אף אחד. אפשר לחזור לדוכן, או לטעון יום לדוגמה מהתפריט.'}</p>
-        <div class="inline" style="justify-content:center"><button class="btn primary" data-stage="today">למחר בבוקר</button></div>
-      </div></div>`;
-      return;
-    }
-    // The lead stays on screen after it is tagged, so interests and the extra
-    // fields can still be filled in. "הבא" is what moves on.
-    const l = (eveId && leadById(eveId)) || todo[0];
-    eveId = l.id;
-    const left = todo.filter((x) => x.id !== l.id).length;
+    if (leadsFilter === 'todo' && !todo.length) leadsFilter = 'all';
+    const list = leadsFilter === 'todo' ? todo : all;
+    const l = (eveId && leadById(eveId)) || (leadsFilter === 'todo' ? todo[0] : null);
+    eveId = l ? l.id : null;
+    const left = todo.filter((x) => !l || x.id !== l.id).length;
+
     main().innerHTML = `<div class="stack">
-      <div><h1>חמש דקות של ערב</h1><p class="lead-text">מי שלא הספקת לתייג בדוכן. נגיעה אחת לכל אחד, כל עוד אתה זוכר, ואפשר גם להוסיף פרטים.</p></div>
-      <div class="card">
-        <div class="card-count num">${left ? 'נשארו עוד ' + left : 'האחרון'}</div>
+      <div class="section-head"><div><h1>מי היה אצלי</h1>
+        <p class="lead-text">כל מי שנקלט בדוכן. אפשר לפתוח כל אחד, לתייג, להוסיף פרטים ולשנות את הצעד הבא, מתי שרוצים.</p></div></div>
+      ${all.length ? `<div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-lfilter="todo" aria-selected="${leadsFilter === 'todo'}">ממתינים לתיוג <span class="num">(${todo.length})</span></button>
+        <button class="tab" role="tab" data-lfilter="all" aria-selected="${leadsFilter === 'all'}">כולם <span class="num">(${all.length})</span></button>
+      </div>` : ''}
+      ${l ? `<div class="card">
+        <div class="card-count num">${leadsFilter === 'todo' ? (left ? 'נשארו עוד ' + left + ' לתייג' : 'האחרון לתיוג') : 'פתוח לעריכה'}
+          <button class="next-btn" data-eve="close">✕ לסגור</button></div>
         <div><div class="person-main"><span class="person-name">${esc(leadName(l))}</span><span class="person-city">${esc(leadTown(l))}</span></div>
           <div class="person-meta">${esc(leadMeta(l))}</div></div>
-        <div class="optional">היה בדוכן ב-<span class="num">${hhmm(new Date(l.createdAt))}</span> · ${l.source === 'dial' ? 'חייג' : 'נקלט בחיפוש'}${l.visits.length > 1 ? ' · חזר ' + l.visits.length + ' פעמים' : ''}</div>
+        <div class="optional">היה בדוכן ב-<span class="num">${hhmm(new Date(l.createdAt))}</span> · ${l.source === 'dial' ? 'חייג' : l.source === 'new' ? 'נוסף ידנית' : 'נקלט בחיפוש'}${l.visits.length > 1 ? ' · חזר ' + l.visits.length + ' פעמים' : ''}</div>
         ${editFields(l)}
-        <div class="inline">
+        ${leadsFilter === 'todo' ? `<div class="inline">
           <button class="btn primary big" data-eve="next" data-id="${l.id}">${l.warmth ? 'הבא ←' : 'לדלג, לא זוכר'}</button>
           ${l.warmth ? `<button class="btn ghost" data-eve="skip" data-id="${l.id}">לדלג</button>` : ''}
-        </div>
-      </div></div>`;
+        </div>` : ''}
+      </div>` : ''}
+      ${!all.length ? `<div class="empty-hint">עוד לא נקלט אף אחד. אפשר לחזור לדוכן, או לטעון יום לדוגמה מהתפריט.</div>` : ''}
+    </div>
+    ${list.length ? `<div class="rows-head optional">${leadsFilter === 'todo' ? 'מי שעוד לא קיבל חום.' : 'הכי אחרון למעלה. נגיעה בשם פותחת אותו לעריכה.'}</div>
+    <div class="rows">${list.map((x) => `<button class="row" data-eveopen="${x.id}" ${eveId === x.id ? 'aria-current="true"' : ''}>
+      <span><span class="w-dot ${x.warmth || ''}" style="display:inline-block;margin-inline-end:8px"></span><span class="person-name">${esc(leadName(x))}</span> <span class="row-side">${esc(leadTown(x))}</span></span>
+      <span class="row-side num">${hhmm(new Date(x.createdAt))}${x.warmth ? ' · ' + WARMTH[x.warmth] : ' · לא תויג'}</span></button>`).join('')}</div>` : ''}`;
   }
 
   // ---------------- Today ----------------
@@ -816,8 +840,7 @@
           <div class="person-meta">${esc(leadMeta(l))}</div></div>
         <div class="why">למה עכשיו: ${esc(whyNow(l, now))}</div>
         ${editFields(l)}
-        <div class="next-line"><span>הלאה: <b>${esc(nextOf(l).label)}</b>${nextOf(l).due ? ' · ' + esc(relDay(new Date(nextOf(l).due), now)) : ''}${l.calls.length ? ' · ניסיונות קודמים: ' + l.calls.length : ''}${l.pid != null ? '' : l.custom && l.custom.phone ? ' · ' + esc(l.custom.phone) : ''}</span>
-          <button class="next-btn" data-act="next-cycle" data-id="${l.id}">לשנות</button></div>
+        ${l.calls.length || (l.custom && l.custom.phone) ? `<div class="optional">${l.calls.length ? 'ניסיונות קודמים: ' + l.calls.length : ''}${l.custom && l.custom.phone ? ' · ' + esc(l.custom.phone) : ''}</div>` : ''}
         ${asking ? `
           <div class="field-label">איך הלך?</div>
           <div class="outcomes">
@@ -831,8 +854,8 @@
       </div>`;
     }
     main().innerHTML = `<div class="stack">
-      <div class="section-head"><div><h1>השיחות של היום</h1><p class="lead-text">כרטיס אחד בכל פעם. אחרי כל שיחה, נגיעה אחת, והמערכת מתזמנת את ההמשך.</p></div></div>
-      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא מתויגים מאתמול.</span><button class="btn" data-stage="evening">לתייג עכשיו</button></div>` : ''}
+      <div class="section-head"><div><h1>לטיפול</h1><p class="lead-text">ניהול הלידים אחרי התערוכה. כרטיס אחד בכל פעם, ואחרי כל שיחה נגיעה אחת שמתזמנת את ההמשך.</p></div></div>
+      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא תויגו.</span><button class="btn" data-stage="evening">לתייג עכשיו</button></div>` : ''}
       ${card}
     </div>
     <div class="tabs" role="tablist">
@@ -861,7 +884,7 @@
     audience.forEach((l) => (l.interests.length ? l.interests : ['כללי']).forEach((i) => { byInterest[i] = (byInterest[i] || 0) + 1; }));
     const anyCalls = leads.some((l) => l.calls.length);
     main().innerHTML = `<div class="summary">
-      <div class="section-head"><div><h1>שבועיים אחרי התערוכה</h1><p class="lead-text">מה יצא מהדוכן. המספרים שלך בלבד, בלי השוואה לאף אחד.</p></div>
+      <div class="section-head"><div><h1>סיכום שבועיים</h1><p class="lead-text">מה יצא מהדוכן. המספרים שלך בלבד, בלי השוואה לאף אחד.</p></div>
         ${!anyCalls && leads.length ? '<button class="btn" data-act="sim-two-weeks">הדמיית שבועיים של מעקב</button>' : ''}</div>
       <div class="headline"><div class="headline-big">${hot.length ? `חזרת ל-<em class="num">${fast.length}</em> מתוך <span class="num">${hot.length}</span> הלידים החמים תוך 48 שעות.` : 'עוד אין לידים חמים.'}</div>
         <p class="lead-text">מהירות החזרה היא הגורם שמשפיע הכי הרבה על סגירת עסקה.</p></div>
@@ -936,12 +959,13 @@
   // 7. Shell: time machine, menu, toast, modal
   // ------------------------------------------------------------------
 
+  // 'evening', 'today' and 'day14' keep their old ids so saved state still loads.
   const STAGES = [
-    { id: 'setup', label: 'הכנה' },
+    { id: 'setup', label: 'הגדרות העסק' },
     { id: 'booth', label: 'יום התערוכה' },
-    { id: 'evening', label: 'ערב' },
-    { id: 'today', label: 'למחרת' },
-    { id: 'day14', label: 'יום 14' },
+    { id: 'evening', label: 'מי היה אצלי' },
+    { id: 'today', label: 'לטיפול', group: 'CRM' },
+    { id: 'day14', label: 'סיכום', group: 'CRM' },
   ];
 
   function renderTopbar() {
@@ -949,8 +973,10 @@
     $('#topbar').innerHTML = `<div class="topbar-inner">
       <div class="brand"><span class="brand-name">${esc(S.business.name || 'העסק שלי')}</span>
         <span class="brand-sub">${esc(tpl().name)} · <span class="pill ${REAL ? 'real' : ''}">${REAL ? 'רשימה אמיתית · ' + PEOPLE.length.toLocaleString('he-IL') : 'נתוני הדגמה'}</span></span></div>
-      <nav class="stages" aria-label="מכונת זמן">
-        ${STAGES.map((s, n) => `<button class="stage" data-stage="${s.id}" ${S.stage === s.id ? 'aria-current="step"' : ''}><span class="dot num">${n + 1}</span><span class="label">${s.label}</span></button>`).join('')}
+      <nav class="stages" aria-label="מסכי המערכת">
+        ${STAGES.map((s, n) => (s.group && (n === 0 || STAGES[n - 1].group !== s.group)
+          ? `<span class="group-sep" aria-hidden="true"></span><span class="group-label">${esc(s.group)}</span>` : '')
+          + `<button class="stage" data-stage="${s.id}" ${S.stage === s.id ? 'aria-current="step"' : ''}><span class="dot num">${n + 1}</span><span class="label">${s.label}</span></button>`).join('')}
       </nav>
       <div class="clock"><span class="clock-date" id="clock-date">${esc(hebDate(now))}</span><span class="clock-time num" id="clock-time">${S.stage === 'setup' ? 'שבוע לפני' : hhmm(now)}</span></div>
       <button class="icon-btn" data-act="menu" aria-haspopup="true" aria-label="כלי הדגמה">⋯</button>
@@ -1041,9 +1067,19 @@
     if (d.int && l) { const k = l.interests.indexOf(d.int); if (k >= 0) l.interests.splice(k, 1); else l.interests.push(d.int); save(); return rerender(l); }
     if (d.ask && l) { l.ask = l.ask === d.ask ? null : d.ask; save(); return rerender(l); }
     if (d.when && l) { l.when = l.when === d.when ? null : d.when; save(); return rerender(l); }
+    if (d.next && l) {
+      const o = NEXT_OPTIONS.find((x) => x.key === d.next);
+      if (!o) return;
+      if (o.key === 'auto') l.next = null;
+      else if (o.audience) l.next = { key: o.key, label: o.label, due: null, kind: 'audience', by: 'person' };
+      else l.next = { key: o.key, label: 'להתקשר ' + o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task', by: 'person' };
+      if (l.status === 'audience' && o.key !== 'audience') l.status = 'open';
+      save(); return rerender(l);
+    }
 
     if (d.eve) {
       const x = leadById(parseInt(d.id, 10));
+      if (d.eve === 'close') { eveId = null; moreOpenId = null; return viewEvening(); }
       if (x && d.eve === 'skip') { x.warmth = 'cold'; x.skipped = true; }
       else if (x && d.eve === 'next' && !x.warmth) { x.warmth = 'cold'; x.skipped = true; }
       eveId = null;          // move on to the next untagged visitor
@@ -1052,22 +1088,13 @@
     }
     if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return viewToday(); }
     if (d.tab) { todayTab = d.tab; return viewToday(); }
+    if (d.lfilter) { leadsFilter = d.lfilter; eveId = null; return viewEvening(); }
+    if (d.eveopen) { eveId = parseInt(d.eveopen, 10); moreOpenId = null; viewEvening(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
     if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; viewToday(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
     switch (d.act) {
       case 'more': { const id = d.id ? parseInt(d.id, 10) : openLeadId; moreOpenId = moreOpenId === id ? null : id; return rerender(leadById(id)); }
       case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); rerender(l); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
-      case 'next-cycle': {
-        // Works in the booth and in the day-after card. The person's choice is marked as theirs.
-        const target = d.id ? leadById(parseInt(d.id, 10)) : l;
-        if (!target) return;
-        const cur = target.next ? OVERRIDES.findIndex((o) => o.label === target.next.label) : -1;
-        const o = OVERRIDES[cur + 1];
-        if (!o) target.next = null;
-        else if (o.audience) target.next = { label: o.label, due: null, kind: 'audience', by: 'person' };
-        else target.next = { label: o.label, due: daysFrom(NOW(), o.days, 10).getTime(), kind: 'task', by: 'person' };
-        save(); return d.id ? viewToday() : renderPanel();
-      }
       case 'new-person': return newPersonModal();
       case 'np-save': return saveNewPerson();
       case 'close-modal': return closeModal();

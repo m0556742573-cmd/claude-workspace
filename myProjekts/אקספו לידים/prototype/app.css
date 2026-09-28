@@ -209,6 +209,8 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
   .topbar-inner { padding: 8px 16px; gap: 8px; }
   .stage .label { display: none; }
   .stages { order: 3; flex-basis: 100%; flex-wrap: nowrap; justify-content: space-between; }
+  .group-label { display: none; }
+  .group-sep { margin-inline: 2px; }
   .brand { flex: 1; }
   main { padding-inline: 16px; }
   .search-wrap { display: grid; gap: 8px; }
@@ -240,3 +242,8 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 
 .badges { display: flex; gap: 6px; align-items: center; flex: none; }
 .badge.spell { background: var(--good-soft); color: var(--good); }
+
+.group-sep { width: 1px; align-self: stretch; background: var(--line); margin-inline: 6px; }
+.group-label { font-size: 11px; font-weight: 800; color: var(--faint); letter-spacing: .08em; align-self: center; }
+.next-block { display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.next-block .next-line { background: var(--surface-2); }
