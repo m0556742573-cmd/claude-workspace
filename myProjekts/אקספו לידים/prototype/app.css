@@ -13,7 +13,7 @@
   --surface-2: #f0ede7;
   --ink: #1a1c19;
   --muted: #5c6159;
-  --faint: #8c9188;
+  --faint: #6b7067;
   --line: #ddd9d1;
   --line-strong: #c7c2b8;
 
@@ -24,7 +24,7 @@
 
   --hot: #b8410f;
   --hot-soft: #fbe5da;
-  --warm: #a87406;
+  --warm: #8a5e04;
   --warm-soft: #faeed3;
   --cold: #4a6f8a;
   --cold-soft: #e4edf3;
@@ -151,7 +151,7 @@ h2 { font-size: 22px; }
 
 /* The lead panel that opens after a name is chosen */
 .panel { background: var(--surface); border: 2px solid var(--accent); border-radius: 20px; padding: 20px; box-shadow: var(--shadow); display: grid; gap: 18px; }
-.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 .saved-note { color: var(--good); font-weight: 700; font-size: 15px; }
 .warmth { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .w-btn { border: 2px solid var(--line); background: var(--surface); border-radius: 16px; padding: 16px 8px; font-size: 20px; font-weight: 800; }
@@ -246,11 +246,6 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 
 @media (max-width: 720px) {
   .topbar-inner { padding: 8px 16px; gap: 8px; }
-  .stage .label { display: none; }
-  .stages { order: 3; flex-basis: 100%; flex-wrap: nowrap; justify-content: space-between; }
-  .group-label { display: none; }
-  .group-sep { margin-inline: 2px; }
-  .brand { flex: 1; }
   main { padding-inline: 16px; }
   .search-wrap { display: grid; gap: 8px; }
   .search { font-size: 22px; padding-inline-end: 22px; }
@@ -265,10 +260,10 @@ textarea { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px so
 }
 
 /* Tap targets: nothing a thumb needs is under 44px. */
-.next-btn, .more-toggle, .r-chip, .stage, .icon-btn, .chip, .tab { min-height: 44px; }
+.next-btn, .more-toggle, .r-chip, .icon-btn, .chip, .tab, .nav-btn { min-height: 44px; }
 .next-btn, .more-toggle { padding-inline: 10px; }
 
-.panel-timer { display: flex; align-items: center; gap: 6px; flex: none; }
+.panel-timer { display: flex; align-items: center; gap: 6px; flex: none; margin-inline-start: auto; }
 .ring.soon .bar { stroke: var(--warm); }
 .ring.soon span { color: var(--warm); }
 
@@ -277,13 +272,10 @@ button.row { width: 100%; text-align: start; font: inherit; }
 button.row:hover { border-color: var(--accent); }
 button.row[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
 
-.wrong-btn { border: 0; background: transparent; color: var(--hot); font-weight: 700; text-decoration: underline; padding: 6px 4px; min-height: 40px; }
 
 .badges { display: flex; gap: 6px; align-items: center; flex: none; }
 .badge.spell { background: var(--good-soft); color: var(--good); }
 
-.group-sep { width: 1px; align-self: stretch; background: var(--line); margin-inline: 6px; }
-.group-label { font-size: 11px; font-weight: 800; color: var(--faint); letter-spacing: .08em; align-self: center; }
 .next-block { display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .next-block .next-line { background: var(--surface-2); }
 
@@ -309,7 +301,7 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 
 /* ---------- Filters on the visitors screen ---------- */
 .filters { display: grid; gap: 10px; margin-bottom: 14px; }
-.chip.small { font-size: 14px; padding: 7px 12px; min-height: 40px; }
+.chip.small { font-size: 14px; padding: 7px 12px; min-height: 44px; }
 .filters-sep { width: 1px; background: var(--line); margin-inline: 4px; }
 
 /* ---------- What can be done with a lead ---------- */
@@ -319,6 +311,6 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .btn.primary.danger { background: var(--hot); border-color: var(--hot); color: #fff; }
 
 .history { margin-top: 4px; }
-.history summary { cursor: pointer; color: var(--muted); font-weight: 700; padding: 8px 0; min-height: 40px; }
+.history summary { cursor: pointer; color: var(--muted); font-weight: 700; padding: 10px 0; min-height: 44px; }
 .history ul { margin: 4px 0 0; padding-inline-start: 18px; color: var(--muted); display: grid; gap: 4px; font-size: 15px; }
 #exp-text { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre; overflow: auto; }

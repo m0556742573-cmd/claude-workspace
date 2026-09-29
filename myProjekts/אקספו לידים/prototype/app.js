@@ -107,10 +107,17 @@
     return out;
   }
 
-  // Guard: a real row must have the stripped shape and no contact data in any cell.
-  const CONTACT_RE = /0\d{1,2}-?\d{7}|[\w.+-]+@[\w-]+\.[\w.]+/;
+  /* Guard: a real row must have the stripped shape and carry no way to contact
+   * anyone. Phone numbers are written every which way — 054-123-4567, 054 1234567,
+   * +972-54-… — so the digits are pulled out first and judged on their own. */
+  const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/;
+  function hasContact(cell) {
+    const s = String(cell);
+    if (EMAIL_RE.test(s)) return true;
+    return /(^|\D)(0\d{8,9}|972\d{8,9})(\D|$)/.test(s.replace(/[\s()+.\-]/g, ''));
+  }
   function validRow(r) {
-    return Array.isArray(r) && r.length <= 7 && !r.some((c) => CONTACT_RE.test(String(c)));
+    return Array.isArray(r) && r.length === 7 && !r.some(hasContact);
   }
   const PEOPLE = REAL ? window.EXPO_PEOPLE.filter(validRow) : makeDemoPeople();
   if (REAL && PEOPLE.length !== window.EXPO_PEOPLE.length) {
@@ -297,18 +304,33 @@
     if (S.stage === 'day14') crmTab = 'summary';
     S.welcomed = true;
     delete S.stage;
+    // A lead saved by an older version may be missing fields that later screens
+    // read without checking. Fill them in rather than throw and lose the lot.
+    (S.leads || []).forEach((l) => {
+      l.calls = l.calls || [];
+      l.visits = l.visits && l.visits.length ? l.visits : [l.createdAt || Date.now()];
+      l.interests = l.interests || [];
+      l.status = l.status || 'open';
+    });
   }
   /** Leads point at a row by position. If the list was re-exported in another order,
    *  find each person again by the name saved with the lead, rather than show someone else. */
   function relinkPeople() {
     S.leads.forEach((l) => {
       if (l.pid == null || !l.snap) return;
-      if (person(l.pid) && fullName(person(l.pid)) + '|' + person(l.pid)[5] === l.snap) return;
-      const k = PEOPLE.findIndex((p) => fullName(p) + '|' + p[5] === l.snap);
-      if (k >= 0) l.pid = k;
-      else { const [name, town] = l.snap.split('|'); l.custom = { first: name, last: '', town }; l.pid = null; }
+      if (person(l.pid) && snapOf(person(l.pid)) === l.snap) return;
+      const k = PEOPLE.findIndex((p) => snapOf(p) === l.snap);
+      if (k >= 0) { l.pid = k; return; }
+      // Nobody matches any more: keep the lead as a hand-written one, and keep
+      // anything the exhibitor typed himself, above all the phone.
+      const [name, town] = l.snap.split('|');
+      l.custom = Object.assign({ first: name, last: '', town: town || '' }, l.custom || {});
+      l.pid = null;
     });
   }
+  /** Name and town alone repeat often in this community. The father and the
+   *  father-in-law are what make a person unique, so they belong in the key. */
+  const snapOf = (p) => [fullName(p), p[5], p[3], p[4]].join('|');
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* in memory only */ }
   }
@@ -355,7 +377,7 @@
       warmth: null, interests: [], ask: null, when: null, note: '', sendMaterial: false,
       visits: [NOW().getTime()], next: null, calls: [], status: 'open', tagger: 'טאבלט הדוכן',
     }, fields);
-    if (l.pid != null) l.snap = fullName(person(l.pid)) + '|' + person(l.pid)[5];
+    if (l.pid != null) l.snap = snapOf(person(l.pid));
     S.leads.push(l);
     return l;
   }
@@ -551,6 +573,7 @@
     renderRecent();
     if (openLeadId && leadById(openLeadId)) renderPanel();
     else { renderResults(lastQuery); q.focus(); }
+    renderNav();
   }
 
   /** Wrong name tapped: undo it and go straight back to the same search. */
@@ -691,11 +714,15 @@
   /** What can be done with a lead right now: call, write, or remove it. */
   function leadActions(l) {
     const phone = leadPhone(l);
-    const intl = phone.replace(/\D/g, '').replace(/^0/, '972');
+    // Only a number that really looks Israeli becomes an international one. A
+    // mistyped number must not open a chat with a stranger somewhere else.
+    const digits = phone.replace(/\D/g, '');
+    const intl = /^0\d{8,9}$/.test(digits) ? '972' + digits.slice(1)
+      : /^972\d{8,9}$/.test(digits) ? digits : '';
     return `
       <div class="lead-actions">
         ${phone ? `<a class="btn primary" href="tel:${esc(phone)}">📞 חיוג</a>
-          <a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>
+          ${intl ? `<a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>` : ''}
           <button class="btn ghost" data-act="copy-phone" data-id="${l.id}">העתקת המספר</button>`
           : `<span class="optional">אין טלפון. ${l.pid != null ? 'ברשימת המארגנים אין מספרים.' : ''}</span>
           <button class="btn ghost" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
@@ -731,9 +758,13 @@
   /** Redraw whichever screen is showing, after a field was edited. On the day-after
    *  screen the edited lead is pinned, so it cannot slip out from under the finger
    *  when the change reorders the list. */
+  const isTopCall = (l) => { const c = todaysCalls(NOW()); return !!c.length && c[0].id === l.id; };
+
   function rerender(l) {
     if (S.screen === 'booth' && openLeadId) return renderPanel();
-    if (S.screen === 'crm' && l) focusLead = l.id;
+    // Pin only a lead opened from the list, never the card already on screen:
+    // pinning that one would drop its place in today's queue mid-edit.
+    if (S.screen === 'crm' && l && focusLead == null && callStep == null && !isTopCall(l)) focusLead = l.id;
     return render();
   }
 
@@ -833,7 +864,10 @@
     else newLead({ pid: i, source: 'dial' });
     save();
     toast('📞 ' + fullName(person(i)) + ' חייג לדוכן. מחכה לתיוג, מתי שנוח.');
-    if (!openLeadId) viewBooth(); else { renderRecent(); }
+    // The dial is reachable from every screen, so it must not paint the booth
+    // over the one that is open.
+    if (S.screen !== 'booth') return renderNav();
+    if (!openLeadId) viewBooth(); else renderRecent();
   }
 
   // ---------------- Evening ----------------
@@ -915,6 +949,7 @@
         if (again) { again.focus(); again.setSelectionRange(at, at); }
       });
     }
+    renderNav();
   }
 
   // ---------------- Today ----------------
@@ -932,6 +967,7 @@
       <button class="seg" data-crmtab="todo" aria-pressed="${crmTab === 'todo'}">שיחות לטיפול</button>
       <button class="seg" data-crmtab="summary" aria-pressed="${crmTab === 'summary'}">מה יצא מזה</button>`;
     main().prepend(head);
+    renderNav();
   }
 
   function viewToday() {
@@ -1057,9 +1093,14 @@
     const t0 = EXPO_DAY.getTime();
     const offers = S.business.offerings;
     const askOpts = tpl().ask ? tpl().ask.options : [];
-    for (let n = 0; n < 36; n++) {
-      let i;
-      do { i = Math.floor(rnd() * PEOPLE.length); } while (used.has(i) || isWoman(person(i)));
+    // Draw from a pool built once, so a short list cannot spin here forever.
+    const pool = [];
+    for (let k = 0; k < PEOPLE.length; k++) if (!used.has(k) && !isWoman(person(k))) pool.push(k);
+    const wanted = Math.min(36, pool.length);
+    for (let n = 0; n < wanted; n++) {
+      const pick = Math.floor(rnd() * pool.length);
+      const i = pool[pick];
+      pool.splice(pick, 1);
       used.add(i);
       const at = t0 + Math.floor(rnd() * 9.5 * 3600000);
       const r = rnd();
@@ -1136,6 +1177,7 @@
   }
 
   function toggleMenu() {
+    stopIdle();   // the panel must not close behind an open menu
     const existing = $('#menu');
     if (existing) { existing.remove(); return; }
     const m = document.createElement('div');
@@ -1206,6 +1248,7 @@
 
   /** Export is how the exhibitor knows the list is his: plain text he can paste anywhere. */
   function exportModal() {
+    stopIdle();
     const rows = S.leads.slice().sort((a, b) => rank(b) - rank(a));
     if (!rows.length) return toast('אין עדיין לידים לייצא');
     const head = 'שם\tעיר\tחום\tמה עניין אותו\tצעד הבא\tהערה';
@@ -1234,8 +1277,18 @@
   }
 
   function confirmReset() {
+    stopIdle();
     modal(`<h2>להתחיל מחדש?</h2><p class="lead-text">כל הלידים וההגדרות בדוגמית יימחקו מהמכשיר הזה.</p>
       <div class="inline"><button class="btn primary" data-act="reset-yes">כן, מחדש</button><button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
+  }
+
+  /** Everything the views keep between renders. One place, so nothing is forgotten. */
+  function resetViewState() {
+    stopIdle();
+    openLeadId = null; callStep = null; focusLead = null; eveId = null; moreOpenId = null;
+    lastAction = null; lastQuery = '';
+    leadsQuery = ''; leadsWarmth = ''; leadsSort = 'time'; leadsFilter = 'todo';
+    todayTab = 'todo'; eveAutoOpen = true;
   }
 
   function setScreen(id, filter) {
@@ -1255,12 +1308,15 @@
     window.scrollTo(0, 0);
   }
 
-  /** Changing the demo day is a demo control: it never changes which screen is open. */
+  /** Changing the demo day is a demo control. It keeps the screen, unless that
+   *  screen cannot exist on the chosen day: there is no booth two weeks later. */
   function setDay(id) {
     stopIdle();
     openLeadId = null; callStep = null; focusLead = null; eveId = null;
+    moreOpenId = null; lastQuery = ''; eveAutoOpen = true;
     S.day = id;
     if (id === 'expo') S.boothEnteredAt = Date.now();
+    else if (S.screen === 'booth') S.screen = 'leads';
     save(); render();
   }
 
@@ -1268,7 +1324,7 @@
     if (!S.welcomed) return viewWelcome();
     renderTopbar();
     ({ settings: viewSetup, booth: viewBooth, leads: viewEvening, crm: viewCrm }[S.screen] || viewBooth)();
-    renderNav();
+
     if (S.screen !== 'booth') renderRecent();
   }
 
@@ -1297,13 +1353,14 @@
 
   // One delegated handler for every button in the app.
   document.addEventListener('click', (e) => {
+    // Any touch inside the open panel keeps it open — a link, a disclosure or
+    // plain text as much as a button. Reading the history is not being idle.
+    if (openLeadId && e.target.closest && e.target.closest('.panel')) startIdle();
+
     const b = e.target.closest('button, label[for]');
     if (!b) { const m = $('#menu'); if (m && !e.target.closest('#menu')) m.remove(); return; }
     const d = b.dataset;
     if (!b.closest('#menu') && d.act !== 'menu') { const m = $('#menu'); if (m) m.remove(); }
-
-    // Any touch inside the open panel restarts the five-second clock.
-    if (openLeadId && b.closest('.panel')) startIdle();
 
     if (d.screen) return setScreen(d.screen, d.filter);
     if (d.day) { $("#menu") && $("#menu").remove(); return setDay(d.day); }
@@ -1397,7 +1454,7 @@
         return $('#menu') && $('#menu').remove();
       }
       case 'reset': $('#menu') && $('#menu').remove(); return confirmReset();
-      case 'reset-yes': S = freshState(); save(); closeModal(false); lastAction = null; crmTab = 'todo'; return render();
+      case 'reset-yes': resetViewState(); S = freshState(); crmTab = 'todo'; save(); closeModal(false); return render();
     }
   });
 
