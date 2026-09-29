@@ -263,9 +263,14 @@
   const STORE_KEY = 'expo-proto-v1-' + (REAL ? 'real' : 'demo');
   let S;
 
+  /* Two separate things, which version 1 confused into one "stage":
+   *   screen — where the exhibitor is: the booth, his visitors, or the CRM.
+   *   day    — which day the demo is pretending it is. A demo control, not a screen. */
   function freshState() {
     return {
-      stage: 'setup',
+      screen: 'booth',
+      day: 'expo',
+      welcomed: false,
       business: { name: 'נגריית הדר', template: 'quote', offerings: SUGGESTED_OFFERINGS.quote.slice(0, 5), catalog: null, keepAudience: true, setupDone: false },
       leads: [],
       seq: 1,
@@ -275,9 +280,23 @@
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) { S = JSON.parse(raw); relinkPeople(); return; }
+      if (raw) { S = JSON.parse(raw); migrate(); relinkPeople(); return; }
     } catch (e) { /* storage unavailable: run in memory */ }
     S = freshState();
+  }
+  /** Version 1 stored one "stage". Split it, so saved demos still open. */
+  function migrate() {
+    if (S.screen) return;
+    const map = {
+      setup: ['settings', 'expo'], booth: ['booth', 'expo'], evening: ['leads', 'evening'],
+      today: ['crm', 'after'], day14: ['crm', 'day14'],
+    };
+    const [screen, day] = map[S.stage] || ['booth', 'expo'];
+    S.screen = screen;
+    S.day = day;
+    if (S.stage === 'day14') crmTab = 'summary';
+    S.welcomed = true;
+    delete S.stage;
   }
   /** Leads point at a row by position. If the list was re-exported in another order,
    *  find each person again by the name saved with the lead, rather than show someone else. */
@@ -294,9 +313,9 @@
     try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* in memory only */ }
   }
 
-  /** The simulated "now" for each stage of the time machine. */
+  /** The simulated "now" for each demo day. */
   function nowFor(stage) {
-    if (stage === 'booth') {
+    if (stage === 'expo') {
       // The expo day restarts at 10:00 every time the booth is opened, so the hours
       // stay believable instead of everyone arriving at the same minute.
       const entered = S.boothEnteredAt || Date.now();
@@ -304,11 +323,18 @@
       return new Date(EXPO_DAY.getTime() + (elapsed > 10 * 3600000 ? 0 : elapsed));
     }
     if (stage === 'evening') return new Date(EXPO_DAY.getFullYear(), EXPO_DAY.getMonth(), EXPO_DAY.getDate(), 21, 0);
-    if (stage === 'today') return daysFrom(EXPO_DAY, 1, 9);
+    if (stage === 'after') return daysFrom(EXPO_DAY, 1, 9);
     if (stage === 'day14') return daysFrom(EXPO_DAY, 14, 18);
     return new Date(EXPO_DAY.getTime() - 7 * DAY);
   }
-  const NOW = () => nowFor(S.stage);
+  const NOW = () => nowFor(S.day);
+
+  const DAYS = [
+    { id: 'expo', label: 'יום התערוכה' },
+    { id: 'evening', label: 'הערב שאחריו' },
+    { id: 'after', label: 'למחרת בבוקר' },
+    { id: 'day14', label: 'שבועיים אחרי' },
+  ];
 
   const tpl = () => TEMPLATES[S.business.template] || TEMPLATES.general;
   const leadById = (id) => S.leads.find((l) => l.id === id);
@@ -426,8 +452,8 @@
     main().innerHTML = `
       <div class="setup">
         <div>
-          <h1>הכנה לתערוכה</h1>
-          <p class="lead-text">שלושה צעדים, אף אחד מהם לא חובה. מה שתגדיר כאן הופך לכפתורים בדוכן, כדי שביום עצמו לא תצטרך להקליד.</p>
+          <h1>הגדרות העסק</h1>
+          <p class="lead-text">מה שתגדיר כאן הופך לכפתורים בדוכן, כדי שביום עצמו לא תצטרך להקליד. שום דבר כאן אינו חובה, ואפשר לשנות בכל רגע.</p>
         </div>
         <label class="step">
           <span class="field-label">שם העסק</span>
@@ -463,8 +489,8 @@
           <label class="check"><input id="keep-aud" type="checkbox" ${b.keepAudience ? 'checked' : ''}> לשמור גם "קהל": מי שהתעניין בלי צורך עכשיו, כדי לפנות אליו בעונה</label>
         </section>
         <div class="setup-actions">
-          <button class="btn primary big" data-act="setup-done">מוכן, ליום התערוכה</button>
-          <button class="btn ghost" data-act="setup-skip">לדלג, תבנית כללית</button>
+          <button class="btn primary big" data-act="setup-done">✓ שמור, חזרה לדוכן</button>
+          <button class="btn ghost" data-act="setup-skip">לאפס לתבנית כללית</button>
         </div>
       </div>`;
     $('#biz-name').addEventListener('input', (e) => { b.name = e.target.value; save(); renderTopbar(); });
@@ -673,8 +699,8 @@
    *  screen the edited lead is pinned, so it cannot slip out from under the finger
    *  when the change reorders the list. */
   function rerender(l) {
-    if (S.stage === 'booth' && openLeadId) return renderPanel();
-    if (S.stage === 'today' && l) focusLead = l.id;
+    if (S.screen === 'booth' && openLeadId) return renderPanel();
+    if (S.screen === 'crm' && l) focusLead = l.id;
     return render();
   }
 
@@ -710,7 +736,7 @@
     stopIdle();
     const l = leadById(openLeadId);
     openLeadId = null;
-    if (S.stage !== 'booth') return;
+    if (S.screen !== 'booth') return;
     // Saved and done, so the box is cleared and the next name can be typed straight
     // away. The typed text is kept only when the pick is taken back ("לא זה").
     lastQuery = '';
@@ -733,12 +759,12 @@
 
   function renderRecent() {
     let bar = $('#recent');
-    if (S.stage !== 'booth') { if (bar) bar.remove(); return; }
+    if (S.screen !== 'booth') { if (bar) bar.remove(); return; }
     if (!bar) { bar = document.createElement('div'); bar.id = 'recent'; bar.className = 'recent'; document.body.appendChild(bar); }
     const recent = S.leads.slice().sort((a, b) => b.visits[b.visits.length - 1] - a.visits[a.visits.length - 1]).slice(0, 10);
     bar.innerHTML = `<div class="recent-inner"><span class="recent-label">אחרונים</span>${recent.length ? recent.map((l) => `
       <button class="r-chip" data-open="${l.id}"><span class="w-dot ${l.warmth || ''}"></span>${esc(leadName(l))}${l.visits.length > 1 ? ' ↺' : ''}</button>`).join('')
-      + `<button class="r-chip" data-stage="evening">כל מי שהיה אצלי ←</button>` : '<span class="optional">עוד אין. מי שייקלט יופיע כאן.</span>'}</div>`;
+      + `<button class="r-chip" data-screen="leads">כל מי שהיה אצלי ←</button>` : '<span class="optional">עוד אין. מי שייקלט יופיע כאן.</span>'}</div>`;
   }
 
   function newPersonModal() {
@@ -821,8 +847,20 @@
 
   // ---------------- Today ----------------
   let todayTab = 'todo';
+  let crmTab = 'todo';   // 'todo' = the calls, 'summary' = what came of them
   let callStep = null;   // id of the lead whose outcome is being asked
   let focusLead = null;  // a lead tapped in the list takes over the card
+
+  /** The CRM is one screen with two views, not two screens. */
+  function viewCrm() {
+    (crmTab === 'summary' ? viewDay14 : viewToday)();
+    const head = document.createElement('div');
+    head.className = 'crm-tabs';
+    head.innerHTML = `
+      <button class="seg" data-crmtab="todo" aria-pressed="${crmTab === 'todo'}">שיחות לטיפול</button>
+      <button class="seg" data-crmtab="summary" aria-pressed="${crmTab === 'summary'}">מה יצא מזה</button>`;
+    main().prepend(head);
+  }
 
   function viewToday() {
     const now = NOW();
@@ -861,7 +899,7 @@
     }
     main().innerHTML = `<div class="stack">
       <div class="section-head"><div><h1>לטיפול</h1><p class="lead-text">ניהול הלידים אחרי התערוכה. כרטיס אחד בכל פעם, ואחרי כל שיחה נגיעה אחת שמתזמנת את ההמשך.</p></div></div>
-      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא תויגו.</span><button class="btn" data-stage="evening" data-filter="todo">לתייג עכשיו</button></div>` : ''}
+      ${untagged ? `<div class="waiting"><span class="waiting-label">${untagged} עוד לא תויגו.</span><button class="btn" data-screen="leads" data-filter="todo">לתייג עכשיו</button></div>` : ''}
       ${card}
     </div>
     <div class="tabs" role="tablist">
@@ -966,27 +1004,53 @@
   // ------------------------------------------------------------------
 
   // 'evening', 'today' and 'day14' keep their old ids so saved state still loads.
-  const STAGES = [
-    { id: 'setup', label: 'הגדרות העסק' },
-    { id: 'booth', label: 'יום התערוכה' },
-    { id: 'evening', label: 'מי היה אצלי' },
-    { id: 'today', label: 'לטיפול', group: 'CRM' },
-    { id: 'day14', label: 'סיכום', group: 'CRM' },
+  /* Three screens, the way the exhibitor thinks about his work. Settings is a
+   * button, not a screen in the journey, and the demo day lives in the demo menu. */
+  const SCREENS = [
+    { id: 'booth', label: 'הדוכן', icon: '🔍' },
+    { id: 'leads', label: 'מי היה אצלי', icon: '👥' },
+    { id: 'crm', label: 'מעקב', icon: '📞' },
   ];
+
+  function screenTitle() {
+    if (S.screen === 'settings') return 'הגדרות העסק';
+    const s = SCREENS.find((x) => x.id === S.screen);
+    return s ? s.label : '';
+  }
 
   function renderTopbar() {
     const now = NOW();
+    const dayLabel = (DAYS.find((d) => d.id === S.day) || DAYS[0]).label;
     $('#topbar').innerHTML = `<div class="topbar-inner">
-      <div class="brand"><span class="brand-name">${esc(S.business.name || 'העסק שלי')}</span>
-        <span class="brand-sub">${esc(tpl().name)} · <span class="pill ${REAL ? 'real' : ''}">${REAL ? 'רשימה אמיתית · ' + PEOPLE.length.toLocaleString('he-IL') : 'נתוני הדגמה'}</span></span></div>
-      <nav class="stages" aria-label="מסכי המערכת">
-        ${STAGES.map((s, n) => (s.group && (n === 0 || STAGES[n - 1].group !== s.group)
-          ? `<span class="group-sep" aria-hidden="true"></span><span class="group-label">${esc(s.group)}</span>` : '')
-          + `<button class="stage" data-stage="${s.id}" ${S.stage === s.id ? 'aria-current="step"' : ''}><span class="dot num">${n + 1}</span><span class="label">${s.label}</span></button>`).join('')}
-      </nav>
-      <div class="clock"><span class="clock-date" id="clock-date">${esc(hebDate(now))}</span><span class="clock-time num" id="clock-time">${S.stage === 'setup' ? 'שבוע לפני' : hhmm(now)}</span></div>
-      <button class="icon-btn" data-act="menu" aria-haspopup="true" aria-label="כלי הדגמה">⋯</button>
+      <div class="brand">
+        <span class="brand-name">${esc(S.business.name || 'העסק שלי')}</span>
+        <span class="brand-sub">${esc(screenTitle())}</span>
+      </div>
+      <div class="clock">
+        <span class="clock-date" id="clock-date">${esc(dayLabel)} · ${esc(hebDate(now))}</span>
+        <span class="clock-time num" id="clock-time">${hhmm(now)}</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" data-act="settings" aria-label="הגדרות העסק" title="הגדרות העסק">⚙</button>
+        <button class="icon-btn" data-act="menu" aria-haspopup="true" aria-label="כלי הדגמה" title="כלי הדגמה">⋯</button>
+      </div>
     </div>`;
+  }
+
+  function renderNav() {
+    let nav = $('#nav');
+    if (!nav) { nav = document.createElement('nav'); nav.id = 'nav'; nav.className = 'nav'; document.body.appendChild(nav); }
+    nav.setAttribute('aria-label', 'מסכי המערכת');
+    const counts = {
+      leads: S.leads.filter((l) => l.status === 'open' && !l.warmth).length,
+      crm: todaysCalls(NOW()).length,
+    };
+    nav.innerHTML = `<div class="nav-inner">${SCREENS.map((s) => `
+      <button class="nav-btn" data-screen="${s.id}" ${S.screen === s.id ? 'aria-current="page"' : ''}>
+        <span class="nav-icon" aria-hidden="true">${s.icon}</span>
+        <span class="nav-label">${esc(s.label)}</span>
+        ${counts[s.id] ? `<span class="nav-badge num">${counts[s.id]}</span>` : ''}
+      </button>`).join('')}</div>`;
   }
 
   function toggleMenu() {
@@ -995,8 +1059,12 @@
     const m = document.createElement('div');
     m.id = 'menu'; m.className = 'menu';
     m.innerHTML = `
-      <button data-act="sim-dial">📞 הדמיית מבקר שמחייג לדוכן</button>
-      <button data-act="demo-day">טעינת יום תערוכה לדוגמה (36 אנשים)</button>
+      <div class="menu-head">כלי הדגמה</div>
+      <div class="menu-head sub">איזה יום מציגים</div>
+      ${DAYS.map((d) => `<button data-day="${d.id}" ${S.day === d.id ? 'class="on"' : ''}>${S.day === d.id ? '● ' : '○ '}${esc(d.label)}</button>`).join('')}
+      <hr>
+      <button data-act="sim-dial">📞 מבקר מחייג לדוכן</button>
+      <button data-act="demo-day">טעינת יום תערוכה מלא (36 אנשים)</button>
       <button data-act="sim-two-weeks">הדמיית שבועיים של מעקב</button>
       <hr>
       <button data-act="theme">מצב בהיר / כהה</button>
@@ -1029,7 +1097,7 @@
   function closeModal(restart) {
     const s = $('#scrim'); if (!s) return;
     s.remove();
-    if (restart !== false && openLeadId && S.stage === 'booth') startIdle();
+    if (restart !== false && openLeadId && S.screen === 'booth') startIdle();
   }
 
   function confirmReset() {
@@ -1037,23 +1105,57 @@
       <div class="inline"><button class="btn primary" data-act="reset-yes">כן, מחדש</button><button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
   }
 
-  function setStage(id, filter) {
+  function setScreen(id, filter) {
     stopIdle();
     openLeadId = null; callStep = null; focusLead = null; eveId = null; moreOpenId = null;
     lastQuery = '';
     eveAutoOpen = true;
     if (filter) leadsFilter = filter;
-    // Entering the booth starts the expo day at 10:00 again.
-    if (id === 'booth' && S.stage !== 'booth') S.boothEnteredAt = Date.now();
-    S.stage = id;
+    // Opening the booth starts the expo day at 10:00 again.
+    if (id === 'booth' && S.screen !== 'booth') S.boothEnteredAt = Date.now();
+    S.screen = id;
     save(); render();
     window.scrollTo(0, 0);
   }
 
+  /** Changing the demo day is a demo control: it never changes which screen is open. */
+  function setDay(id) {
+    stopIdle();
+    openLeadId = null; callStep = null; focusLead = null; eveId = null;
+    S.day = id;
+    if (id === 'expo') S.boothEnteredAt = Date.now();
+    save(); render();
+  }
+
   function render() {
+    if (!S.welcomed) return viewWelcome();
     renderTopbar();
-    ({ setup: viewSetup, booth: viewBooth, evening: viewEvening, today: viewToday, day14: viewDay14 }[S.stage] || viewSetup)();
-    if (S.stage !== 'booth') renderRecent();
+    ({ settings: viewSetup, booth: viewBooth, leads: viewEvening, crm: viewCrm }[S.screen] || viewBooth)();
+    renderNav();
+    if (S.screen !== 'booth') renderRecent();
+  }
+
+  /** One screen the exhibitor sees once: what this is, and what to do first. */
+  function viewWelcome() {
+    $('#topbar').innerHTML = '';
+    const nav = $('#nav'); if (nav) nav.remove();
+    const rec = $('#recent'); if (rec) rec.remove();
+    main().innerHTML = `
+      <div class="welcome">
+        <div class="welcome-card">
+          <div class="welcome-kicker">הדגמה</div>
+          <h1>הדוכן שלך, בלי לרשום כלום ביד</h1>
+          <p class="lead-text">מישהו ניגש לדוכן. אתה מקליד שתי אותיות מהשם שלו, נוגע בשם, וזהו — הוא נשמר.
+            כל השאר רשות: כמה הוא מעניין, מה חיפש, ומתי לחזור אליו.</p>
+          <ol class="welcome-steps">
+            <li><b>הדוכן</b> — מוצאים מבקר ומתייגים בנגיעה</li>
+            <li><b>מי היה אצלי</b> — כל מי שנקלט, פתוח לעריכה בכל זמן</li>
+            <li><b>מעקב</b> — למחרת: למי להתקשר, ומה יצא מזה</li>
+          </ol>
+          <p class="optional">בהדגמה הזו אתה בעל נגרייה. השמות והנתונים מומצאים.</p>
+          <button class="btn primary big" data-act="welcome-done">להתחיל</button>
+        </div>
+      </div>`;
   }
 
   // One delegated handler for every button in the app.
@@ -1066,7 +1168,8 @@
     // Any touch inside the open panel restarts the five-second clock.
     if (openLeadId && b.closest('.panel')) startIdle();
 
-    if (d.stage) return setStage(d.stage, d.filter);
+    if (d.screen) return setScreen(d.screen, d.filter);
+    if (d.day) { $("#menu") && $("#menu").remove(); return setDay(d.day); }
     if (d.tpl) { S.business.template = d.tpl; S.business.offerings = SUGGESTED_OFFERINGS[d.tpl].slice(0, 5); save(); return viewSetup(); }
     if (d.offer) { const o = S.business.offerings; const k = o.indexOf(d.offer); if (k >= 0) o.splice(k, 1); else if (o.length < 8) o.push(d.offer); save(); return viewSetup(); }
     if (d.pick) return pickPerson(parseInt(d.pick, 10));
@@ -1098,15 +1201,18 @@
       moreOpenId = null;
       save(); return viewEvening();
     }
-    if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return viewToday(); }
-    if (d.tab) { todayTab = d.tab; return viewToday(); }
+    if (d.out) { const x = leadById(callStep); if (x) recordOutcome(x, d.out); callStep = null; focusLead = null; save(); return render(); }
+    if (d.tab) { todayTab = d.tab; return viewCrm(); }
+    if (d.crmtab) { crmTab = d.crmtab; focusLead = null; callStep = null; return render(); }
     if (d.lfilter) { leadsFilter = d.lfilter; eveId = null; eveAutoOpen = true; return viewEvening(); }
     if (d.eveopen) { eveId = parseInt(d.eveopen, 10); moreOpenId = null; eveAutoOpen = true; viewEvening(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
-    if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; viewToday(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; render(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
     switch (d.act) {
       case 'more': { const id = d.id ? parseInt(d.id, 10) : openLeadId; moreOpenId = moreOpenId === id ? null : id; return rerender(leadById(id)); }
       case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); rerender(l); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
+      case 'settings': return setScreen(S.screen === 'settings' ? 'booth' : 'settings');
+      case 'welcome-done': S.welcomed = true; S.boothEnteredAt = Date.now(); save(); return render();
       case 'new-person': return newPersonModal();
       case 'np-save': return saveNewPerson();
       case 'close-modal': return closeModal();
@@ -1114,12 +1220,12 @@
       case 'wrong': return wrongPerson();
       case 'sim-dial': $('#menu') && $('#menu').remove(); return simulateDial();
       case 'add-offer': return addOffer();
-      case 'setup-done': S.business.setupDone = true; return setStage('booth');
-      case 'setup-skip': S.business.template = 'general'; S.business.offerings = []; S.business.setupDone = false; return setStage('booth');
-      case 'call': callStep = parseInt(d.id, 10); return viewToday();
-      case 'call-cancel': callStep = null; return viewToday();
-      case 'unfocus': focusLead = null; return viewToday();
-      case 'sim-two-weeks': $('#menu') && $('#menu').remove(); simulateTwoWeeks(); return setStage('day14');
+      case 'setup-done': S.business.setupDone = true; return setScreen('booth');
+      case 'setup-skip': S.business.template = 'general'; S.business.offerings = []; S.business.setupDone = false; return setScreen('booth');
+      case 'call': callStep = parseInt(d.id, 10); return render();
+      case 'call-cancel': callStep = null; return render();
+      case 'unfocus': focusLead = null; return render();
+      case 'sim-two-weeks': $('#menu') && $('#menu').remove(); simulateTwoWeeks(); S.day = 'day14'; crmTab = 'summary'; return setScreen('crm');
       case 'demo-day': $('#menu') && $('#menu').remove(); return loadDemoDay();
       case 'menu': return toggleMenu();
       case 'theme': {
@@ -1130,7 +1236,7 @@
         return $('#menu') && $('#menu').remove();
       }
       case 'reset': $('#menu') && $('#menu').remove(); return confirmReset();
-      case 'reset-yes': S = freshState(); save(); closeModal(false); lastAction = null; return setStage('setup');
+      case 'reset-yes': S = freshState(); save(); closeModal(false); lastAction = null; crmTab = 'todo'; return render();
     }
   });
 
@@ -1143,12 +1249,12 @@
     if (!l) return;
     l.note = ta.value;
     save();
-    if (S.stage === 'booth' && openLeadId === l.id) pauseIdle(NOTE_IDLE_MS);
+    if (S.screen === 'booth' && openLeadId === l.id) pauseIdle(NOTE_IDLE_MS);
   });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeModal(); const m = $('#menu'); if (m) m.remove(); if (openLeadId) closePanel(); return; }
-    if (S.stage !== 'booth' || $('#scrim')) return;
+    if (S.screen !== 'booth' || $('#scrim')) return;
     const q = $('#q');
     if (!q || document.activeElement === q || e.target.closest('input, textarea')) return;
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -1169,7 +1275,7 @@
   // Keep the booth clock moving while the screen is open.
   // Only the clock text changes, so an open menu is never redrawn away.
   setInterval(() => {
-    if (S.stage !== 'booth') return;
+    if (S.screen !== 'booth') return;
     const t = $('#clock-time'); if (t) t.textContent = hhmm(NOW());
   }, 30000);
 })();
