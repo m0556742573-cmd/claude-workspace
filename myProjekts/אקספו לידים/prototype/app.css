@@ -306,3 +306,19 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .result:hover { border-color: var(--accent); box-shadow: var(--shadow); }
 .card, .panel { box-shadow: var(--shadow); }
 .panel { border-width: 2px; }
+
+/* ---------- Filters on the visitors screen ---------- */
+.filters { display: grid; gap: 10px; margin-bottom: 14px; }
+.chip.small { font-size: 14px; padding: 7px 12px; min-height: 40px; }
+.filters-sep { width: 1px; background: var(--line); margin-inline: 4px; }
+
+/* ---------- What can be done with a lead ---------- */
+.lead-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px dashed var(--line); }
+.lead-actions .btn { text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+.btn.danger { color: var(--hot); border-color: var(--hot); }
+.btn.primary.danger { background: var(--hot); border-color: var(--hot); color: #fff; }
+
+.history { margin-top: 4px; }
+.history summary { cursor: pointer; color: var(--muted); font-weight: 700; padding: 8px 0; min-height: 40px; }
+.history ul { margin: 4px 0 0; padding-inline-start: 18px; color: var(--muted); display: grid; gap: 4px; font-size: 15px; }
+#exp-text { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre; overflow: auto; }

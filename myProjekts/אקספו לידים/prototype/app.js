@@ -681,8 +681,41 @@
           <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" data-id="${l.id}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
           <div><label class="field-label" for="note-${l.id}">הערה</label><textarea id="note-${l.id}" data-note="${l.id}" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
         </div>` : ''}
-      ${nextBlock(l)}`;
+      ${nextBlock(l)}
+      ${leadActions(l)}
+      ${leadHistory(l)}`;
   }
+
+  const leadPhone = (l) => (l.custom && l.custom.phone) || '';
+
+  /** What can be done with a lead right now: call, write, or remove it. */
+  function leadActions(l) {
+    const phone = leadPhone(l);
+    const intl = phone.replace(/\D/g, '').replace(/^0/, '972');
+    return `
+      <div class="lead-actions">
+        ${phone ? `<a class="btn primary" href="tel:${esc(phone)}">📞 חיוג</a>
+          <a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>
+          <button class="btn ghost" data-act="copy-phone" data-id="${l.id}">העתקת המספר</button>`
+          : `<span class="optional">אין טלפון. ${l.pid != null ? 'ברשימת המארגנים אין מספרים.' : ''}</span>
+          <button class="btn ghost" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
+        <button class="btn ghost danger" data-act="del-lead" data-id="${l.id}">מחיקה</button>
+      </div>`;
+  }
+
+  /** What already happened with this lead, newest last. */
+  function leadHistory(l) {
+    const rows = [];
+    l.visits.forEach((v, i) => rows.push({ at: v, what: i === 0 ? 'הגיע לדוכן' : 'חזר לדוכן' }));
+    (l.calls || []).forEach((c) => rows.push({ at: c.at, what: OUTCOME_LABEL[c.outcome] || 'שיחה' }));
+    if (!rows.length) return '';
+    rows.sort((a, b) => a.at - b.at);
+    return `<details class="history"><summary>מה היה עד עכשיו (${rows.length})</summary>
+      <ul>${rows.map((r) => `<li><span class="num">${esc(hebDate(new Date(r.at)).split(', ')[1] || '')} ${hhmm(new Date(r.at))}</span> · ${esc(r.what)}</li>`).join('')}</ul></details>`;
+  }
+  const OUTCOME_LABEL = {
+    meeting: 'נקבעה פגישה', quote: 'נשלחה הצעה', won: 'נסגרה עסקה', noanswer: 'לא ענה', lost: 'לא רלוונטי',
+  };
 
   /** The next step, as buttons, on every screen where a lead is open. */
   function nextBlock(l) {
@@ -807,13 +840,32 @@
   /* "מי היה אצלי" — not only for the evening. This is where every visitor who came
    * to the booth can be found at any time, opened and changed. */
   let leadsFilter = 'todo';
+  let leadsQuery = '';
+  let leadsWarmth = '';     // '' = all, or hot / warm / cold
+  let leadsSort = 'time';   // 'time' = newest first, 'warm' = most promising first
   let eveAutoOpen = true;   // false after the card is closed, so it does not reopen by itself
 
+  /** Searching my own visitors, by name or by phone. */
+  function matchLead(l, q) {
+    if (!q) return true;
+    const digits = q.replace(/\D/g, '');
+    if (digits.length >= 3) {
+      const phone = (l.custom && l.custom.phone || '').replace(/\D/g, '');
+      return phone.includes(digits);
+    }
+    const hay = norm(leadName(l) + ' ' + leadTown(l) + ' ' + l.interests.join(' ') + ' ' + (l.note || ''));
+    const nq = norm(q);
+    return hay.includes(nq) || skel(hay).includes(skel(nq));
+  }
+
   function viewEvening() {
-    const all = S.leads.slice().sort((a, b) => b.createdAt - a.createdAt);
-    const todo = S.leads.filter((l) => l.status === 'open' && !l.warmth);
-    if (leadsFilter === 'todo' && !todo.length) leadsFilter = 'all';
-    const list = leadsFilter === 'todo' ? todo : all;
+    const q = leadsQuery.trim();
+    const all = S.leads.slice().sort((a, b) => b.createdAt - a.createdAt).filter((l) => matchLead(l, q));
+    const todo = S.leads.filter((l) => l.status === 'open' && !l.warmth).filter((l) => matchLead(l, q));
+    if (leadsFilter === 'todo' && !todo.length && !q) leadsFilter = 'all';
+    let list = leadsFilter === 'todo' ? todo : all;
+    if (leadsWarmth) list = list.filter((l) => l.warmth === leadsWarmth);
+    if (leadsSort === 'warm') list = list.slice().sort((a, b) => rank(b) - rank(a));
     const l = (eveId && leadById(eveId)) || (leadsFilter === 'todo' && eveAutoOpen ? todo[0] : null);
     eveId = l ? l.id : null;
     const left = todo.filter((x) => !l || x.id !== l.id).length;
@@ -821,9 +873,18 @@
     main().innerHTML = `<div class="stack">
       <div class="section-head"><div><h1>מי היה אצלי</h1>
         <p class="lead-text">כל מי שנקלט בדוכן. אפשר לפתוח כל אחד, לתייג, להוסיף פרטים ולשנות את הצעד הבא, מתי שרוצים.</p></div></div>
-      ${all.length ? `<div class="tabs" role="tablist">
+      ${S.leads.length ? `<div class="tabs" role="tablist">
         <button class="tab" role="tab" data-lfilter="todo" aria-selected="${leadsFilter === 'todo'}">ממתינים לתיוג <span class="num">(${todo.length})</span></button>
         <button class="tab" role="tab" data-lfilter="all" aria-selected="${leadsFilter === 'all'}">כולם <span class="num">(${all.length})</span></button>
+      </div>
+      <div class="filters">
+        <input id="lq" class="text-input" type="search" placeholder="חיפוש בשם, בעיר, בהערה או בטלפון" value="${esc(leadsQuery)}" aria-label="חיפוש בלידים שלי">
+        <div class="chips">
+          ${['', 'hot', 'warm', 'cold'].map((w) => `<button class="chip small" data-lwarm="${w}" aria-pressed="${leadsWarmth === w}">${w ? WARMTH[w] : 'הכול'}</button>`).join('')}
+          <span class="filters-sep"></span>
+          <button class="chip small" data-lsort="${leadsSort === 'time' ? 'warm' : 'time'}">${leadsSort === 'time' ? '↕ לפי שעה' : '↕ לפי חשיבות'}</button>
+          <button class="chip small" data-act="export">⇩ ייצוא</button>
+        </div>
       </div>` : ''}
       ${l ? `<div class="card">
         <div class="card-count num">${leadsFilter === 'todo' ? (left ? 'נשארו עוד ' + left + ' לתייג' : 'האחרון לתיוג') : 'פתוח לעריכה'}
@@ -842,7 +903,18 @@
     ${list.length ? `<div class="rows-head optional">${leadsFilter === 'todo' ? 'מי שעוד לא קיבל חום.' : 'הכי אחרון למעלה. נגיעה בשם פותחת אותו לעריכה.'}</div>
     <div class="rows">${list.map((x) => `<button class="row" data-eveopen="${x.id}" ${eveId === x.id ? 'aria-current="true"' : ''}>
       <span><span class="w-dot ${x.warmth || ''}" style="display:inline-block;margin-inline-end:8px"></span><span class="person-name">${esc(leadName(x))}</span> <span class="row-side">${esc(leadTown(x))}</span></span>
-      <span class="row-side num">${hhmm(new Date(x.createdAt))}${x.warmth ? ' · ' + WARMTH[x.warmth] : ' · לא תויג'}</span></button>`).join('')}</div>` : ''}`;
+      <span class="row-side num">${hhmm(new Date(x.createdAt))}${x.warmth ? ' · ' + WARMTH[x.warmth] : ' · לא תויג'}</span></button>`).join('')}</div>`
+      : S.leads.length ? '<div class="empty-hint">אף אחד לא תואם את החיפוש או הסינון.</div>' : ''}`;
+    const lq = $('#lq');
+    if (lq) {
+      lq.addEventListener('input', () => {
+        leadsQuery = lq.value;
+        const at = lq.selectionStart;
+        viewEvening();
+        const again = $('#lq');
+        if (again) { again.focus(); again.setSelectionRange(at, at); }
+      });
+    }
   }
 
   // ---------------- Today ----------------
@@ -1100,6 +1172,57 @@
     if (restart !== false && openLeadId && S.screen === 'booth') startIdle();
   }
 
+  function confirmDelete(id) {
+    const l = leadById(id);
+    if (!l) return;
+    stopIdle();
+    modal(`<h2>למחוק את ${esc(leadName(l))}?</h2>
+      <p class="lead-text">כל מה שנרשם עליו יימחק. אי אפשר להחזיר.</p>
+      <div class="inline"><button class="btn primary danger" data-act="del-yes" data-id="${id}">כן, למחוק</button>
+      <button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
+  }
+
+  function phoneModal(id) {
+    const l = leadById(id);
+    if (!l) return;
+    stopIdle();
+    modal(`<h2>טלפון של ${esc(leadName(l))}</h2>
+      <p class="lead-text">נשמר במכשיר הזה בלבד, כדי שאפשר יהיה לחזור אליו.</p>
+      <input id="ph-val" class="text-input num" inputmode="tel" value="${esc(leadPhone(l))}" autocomplete="off">
+      <div class="inline"><button class="btn primary" data-act="save-phone" data-id="${id}">שמירה</button>
+      <button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
+    setTimeout(() => $('#ph-val') && $('#ph-val').focus(), 30);
+  }
+
+  /** Export is how the exhibitor knows the list is his: plain text he can paste anywhere. */
+  function exportModal() {
+    const rows = S.leads.slice().sort((a, b) => rank(b) - rank(a));
+    if (!rows.length) return toast('אין עדיין לידים לייצא');
+    const head = 'שם\tעיר\tחום\tמה עניין אותו\tצעד הבא\tהערה';
+    const body = rows.map((l) => [
+      leadName(l), leadTown(l), l.warmth ? WARMTH[l.warmth] : '', l.interests.join(', '),
+      nextOf(l).label, (l.note || '').replace(/\s+/g, ' '),
+    ].join('\t')).join('\n');
+    modal(`<h2>ייצוא ${rows.length} לידים</h2>
+      <p class="lead-text">מסודר לפי חשיבות. להעתיק, ולהדביק באקסל או בוואטסאפ.</p>
+      <textarea id="exp-text" rows="8" readonly>${esc(head + '\n' + body)}</textarea>
+      <div class="inline"><button class="btn primary" data-act="copy-export">העתקה</button>
+      <button class="btn ghost" data-act="close-modal">סגירה</button></div>`);
+  }
+
+  function copyText(text, okMsg) {
+    if (!text) return;
+    const done = () => toast(okMsg);
+    try {
+      navigator.clipboard.writeText(text).then(done, () => selectFallback());
+    } catch (e) { selectFallback(); }
+    function selectFallback() {
+      const ta = $('#exp-text');
+      if (ta) { ta.focus(); ta.select(); toast('סמן והעתק ידנית'); }
+      else toast(text);
+    }
+  }
+
   function confirmReset() {
     modal(`<h2>להתחיל מחדש?</h2><p class="lead-text">כל הלידים וההגדרות בדוגמית יימחקו מהמכשיר הזה.</p>
       <div class="inline"><button class="btn primary" data-act="reset-yes">כן, מחדש</button><button class="btn ghost" data-act="close-modal">ביטול</button></div>`);
@@ -1205,6 +1328,8 @@
     if (d.tab) { todayTab = d.tab; return viewCrm(); }
     if (d.crmtab) { crmTab = d.crmtab; focusLead = null; callStep = null; return render(); }
     if (d.lfilter) { leadsFilter = d.lfilter; eveId = null; eveAutoOpen = true; return viewEvening(); }
+    if (d.lwarm !== undefined) { leadsWarmth = d.lwarm; return viewEvening(); }
+    if (d.lsort) { leadsSort = d.lsort; return viewEvening(); }
     if (d.eveopen) { eveId = parseInt(d.eveopen, 10); moreOpenId = null; eveAutoOpen = true; viewEvening(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
     if (d.lead) { focusLead = parseInt(d.lead, 10); callStep = null; render(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
@@ -1212,6 +1337,28 @@
       case 'more': { const id = d.id ? parseInt(d.id, 10) : openLeadId; moreOpenId = moreOpenId === id ? null : id; return rerender(leadById(id)); }
       case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); rerender(l); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
       case 'settings': return setScreen(S.screen === 'settings' ? 'booth' : 'settings');
+      case 'del-lead': return confirmDelete(parseInt(d.id, 10));
+      case 'del-yes': {
+        const id = parseInt(d.id, 10);
+        S.leads = S.leads.filter((x) => x.id !== id);
+        if (openLeadId === id) { openLeadId = null; stopIdle(); }
+        if (eveId === id) eveId = null;
+        if (focusLead === id) focusLead = null;
+        save(); closeModal(false); render(); return toast('הליד נמחק');
+      }
+      case 'add-phone': return phoneModal(parseInt(d.id, 10));
+      case 'save-phone': {
+        const x = leadById(parseInt(d.id, 10));
+        const v = $('#ph-val').value.trim();
+        if (x) { x.custom = Object.assign({ first: '', last: '', town: '' }, x.custom, { phone: v }); save(); }
+        closeModal(false); return rerender(x);
+      }
+      case 'copy-phone': {
+        const x = leadById(parseInt(d.id, 10));
+        return copyText(leadPhone(x), 'המספר הועתק');
+      }
+      case 'export': return exportModal();
+      case 'copy-export': return copyText($('#exp-text').value, 'הרשימה הועתקה. אפשר להדביק בוואטסאפ או באקסל');
       case 'welcome-done': S.welcomed = true; S.boothEnteredAt = Date.now(); save(); return render();
       case 'new-person': return newPersonModal();
       case 'np-save': return saveNewPerson();
