@@ -256,6 +256,54 @@
     register: { name: 'הרשמה', example: 'קורסים, מנויים', ask: { label: 'מסלול', options: ['הקרוב', 'הבא', 'רק מידע'] }, hot: 'לשלוח פרטי הרשמה' },
     general: { name: 'כללי', example: 'כל עסק אחר', ask: null, hot: 'להתקשר' },
   };
+  /* The trade library. This is what turns setting up from writing into approving:
+   * the exhibitor picks his trade and everything below is already filled in, in
+   * the words that trade actually uses. Drawn from the thirty businesses that
+   * exhibited last time. Sizes are s / m / l — enough to rank a lead by what it
+   * is worth, without anyone having to write down prices.
+   *
+   * ⚠️ Written by Claude and not yet checked by Yitzhak, who knows these
+   * businesses. Expect the names and the sizes to be corrected.
+   */
+  const TRADES = [
+    { id: 'carpentry', name: 'נגרייה', template: 'quote', days: 1,
+      offers: [['מטבחים', 'l'], ['ארונות קיר', 'l'], ['ריהוט למוסדות', 'l'], ['חדרי ילדים', 'm'], ['ספריות', 'm'], ['דלתות', 's']] },
+    { id: 'furniture', name: 'רהיטים וסלונים', template: 'buy', days: 2,
+      offers: [['סלונים', 'l'], ['פינות אוכל', 'm'], ['מזרנים ומיטות', 'm'], ['ריהוט משרדי', 'm'], ['מבצע התערוכה', 's']] },
+    { id: 'print', name: 'דפוס וגרפיקה', template: 'quote', days: 1,
+      offers: [['הזמנות לאירוע', 'm'], ['חוברות וספרים', 'l'], ['שילוט ובאנרים', 'm'], ['כרטיסי ביקור', 's'], ['הדפסה למוסדות', 'l']] },
+    { id: 'events', name: 'הפקת אירועים', template: 'date', days: 1,
+      offers: [['חתונה', 'l'], ['בר מצווה', 'l'], ['אירוע למוסד', 'l'], ['שבת חתן', 'm'], ['ציוד והשכרה', 's']] },
+    { id: 'food', name: 'מזון וקייטרינג', template: 'date', days: 1,
+      offers: [['אירוע גדול', 'l'], ['שבת ואירוח', 'm'], ['הזמנה קבועה למוסד', 'l'], ['מגשי אירוח', 'm'], ['קמעונאי', 's']] },
+    { id: 'clothing', name: 'ביגוד והלבשה', template: 'buy', days: 3,
+      offers: [['חליפות', 'm'], ['בגדי ילדים', 's'], ['הזמנה מיוחדת', 'm'], ['מבצע התערוכה', 's']] },
+    { id: 'judaica', name: 'יודאיקה ותשמישי קדושה', template: 'buy', days: 3,
+      offers: [['תפילין', 'l'], ['ספרי תורה ומגילות', 'l'], ['כלי כסף', 'm'], ['מתנה לאירוע', 'm'], ['תשמישי קדושה', 's']] },
+    { id: 'insurance', name: 'ביטוח ופיננסים', template: 'meeting', days: 1,
+      offers: [['ביטוח בריאות', 'l'], ['ביטוח לעסק', 'l'], ['פנסיה וחיסכון', 'l'], ['ביטוח רכב ודירה', 'm'], ['בדיקת תיק קיים', 'm']] },
+    { id: 'legal', name: 'עורכי דין וייעוץ', template: 'meeting', days: 1,
+      offers: [['ייעוץ ראשוני', 'm'], ['נדל"ן וחוזים', 'l'], ['ליווי למוסד', 'l'], ['ירושות וצוואות', 'm']] },
+    { id: 'health', name: 'בריאות וטיפולים', template: 'date', days: 2,
+      offers: [['טיפול בודד', 's'], ['סדרת טיפולים', 'm'], ['מנוי חודשי', 'm'], ['טיפול בבית', 'm']] },
+    { id: 'courses', name: 'קורסים והכשרות', template: 'register', days: 1,
+      offers: [['המחזור הקרוב', 'm'], ['המחזור הבא', 'm'], ['קורס למוסד', 'l'], ['רק לקבל מידע', 's']] },
+    { id: 'trips', name: 'טיולים והסעות', template: 'date', days: 1,
+      offers: [['טיול לקבוצה', 'l'], ['הסעה לאירוע', 'm'], ['בין הזמנים', 'l'], ['טיול משפחתי', 'm']] },
+    { id: 'home', name: 'שיפוץ ותחזוקה לבית', template: 'quote', days: 1,
+      offers: [['מזגנים', 'm'], ['חשמל ותאורה', 'm'], ['צבע ושיפוץ', 'l'], ['עבודה למוסד', 'l'], ['תיקון קטן', 's']] },
+    { id: 'auto', name: 'רכב ותחבורה', template: 'date', days: 2,
+      offers: [['טיפול וסדרה', 'm'], ['השכרה ליום', 's'], ['השכרה לאירוע', 'm'], ['בדיקה לפני קנייה', 's']] },
+    { id: 'supply', name: 'אספקה וסיטונאות', template: 'quote', days: 1,
+      offers: [['הזמנה קבועה', 'l'], ['ציוד למוסד', 'l'], ['הזמנה חד-פעמית', 'm'], ['דוגמאות', 's']] },
+    { id: 'general', name: 'אחר', template: 'general', days: 2,
+      offers: [['מידע כללי', 'm'], ['מבצע התערוכה', 's']] },
+  ];
+  const tradeById = (id) => TRADES.find((t) => t.id === id) || TRADES[TRADES.length - 1];
+
+  const SIZES = { s: 'קטן', m: 'בינוני', l: 'גדול' };
+  const SIZE_RANK = { s: 1, m: 3, l: 6 };
+
   const SUGGESTED_OFFERINGS = {
     quote: ['מטבחים', 'ארונות קיר', 'ריהוט למוסדות', 'חדרי ילדים', 'ספריות', 'דלתות'],
     buy: ['מבצע התערוכה', 'מוצרים חדשים', 'הזמנה מיוחדת', 'מתנות לאירוע'],
@@ -265,7 +313,14 @@
     general: ['מידע כללי', 'מבצע התערוכה'],
   };
   const WHEN_OPTIONS = ['עכשיו', 'עד 3 חודשים', 'בהמשך'];
-  const WARMTH = { hot: 'חם', warm: 'פושר', cold: 'קר' };
+  const WARMTH_DEFAULT = { hot: 'חם', warm: 'פושר', cold: 'קר' };
+  /** The grades carry the exhibitor's own words when he has renamed them. */
+  const warmthName = (k) => (S && S.business && S.business.warmthNames && S.business.warmthNames[k]) || WARMTH_DEFAULT[k];
+  const WARMTH = new Proxy({}, {
+    get: (_, k) => warmthName(k),
+    ownKeys: () => Object.keys(WARMTH_DEFAULT),
+    getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+  });
 
   const STORE_KEY = 'expo-proto-v1-' + (REAL ? 'real' : 'demo');
   let S;
@@ -278,7 +333,12 @@
       screen: 'booth',
       day: 'expo',
       welcomed: false,
-      business: { name: 'נגריית הדר', template: 'quote', offerings: SUGGESTED_OFFERINGS.quote.slice(0, 5), catalog: 'קטלוג נגריית הדר 2026.pdf', keepAudience: true, setupDone: false },
+      business: {
+        name: '', trade: '', template: 'general', offerings: [],
+        warmthNames: null, catalog: null, catalogMessage: 'שלום, מצורף החומר שביקשת. אשמח לעמוד לרשותך.',
+        channels: { email: true, whatsapp: true, sms: false },
+        keepAudience: true, season: '', devices: [], registered: false,
+      },
       leads: [],
       seq: 1,
       boothEnteredAt: null,
@@ -304,6 +364,15 @@
     if (S.stage === 'day14') crmTab = 'summary';
     S.welcomed = true;
     delete S.stage;
+    // Offerings used to be plain strings and now carry a size.
+    const b = S.business || {};
+    if (b.offerings && b.offerings.length && typeof b.offerings[0] === 'string') {
+      b.offerings = b.offerings.map((name) => ({ name, size: 'm' }));
+    }
+    b.channels = b.channels || { email: true, whatsapp: true, sms: false };
+    b.devices = b.devices || [];
+    b.catalogMessage = b.catalogMessage || 'שלום, מצורף החומר שביקשת. אשמח לעמוד לרשותך.';
+    if (b.registered === undefined) b.registered = !!b.name;
     // A lead saved by an older version may be missing fields that later screens
     // read without checking. Fill them in rather than throw and lose the lot.
     (S.leads || []).forEach((l) => {
@@ -436,7 +505,8 @@
 
   function whyNow(l, now) {
     const r = [];
-    if (l.warmth === 'hot') r.push('חם');
+    if (l.warmth === 'hot') r.push(warmthName('hot'));
+    if (leadSize(l) >= SIZE_RANK.l) r.push('עסקה גדולה');
     if (l.ask) r.push(tpl().ask ? tpl().ask.label + ': ' + l.ask : l.ask);
     if (l.interests.length) r.push('התעניין ב' + l.interests.join(', '));
     if (l.visits.length > 1) r.push('חזר לדוכן ' + l.visits.length + ' פעמים');
@@ -454,8 +524,19 @@
       .sort((a, b) => rank(b) - rank(a) || a.createdAt - b.createdAt)
       .slice(0, 8);
   }
+  /** What each lead is worth, from the sizes set once at home: this is what the
+   *  sizes buy — a kitchen outranks a bookshelf without anyone marking it. */
+  function leadSize(l) {
+    let best = 0;
+    l.interests.forEach((name) => {
+      const o = S.business.offerings.find((x) => x.name === name);
+      if (o) best = Math.max(best, SIZE_RANK[o.size] || 0);
+    });
+    return best;
+  }
   function rank(l) {
-    return (l.warmth === 'hot' ? 100 : 0) + (l.ask ? 20 : 0) + (l.when === 'עכשיו' ? 15 : 0) + (l.visits.length > 1 ? 10 : 0) + l.interests.length;
+    return (l.warmth === 'hot' ? 100 : 0) + leadSize(l) * 6 + (l.ask ? 20 : 0)
+      + (l.when === 'עכשיו' ? 15 : 0) + (l.visits.length > 1 ? 10 : 0) + l.interests.length;
   }
 
   // ------------------------------------------------------------------
@@ -467,63 +548,198 @@
   const main = () => $('#main');
 
   // ---------------- Setup ----------------
+  /* Settings, in three layers. Layer one is a question, layer two is an approval
+   * of what the trade library already filled in, and layer three is folded away.
+   * Same abilities on the tablet and on the computer — only the presentation
+   * differs — because an exhibitor may well register at the last minute, on the
+   * tablet, standing at his booth. */
+  let advOpen = '';   // which advanced section is open
+
   function viewSetup() {
     const b = S.business;
-    const offers = SUGGESTED_OFFERINGS[b.template] || [];
-    const allOffers = Array.from(new Set(offers.concat(b.offerings)));
+    if (!b.registered) return viewRegister();
+    const t = tradeById(b.trade);
     main().innerHTML = `
       <div class="setup">
-        <div>
+        <div class="section-head"><div>
           <h1>הגדרות העסק</h1>
-          <p class="lead-text">מה שתגדיר כאן הופך לכפתורים בדוכן, כדי שביום עצמו לא תצטרך להקליד. שום דבר כאן אינו חובה, ואפשר לשנות בכל רגע.</p>
-        </div>
-        <label class="step">
-          <span class="field-label">שם העסק</span>
-          <input id="biz-name" class="text-input" value="${esc(b.name)}" autocomplete="off">
-        </label>
-        <section class="step" aria-labelledby="s1">
-          <div class="step-head"><span class="step-no">1</span><h2 id="s1">איך אתה בדרך כלל סוגר עסקה?</h2></div>
+          <p class="lead-text">הכול כבר ממולא לפי התחום שבחרת. לעבור, לתקן מה שלא מדויק, וזהו.</p>
+        </div><button class="btn" data-act="setup-done">✓ שמור, חזרה לדוכן</button></div>
+
+        <section class="step">
+          <div class="step-head"><h2>העסק</h2></div>
+          <div class="field-row">
+            <label class="field"><span class="field-label">שם העסק</span>
+              <input id="biz-name" class="text-input" value="${esc(b.name)}" autocomplete="off"></label>
+            <label class="field"><span class="field-label">תחום</span>
+              <select id="biz-trade" class="text-input">
+                ${TRADES.map((x) => `<option value="${x.id}" ${b.trade === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
+              </select></label>
+          </div>
+          <p class="optional">שינוי התחום מציע מחדש את התבנית והמוצרים. מה שערכת ידנית לא יידרס בלי אישור.</p>
+        </section>
+
+        <section class="step">
+          <div class="step-head"><h2>איך אתה סוגר עסקה</h2>
+            <span class="optional">קובע מה נשאל בדוכן ותוך כמה זמן להזכיר</span></div>
           <div class="templates">
-            ${Object.entries(TEMPLATES).map(([k, t]) => `
+            ${Object.entries(TEMPLATES).map(([k, tp]) => `
               <button class="tpl" data-tpl="${k}" aria-pressed="${b.template === k}">
-                <b>${esc(t.name)}</b><small>${esc(t.example)}</small>
-                <small>${t.ask ? 'שואל גם: ' + esc(t.ask.label) : 'בלי שאלה נוספת'}</small>
+                <b>${esc(tp.name)}</b><small>${esc(tp.example)}</small>
+                <small>${tp.ask ? 'שואל גם: ' + esc(tp.ask.label) : 'בלי שאלה נוספת'}</small>
               </button>`).join('')}
           </div>
         </section>
-        <section class="step" aria-labelledby="s2">
-          <div class="step-head"><span class="step-no">2</span><h2 id="s2">מה אתה מציע?</h2><span class="optional">3–6 כפתורים</span></div>
-          <div class="chips">
-            ${allOffers.map((o) => `<button class="chip" data-offer="${esc(o)}" aria-pressed="${b.offerings.includes(o)}">${esc(o)}</button>`).join('')}
+
+        <section class="step">
+          <div class="step-head"><h2>מה אתה מציע</h2>
+            <span class="optional">אלה הכפתורים שתיגע בהם בדוכן</span></div>
+          <div class="offer-list">
+            ${b.offerings.length ? b.offerings.map((o, i) => `
+              <div class="offer-row">
+                <input class="text-input" data-offname="${i}" value="${esc(o.name)}" aria-label="שם המוצר">
+                <div class="chips sizes">
+                  ${Object.entries(SIZES).map(([k, lbl]) => `<button class="chip small" data-offsize="${i}" data-size="${k}" aria-pressed="${o.size === k}">${lbl}</button>`).join('')}
+                </div>
+                <button class="icon-btn" data-offdel="${i}" aria-label="להסיר">✕</button>
+              </div>`).join('')
+              : '<p class="empty-hint">אין עדיין מוצרים. אפשר להוסיף, או לבחור תחום ולקבל הצעה.</p>'}
           </div>
           <div class="inline">
             <input id="new-offer" class="text-input" placeholder="להוסיף משהו משלך" autocomplete="off">
             <button class="btn" data-act="add-offer">הוספה</button>
+            ${t.offers.length ? `<button class="btn ghost" data-act="reset-offers">להחזיר את ההצעה של ${esc(t.name)}</button>` : ''}
           </div>
+          <p class="optional"><b>הגודל קובע מי חשוב יותר.</b> מטבח גדול עולה מעל ספרייה קטנה בלי שתסמן כלום.</p>
         </section>
-        <section class="step" aria-labelledby="s3">
-          <div class="step-head"><span class="step-no">3</span><h2 id="s3">חומר לשליחה, וקהל</h2><span class="optional">רשות</span></div>
-          <div class="inline">
-            <label class="btn" for="catalog">${b.catalog ? '📎 ' + esc(b.catalog) : 'להעלות קטלוג או מחירון'}</label>
-            <input id="catalog" type="file" hidden>
-            <span class="optional">${b.catalog ? 'בדוכן יופיע כפתור "שלח חומר"' : 'אם תעלה, בדוכן יופיע כפתור "שלח חומר"'}</span>
-          </div>
-          <label class="check"><input id="keep-aud" type="checkbox" ${b.keepAudience ? 'checked' : ''}> לשמור גם "קהל": מי שהתעניין בלי צורך עכשיו, כדי לפנות אליו בעונה</label>
-        </section>
-        <div class="setup-actions">
-          <button class="btn primary big" data-act="setup-done">✓ שמור, חזרה לדוכן</button>
-          <button class="btn ghost" data-act="setup-skip">לאפס לתבנית כללית</button>
+
+        <h2 class="adv-title">הגדרות מתקדמות</h2>
+        <p class="lead-text">שום דבר כאן אינו חובה. ליד כל אחת כתוב מה היא קונה.</p>
+        <div class="adv">
+          ${advSection('grades', 'שמות הדרגות', '"חם / פושר / קר" לא מתאים לכל עסק. אצלך אולי "רציני / אולי / רק עבר".', `
+            <div class="field-row">
+              ${['hot', 'warm', 'cold'].map((k) => `<label class="field"><span class="field-label">${esc(WARMTH_DEFAULT[k])}</span>
+                <input class="text-input" data-grade="${k}" value="${esc(warmthName(k))}" autocomplete="off"></label>`).join('')}
+            </div>
+            <button class="btn ghost" data-act="grades-reset">להחזיר לברירת המחדל</button>`)}
+
+          ${advSection('devices', 'המכשירים שלי', 'כמה טאבלטים על אותו דוכן, כולם רואים את אותם לידים.', `
+            <p class="pair-code">קוד חיבור: <b class="num">${pairCode()}</b></p>
+            <p class="optional">בטאבלט חדש מקלידים את הקוד פעם אחת, ונותנים למכשיר שם.</p>
+            <div class="rows">${(b.devices.length ? b.devices : [{ name: 'המכשיר הזה', here: true }]).map((dv) => `
+              <div class="row"><span>${esc(dv.name)}${dv.here ? ' <span class="badge">כאן</span>' : ''}</span>
+                <span class="row-side">${dv.here ? 'מחובר' : 'לא מחובר'}</span></div>`).join('')}</div>
+            <div class="inline"><input id="dev-name" class="text-input" placeholder="שם למכשיר הזה, למשל: טאבלט ימין">
+              <button class="btn" data-act="name-device">שמירה</button></div>
+            <p class="optional">⚠️ בדוגמית אין סנכרון אמיתי בין מכשירים. זה דורש שרת.</p>`)}
+
+          ${advSection('material', 'חומר לשליחה', 'כשמבקר מבקש קטלוג, שולחים בנגיעה במקום להעתיק מספר.', `
+            <div class="inline">
+              <label class="btn" for="catalog">${b.catalog ? '📎 ' + esc(b.catalog) : 'להעלות קטלוג או מחירון'}</label>
+              <input id="catalog" type="file" hidden>
+              ${b.catalog ? '<button class="btn ghost" data-act="catalog-clear">להסיר</button>' : ''}
+            </div>
+            <label class="field"><span class="field-label">המשפט שנשלח איתו</span>
+              <textarea id="cat-msg">${esc(b.catalogMessage)}</textarea></label>
+            <div><span class="field-label">באילו ערוצים</span>
+              <div class="chips">
+                ${[['email', 'מייל'], ['whatsapp', 'וואטסאפ'], ['sms', 'SMS']].map(([k, lbl]) =>
+                  `<button class="chip" data-chan="${k}" aria-pressed="${!!b.channels[k]}">${lbl}</button>`).join('')}
+              </div></div>
+            <p class="optional">נשלח רק למי שביקש ממך, ורק כשתיגע. המערכת לא פונה לאף אחד מעצמה.</p>`)}
+
+          ${advSection('audience', 'קהל ועונה', 'מי שהתעניין בלי צורך עכשיו נשמר, והמערכת תזכיר לך בעונה שלך.', `
+            <label class="check"><input id="keep-aud" type="checkbox" ${b.keepAudience ? 'checked' : ''}>
+              לשמור גם את מי שאינו לקוח עכשיו</label>
+            <label class="field"><span class="field-label">מתי העונה החזקה שלך</span>
+              <input id="season" class="text-input" value="${esc(b.season)}" placeholder="למשל: לפני פסח, בין הזמנים, עונת החתונות"></label>`)}
         </div>
       </div>`;
-    $('#biz-name').addEventListener('input', (e) => { b.name = e.target.value; save(); renderTopbar(); });
-    $('#catalog').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) { b.catalog = f.name; save(); viewSetup(); } });
-    $('#keep-aud').addEventListener('change', (e) => { b.keepAudience = e.target.checked; save(); });
-    $('#new-offer').addEventListener('keydown', (e) => { if (e.key === 'Enter') addOffer(); });
+    bindSetup();
   }
+
+  function advSection(id, title, buys, body) {
+    const open = advOpen === id;
+    return `<section class="adv-card ${open ? 'open' : ''}">
+      <button class="adv-head" data-adv="${id}" aria-expanded="${open}">
+        <span><b>${esc(title)}</b><small>${esc(buys)}</small></span><span class="adv-mark">${open ? '−' : '+'}</span>
+      </button>
+      ${open ? `<div class="adv-body">${body}</div>` : ''}
+    </section>`;
+  }
+
+  /** A stable-looking code for the demo, derived from the business name. */
+  function pairCode() {
+    const s = (S.business.name || 'expo');
+    let n = 0;
+    for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
+    return String(100000 + (n % 900000));
+  }
+
+  function viewRegister() {
+    main().innerHTML = `
+      <div class="welcome">
+        <div class="welcome-card">
+          <div class="welcome-kicker">הרשמה</div>
+          <h1>שתי שאלות, וסיימנו</h1>
+          <p class="lead-text">לפי התחום נמלא לך מראש את התבנית ואת המוצרים. תוכל לתקן הכול אחר כך.</p>
+          <label class="field"><span class="field-label">שם העסק</span>
+            <input id="reg-name" class="text-input" placeholder="למשל: נגריית הדר" autocomplete="off"></label>
+          <div>
+            <span class="field-label">התחום</span>
+            <div class="trade-grid">
+              ${TRADES.map((t) => `<button class="tpl" data-regtrade="${t.id}">${esc(t.name)}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => $('#reg-name') && $('#reg-name').focus(), 30);
+  }
+
+  /** Applying a trade fills in what has not been touched by hand. */
+  function applyTrade(id, force) {
+    const t = tradeById(id);
+    const b = S.business;
+    b.trade = id;
+    if (force || !b.offerings.length) {
+      b.template = t.template;
+      b.offerings = t.offers.map(([name, size]) => ({ name, size }));
+    }
+    save();
+  }
+
+  function bindSetup() {
+    const b = S.business;
+    const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
+    on('#biz-name', 'input', (e) => { b.name = e.target.value; save(); renderTopbar(); });
+    on('#biz-trade', 'change', (e) => { applyTrade(e.target.value, true); viewSetup(); });
+    on('#catalog', 'change', (e) => { const f = e.target.files[0]; if (f) { b.catalog = f.name; save(); viewSetup(); } });
+    on('#cat-msg', 'input', (e) => { b.catalogMessage = e.target.value; save(); });
+    on('#keep-aud', 'change', (e) => { b.keepAudience = e.target.checked; save(); });
+    on('#season', 'input', (e) => { b.season = e.target.value; save(); });
+    on('#new-offer', 'keydown', (e) => { if (e.key === 'Enter') addOffer(); });
+    document.querySelectorAll('[data-offname]').forEach((el) => {
+      el.addEventListener('input', () => {
+        const o = b.offerings[parseInt(el.dataset.offname, 10)];
+        if (o) { o.name = el.value; save(); }
+      });
+    });
+    document.querySelectorAll('[data-grade]').forEach((el) => {
+      el.addEventListener('input', () => {
+        b.warmthNames = b.warmthNames || {};
+        b.warmthNames[el.dataset.grade] = el.value.trim() || WARMTH_DEFAULT[el.dataset.grade];
+        save();
+      });
+    });
+  }
+
   function addOffer() {
-    const v = $('#new-offer').value.trim();
+    const el = $('#new-offer');
+    const v = el ? el.value.trim() : '';
     if (!v) return;
-    if (!S.business.offerings.includes(v) && S.business.offerings.length < 8) S.business.offerings.push(v);
+    if (!S.business.offerings.some((o) => o.name === v) && S.business.offerings.length < 8) {
+      S.business.offerings.push({ name: v, size: 'm' });
+    }
     save(); viewSetup();
   }
 
@@ -693,7 +909,7 @@
       </div>
       ${S.business.offerings.length ? `
         <div><div class="field-label">מה עניין אותו</div>
-        <div class="chips">${S.business.offerings.map((o) => `<button class="chip" data-int="${esc(o)}" data-id="${l.id}" aria-pressed="${l.interests.includes(o)}">${esc(o)}</button>`).join('')}</div></div>` : ''}
+        <div class="chips">${S.business.offerings.map((o) => `<button class="chip" data-int="${esc(o.name)}" data-id="${l.id}" aria-pressed="${l.interests.includes(o.name)}">${esc(o.name)}</button>`).join('')}</div></div>` : ''}
       <div class="inline">
         <button class="more-toggle" data-act="more" data-id="${l.id}" aria-expanded="${open}">${open ? '− פחות' : '+ עוד: ' + [t.ask ? t.ask.label : null, 'מתי', 'הערה'].filter(Boolean).join(' · ')}</button>
         ${S.business.catalog ? `<button class="chip" data-act="send" data-id="${l.id}" aria-pressed="${l.sendMaterial}">📎 ${l.sendMaterial ? 'החומר יישלח' : 'שלח חומר'}</button>` : ''}
@@ -1107,17 +1323,16 @@
       const kind = r < 0.5 ? 'friend' : r < 0.62 ? 'untagged' : r < 0.85 ? 'warm' : 'hot';
       const l = newLead({ pid: i, createdAt: at, visits: [at], source: rnd() < 0.3 ? 'dial' : 'search', touched: true });
       if (kind === 'friend') l.warmth = 'cold';
-      if (kind === 'warm') { l.warmth = 'warm'; l.interests = offers.length ? [offers[Math.floor(rnd() * offers.length)]] : []; }
+      if (kind === 'warm') { l.warmth = 'warm'; l.interests = offers.length ? [offers[Math.floor(rnd() * offers.length)].name] : []; }
       if (kind === 'hot') {
         l.warmth = 'hot';
-        l.interests = offers.length ? [offers[Math.floor(rnd() * offers.length)]] : [];
+        l.interests = offers.length ? [offers[Math.floor(rnd() * offers.length)].name] : [];
         if (askOpts.length) l.ask = askOpts[Math.floor(rnd() * askOpts.length)];
         l.when = WHEN_OPTIONS[Math.floor(rnd() * 2)];
         if (rnd() < 0.5) l.note = ['רוצה שאבוא למדוד', 'לחזור אחרי החגים', 'מחפש משהו מיוחד, לשלוח דוגמאות', 'מוסד, להכין הצעה מסודרת'][Math.floor(rnd() * 4)];
         if (rnd() < 0.35) l.visits.push(at + 2 * 3600000);
       }
     }
-    S.business.setupDone = true;
     save(); render();
     toast('נטען יום לדוגמה: 36 אנשים, בשעות 10:00–19:30');
   }
@@ -1322,6 +1537,14 @@
 
   function render() {
     if (!S.welcomed) return viewWelcome();
+    // Nothing works before the business has a name and a trade, so that comes
+    // first — and it is two questions, not a form.
+    if (!S.business.registered) {
+      $('#topbar').innerHTML = '';
+      const n = $('#nav'); if (n) n.remove();
+      const r = $('#recent'); if (r) r.remove();
+      return viewRegister();
+    }
     renderTopbar();
     ({ settings: viewSetup, booth: viewBooth, leads: viewEvening, crm: viewCrm }[S.screen] || viewBooth)();
 
@@ -1364,8 +1587,12 @@
 
     if (d.screen) return setScreen(d.screen, d.filter);
     if (d.day) { $("#menu") && $("#menu").remove(); return setDay(d.day); }
-    if (d.tpl) { S.business.template = d.tpl; S.business.offerings = SUGGESTED_OFFERINGS[d.tpl].slice(0, 5); save(); return viewSetup(); }
-    if (d.offer) { const o = S.business.offerings; const k = o.indexOf(d.offer); if (k >= 0) o.splice(k, 1); else if (o.length < 8) o.push(d.offer); save(); return viewSetup(); }
+    if (d.tpl) { S.business.template = d.tpl; save(); return viewSetup(); }
+    if (d.regtrade) { S.business.trade = d.regtrade; S.business.name = ($('#reg-name') && $('#reg-name').value.trim()) || S.business.name || tradeById(d.regtrade).name; S.business.registered = true; applyTrade(d.regtrade, true); return setScreen('settings'); }
+    if (d.adv !== undefined) { advOpen = advOpen === d.adv ? '' : d.adv; return viewSetup(); }
+    if (d.offsize) { const o = S.business.offerings[parseInt(d.offsize, 10)]; if (o) { o.size = d.size; save(); } return viewSetup(); }
+    if (d.offdel) { S.business.offerings.splice(parseInt(d.offdel, 10), 1); save(); return viewSetup(); }
+    if (d.chan) { const c = S.business.channels; c[d.chan] = !c[d.chan]; save(); return viewSetup(); }
     if (d.pick) return pickPerson(parseInt(d.pick, 10));
     if (d.open) return openLead(parseInt(d.open, 10));
 
@@ -1438,8 +1665,11 @@
       case 'wrong': return wrongPerson();
       case 'sim-dial': $('#menu') && $('#menu').remove(); return simulateDial();
       case 'add-offer': return addOffer();
-      case 'setup-done': S.business.setupDone = true; return setScreen('booth');
-      case 'setup-skip': S.business.template = 'general'; S.business.offerings = []; S.business.setupDone = false; return setScreen('booth');
+      case 'setup-done': return setScreen('booth');
+      case 'reset-offers': applyTrade(S.business.trade, true); return viewSetup();
+      case 'grades-reset': S.business.warmthNames = null; save(); return viewSetup();
+      case 'catalog-clear': S.business.catalog = null; save(); return viewSetup();
+      case 'name-device': { const v = $('#dev-name') && $('#dev-name').value.trim(); if (v) { S.business.devices = [{ name: v, here: true }].concat(S.business.devices.filter((x) => !x.here)); save(); } return viewSetup(); }
       case 'call': callStep = parseInt(d.id, 10); return render();
       case 'call-cancel': callStep = null; return render();
       case 'unfocus': focusLead = null; return render();
