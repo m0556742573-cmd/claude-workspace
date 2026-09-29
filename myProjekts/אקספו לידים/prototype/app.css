@@ -103,7 +103,7 @@ input, textarea { font: inherit; color: var(--ink); }
 .welcome-steps { margin: 4px 0 0; padding-inline-start: 22px; display: grid; gap: 8px; color: var(--muted); }
 .welcome-steps b { color: var(--ink); }
 /* ---------- Page shell ---------- */
-main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; box-sizing: border-box; padding-inline: 20px; padding-block: 22px calc(var(--nav-h) + 90px); }
+main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; box-sizing: border-box; padding-inline: 20px; padding-block: 22px calc(var(--nav-h) + 120px); }
 h1, h2 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; margin: 0; }
 h1 { font-size: 30px; letter-spacing: -.015em; }
 h2 { font-size: 22px; }

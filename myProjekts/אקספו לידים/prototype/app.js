@@ -251,11 +251,11 @@
   };
   const SUGGESTED_OFFERINGS = {
     quote: ['מטבחים', 'ארונות קיר', 'ריהוט למוסדות', 'חדרי ילדים', 'ספריות', 'דלתות'],
-    buy: ['מבצע תערוכה', 'מוצר חדש', 'קטלוג'],
-    meeting: ['ייעוץ', 'בדיקה', 'הצעה'],
-    date: ['אירוע', 'טיול', 'השכרה'],
-    register: ['קורס קרוב', 'מנוי', 'מידע'],
-    general: ['מידע כללי'],
+    buy: ['מבצע התערוכה', 'מוצרים חדשים', 'הזמנה מיוחדת', 'מתנות לאירוע'],
+    meeting: ['ייעוץ ראשוני', 'בדיקת מצב קיים', 'טיפול בתיק קיים'],
+    date: ['אירוע משפחתי', 'טיול לקבוצה', 'השכרה ליום', 'בין הזמנים'],
+    register: ['המחזור הקרוב', 'המחזור הבא', 'מנוי שנתי', 'רק לקבל מידע'],
+    general: ['מידע כללי', 'מבצע התערוכה'],
   };
   const WHEN_OPTIONS = ['עכשיו', 'עד 3 חודשים', 'בהמשך'];
   const WARMTH = { hot: 'חם', warm: 'פושר', cold: 'קר' };
@@ -271,7 +271,7 @@
       screen: 'booth',
       day: 'expo',
       welcomed: false,
-      business: { name: 'נגריית הדר', template: 'quote', offerings: SUGGESTED_OFFERINGS.quote.slice(0, 5), catalog: null, keepAudience: true, setupDone: false },
+      business: { name: 'נגריית הדר', template: 'quote', offerings: SUGGESTED_OFFERINGS.quote.slice(0, 5), catalog: 'קטלוג נגריית הדר 2026.pdf', keepAudience: true, setupDone: false },
       leads: [],
       seq: 1,
       boothEnteredAt: null,
@@ -898,7 +898,7 @@
           ${l.warmth ? `<button class="btn ghost" data-eve="skip" data-id="${l.id}">לדלג</button>` : ''}
         </div>` : ''}
       </div>` : ''}
-      ${!all.length ? `<div class="empty-hint">עוד לא נקלט אף אחד. אפשר לחזור לדוכן, או לטעון יום לדוגמה מהתפריט.</div>` : ''}
+      ${!all.length ? `<div class="empty-hint">עוד לא נקלט אף אחד.<br>מי שתקלוט בדוכן יופיע כאן, ויישאר פתוח לעריכה בכל זמן.</div>` : ''}
     </div>
     ${list.length ? `<div class="rows-head optional">${leadsFilter === 'todo' ? 'מי שעוד לא קיבל חום.' : 'הכי אחרון למעלה. נגיעה בשם פותחת אותו לעריכה.'}</div>
     <div class="rows">${list.map((x) => `<button class="row" data-eveopen="${x.id}" ${eveId === x.id ? 'aria-current="true"' : ''}>
@@ -944,7 +944,17 @@
     const picked = focusLead ? leadById(focusLead) : null;
     let card;
     if (!calls.length && !picked) {
-      card = `<div class="card done"><h2>אין שיחות להיום</h2><p class="lead-text" style="margin-inline:auto">${S.leads.length ? 'מה שצריך לקרות קרה, והשאר מתוזמן לימים הבאים. אפשר לגעת בכל שם ברשימה שלמטה ולהתקשר אליו עכשיו.' : 'עוד אין לידים. אפשר לטעון יום לדוגמה מהתפריט.'}</p></div>`;
+      // During the expo itself there is nothing to call yet, and saying "nothing to
+      // do" would read as a failure rather than as the plain truth.
+      const duringExpo = S.day === 'expo' || S.day === 'evening';
+      card = `<div class="card done">
+        <h2>${S.leads.length ? (duringExpo ? 'השיחות מתחילות מחר' : 'אין שיחות להיום') : 'עוד אין לידים'}</h2>
+        <p class="lead-text" style="margin-inline:auto">${!S.leads.length
+          ? 'מה שתקלוט בדוכן יופיע כאן למחרת, מסודר לפי מי שדחוף להתקשר אליו.'
+          : duringExpo
+            ? 'עכשיו אתה בתערוכה. מחר בבוקר תמצא כאן את מי שצריך שיחה, לפי הסדר. הרשימה שלמטה כבר מוכנה.'
+            : 'מה שצריך לקרות קרה, והשאר מתוזמן לימים הבאים. אפשר לגעת בכל שם ברשימה שלמטה ולהתקשר אליו עכשיו.'}</p>
+      </div>`;
     } else {
       const l = picked || calls[0];
       const asking = callStep === l.id;
@@ -983,7 +993,7 @@
       const nx = nextOf(l);
       return `<button class="row" data-lead="${l.id}" ${focusLead === l.id ? 'aria-current="true"' : ''}><span><span class="w-dot ${l.warmth || ''}" style="display:inline-block;margin-inline-end:8px"></span><span class="person-name">${esc(leadName(l))}</span> <span class="row-side">${esc(leadTown(l))}</span></span>
         <span class="row-side">${todayTab === 'todo' ? esc(nx.label) + (nx.due ? ' · ' + esc(relDay(new Date(nx.due), now)) : '') : esc(l.interests.join(', ') || 'כללי')}</span></button>`;
-    }).join('') || '<div class="empty-hint">ריק.</div>'}</div>`;
+    }).join('') || (todayTab === 'todo' ? '<div class="empty-hint">אין כרגע מה לטפל. מה שצריך שיחה יופיע כאן ביומו.</div>' : '<div class="empty-hint">הקהל מתמלא ממי שהתעניין בלי צורך מיידי.</div>')}</div>`;
   }
 
   // ---------------- Day 14 ----------------
@@ -1234,8 +1244,12 @@
     lastQuery = '';
     eveAutoOpen = true;
     if (filter) leadsFilter = filter;
-    // Opening the booth starts the expo day at 10:00 again.
-    if (id === 'booth' && S.screen !== 'booth') S.boothEnteredAt = Date.now();
+    // The booth exists only on the expo day, so opening it says so and restarts
+    // the clock at 10:00. The other screens work on whichever day is showing.
+    if (id === 'booth' && (S.screen !== 'booth' || S.day !== 'expo')) {
+      S.day = 'expo';
+      S.boothEnteredAt = Date.now();
+    }
     S.screen = id;
     save(); render();
     window.scrollTo(0, 0);
