@@ -335,3 +335,5 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .adv-body { padding: 0 18px 18px; display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .pair-code { background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 10px 14px; font-weight: 700; margin: 0; }
 .pair-code b { font-size: 22px; letter-spacing: .12em; }
+
+.phone-line { font-size: 19px; font-weight: 700; letter-spacing: .02em; user-select: all; }

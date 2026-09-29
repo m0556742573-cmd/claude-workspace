@@ -785,7 +785,11 @@
       </div>`;
     const q = $('#q');
     q.value = lastQuery;
-    q.addEventListener('input', () => { lastQuery = q.value; openLeadId = null; stopIdle(); renderResults(q.value); });
+    q.addEventListener('input', () => {
+      lastQuery = q.value; openLeadId = null; stopIdle();
+      renderResults(q.value);
+      renderRecent();   // the strip steps aside while results are on screen
+    });
     renderRecent();
     if (openLeadId && leadById(openLeadId)) renderPanel();
     else { renderResults(lastQuery); q.focus(); }
@@ -815,7 +819,9 @@
       slot.innerHTML = `<div class="empty-hint">שתיים-שלוש אותיות מהשם מספיקות.<br>${total ? `<span class="num">${total}</span> אנשים נקלטו היום.` : ''}</div>`;
       return;
     }
-    const { hits, total } = search(query, 8);
+    // Six fit above the bottom bar on a tablet without scrolling. A result that
+    // needs a scroll to reach is a result the thumb misses.
+    const { hits, total } = search(query, 6);
     if (!hits.length) {
       slot.innerHTML = `<div class="empty-hint">לא נמצא ברשימה. <button class="btn" data-act="new-person" style="margin-inline-start:8px">להוסיף כחדש</button></div>`;
       return;
@@ -935,13 +941,17 @@
     const digits = phone.replace(/\D/g, '');
     const intl = /^0\d{8,9}$/.test(digits) ? '972' + digits.slice(1)
       : /^972\d{8,9}$/.test(digits) ? digits : '';
+    // The number itself is shown as text and can always be copied. The dialling
+    // links are a convenience: inside a demo page the browser often refuses them,
+    // and a button that quietly does nothing is worse than no button.
     return `
       <div class="lead-actions">
-        ${phone ? `<a class="btn primary" href="tel:${esc(phone)}">📞 חיוג</a>
-          ${intl ? `<a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>` : ''}
-          <button class="btn ghost" data-act="copy-phone" data-id="${l.id}">העתקת המספר</button>`
-          : `<span class="optional">אין טלפון. ${l.pid != null ? 'ברשימת המארגנים אין מספרים.' : ''}</span>
-          <button class="btn ghost" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
+        ${phone ? `<span class="phone-line num">${esc(phone)}</span>
+          <button class="btn" data-act="copy-phone" data-id="${l.id}">העתקה</button>
+          <a class="btn primary" href="tel:${esc(phone)}">📞 חיוג</a>
+          ${intl ? `<a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>` : ''}`
+          : `<span class="optional">אין טלפון${l.pid != null ? ', וברשימת המארגנים אין מספרים' : ''}.</span>
+          <button class="btn" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
         <button class="btn ghost danger" data-act="del-lead" data-id="${l.id}">מחיקה</button>
       </div>`;
   }
@@ -1039,7 +1049,9 @@
 
   function renderRecent() {
     let bar = $('#recent');
-    if (S.screen !== 'booth') { if (bar) bar.remove(); return; }
+    // The strip is for the quiet moments. While a search is on screen or a
+    // visitor is open, it would sit over the results and swallow the tap.
+    if (S.screen !== 'booth' || lastQuery || openLeadId) { if (bar) bar.remove(); return; }
     if (!bar) { bar = document.createElement('div'); bar.id = 'recent'; bar.className = 'recent'; document.body.appendChild(bar); }
     const recent = S.leads.slice().sort((a, b) => b.visits[b.visits.length - 1] - a.visits[a.visits.length - 1]).slice(0, 10);
     bar.innerHTML = `<div class="recent-inner"><span class="recent-label">אחרונים</span>${recent.length ? recent.map((l) => `
