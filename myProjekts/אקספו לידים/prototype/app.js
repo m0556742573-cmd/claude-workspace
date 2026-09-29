@@ -353,24 +353,33 @@
   }
   /** Version 1 stored one "stage". Split it, so saved demos still open. */
   function migrate() {
-    if (S.screen) return;
-    const map = {
-      setup: ['settings', 'expo'], booth: ['booth', 'expo'], evening: ['leads', 'evening'],
-      today: ['crm', 'after'], day14: ['crm', 'day14'],
-    };
-    const [screen, day] = map[S.stage] || ['booth', 'expo'];
-    S.screen = screen;
-    S.day = day;
-    if (S.stage === 'day14') crmTab = 'summary';
-    S.welcomed = true;
-    delete S.stage;
+    // Two jobs, and only the first one is once-only. Filling in missing fields
+    // must run on every load: a state saved by any earlier version can be missing
+    // something a newer screen reads, and then that screen dies silently.
+    if (!S.screen) {
+      const map = {
+        setup: ['settings', 'expo'], booth: ['booth', 'expo'], evening: ['leads', 'evening'],
+        today: ['crm', 'after'], day14: ['crm', 'day14'],
+      };
+      const [screen, day] = map[S.stage] || ['booth', 'expo'];
+      S.screen = screen;
+      S.day = day;
+      if (S.stage === 'day14') crmTab = 'summary';
+      S.welcomed = true;
+      delete S.stage;
+    }
+    if (!S.day) S.day = 'expo';
+    if (!S.business) S.business = freshState().business;
     // Offerings used to be plain strings and now carry a size.
     const b = S.business || {};
     if (b.offerings && b.offerings.length && typeof b.offerings[0] === 'string') {
       b.offerings = b.offerings.map((name) => ({ name, size: 'm' }));
     }
+    b.offerings = b.offerings || [];
     b.channels = b.channels || { email: true, whatsapp: true, sms: false };
     b.devices = b.devices || [];
+    b.trade = b.trade || '';
+    b.template = b.template || 'general';
     b.catalogMessage = b.catalogMessage || 'שלום, מצורף החומר שביקשת. אשמח לעמוד לרשותך.';
     if (b.registered === undefined) b.registered = !!b.name;
     // A lead saved by an older version may be missing fields that later screens
@@ -1727,6 +1736,13 @@
   // ------------------------------------------------------------------
   // 8. Boot
   // ------------------------------------------------------------------
+  /* A button that throws leaves the screen exactly as it was, which looks to the
+   * user like a button that does nothing. Say so instead: the same bug then
+   * takes seconds to find instead of a screen recording. */
+  window.addEventListener('error', (e) => {
+    try { toast('תקלה: ' + (e.message || 'שגיאה'), 'רענון', () => location.reload()); } catch (x) { /* nothing else to try */ }
+  });
+
   document.documentElement.setAttribute('dir', 'rtl');
   document.documentElement.setAttribute('lang', 'he');
   try { const th = localStorage.getItem('expo-proto-theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) { /* ignore */ }
