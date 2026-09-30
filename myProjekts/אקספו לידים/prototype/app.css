@@ -337,3 +337,23 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .pair-code b { font-size: 22px; letter-spacing: .12em; }
 
 .phone-line { font-size: 19px; font-weight: 700; letter-spacing: .02em; user-select: all; }
+
+/* Channels. Each engine is a card the exhibitor picks between, not a switch,
+ * because "how it is sent" changes what he gets — a file or only a link. */
+.chan-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; background: var(--surface-2); }
+.chan-head b { font-size: 17px; }
+.chan-engines { display: grid; gap: 8px; }
+.chan-opt { display: grid; gap: 2px; text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 44px; color: var(--ink); }
+.chan-opt b { font-size: 15px; font-weight: 700; }
+.chan-opt small { font-size: 13px; color: var(--muted); }
+.chan-opt small.needs { color: var(--warm); font-weight: 700; }
+.chan-opt[aria-pressed="true"] { border-color: var(--accent); border-width: 2px; background: var(--accent-soft); }
+.chan-opt[aria-pressed="true"] b { color: var(--accent-deep); }
+.chan-fields { display: grid; gap: 10px; }
+.chan-fields .optional { display: block; margin-top: 4px; }
+
+.warn-line { margin: 0; font-size: 14px; font-weight: 700; color: var(--hot); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.signed { margin: 0; font-size: 14px; font-weight: 700; color: var(--accent); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.warn-box { background: var(--hot-soft); border: 2px solid var(--hot); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.warn-box p { margin: 0; font-size: 15px; line-height: 1.5; }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }

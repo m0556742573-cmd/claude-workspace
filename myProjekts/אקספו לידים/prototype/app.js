@@ -304,6 +304,92 @@
   const SIZES = { s: 'קטן', m: 'בינוני', l: 'גדול' };
   const SIZE_RANK = { s: 1, m: 3, l: 6 };
 
+  /* ---- שכבת ערוץ (decision 0008) -----------------------------------------
+   * Everything that sends goes through send(). Behind it sit engines that are
+   * chosen per business, so one exhibitor can run the official API, another the
+   * unofficial link, and a third nothing at all — on the same system. The point
+   * is that swapping an engine is a setting, not a rewrite: if WhatsApp changes
+   * the rules, or if the unofficial route turns out to be a mistake, one entry
+   * in this table moves and no screen notices.
+   *   needs.server — cannot run on a static page; needs a process that stays up.
+   *   warn         — the exhibitor signs before it can be turned on.
+   *   file         — can carry the catalog itself rather than a link to it. */
+  const CHANNELS = {
+    whatsapp: {
+      name: 'וואטסאפ', icon: '💬',
+      engines: {
+        off:  { name: 'כבוי', note: 'לא מוצע בדוכן' },
+        link: { name: 'פותח לי את וואטסאפ', note: 'אני לוחץ שלח. בלי קובץ מצורף.', file: false },
+        gray: {
+          name: 'חיבור ישיר למספר שלי', note: 'נשלח לבד, עם הקטלוג מצורף.',
+          file: true, needs: { server: true }, warn: true,
+        },
+        api:  {
+          name: 'API רשמי', note: 'למי שכבר יש חשבון. בלי סיכון חסימה.',
+          file: true, needs: { server: true },
+          fields: [
+            ['phoneId', 'מזהה המספר', 'לא מספר הטלפון — מזהה מלוח הבקרה'],
+            ['wabaId', 'מזהה החשבון העסקי', ''],
+            ['token', 'מפתח גישה קבוע', 'של "משתמש מערכת". המפתח הראשוני מת תוך חודשיים'],
+          ],
+        },
+      },
+    },
+    email: {
+      name: 'מייל', icon: '✉️',
+      engines: {
+        off:    { name: 'כבוי', note: '' },
+        mailto: { name: 'פותח לי את תוכנת המייל', note: 'בלי קובץ מצורף.', file: false },
+        system: {
+          name: 'המערכת שולחת בשמי', note: 'קטלוג מצורף, והתשובה חוזרת לתיבה שלי.',
+          file: true, needs: { server: true },
+          fields: [['reply', 'הכתובת שאליה יחזרו', 'זה כל מה שנדרש ממך']],
+        },
+      },
+    },
+    sms: {
+      name: 'SMS', icon: '📱',
+      engines: {
+        off:     { name: 'כבוי', note: '' },
+        gateway: {
+          name: 'המערכת שולחת', note: 'לא דרך המספר שלך. חשבון אחד משרת את כולם.',
+          file: false, needs: { server: true },
+        },
+      },
+    },
+  };
+  const ENGINE_DEFAULT = { whatsapp: 'link', email: 'mailto', sms: 'off' };
+
+  function channelConf(kind) {
+    const c = S.business.channels || {};
+    return c[kind] || (c[kind] = { engine: ENGINE_DEFAULT[kind] });
+  }
+  function engineOf(kind) {
+    const conf = channelConf(kind);
+    return CHANNELS[kind].engines[conf.engine] || CHANNELS[kind].engines.off;
+  }
+  /** Which channels the exhibitor could actually reach this lead through. */
+  function liveChannels() {
+    return Object.keys(CHANNELS).filter((k) => channelConf(k).engine !== 'off');
+  }
+
+  /** The one place anything is sent from. The prototype has no server, so it
+   *  reports what would happen rather than pretending it happened. */
+  function send(lead, kind) {
+    const conf = channelConf(kind);
+    const eng = engineOf(kind);
+    const ch = CHANNELS[kind];
+    if (conf.engine === 'off') return { ok: false, why: ch.name + ' כבוי בהגדרות' };
+    if (eng.warn && !conf.signed) return { ok: false, why: 'החיבור טרם אושר בהגדרות' };
+    const what = S.business.catalog
+      ? (eng.file ? 'הקטלוג יישלח כקובץ' : 'יישלח קישור לקטלוג')
+      : 'תישלח ההודעה בלבד';
+    if (eng.needs && eng.needs.server) {
+      return { ok: true, real: false, text: ch.icon + ' ' + ch.name + ': ' + what + ' ל' + leadName(lead) + '. ⚠️ דורש שרת — בדוגמית לא נשלח.' };
+    }
+    return { ok: true, real: false, text: ch.icon + ' ' + eng.name + ' — ' + what + ' ל' + leadName(lead) + '. בדוגמית לא נשלח באמת.' };
+  }
+
   const SUGGESTED_OFFERINGS = {
     quote: ['מטבחים', 'ארונות קיר', 'ריהוט למוסדות', 'חדרי ילדים', 'ספריות', 'דלתות'],
     buy: ['מבצע התערוכה', 'מוצרים חדשים', 'הזמנה מיוחדת', 'מתנות לאירוע'],
@@ -336,7 +422,7 @@
       business: {
         name: '', trade: '', template: 'general', offerings: [],
         warmthNames: null, catalog: null, catalogMessage: 'שלום, מצורף החומר שביקשת. אשמח לעמוד לרשותך.',
-        channels: { email: true, whatsapp: true, sms: false },
+        channels: { whatsapp: { engine: 'link' }, email: { engine: 'mailto' }, sms: { engine: 'off' } },
         keepAudience: true, season: '', devices: [], registered: false,
       },
       leads: [],
@@ -376,7 +462,14 @@
       b.offerings = b.offerings.map((name) => ({ name, size: 'm' }));
     }
     b.offerings = b.offerings || [];
-    b.channels = b.channels || { email: true, whatsapp: true, sms: false };
+    // Channels used to be on/off flags and now carry an engine and its settings.
+    b.channels = b.channels || {};
+    Object.keys(CHANNELS).forEach((k) => {
+      const v = b.channels[k];
+      if (v === undefined) b.channels[k] = { engine: ENGINE_DEFAULT[k] };
+      else if (typeof v === 'boolean') b.channels[k] = { engine: v ? ENGINE_DEFAULT[k] : 'off' };
+      else if (!CHANNELS[k].engines[v.engine]) v.engine = ENGINE_DEFAULT[k];
+    });
     b.devices = b.devices || [];
     b.trade = b.trade || '';
     b.template = b.template || 'general';
@@ -650,12 +743,11 @@
             </div>
             <label class="field"><span class="field-label">המשפט שנשלח איתו</span>
               <textarea id="cat-msg">${esc(b.catalogMessage)}</textarea></label>
-            <div><span class="field-label">באילו ערוצים</span>
-              <div class="chips">
-                ${[['email', 'מייל'], ['whatsapp', 'וואטסאפ'], ['sms', 'SMS']].map(([k, lbl]) =>
-                  `<button class="chip" data-chan="${k}" aria-pressed="${!!b.channels[k]}">${lbl}</button>`).join('')}
-              </div></div>
-            <p class="optional">נשלח רק למי שביקש ממך, ורק כשתיגע. המערכת לא פונה לאף אחד מעצמה.</p>`)}
+            <p class="optional">נשלח רק למי שביקש ממך, ורק כשתיגע. המערכת לא פונה לאף אחד מעצמה.
+              <b>באיזה ערוץ — ב"ערוצי שליחה" למטה.</b></p>`)}
+
+          ${advSection('channels', 'ערוצי שליחה', 'איך החומר יוצא: פותח לך את האפליקציה, או נשלח לבד.',
+            Object.keys(CHANNELS).map(channelCard).join(''))}
 
           ${advSection('audience', 'קהל ועונה', 'מי שהתעניין בלי צורך עכשיו נשמר, והמערכת תזכיר לך בעונה שלך.', `
             <label class="check"><input id="keep-aud" type="checkbox" ${b.keepAudience ? 'checked' : ''}>
@@ -665,6 +757,54 @@
         </div>
       </div>`;
     bindSetup();
+  }
+
+  /** One channel, and the engines it can run on. Same shape for all three, so a
+   *  new engine is a row in CHANNELS and nothing here changes. */
+  function channelCard(kind) {
+    const ch = CHANNELS[kind];
+    const conf = channelConf(kind);
+    const eng = engineOf(kind);
+    const fields = (eng.fields || []).map(([key, label, hint]) => `
+      <label class="field"><span class="field-label">${esc(label)}</span>
+        <input class="text-input" data-cfield="${kind}" data-key="${key}"
+               value="${esc(conf[key] || '')}" autocomplete="off">
+        ${hint ? `<small class="optional">${esc(hint)}</small>` : ''}</label>`).join('');
+    return `<div class="chan-card">
+      <div class="chan-head"><b>${ch.icon} ${esc(ch.name)}</b></div>
+      <div class="chan-engines">
+        ${Object.entries(ch.engines).map(([k, e]) => `
+          <button class="chan-opt" data-engine="${kind}" data-eng="${k}" aria-pressed="${conf.engine === k}">
+            <b>${esc(e.name)}${e.warn ? ' ⚠️' : ''}</b>
+            ${e.note ? `<small>${esc(e.note)}</small>` : ''}
+            ${e.needs && e.needs.server ? '<small class="needs">דורש שרת</small>' : ''}
+          </button>`).join('')}
+      </div>
+      ${fields ? `<div class="chan-fields">${fields}</div>` : ''}
+      ${eng.warn ? (conf.signed
+        ? `<p class="signed">✓ האזהרה אושרה על ידי ${esc(conf.signed)}. <button class="btn ghost small" data-act="unsign" data-kind="${kind}">לבטל את החיבור</button></p>`
+        : `<p class="warn-line">⚠️ החיבור הזה לא יפעל עד שתקרא ותאשר.
+             <button class="btn" data-act="sign" data-kind="${kind}">לקרוא ולאשר</button></p>`) : ''}
+    </div>`;
+  }
+
+  /** Not a formality. On the day a number is blocked, this is what shows the
+   *  exhibitor was told first — and in a community this small, that matters more
+   *  than the feature does. */
+  function signModal(kind) {
+    modal(`<h2>חיבור ${esc(CHANNELS[kind].name)} — חשוב לקרוא</h2>
+      <div class="warn-box">
+        <p>החיבור הזה <b>אינו דרך הממשק הרשמי</b> של ${esc(CHANNELS[kind].name)}.</p>
+        <p><b>ייתכן שהמספר שלך ייחסם, זמנית או לצמיתות</b>, וייתכן שתאבד גישה לוואטסאפ העסקי שלך.</p>
+        <p>המערכת שולחת רק למי שביקש ממך, ורק בנגיעה שלך, ואינה שולחת לרשימות.
+           זה מקטין מאוד את הסיכון — <b>אך אינו מבטל אותו.</b></p>
+        <p><b>האחריות על המספר היא שלך בלבד.</b></p>
+      </div>
+      <label class="field"><span class="field-label">השם שלי, כאישור שקראתי</span>
+        <input id="sign-name" class="text-input" value="${esc(S.business.name || '')}" autocomplete="off"></label>
+      <div class="inline">
+        <button class="btn primary" data-act="sign-yes" data-kind="${kind}">קראתי, הבנתי, ואני מאשר</button>
+        <button class="btn ghost" data-act="close-modal">לא עכשיו</button></div>`);
   }
 
   function advSection(id, title, buys, body) {
@@ -732,6 +872,9 @@
         const o = b.offerings[parseInt(el.dataset.offname, 10)];
         if (o) { o.name = el.value; save(); }
       });
+    });
+    document.querySelectorAll('[data-cfield]').forEach((el) => {
+      el.addEventListener('input', () => { channelConf(el.dataset.cfield)[el.dataset.key] = el.value.trim(); save(); });
     });
     document.querySelectorAll('[data-grade]').forEach((el) => {
       el.addEventListener('input', () => {
@@ -1613,7 +1756,16 @@
     if (d.adv !== undefined) { advOpen = advOpen === d.adv ? '' : d.adv; return viewSetup(); }
     if (d.offsize) { const o = S.business.offerings[parseInt(d.offsize, 10)]; if (o) { o.size = d.size; save(); } return viewSetup(); }
     if (d.offdel) { S.business.offerings.splice(parseInt(d.offdel, 10), 1); save(); return viewSetup(); }
-    if (d.chan) { const c = S.business.channels; c[d.chan] = !c[d.chan]; save(); return viewSetup(); }
+    if (d.engine) {
+      const conf = channelConf(d.engine);
+      const eng = CHANNELS[d.engine].engines[d.eng];
+      conf.engine = d.eng;
+      save();
+      // Turning on an engine that carries risk goes straight to the warning,
+      // rather than leaving a setting that looks on and quietly is not.
+      if (eng.warn && !conf.signed) { viewSetup(); return signModal(d.engine); }
+      return viewSetup();
+    }
     if (d.pick) return pickPerson(parseInt(d.pick, 10));
     if (d.open) return openLead(parseInt(d.open, 10));
 
@@ -1654,7 +1806,31 @@
 
     switch (d.act) {
       case 'more': { const id = d.id ? parseInt(d.id, 10) : openLeadId; moreOpenId = moreOpenId === id ? null : id; return rerender(leadById(id)); }
-      case 'send': if (l) { l.sendMaterial = !l.sendMaterial; save(); rerender(l); if (l.sendMaterial) toast('📎 ' + S.business.catalog + ' מסומן לשליחה ל' + leadName(l) + '. בדוגמית לא נשלח באמת.'); } return;
+      case 'send': if (l) {
+        l.sendMaterial = !l.sendMaterial;
+        save(); rerender(l);
+        if (!l.sendMaterial) return;
+        // Every send in the system goes through send(), including this one.
+        const live = liveChannels();
+        if (!live.length) return toast('סומן. ⚠️ אין ערוץ פעיל — ר\' "ערוצי שליחה" בהגדרות', 'להגדרות', () => setScreen('settings'));
+        const r = send(l, live[0]);
+        return toast(r.ok ? r.text : 'סומן, אך לא יישלח: ' + r.why);
+      } return;
+      case 'sign': return signModal(d.kind);
+      case 'sign-yes': {
+        const v = ($('#sign-name') && $('#sign-name').value.trim()) || '';
+        if (!v) return toast('צריך לחתום בשם');
+        const conf = channelConf(d.kind);
+        conf.signed = v;
+        conf.signedAt = Date.now();
+        save(); closeModal(false); viewSetup();
+        return toast('החיבור אושר. ⚠️ האחריות על המספר היא שלך');
+      }
+      case 'unsign': {
+        const conf = channelConf(d.kind);
+        conf.signed = null; conf.signedAt = null; conf.engine = ENGINE_DEFAULT[d.kind];
+        save(); return viewSetup();
+      }
       case 'settings': return setScreen(S.screen === 'settings' ? 'booth' : 'settings');
       case 'del-lead': return confirmDelete(parseInt(d.id, 10));
       case 'del-yes': {

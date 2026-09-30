@@ -15,5 +15,6 @@
   - [`0005-crm-free-limited-to-expo-leads.md`](decisions/0005-crm-free-limited-to-expo-leads.md) — ה-CRM חינמי ומוגבל ללידים של התערוכה. המכירה היא של פרויקטים אחרים.
   - [`0006-build-mode-for-expo.md`](decisions/0006-build-mode-for-expo.md) — מצב בנייה לאקספו: אפיון בשיטה הרגילה, בנייה משוחררת מול תרחישים, ואב-טיפוס לזריקה לפני הראיונות. שני סעיפים שונו ב-0007.
   - [`0007-prototype-real-names-and-hosting.md`](decisions/0007-prototype-real-names-and-hosting.md) — הדוגמית: שמות אמיתיים מרשימה מזוקקת בלי פרטי קשר, מחוץ לריפו. דף פרטי לעת עתה. תצוגה: שם ועיר בגדול, אב וחותן בקטן.
+  - [`0008-messaging-channels-and-unofficial-whatsapp.md`](decisions/0008-messaging-channels-and-unofficial-whatsapp.md) — ערוצי שליחה: שכבה אחת עם מנועים מתחלפים, וואטסאפ לא רשמי באחריות המציג עם אזהרה חתומה, ומייל שנשלח מהמערכת עם תשובה חוזרת אליו.
   - **הצעה, ממתינה לאישור (W-014):** [`0002-three-entry-channels-one-voluntary-action.md`](decisions/0002-three-entry-channels-one-voluntary-action.md) — שלוש דרכי כניסה (ימות המשיח, QR, טאבלט), פעולה אחת מרצון, ושתי נגיעות למציג.
 - [`../waiting.md`](../waiting.md) — כל מה שמחכה, עם מזהי `W-###`.
