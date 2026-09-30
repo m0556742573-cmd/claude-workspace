@@ -36,3 +36,4 @@ expo-data/
 
 # Built copy of the prototype - regenerate with build-dist.sh
 myProjekts/*/prototype/dist/
+myProjekts/*/prototype/doochan-demo.zip
