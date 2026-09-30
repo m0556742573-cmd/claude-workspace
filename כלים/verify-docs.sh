@@ -230,7 +230,10 @@ check_project() {
   # every time, so the green line is never read as "everything was seen".
   local bins bincount
   bins=$(git -C "$proj" ls-files -- '*.xlsx' '*.xls' '*.pdf' '*.docx' '*.zip' '*.png' '*.jpg' 2>/dev/null)
-  bincount=$(printf '%s' "$bins" | grep -c . 2>/dev/null || echo 0)
+  # grep -c prints its count and still exits 1 when that count is zero, so an
+  # "|| echo 0" here appends a second line and the comparison below sees "0\n0".
+  bincount=$(printf '%s' "$bins" | grep -c . 2>/dev/null || true)
+  [ -n "$bincount" ] || bincount=0
 
   if [ -z "$pii" ]; then
     ok "no personal or financial data found in tracked text files"

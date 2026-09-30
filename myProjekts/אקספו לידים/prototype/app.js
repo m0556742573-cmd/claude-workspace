@@ -347,8 +347,10 @@
         },
       },
     },
+    // Checked 30/09/2026: a kosher line cannot receive SMS at all. That is most
+    // of the visitors here, so this channel stays off by default and says why.
     sms: {
-      name: 'SMS', icon: '📱',
+      name: 'SMS', icon: '📱', warnNote: '⚠️ טלפון כשר אינו מקבל SMS. רלוונטי רק למבקר עם מכשיר פתוח.',
       engines: {
         off:     { name: 'כבוי', note: '' },
         gateway: {
@@ -771,7 +773,8 @@
                value="${esc(conf[key] || '')}" autocomplete="off">
         ${hint ? `<small class="optional">${esc(hint)}</small>` : ''}</label>`).join('');
     return `<div class="chan-card">
-      <div class="chan-head"><b>${ch.icon} ${esc(ch.name)}</b></div>
+      <div class="chan-head"><b>${ch.icon} ${esc(ch.name)}</b>
+        ${ch.warnNote ? `<small class="chan-warn">${esc(ch.warnNote)}</small>` : ''}</div>
       <div class="chan-engines">
         ${Object.entries(ch.engines).map(([k, e]) => `
           <button class="chan-opt" data-engine="${kind}" data-eng="${k}" aria-pressed="${conf.engine === k}">
