@@ -482,6 +482,7 @@
     // read without checking. Fill them in rather than throw and lose the lot.
     (S.leads || []).forEach((l) => {
       l.calls = l.calls || [];
+      l.sends = l.sends || [];
       l.visits = l.visits && l.visits.length ? l.visits : [l.createdAt || Date.now()];
       l.interests = l.interests || [];
       l.status = l.status || 'open';
@@ -548,7 +549,7 @@
   function newLead(fields) {
     const l = Object.assign({
       id: S.seq++, pid: null, custom: null, createdAt: NOW().getTime(), source: 'search',
-      warmth: null, interests: [], ask: null, when: null, note: '', sendMaterial: false,
+      warmth: null, interests: [], ask: null, when: null, note: '', sendMaterial: false, sends: [],
       visits: [NOW().getTime()], next: null, calls: [], status: 'open', tagger: 'טאבלט הדוכן',
     }, fields);
     if (l.pid != null) l.snap = snapOf(person(l.pid));
@@ -1082,6 +1083,7 @@
           <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" data-id="${l.id}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
           <div><label class="field-label" for="note-${l.id}">הערה</label><textarea id="note-${l.id}" data-note="${l.id}" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
         </div>` : ''}
+      ${reachBlock(l)}
       ${nextBlock(l)}
       ${leadActions(l)}
       ${leadHistory(l)}`;
@@ -1092,24 +1094,45 @@
   /** What can be done with a lead right now: call, write, or remove it. */
   function leadActions(l) {
     const phone = leadPhone(l);
-    // Only a number that really looks Israeli becomes an international one. A
-    // mistyped number must not open a chat with a stranger somewhere else.
-    const digits = phone.replace(/\D/g, '');
-    const intl = /^0\d{8,9}$/.test(digits) ? '972' + digits.slice(1)
-      : /^972\d{8,9}$/.test(digits) ? digits : '';
-    // The number itself is shown as text and can always be copied. The dialling
-    // links are a convenience: inside a demo page the browser often refuses them,
-    // and a button that quietly does nothing is worse than no button.
     return `
       <div class="lead-actions">
         ${phone ? `<span class="phone-line num">${esc(phone)}</span>
-          <button class="btn" data-act="copy-phone" data-id="${l.id}">העתקה</button>
-          <a class="btn primary" href="tel:${esc(phone)}">📞 חיוג</a>
-          ${intl ? `<a class="btn" href="https://wa.me/${esc(intl)}" target="_blank" rel="noopener">וואטסאפ</a>` : ''}`
-          : `<span class="optional">אין טלפון${l.pid != null ? ', וברשימת המארגנים אין מספרים' : ''}.</span>
+          <button class="btn" data-act="copy-phone" data-id="${l.id}">העתקה</button>`
+          : `<span class="optional">אין טלפון${l.pid != null ? ', ובעותק ההדגמה אין מספרים' : ''}.</span>
           <button class="btn" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
         <button class="btn ghost danger" data-act="del-lead" data-id="${l.id}">מחיקה</button>
       </div>`;
+  }
+
+  /* One row of real buttons, one per channel the business actually runs. The
+   * channels are siblings, not a fallback chain: the exhibitor sends on
+   * whichever one this visitor answers on, and may well use two. */
+  function reachBlock(l) {
+    const live = liveChannels();
+    const last = (l.sends || []).slice(-1)[0];
+    return `
+      <div class="reach">
+        <button class="btn primary big" data-act="call-now" data-id="${l.id}">📞 התקשר עכשיו</button>
+        ${live.map((k) => `<button class="btn reach-btn" data-act="reach" data-kind="${k}" data-id="${l.id}">${CHANNELS[k].icon} ${esc(CHANNELS[k].name)}</button>`).join('')}
+        ${live.length ? '' : '<button class="btn ghost" data-act="settings">להפעיל ערוץ שליחה</button>'}
+      </div>
+      ${last ? `<div class="reach-last optional">אחרון: ${CHANNELS[last.kind] ? CHANNELS[last.kind].icon + ' ' + esc(CHANNELS[last.kind].name) : ''} · ${esc(relDay(new Date(last.at), NOW()))} ${hhmm(new Date(last.at))}</div>` : ''}`;
+  }
+
+  /** A send is a touch like a call is: it goes into the history and it moves the
+   *  next step along, so the follow-up screen knows this lead was reached. */
+  function recordSend(l, kind) {
+    const r = send(l, kind);
+    if (!r.ok) return toast('לא נשלח: ' + r.why, 'להגדרות', () => setScreen('settings'));
+    l.sends = l.sends || [];
+    l.sends.push({ at: NOW().getTime(), kind });
+    // Never overwrite a next step the person chose for himself.
+    if (!l.next || l.next.by !== 'person') {
+      l.next = { label: 'לבדוק אם ענה', due: daysFrom(NOW(), 2, 10).getTime(), kind: 'task', by: 'machine' };
+    }
+    save();
+    rerender(l);
+    return toast(r.text);
   }
 
   /** What already happened with this lead, newest last. */
@@ -1117,6 +1140,11 @@
     const rows = [];
     l.visits.forEach((v, i) => rows.push({ at: v, what: i === 0 ? 'הגיע לדוכן' : 'חזר לדוכן' }));
     (l.calls || []).forEach((c) => rows.push({ at: c.at, what: OUTCOME_LABEL[c.outcome] || 'שיחה' }));
+    // "נשלח בוואטסאפ" but "נשלח ב-SMS": a Latin name needs the hyphen.
+    (l.sends || []).forEach((s) => {
+      const nm = (CHANNELS[s.kind] || {}).name || s.kind;
+      rows.push({ at: s.at, what: 'נשלח ב' + (/^[A-Za-z]/.test(nm) ? '-' : '') + nm });
+    });
     if (!rows.length) return '';
     rows.sort((a, b) => a.at - b.at);
     return `<details class="history"><summary>מה היה עד עכשיו (${rows.length})</summary>
@@ -1396,7 +1424,7 @@
             <button class="btn" data-out="noanswer">לא ענה</button>
             <button class="btn ghost" data-out="lost">לא רלוונטי</button>
             <button class="btn ghost" data-act="call-cancel">עוד לא התקשרתי</button>
-          </div>` : `<button class="btn primary big" data-act="call" data-id="${l.id}">📞 התקשרתי</button>`}
+          </div>` : ''}
       </div>`;
     }
     main().innerHTML = `<div class="stack">
@@ -1871,6 +1899,19 @@
       case 'grades-reset': S.business.warmthNames = null; save(); return viewSetup();
       case 'catalog-clear': S.business.catalog = null; save(); return viewSetup();
       case 'name-device': { const v = $('#dev-name') && $('#dev-name').value.trim(); if (v) { S.business.devices = [{ name: v, here: true }].concat(S.business.devices.filter((x) => !x.here)); save(); } return viewSetup(); }
+      case 'reach': return recordSend(leadById(parseInt(d.id, 10)), d.kind);
+      // Dial, and ask how it went in the same breath: the outcome is what feeds
+      // the status and schedules the next step, so it must not need a second trip.
+      case 'call-now': {
+        const x = leadById(parseInt(d.id, 10));
+        if (!x) return;
+        const ph = leadPhone(x);
+        callStep = x.id;
+        if (S.screen !== 'crm') { focusLead = x.id; setScreen('crm'); } else render();
+        if (ph) { try { window.location.href = 'tel:' + ph; } catch (e) { /* demo page may refuse */ } }
+        else toast('אין מספר לליד הזה', 'להוסיף', () => phoneModal(x.id));
+        return;
+      }
       case 'call': callStep = parseInt(d.id, 10); return render();
       case 'call-cancel': callStep = null; return render();
       case 'unfocus': focusLead = null; return render();

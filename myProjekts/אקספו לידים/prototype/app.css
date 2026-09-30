@@ -359,3 +359,10 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
 .chan-head { display: grid; gap: 4px; }
 .chan-warn { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* Reach: the channels are siblings on one row, so none of them reads as the
+ * fallback for another. Calling stays visually first because it is. */
+.reach { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.reach .btn.big { flex: 1 1 100%; }
+.reach-btn { flex: 1 1 0; min-width: 116px; justify-content: center; }
+.reach-last { margin: 6px 0 0; }
