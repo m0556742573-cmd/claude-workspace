@@ -347,10 +347,11 @@
         },
       },
     },
-    // Checked 30/09/2026: a kosher line cannot receive SMS at all. That is most
-    // of the visitors here, so this channel stays off by default and says why.
+    // A kosher line cannot receive SMS, but a good part of this audience carries
+    // a second, filtered-but-not-kosher device, and that is who this is for.
+    // The exhibitor is not asked which visitor is which: delivery reports say.
     sms: {
-      name: 'SMS', icon: '📱', warnNote: '⚠️ טלפון כשר אינו מקבל SMS. רלוונטי רק למבקר עם מכשיר פתוח.',
+      name: 'SMS', icon: '📱', warnNote: 'מגיע למי שיש לו מכשיר שאינו כשר. אין צורך לדעת מי — דוח המסירה אומר.',
       engines: {
         off:     { name: 'כבוי', note: '' },
         gateway: {

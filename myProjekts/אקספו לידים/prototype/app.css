@@ -358,4 +358,4 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .warn-box p { margin: 0; font-size: 15px; line-height: 1.5; }
 .btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
 .chan-head { display: grid; gap: 4px; }
-.chan-warn { font-size: 13px; font-weight: 700; color: var(--hot); }
+.chan-warn { font-size: 13px; font-weight: 700; color: var(--muted); }
