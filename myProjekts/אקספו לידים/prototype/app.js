@@ -136,6 +136,12 @@
    * exhibitor never answers "business or private": he touches the row of the
    * man standing in front of him, and that IS the answer.
    *
+   * Two different people, and the system must not confuse them: `owner` is whose
+   * name the business is in, and `pid` is who stands in front of the exhibitor.
+   * A man may well be representing his wife's business — the expo is men only,
+   * the ownership of the businesses is not — so the two fields are kept apart
+   * and the person we link to is always someone who can actually be at the fair.
+   *
    * The trades are the 102 the community's own association uses, not ones we
    * invented. On the real list the businesses carry no phone or email: the
    * stripped copy must stay stripped (decision 0007). */
@@ -149,6 +155,8 @@
     'הנהלת חשבונות': ['הנהלת חשבונות', 'שכר', 'דוחות שנתיים'],
     'גרפיקאי': ['לוגו ומיתוג', 'עיצוב קטלוג', 'מודעות'],
   };
+  const WOMAN_TITLE = /^(מרת|הרבנית)/;
+  const OTHER_OWNER = ['רבקי', 'מלכי', 'שיינדי', 'אסתי', 'חני', 'פריידי', 'ברכי', 'רוחי'];
   const BIZ_PREFIX = ['', '', '', 'בית ', 'סטודיו ', 'מרכז '];
   const BIZ_SUFFIX = ['', '', ' בע"מ', ' והבנים', ' אחים', ' פלוס'];
 
@@ -159,13 +167,19 @@
     const step = 3;                                  // roughly one man in five runs a business
     for (let i = Math.floor(rnd() * step); i < PEOPLE.length; i += step + Math.floor(rnd() * 4)) {
       const p = PEOPLE[i];
-      if (!p) continue;
+      // Whoever represents the business at the fair has to be someone who can be
+      // there and be found in the list.
+      if (!p || WOMAN_TITLE.test(String(p[0]).trim())) continue;
       const trade = BIZ_TRADES[Math.floor(rnd() * BIZ_TRADES.length)];
       const brand = rnd() < 0.55
         ? BIZ_PREFIX[Math.floor(rnd() * BIZ_PREFIX.length)] + p[2] + BIZ_SUFFIX[Math.floor(rnd() * BIZ_SUFFIX.length)]
         : BIZ_PREFIX[Math.floor(rnd() * BIZ_PREFIX.length)] + trade + ' ' + p[2];
+      // One in six is in someone else's name — most often a wife's. The demo
+      // carries it so the screens are built against it from the start.
+      const elsewhere = rnd() < 0.17;
       out.push({
         pid: i,
+        owner: elsewhere ? OTHER_OWNER[Math.floor(rnd() * OTHER_OWNER.length)] + ' ' + p[2] : '',
         name: brand.trim(),
         trade,
         services: BIZ_SERVICES[trade] || [],
@@ -230,7 +244,7 @@
   };
 
   // The expo is for men only, so women's entries never come up in the booth search.
-  const isWoman = (p) => /^(מרת|הרבנית)/.test(String(p[0]).trim());
+  const isWoman = (p) => WOMAN_TITLE.test(String(p[0]).trim());
 
   const INDEX = PEOPLE.map((p) => {
     const words = (norm(p[1]) + ' ' + norm(p[2])).split(' ').filter(Boolean);
@@ -649,7 +663,9 @@
     : l.pid != null ? fullName(person(l.pid)) : (l.custom.first + ' ' + l.custom.last).trim();
   const leadTown = (l) => leadBiz(l) ? leadBiz(l).town
     : l.pid != null ? person(l.pid)[5] : (l.custom.town || '');
-  const leadMeta = (l) => leadBiz(l) ? leadBiz(l).trade + ' · ' + fullName(person(l.pid))
+  // Who you spoke to, and — when it is not the same man — whose business it is.
+  const leadMeta = (l) => leadBiz(l)
+    ? leadBiz(l).trade + ' · ' + fullName(person(l.pid)) + (leadBiz(l).owner ? ' · על שם ' + leadBiz(l).owner : '')
     : l.pid != null ? metaLine(person(l.pid)) : 'נוסף ידנית';
 
   function metaLine(p) {
@@ -1108,7 +1124,9 @@
             ${isBiz ? `<span class="person-name">${esc(b.name)}</span><span class="person-city">${esc(b.trade)}</span>`
               : `<span class="person-title">${esc(p[0])}</span><span class="person-name">${esc(fullName(p))}</span><span class="person-city">${esc(p[5])}</span>`}
           </span>
-          <span class="person-meta">${isBiz ? esc(fullName(p) + ' · ' + b.town) : esc(metaLine(p))}</span>
+          <span class="person-meta">${isBiz
+            ? esc(fullName(p) + (b.owner ? ' · על שם ' + b.owner : '') + ' · ' + b.town)
+            : esc(metaLine(p))}</span>
         </span>
         <span class="badges">
           <span class="badge kind ${isBiz ? 'biz' : 'priv'}">${isBiz ? '🏢 עסק' : 'פרטי'}</span>
@@ -1242,7 +1260,8 @@
     const mate = S.leads.find((x) => x.pid === l.pid && x.id !== l.id
       && (asBiz ? x.bid === bi : x.bid == null));
     const title = asBiz ? '🏢 ' + esc(b.name) + ' · ' + esc(b.trade) : esc(fullName(person(l.pid)));
-    const what = asBiz ? 'העסק שלו' : 'האדם עצמו';
+    // "his business" is wrong when it is his wife's and he only represents it.
+    const what = asBiz ? (b.owner ? 'העסק שהוא מייצג' : 'העסק שלו') : 'מי שעמד מולך';
     return `<div class="cross">
       <span class="cross-what">${what}</span>
       <span class="cross-name">${title}</span>
