@@ -366,3 +366,15 @@ button.row[aria-current="true"] { border-color: var(--accent); background: var(-
 .reach .btn.big { flex: 1 1 100%; }
 .reach-btn { flex: 1 1 0; min-width: 116px; justify-content: center; }
 .reach-last { margin: 6px 0 0; }
+
+/* Business rows. The marker is on every row, not only on businesses: "private"
+ * has to be a statement too, or its absence reads as "we did not check". */
+.badge.kind { font-weight: 800; }
+.badge.kind.biz { background: var(--accent-soft); color: var(--accent-deep); }
+.badge.kind.priv { background: var(--surface-2); color: var(--muted); }
+.result.mate { margin-top: -6px; border-top-color: transparent; background: var(--surface-2); }
+.result.mate::before { content: "↳"; color: var(--faint); font-weight: 800; margin-inline-end: 4px; }
+
+.cross { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+.cross-what { font-size: 13px; font-weight: 700; color: var(--faint); }
+.cross-name { font-size: 15px; font-weight: 700; flex: 1 1 auto; }

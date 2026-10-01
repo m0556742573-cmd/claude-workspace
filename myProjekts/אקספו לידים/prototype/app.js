@@ -126,6 +126,68 @@
   const person = (i) => PEOPLE[i];
   const fullName = (p) => (p[1] + ' ' + p[2]).trim();
 
+  /* ---- Businesses -------------------------------------------------------
+   * A visitor is not always a person. The same man is a private customer when
+   * he wants chairs for his own dining room and a business when he wants them
+   * for his office — and those are two different conversations, with two
+   * different next steps and two different phone numbers that answer.
+   *
+   * So a business is its own row in the list, carrying the owner's index. The
+   * exhibitor never answers "business or private": he touches the row of the
+   * man standing in front of him, and that IS the answer.
+   *
+   * The trades are the 102 the community's own association uses, not ones we
+   * invented. On the real list the businesses carry no phone or email: the
+   * stripped copy must stay stripped (decision 0007). */
+  const BIZ_TRADES = ['אבטחת מידע', 'אדריכלות', 'אדריכלות פנים', 'אוטומציה', 'אינטרקום', 'אינסטלציה', 'אלומיניום', 'אלבומים', 'בגדי גברים', 'ביטוח', 'בנייה קלה', 'בניית אתרים', 'גרפיקאי', 'דגים', 'דלתות ביטחון', 'דפוס', 'הנדימן', 'הנהלת חשבונות', 'הפקת אירועים', 'השכרת רכב', 'וילונות', 'חיפויים', 'חשמל', 'יבוא', 'ייעוץ נדל"ן', 'ייעוץ עסקי', 'ייעוץ פיננסי', 'ירקות ופירות', 'כיורים וברזים', 'לדים', 'מהנדס בניין', 'מוזיקה', 'מוצרי מזון לעסקים', 'מזכרות יודאיקה', 'מחשבים', 'מטבחים', 'מיזוג אוויר', 'מיתוג', 'מערכות אזעקה', 'מצלמות', 'משלוחים בינעירוניים', 'משרד פרסום', 'מתנות מעוצבות', 'סלולר', 'עוגות מעוצבות', 'עיצוב פנים', 'עריכת וידאו', 'פיתוח תוכנה', 'צילום תדמית', 'צימרים', 'קבלן פנים', 'קורסים מקצועיים', 'ראיית חשבון', 'ריהוט גן', 'שיפוצניק', 'תאורה', 'תיווך נדל"ן', 'תיקון מחשבים', 'תכנון והנדסה'];
+  const BIZ_SERVICES = {
+    'מטבחים': ['מטבח מלא', 'חידוש דלתות', 'משטחי שיש'],
+    'דפוס': ['הזמנות', 'חוברות', 'שילוט'],
+    'תאורה': ['גופי תאורה', 'תכנון תאורה', 'לדים'],
+    'שיפוצניק': ['שיפוץ כללי', 'צבע', 'אינסטלציה'],
+    'ביטוח': ['ביטוח עסק', 'ביטוח דירה', 'פנסיה'],
+    'הנהלת חשבונות': ['הנהלת חשבונות', 'שכר', 'דוחות שנתיים'],
+    'גרפיקאי': ['לוגו ומיתוג', 'עיצוב קטלוג', 'מודעות'],
+  };
+  const BIZ_PREFIX = ['', '', '', 'בית ', 'סטודיו ', 'מרכז '];
+  const BIZ_SUFFIX = ['', '', ' בע"מ', ' והבנים', ' אחים', ' פלוס'];
+
+  /** Deterministic, so the same list always yields the same businesses. */
+  function makeBusinesses() {
+    const rnd = mulberry32(90125);
+    const out = [];
+    const step = 3;                                  // roughly one man in five runs a business
+    for (let i = Math.floor(rnd() * step); i < PEOPLE.length; i += step + Math.floor(rnd() * 4)) {
+      const p = PEOPLE[i];
+      if (!p) continue;
+      const trade = BIZ_TRADES[Math.floor(rnd() * BIZ_TRADES.length)];
+      const brand = rnd() < 0.55
+        ? BIZ_PREFIX[Math.floor(rnd() * BIZ_PREFIX.length)] + p[2] + BIZ_SUFFIX[Math.floor(rnd() * BIZ_SUFFIX.length)]
+        : BIZ_PREFIX[Math.floor(rnd() * BIZ_PREFIX.length)] + trade + ' ' + p[2];
+      out.push({
+        pid: i,
+        name: brand.trim(),
+        trade,
+        services: BIZ_SERVICES[trade] || [],
+        town: p[5],
+        // The real list carries no way to reach anyone, and nothing generated here
+        // may put that back — not even invented numbers beside real names.
+        phone: REAL ? '' : '05' + (Math.floor(rnd() * 9) + 1) + '-' + String(1000000 + Math.floor(rnd() * 8999999)).slice(0, 7),
+        email: REAL ? '' : 'info@' + ['hadar', 'tov', 'kesher', 'shelanu', 'ohr'][Math.floor(rnd() * 5)] + '.co.il',
+      });
+    }
+    return out;
+  }
+  const BUSINESSES = makeBusinesses();
+  const biz = (i) => BUSINESSES[i];
+  /** owner index -> business index, so a person row can point at his business. */
+  const BIZ_OF_PERSON = (() => {
+    const m = {};
+    BUSINESSES.forEach((b, i) => { if (m[b.pid] === undefined) m[b.pid] = i; });
+    return m;
+  })();
+  const bizOf = (pid) => (BIZ_OF_PERSON[pid] === undefined ? null : BIZ_OF_PERSON[pid]);
+
   // ------------------------------------------------------------------
   // 3. Search
   //    Understands full and defective spelling, final letters, gershayim,
@@ -179,6 +241,16 @@
     };
   });
 
+  /* A business is searchable by its brand, by its trade, and by what it sells —
+   * "נגר" and "מטבחים" must both find it, not only its name. */
+  const BIZ_INDEX = BUSINESSES.map((b) => {
+    const words = norm(b.name + ' ' + b.trade + ' ' + b.services.join(' ')).split(' ').filter(Boolean);
+    return {
+      words, town: norm(b.town).split(' ').filter(Boolean), firstLen: norm(b.name).split(' ').length, woman: false,
+      skelWords: words.map((w) => skel(w)), deepWords: words.map((w) => skel(w, true)),
+    };
+  });
+
   function tokenMatches(tok, ix) {
     const words = ix.words;
     for (let w = 0; w < words.length; w++) {
@@ -208,40 +280,74 @@
     return null;
   }
 
+  /** Scores one index row against the typed words. null when it does not match. */
+  function scoreRow(toks, ix) {
+    let score = 0;
+    let variant = false;
+    for (let t = 0; t < toks.length; t++) {
+      const m = tokenMatches(toks[t], ix);
+      if (m) {
+        score += m.exact ? 3 : 2;
+        if (m.how === 'skel') { score -= 1; variant = true; } // a spelling variant ranks below a direct hit
+        if (m.how === 'deep') { score -= 2; variant = true; }
+        if (t === 0 && m.w === 0) score += 2;              // first typed word hits the first name
+        if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
+        continue;
+      }
+      if (t > 0 && ix.town.some((w) => w.startsWith(toks[t]))) { score += 1; continue; } // "משה כהן בני"
+      return null;
+    }
+    return { score, variant };
+  }
+
   function search(query, limit) {
     const toks = norm(query).split(' ').filter(Boolean);
     if (!toks.length) return { hits: [], total: 0 };
     const hits = [];
     for (let i = 0; i < INDEX.length; i++) {
-      const ix = INDEX[i];
-      if (ix.woman) continue;
-      let score = 0;
-      let ok = true;
-      let variant = false;
-      for (let t = 0; t < toks.length; t++) {
-        const m = tokenMatches(toks[t], ix);
-        if (m) {
-          score += m.exact ? 3 : 2;
-          if (m.how === 'skel') { score -= 1; variant = true; } // a spelling variant ranks below a direct hit
-          if (m.how === 'deep') { score -= 2; variant = true; }
-          if (t === 0 && m.w === 0) score += 2;              // first typed word hits the first name
-          if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
-          continue;
-        }
-        if (t > 0 && ix.town.some((w) => w.startsWith(toks[t]))) { score += 1; continue; } // "משה כהן בני"
-        ok = false; break;
-      }
-      if (ok) hits.push({ i, score, variant });
+      if (INDEX[i].woman) continue;
+      const r = scoreRow(toks, INDEX[i]);
+      if (r) hits.push({ kind: 'person', i, score: r.score, variant: r.variant });
     }
-    hits.sort((a, b) => b.score - a.score || fullName(person(a.i)).length - fullName(person(b.i)).length);
+    for (let b = 0; b < BIZ_INDEX.length; b++) {
+      const r = scoreRow(toks, BIZ_INDEX[b]);
+      if (r) hits.push({ kind: 'biz', b, i: BUSINESSES[b].pid, score: r.score, variant: r.variant });
+    }
+    const label = (h) => (h.kind === 'biz' ? biz(h.b).name : fullName(person(h.i)));
+    hits.sort((a, b) => b.score - a.score || label(a).length - label(b).length);
     // Names spelled the other way must stay visible, or a common surname fills the
     // whole list and the exhibitor never sees that the other spelling exists.
     const plain = hits.filter((h) => !h.variant);
     const other = hits.filter((h) => h.variant);
-    const shown = other.length && plain.length > limit - 2
-      ? plain.slice(0, limit - 2).concat(other.slice(0, 2))
-      : hits.slice(0, limit);
-    return { hits: shown, total: hits.length };
+    const ordered = other.length && plain.length > limit - 2
+      ? plain.concat(other.slice(0, 2))
+      : hits;
+    return { hits: pairUp(ordered, limit), total: hits.length };
+  }
+
+  /* The same man can appear twice — once as himself, once as his business. Those
+   * two rows are shown together and cost one slot between them, or a common
+   * surname plus its business would push everyone else off a six-row list. */
+  function pairUp(ordered, limit) {
+    const out = [];
+    const taken = new Set();
+    let slots = 0;
+    for (const h of ordered) {
+      const key = h.kind + ':' + (h.kind === 'biz' ? h.b : h.i);
+      if (taken.has(key)) continue;
+      if (slots >= limit) break;
+      taken.add(key);
+      out.push(h);
+      // pull this row's counterpart up next to it, if it also matched
+      const mate = ordered.find((o) => o.i === h.i && o.kind !== h.kind
+        && !taken.has(o.kind + ':' + (o.kind === 'biz' ? o.b : o.i)));
+      if (mate) {
+        taken.add(mate.kind + ':' + (mate.kind === 'biz' ? mate.b : mate.i));
+        out.push(Object.assign({ mate: true }, mate));
+      }
+      slots++;
+    }
+    return out;
   }
 
   // ------------------------------------------------------------------
@@ -482,6 +588,7 @@
     // read without checking. Fill them in rather than throw and lose the lot.
     (S.leads || []).forEach((l) => {
       l.calls = l.calls || [];
+      if (l.bid === undefined) l.bid = null;
       l.sends = l.sends || [];
       l.visits = l.visits && l.visits.length ? l.visits : [l.createdAt || Date.now()];
       l.interests = l.interests || [];
@@ -535,9 +642,15 @@
 
   const tpl = () => TEMPLATES[S.business.template] || TEMPLATES.general;
   const leadById = (id) => S.leads.find((l) => l.id === id);
-  const leadName = (l) => l.pid != null ? fullName(person(l.pid)) : (l.custom.first + ' ' + l.custom.last).trim();
-  const leadTown = (l) => l.pid != null ? person(l.pid)[5] : (l.custom.town || '');
-  const leadMeta = (l) => l.pid != null ? metaLine(person(l.pid)) : 'נוסף ידנית';
+  const leadBiz = (l) => (l && l.bid != null ? biz(l.bid) : null);
+  // A lead captured in his business capacity carries the brand, because that is
+  // who the exhibitor met. The man behind it is one tap away, never lost.
+  const leadName = (l) => leadBiz(l) ? leadBiz(l).name
+    : l.pid != null ? fullName(person(l.pid)) : (l.custom.first + ' ' + l.custom.last).trim();
+  const leadTown = (l) => leadBiz(l) ? leadBiz(l).town
+    : l.pid != null ? person(l.pid)[5] : (l.custom.town || '');
+  const leadMeta = (l) => leadBiz(l) ? leadBiz(l).trade + ' · ' + fullName(person(l.pid))
+    : l.pid != null ? metaLine(person(l.pid)) : 'נוסף ידנית';
 
   function metaLine(p) {
     const parts = [];
@@ -548,7 +661,7 @@
 
   function newLead(fields) {
     const l = Object.assign({
-      id: S.seq++, pid: null, custom: null, createdAt: NOW().getTime(), source: 'search',
+      id: S.seq++, pid: null, bid: null, custom: null, createdAt: NOW().getTime(), source: 'search',
       warmth: null, interests: [], ask: null, when: null, note: '', sendMaterial: false, sends: [],
       visits: [NOW().getTime()], next: null, calls: [], status: 'open', tagger: 'טאבלט הדוכן',
     }, fields);
@@ -983,15 +1096,22 @@
       slot.innerHTML = `<div class="empty-hint">לא נמצא ברשימה. <button class="btn" data-act="new-person" style="margin-inline-start:8px">להוסיף כחדש</button></div>`;
       return;
     }
-    slot.innerHTML = `<div class="results">${hits.map(({ i, variant }) => {
+    slot.innerHTML = `<div class="results">${hits.map((h) => {
+      const { i, variant, mate } = h;
       const p = person(i);
-      const existing = S.leads.find((l) => l.pid === i);
-      return `<button class="result" data-pick="${i}">
+      const isBiz = h.kind === 'biz';
+      const b = isBiz ? biz(h.b) : null;
+      const existing = S.leads.find((l) => l.pid === i && (l.bid == null) === !isBiz);
+      return `<button class="result ${mate ? 'mate' : ''}" data-pick="${i}"${isBiz ? ` data-bid="${h.b}"` : ''}>
         <span>
-          <span class="person-main"><span class="person-title">${esc(p[0])}</span><span class="person-name">${esc(fullName(p))}</span><span class="person-city">${esc(p[5])}</span></span>
-          <span class="person-meta">${esc(metaLine(p))}</span>
+          <span class="person-main">
+            ${isBiz ? `<span class="person-name">${esc(b.name)}</span><span class="person-city">${esc(b.trade)}</span>`
+              : `<span class="person-title">${esc(p[0])}</span><span class="person-name">${esc(fullName(p))}</span><span class="person-city">${esc(p[5])}</span>`}
+          </span>
+          <span class="person-meta">${isBiz ? esc(fullName(p) + ' · ' + b.town) : esc(metaLine(p))}</span>
         </span>
         <span class="badges">
+          <span class="badge kind ${isBiz ? 'biz' : 'priv'}">${isBiz ? '🏢 עסק' : 'פרטי'}</span>
           ${variant ? `<span class="badge spell">כתיב אחר</span>` : ''}
           ${existing ? `<span class="badge again">ביקר כבר</span>` : ''}
         </span>
@@ -999,14 +1119,17 @@
     }).join('')}${total > hits.length ? `<div class="results-more">ועוד ${total - hits.length}. להקליד עוד אות או את העיר.</div>` : ''}</div>`;
   }
 
-  function pickPerson(i) {
+  /** bid: the business he came as, or null when he came as himself. The two are
+   *  separate leads on purpose — different need, different next step. */
+  function pickPerson(i, bid) {
     const t = $('#toast'); if (t) t.remove();   // an old toast must not undo this new pick
-    let l = S.leads.find((x) => x.pid === i);
+    const want = bid == null ? null : bid;
+    let l = S.leads.find((x) => x.pid === i && (x.bid == null ? null : x.bid) === want);
     if (l) {
       addVisit(l);
       lastAction = null;                        // only a brand-new capture can be undone
     } else {
-      l = newLead({ pid: i, source: 'search' });
+      l = newLead({ pid: i, bid: want, source: 'search' });
       lastAction = { type: 'create', id: l.id };
     }
     l.touched = true;
@@ -1083,13 +1206,14 @@
           <div><div class="field-label">מתי זה רלוונטי</div><div class="chips">${WHEN_OPTIONS.map((o) => `<button class="chip" data-when="${esc(o)}" data-id="${l.id}" aria-pressed="${l.when === o}">${esc(o)}</button>`).join('')}</div></div>
           <div><label class="field-label" for="note-${l.id}">הערה</label><textarea id="note-${l.id}" data-note="${l.id}" placeholder="למשל: חידוש כל הריהוט במוסד, רוצה שאבוא למדוד">${esc(l.note)}</textarea></div>
         </div>` : ''}
+      ${crossLink(l)}
       ${reachBlock(l)}
       ${nextBlock(l)}
       ${leadActions(l)}
       ${leadHistory(l)}`;
   }
 
-  const leadPhone = (l) => (l.custom && l.custom.phone) || '';
+  const leadPhone = (l) => (l.custom && l.custom.phone) || (leadBiz(l) ? leadBiz(l).phone : '') || '';
 
   /** What can be done with a lead right now: call, write, or remove it. */
   function leadActions(l) {
@@ -1102,6 +1226,29 @@
           <button class="btn" data-act="add-phone" data-id="${l.id}">להוסיף טלפון</button>`}
         <button class="btn ghost danger" data-act="del-lead" data-id="${l.id}">מחיקה</button>
       </div>`;
+  }
+
+  /* The other hat. A business lead points at the man, a personal lead points at
+   * his business — in both directions, so neither is a dead end. If he has
+   * already been here wearing it, the line opens that lead instead of making a
+   * second one. */
+  function crossLink(l) {
+    if (l.pid == null) return '';
+    const other = l.bid != null ? null : bizOf(l.pid);
+    if (l.bid == null && other == null) return '';
+    const asBiz = l.bid == null;                       // the counterpart is the business
+    const bi = asBiz ? other : l.bid;
+    const b = biz(bi);
+    const mate = S.leads.find((x) => x.pid === l.pid && x.id !== l.id
+      && (asBiz ? x.bid === bi : x.bid == null));
+    const title = asBiz ? '🏢 ' + esc(b.name) + ' · ' + esc(b.trade) : esc(fullName(person(l.pid)));
+    const what = asBiz ? 'העסק שלו' : 'האדם עצמו';
+    return `<div class="cross">
+      <span class="cross-what">${what}</span>
+      <span class="cross-name">${title}</span>
+      ${mate ? `<button class="btn ghost small" data-act="go-mate" data-id="${mate.id}">ביקר גם כך — לפתוח</button>`
+        : `<button class="btn ghost small" data-act="open-mate" data-id="${l.id}">${asBiz ? 'בא בשביל העסק' : 'בא בשביל עצמו'}</button>`}
+    </div>`;
   }
 
   /* One row of real buttons, one per channel the business actually runs. The
@@ -1271,7 +1418,7 @@
       i = Math.floor(Math.random() * PEOPLE.length);
       if (!isWoman(person(i))) break;
     }
-    const existing = S.leads.find((l) => l.pid === i);
+    const existing = S.leads.find((l) => l.pid === i && l.bid == null);
     if (existing) { addVisit(existing); existing.touched = false; }
     else newLead({ pid: i, source: 'dial' });
     save();
@@ -1517,7 +1664,11 @@
       const at = t0 + Math.floor(rnd() * 9.5 * 3600000);
       const r = rnd();
       const kind = r < 0.5 ? 'friend' : r < 0.62 ? 'untagged' : r < 0.85 ? 'warm' : 'hot';
-      const l = newLead({ pid: i, createdAt: at, visits: [at], source: rnd() < 0.3 ? 'dial' : 'search', touched: true });
+      // Some of the day's visitors came wearing their business hat, so the
+      // follow-up screen shows both kinds side by side.
+      const hisBiz = bizOf(i);
+      const l = newLead({ pid: i, bid: hisBiz != null && rnd() < 0.45 ? hisBiz : null,
+        createdAt: at, visits: [at], source: rnd() < 0.3 ? 'dial' : 'search', touched: true });
       if (kind === 'friend') l.warmth = 'cold';
       if (kind === 'warm') { l.warmth = 'warm'; l.interests = offers.length ? [offers[Math.floor(rnd() * offers.length)].name] : []; }
       if (kind === 'hot') {
@@ -1798,7 +1949,7 @@
       if (eng.warn && !conf.signed) { viewSetup(); return signModal(d.engine); }
       return viewSetup();
     }
-    if (d.pick) return pickPerson(parseInt(d.pick, 10));
+    if (d.pick) return pickPerson(parseInt(d.pick, 10), d.bid === undefined ? null : parseInt(d.bid, 10));
     if (d.open) return openLead(parseInt(d.open, 10));
 
     // Field edits work on every screen: the id on the control says which lead.
@@ -1899,6 +2050,13 @@
       case 'grades-reset': S.business.warmthNames = null; save(); return viewSetup();
       case 'catalog-clear': S.business.catalog = null; save(); return viewSetup();
       case 'name-device': { const v = $('#dev-name') && $('#dev-name').value.trim(); if (v) { S.business.devices = [{ name: v, here: true }].concat(S.business.devices.filter((x) => !x.here)); save(); } return viewSetup(); }
+      case 'go-mate': return openLead(parseInt(d.id, 10));
+      case 'open-mate': {
+        const x = leadById(parseInt(d.id, 10));
+        if (!x || x.pid == null) return;
+        // Same man, other hat: a second lead, because it is a different need.
+        return pickPerson(x.pid, x.bid == null ? bizOf(x.pid) : null);
+      }
       case 'reach': return recordSend(leadById(parseInt(d.id, 10)), d.kind);
       // Dial, and ask how it went in the same breath: the outcome is what feeds
       // the status and schedules the next step, so it must not need a second trip.
