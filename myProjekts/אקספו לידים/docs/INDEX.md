@@ -8,7 +8,8 @@
 - [`prototype-findings.md`](prototype-findings.md) — **מה נלמד מהדוגמית והוראות למערכת האמיתית:** מה נמדד, מה הוכרע, ומה נאסור להעביר.
 - [`hisparnesu-association.md`](hisparnesu-association.md) — **'התפרנסו', איגוד העסקים של בעלזא:** 458 חברים, **102 תחומים** למיפוי ההגדרות, ומבנה עמוד העסק שלהם.
 - [`businesses-as-leads.md`](businesses-as-leads.md) — **עסק כרשומת מבקר, מאושר ובנוי:** שתי שורות נפרדות לאותו אדם, סימון עסק/פרטי, וקישור דו-כיווני.
-- [`belz-directory.md`](belz-directory.md) — **מדריך העסקים של הקהילה (`belzbusiness.com`):** 1,343 עסקים ב-17 קטגוריות, מה הקהילה כבר מוסרת בטופס, ומה אסור להסיק מזה.
+- [`community-businesses.md`](community-businesses.md) — **הרשימה המאוחדת: 1,591 עסקים** משני המקורות, איפה היא יושבת, ומה היא לא נותנת.
+- [`belz-directory.md`](belz-directory.md)(belz-directory.md) — **מדריך העסקים של הקהילה (`belzbusiness.com`):** 1,343 עסקים ב-17 קטגוריות, מה הקהילה כבר מוסרת בטופס, ומה אסור להסיק מזה.
 - [`build-v2.md`](build-v2.md) — תוכנית הבנייה של גרסה 2 של הדוגמית. ממתינה לאישור.
 - [`../CLAUDE.md`](../CLAUDE.md) — מצב בנייה: כללים מקומיים שגוברים על 4 ו-10 של הקובץ הראשי, רק בפרויקט הזה.
 - `decisions/`:
