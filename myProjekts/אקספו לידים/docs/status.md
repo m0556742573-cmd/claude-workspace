@@ -14,7 +14,7 @@
 
 ר' [`overview.md`](overview.md) לאפיון המלא.
 
-**⭐ 01/10: כנראה נמצא המארגן** — ['התפרנסו', איגוד העסקים של בעלזא](hisparnesu-association.md), שמפעיל כנסים **ומפרסם שהוא סופר עסקאות שנסגרו (3,256)**. **טרם אומת** (W-030).
+**⭐ 01/10: שני מאגרי עסקים של הקהילה נסרקו** ([`hisparnesu-association.md`](hisparnesu-association.md), [`belz-directory.md`](belz-directory.md)) — **102 תחומים למיפוי ההגדרות**, ומהם עלתה ההצעה [`businesses-as-leads.md`](businesses-as-leads.md): **עסק כרשומת מבקר** (W-032).
 
 ## הצעד הבא
 
