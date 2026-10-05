@@ -1,39 +1,40 @@
 /* Expo leads — design tokens. Components read tokens and never literals,
  * so both themes stay consistent and the palette changes in one place.
  *
- * The palette is deliberately not the default blue-on-grey: a deep pine green
- * carries the interface, warm paper neutrals sit behind it, and the three
- * warmth colours (ember, amber, slate) stay reserved for how hot a lead is,
- * so they never compete with the primary.
+ * The palette is version 1's, restored at Yitzhak's request (05/10): a clear
+ * blue carries the interface on cool grey neutrals, and the three warmth
+ * colours (ember, amber, slate) stay reserved for how hot a lead is.
+ * Two values are darker than version 1 had them — --faint and --warm — because
+ * the review of version 2 found them too faint to read on white.
  */
 :root {
   color-scheme: light;
-  --bg: #f4f2ee;
+  --bg: #f3f5f8;
   --surface: #ffffff;
-  --surface-2: #f0ede7;
-  --ink: #1a1c19;
-  --muted: #5c6159;
-  --faint: #6b7067;
-  --line: #ddd9d1;
-  --line-strong: #c7c2b8;
+  --surface-2: #eef1f5;
+  --ink: #152033;
+  --muted: #5a6577;
+  --faint: #687284;
+  --line: #d9dee6;
+  --line-strong: #c2c9d3;
 
-  --accent: #1f5c4a;
+  --accent: #1d5bb8;
   --accent-ink: #ffffff;
-  --accent-soft: #e2efe9;
-  --accent-deep: #133c30;
+  --accent-soft: #e3ecfa;
+  --accent-deep: #123d7d;
 
-  --hot: #b8410f;
-  --hot-soft: #fbe5da;
+  --hot: #d2440f;
+  --hot-soft: #fde8df;
   --warm: #8a5e04;
-  --warm-soft: #faeed3;
-  --cold: #4a6f8a;
-  --cold-soft: #e4edf3;
-  --good: #26734f;
-  --good-soft: #dcefe4;
+  --warm-soft: #fcf1d6;
+  --cold: #3f78a3;
+  --cold-soft: #e1edf6;
+  --good: #2c8a57;
+  --good-soft: #def2e7;
 
-  --shadow-sm: 0 1px 2px rgba(26, 28, 25, .06);
-  --shadow: 0 1px 3px rgba(26, 28, 25, .07), 0 8px 24px rgba(26, 28, 25, .07);
-  --shadow-lg: 0 2px 6px rgba(26, 28, 25, .1), 0 18px 48px rgba(26, 28, 25, .14);
+  --shadow-sm: 0 1px 2px rgba(21, 32, 51, .06);
+  --shadow: 0 1px 2px rgba(21, 32, 51, .06), 0 6px 20px rgba(21, 32, 51, .06);
+  --shadow-lg: 0 2px 6px rgba(21, 32, 51, .1), 0 18px 48px rgba(21, 32, 51, .14);
   --radius: 16px;
   --radius-lg: 22px;
 
@@ -45,26 +46,26 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #14160f; --surface: #1c1f19; --surface-2: #252921; --ink: #ecefe6; --muted: #a8ada0; --faint: #7c8177;
-    --line: #333830; --line-strong: #454b41;
-    --accent: #6fbfa3; --accent-ink: #0f1a15; --accent-soft: #1e332a; --accent-deep: #9bd6c0;
-    --hot: #f08a56; --hot-soft: #3a2015; --warm: #e0ad4a; --warm-soft: #33280f;
-    --cold: #8db4cd; --cold-soft: #1a2833; --good: #6cc494; --good-soft: #14301f;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-    --shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.35);
-    --shadow-lg: 0 2px 6px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.45);
+    --bg: #0e131a; --surface: #161d27; --surface-2: #1d2633; --ink: #e6ecf3; --muted: #a0acbb; --faint: #8390a1;
+    --line: #2a3442; --line-strong: #3a4555;
+    --accent: #6b9ff0; --accent-ink: #0e131a; --accent-soft: #1d2c45; --accent-deep: #a9c8f7;
+    --hot: #ff7a45; --hot-soft: #3a1f15; --warm: #f0b53a; --warm-soft: #33290f;
+    --cold: #7fb2d9; --cold-soft: #16283a; --good: #5cc48b; --good-soft: #14301f;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+    --shadow-lg: 0 2px 6px rgba(0,0,0,.45), 0 18px 48px rgba(0,0,0,.4);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #14160f; --surface: #1c1f19; --surface-2: #252921; --ink: #ecefe6; --muted: #a8ada0; --faint: #7c8177;
-  --line: #333830; --line-strong: #454b41;
-  --accent: #6fbfa3; --accent-ink: #0f1a15; --accent-soft: #1e332a; --accent-deep: #9bd6c0;
-  --hot: #f08a56; --hot-soft: #3a2015; --warm: #e0ad4a; --warm-soft: #33280f;
-  --cold: #8db4cd; --cold-soft: #1a2833; --good: #6cc494; --good-soft: #14301f;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-  --shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.35);
-  --shadow-lg: 0 2px 6px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.45);
+  --bg: #0e131a; --surface: #161d27; --surface-2: #1d2633; --ink: #e6ecf3; --muted: #a0acbb; --faint: #8390a1;
+  --line: #2a3442; --line-strong: #3a4555;
+  --accent: #6b9ff0; --accent-ink: #0e131a; --accent-soft: #1d2c45; --accent-deep: #a9c8f7;
+  --hot: #ff7a45; --hot-soft: #3a1f15; --warm: #f0b53a; --warm-soft: #33290f;
+  --cold: #7fb2d9; --cold-soft: #16283a; --good: #5cc48b; --good-soft: #14301f;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.45), 0 18px 48px rgba(0,0,0,.4);
 }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.45; -webkit-tap-highlight-color: transparent; }
