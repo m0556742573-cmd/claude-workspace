@@ -128,16 +128,55 @@ window.People = (function () {
     return { score, variant };
   }
 
-  function search(query, limit) {
+  /* Businesses: the same man is a private customer when he wants chairs for his
+   * dining room and a business when he wants them for his office. So a business
+   * is its own row, carrying the index of the man who stands at the booth for it
+   * (`pid`) and, apart from that, whose name it is in (`owner` — often a wife's).
+   * Demo names only, made up from the demo people. */
+  const BIZ_TRADES = ['מטבחים', 'דפוס', 'תאורה', 'שיפוצים', 'ביטוח', 'הנהלת חשבונות', 'גרפיקה ומיתוג', 'קייטרינג', 'מאפייה', 'אולם אירועים', 'הסעות', 'מחשבים', 'יודאיקה', 'הפקת אירועים', 'צימרים', 'מיזוג אוויר', 'חשמל', 'תיווך נדל"ן', 'מתנות מעוצבות', 'עוגות מעוצבות'];
+  const OTHER_OWNER = ['רבקי', 'מלכי', 'שיינדי', 'אסתי', 'חני', 'פריידי'];
+  const BIZ_PREFIX = ['', '', 'בית ', 'סטודיו ', 'מרכז '];
+  const BIZ_SUFFIX = ['', '', ' בע"מ', ' והבנים', ' אחים'];
+  const BUSINESSES = (function () {
+    const rnd = mulberry32(90125);
+    const pick = (a) => a[Math.floor(rnd() * a.length)];
+    const out = [];
+    for (let i = Math.floor(rnd() * 3); i < PEOPLE.length; i += 3 + Math.floor(rnd() * 4)) {
+      const p = PEOPLE[i];
+      const trade = pick(BIZ_TRADES);
+      const elsewhere = rnd() < 0.17;
+      out.push({
+        pid: i, trade, town: p[5],
+        name: (rnd() < 0.55 ? pick(BIZ_PREFIX) + p[2] + pick(BIZ_SUFFIX) : pick(BIZ_PREFIX) + trade + ' ' + p[2]).trim(),
+        owner: elsewhere ? pick(OTHER_OWNER) + ' ' + p[2] : '',
+      });
+    }
+    return out;
+  })();
+  const BIZ_OF = {};
+  BUSINESSES.forEach((b, i) => { if (BIZ_OF[b.pid] === undefined) BIZ_OF[b.pid] = i; });
+  const BIZ_INDEX = BUSINESSES.map((b) => {
+    const words = norm(b.name + ' ' + b.trade).split(' ').filter(Boolean);
+    return { words, town: norm(b.town).split(' ').filter(Boolean), firstLen: norm(b.name).split(' ').length,
+      skelWords: words.map((w) => skel(w)), deepWords: words.map((w) => skel(w, true)) };
+  });
+
+  /** Rows, people and businesses together. A row's key is "p:<person>" or "b:<business>". */
+  function search(query, limit, skip) {
     const toks = norm(query).split(' ').filter(Boolean);
-    if (!toks.length) return [];
+    if (!toks.length) return { hits: [], skipped: [] };
     const hits = [];
     for (let i = 0; i < INDEX.length; i++) {
       const r = scoreRow(toks, INDEX[i]);
-      if (r) hits.push({ i, score: r.score, variant: r.variant });
+      if (r) hits.push({ key: 'p:' + i, i, b: null, score: r.score });
     }
-    hits.sort((a, b) => b.score - a.score || fullName(PEOPLE[a.i]).length - fullName(PEOPLE[b.i]).length);
-    return hits.slice(0, limit || 6);
+    for (let b = 0; b < BIZ_INDEX.length; b++) {
+      const r = scoreRow(toks, BIZ_INDEX[b]);
+      if (r) hits.push({ key: 'b:' + b, i: BUSINESSES[b].pid, b, score: r.score });
+    }
+    hits.sort((a, b) => b.score - a.score || rowName(a).length - rowName(b).length);
+    const skipped = skip ? hits.filter((h) => skip(h.key)) : [];
+    return { hits: hits.filter((h) => !skip || !skip(h.key)).slice(0, limit || 6), skipped };
   }
   function meta(p) {
     const parts = [];
@@ -145,5 +184,17 @@ window.People = (function () {
     if (p[4]) parts.push('חתן ' + p[4]);
     return parts.join(' · ');
   }
-  return { list: PEOPLE, get: (i) => PEOPLE[i], name: fullName, meta, search, norm };
+  /** What a row is called, and the line under it. */
+  function rowName(r) { return r.b != null ? BUSINESSES[r.b].name : fullName(PEOPLE[r.i]); }
+  function rowMeta(r) {
+    if (r.b == null) return meta(PEOPLE[r.i]);
+    const b = BUSINESSES[r.b];
+    return b.trade + ' · ' + fullName(PEOPLE[b.pid]) + (b.owner ? ' · על שם ' + b.owner : '');
+  }
+  const row = (key) => { const [k, n] = String(key).split(':'); return k === 'b' ? { key, i: BUSINESSES[+n].pid, b: +n } : { key, i: +n, b: null }; };
+  return {
+    list: PEOPLE, get: (i) => PEOPLE[i], name: fullName, meta, search, norm,
+    biz: (b) => BUSINESSES[b], bizOf: (pid) => (BIZ_OF[pid] === undefined ? null : BIZ_OF[pid]),
+    row, rowName, rowMeta, town: (r) => (r.b != null ? BUSINESSES[r.b].town : PEOPLE[r.i][5]),
+  };
 })();
