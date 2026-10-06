@@ -68,6 +68,11 @@ check_project() {
   local EXPIRY_DAYS=$DEF_EXPIRY_DAYS
   if [ -f "$docs/.limits" ]; then . "$docs/.limits"; fi
 
+  # A project can opt out of the method: docs/.lite keeps only the personal-data
+  # check, because that is the one failure here that cannot be undone.
+  local LITE=0; [ -f "$docs/.lite" ] && LITE=1
+  if [ "$LITE" = 1 ]; then note "lite method: only the personal-data check runs"; else
+
   # 1. every doc is listed in the index that owns it
   local missing=""
   while IFS= read -r f; do
@@ -162,6 +167,7 @@ check_project() {
     else bad "dependency violations in waiting.md:"; list "$violations"; fi
   fi
 
+  fi
   # 7. real personal or financial data must never enter the repository.
   #
   # This is the one failure on this list that cannot be undone. Everything
@@ -247,6 +253,7 @@ check_project() {
     note "if a match is deliberate, add a regex to docs/.pii-allow"
   fi
 
+  if [ "$LITE" != 1 ]; then
   # 8. every entity row carries a type.
   #
   # The type answers a question that was being re-argued from scratch every
@@ -274,6 +281,7 @@ check_project() {
     fi
   fi
 
+  fi
   # 9. remember which repo this project actually lives in.
   # The previous version checked the toolkit repo for every project.
   local top
