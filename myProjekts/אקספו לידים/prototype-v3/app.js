@@ -197,22 +197,35 @@ Reply with ONLY one JSON object, all strings in Hebrew:
 {"products":[{"name":"...","next":"...","options":["...","..."]}],"trade":"...","season":null,"institutions":false,"unclear":[]}
 
 Rules:
-- products: what he sells, as short buttons in HIS words (1-3 words), at most 8. Audiences (לבתים, לעסקים, למוסדות, לבתי כנסת) are NOT products. Drop prices and filler ("אני מוכר").
-- next: what HE does next with a visitor interested in that product, 2-4 Hebrew words, specific to his business (e.g. "לתאם מדידה", "לשלוח מחירון", "לבדוק תאריך", "להציע משלוח קבוע"). Never something that does not fit his business.
+- products: what he sells, as short buttons in HIS words (1-3 words), at most 8. ONLY things he actually named. Never add a product or service he did not say.
+- Audiences and occasions are NOT products: לבתים, לעסקים, למוסדות, לבתי כנסת, לאירועים, לשמחות, "לכל מי שצריך". They tell you who buys, nothing more.
+- Read community Hebrew correctly: "מזונות" = pastries and cakes (the mezonot blessing), not food or catering. "משווק", "סוכן", "מפיץ", "יבואן" = he sells goods made by others (a distributor), he does not produce or cook them. "בוטיק" = small premium makers.
+- Drop prices and filler ("אני מוכר", "אני משווק").
+- next: what HE does next with a visitor interested in that product, 2-4 Hebrew words, specific to his business and his role (a distributor sends a price list, arranges a tasting or a regular supply; he does not "measure" or "cook"). Examples of the form: "לשלוח מחירון", "לתאם טעימה", "להציע אספקה קבועה", "לבדוק תאריך". Never something that does not fit his business.
 - options: 2-3 other next steps that fit THIS business.
-- trade: his trade in 1-3 Hebrew words.
+- trade: his trade in 1-4 Hebrew words, including his role when he said it (e.g. "סוכן מאפיות בוטיק", not "קייטרינג").
 - season: the period of the Jewish year when his business is busiest, only if clearly so, from: "לפני פסח", "לפני ראש השנה", "אלול–תשרי", "לפני סוכות", "בין הזמנים", "עונת החתונות", "חנוכה", "פורים", "לפני הקיץ"; otherwise null.
 - institutions: true if he sells to institutions, shuls, yeshivas, schools or community groups.
 - unclear: parts of his sentence you could not understand.`;
 
-  function cleanAI(r) {
+  // A product whose main word is not in his sentence was invented: keep it, but marked "?".
+  const saidIt = (name, text) => {
+    const w = fin(name.split(/\s+/)[0] || '');
+    const t = fin(text);
+    return !w || t.includes(w) || (w.length > 3 && t.includes(w.slice(0, -2)));
+  };
+
+  function cleanAI(r, text) {
     if (!r || !Array.isArray(r.products)) throw { code: 'invalid_json' };
     const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
-    const products = r.products.slice(0, 8).map((p) => ({
-      name: str(p && p.name, 30), next: str(p && p.next, 30) || null,
-      opts: Array.isArray(p && p.options) ? p.options.map((o) => str(o, 30)).filter(Boolean).slice(0, 3) : [],
-      unsure: false,
-    })).filter((p) => p.name);
+    const products = r.products.slice(0, 8).map((p) => {
+      const name = str(p && p.name, 30);
+      return {
+        name, next: str(p && p.next, 30) || null,
+        opts: Array.isArray(p && p.options) ? p.options.map((o) => str(o, 30)).filter(Boolean).slice(0, 3) : [],
+        unsure: !saidIt(name, text),
+      };
+    }).filter((p) => p.name);
     return {
       products, trade: str(r.trade, 30), season: str(r.season, 30) || null, institutions: r.institutions === true,
       unclear: Array.isArray(r.unclear) ? r.unclear.map((u) => str(u, 40)).filter(Boolean) : [], dropped: [], by: 'ai',
@@ -348,7 +361,7 @@ Rules:
     if (btn) btn.disabled = true;
     if (note) note.textContent = 'קורא…';
     try {
-      applyReading(cleanAI(await ai.json(PROMPT(text), { modelTier: 'quick' })), text);
+      applyReading(cleanAI(await ai.json(PROMPT(text), { modelTier: 'quick' }), text), text);
     } catch (e) {
       const code = e && e.code;
       if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
