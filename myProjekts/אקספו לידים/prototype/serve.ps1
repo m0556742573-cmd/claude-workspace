@@ -1,6 +1,6 @@
 ﻿# Local-only static server for the expo prototype. Serves two folders, nothing else.
 $root = "C:\Users\user"
-$allowed = @("expo-data/", "claude/myProjekts/אקספו לידים/prototype/")
+$allowed = @("expo-data/", "claude/myProjekts/אקספו לידים/prototype/", "claude/myProjekts/אקספו לידים/prototype-v3/")
 $types = @{ ".html" = "text/html; charset=utf-8"; ".js" = "text/javascript; charset=utf-8"; ".css" = "text/css; charset=utf-8" }
 $l = New-Object System.Net.HttpListener
 $l.Prefixes.Add("http://localhost:8765/")
