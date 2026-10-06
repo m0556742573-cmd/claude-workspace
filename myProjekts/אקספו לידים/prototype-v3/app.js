@@ -669,5 +669,7 @@
     }
   });
 
+  // Test hook: lets the sentence reader be checked against real trades from the console.
+  window.Demo3 = { parse, STEPS };
   render();
 })();
