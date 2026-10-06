@@ -158,3 +158,15 @@ details.held { margin-top: 10px; } details.held summary { cursor: pointer; font-
 .menu button:hover { background: var(--surface-2); }
 .toast { position: fixed; bottom: 22px; inset-inline: 16px; margin: 0 auto; max-width: 520px; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 12px 16px; z-index: 50; box-shadow: var(--shadow-lg); font-weight: 600; }
 .foot { text-align: center; font-size: 12px; color: var(--faint); padding: 24px 0 0; }
+
+/* ---------- products you can correct ---------- */
+.prod-list { display: grid; gap: 6px; }
+.prod-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-height: 48px; }
+.prod-row .pn { font-weight: 800; }
+.prod-row .pnext { color: var(--muted); font-size: 15px; }
+.prod-row .q { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--warm-soft); color: var(--warm); font-size: 13px; font-weight: 800; }
+.add-row { display: flex; gap: 8px; margin-top: 8px; }
+.warn-li { color: var(--warm); }
+.btn.danger, .opt.danger { color: var(--hot); }
+button.row { width: 100%; text-align: start; font: inherit; color: inherit; cursor: pointer; }
+.link { border: 0; background: transparent; padding: 6px 0; text-align: start; min-height: 44px; }
