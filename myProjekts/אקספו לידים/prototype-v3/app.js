@@ -529,7 +529,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית'], ['try', 'ניסיון']];
   const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'חומרים ונוסח'], ['crm', 'שלבים, צוות ובוקר']];
-  const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'CRM']];
+  const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
     const m = $('#main');
@@ -1099,7 +1099,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /** Redraw wherever this lead is being edited. */
   function refreshLead(l) {
     const sh = $('#scrim .sheet[data-lead]');
-    if (sh && +sh.dataset.lead === l.id && !sh.dataset.tasks && !sh.dataset.note) { sh.innerHTML = leadBody(l, true); return; }
+    if (sh && +sh.dataset.lead === l.id && sh.dataset.tags) return sheetTags(l);
+    if (sh && +sh.dataset.lead === l.id && !sh.dataset.tasks && !sh.dataset.note && !sh.dataset.guard) { sh.innerHTML = leadBody(l, true); return; }
     if ($('#slot') && openId === l.id) renderLead();
     else if (S.phase === 'live' && S.view !== 'booth') render();
   }
@@ -1125,13 +1126,17 @@ Reply with ONLY one JSON object, all strings in Hebrew:
 
   // ---- sending ----
   const channelsOn = () => CHANNELS.filter((c) => S.biz.channels[c.k]).map((c) => c.name);
+  // One message goes out on one channel: WhatsApp first, then mail, then SMS — never the same text three times.
+  const CH_ORDER = ['wa', 'waApi', 'email', 'sms'];
+  const bestChannel = (keys) => { const k = CH_ORDER.find((c) => S.biz.channels[c] && (!keys || keys.includes(c))); return k ? CHANNELS.find((c) => c.k === k).name : ''; };
+  let byRule = false;   // set while an automation acts: what it sends is logged as the system's, not the owner's
   function doSend(l, name) {
     if (l.sent.includes(name)) return;
-    const ch = channelsOn();
-    if (!ch.length) { l.pendingMat = true; toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return; }
+    const ch = bestChannel();
+    if (!ch) { l.pendingMat = true; if (!byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return; }
     l.sent.push(name); l.pendingMat = false;
-    log(l, `📎 ${name} — ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ב${ch.join(' + ')}`);
-    toast(`📎 ${name} ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ל${People.rowName(l)} · ${ch.join(' + ')}`);
+    log(l, `${byRule ? '⚙️ ' : ''}📎 ${name} — ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ב${ch}${byRule ? ' (אוטומטי)' : ''}`);
+    if (!byRule) toast(`📎 ${name} ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ל${People.rowName(l)} · ${ch}`);
   }
   /* A button whose step is "send at once" queues its own material, and the queue goes
    * out when the card closes. Until then, untapping the button takes it back — a
@@ -1338,7 +1343,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       ${insightsBox('dash', 'מה רואים בתיוג של היום')}
       <h2 style="margin-top:26px">מחר בבוקר</h2>
       ${crmRows(openTasks(L).slice(0, 5)) || '<div class="empty">אין משימות.</div>'}
-      <div class="actions"><button class="btn" data-view="crm">לרשימה המלאה ב-CRM ←</button></div>`;
+      <div class="actions"><button class="btn" data-view="crm">לרשימה המלאה במעקב ←</button></div>`;
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
@@ -1474,8 +1479,9 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     { id: 't3', name: 'תזכורת לפגישה', ch: 'wa', text: 'שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!' },
     { id: 't4', name: 'לפני העונה', ch: 'any', text: 'שלום {שם}, העונה מתקרבת — זה הזמן להזמין. נשמח לשמוע ממך.' },
   ];
+  // Rules that send something to the visitor start switched off: the owner turns them on knowingly.
   const DEF_RULES = [
-    { id: 'r1', on: true, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'send', mat: '' }, fired: 0 },
+    { id: 'r1', on: false, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'send', mat: '' }, fired: 0 },
     { id: 'r2', on: true, trigger: 'captured', arg: null, cond: { warm: 0 }, action: { kind: 'step', type: 'meet', days: 1 }, fired: 0 },
     { id: 'r3', on: true, trigger: 'idle', arg: 7, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0 },
     { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't1' }, fired: 0 },
@@ -1489,10 +1495,17 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!b.templates) b.templates = clone(DEF_TEMPLATES);
     if (!b.rules) b.rules = clone(DEF_RULES);
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
+    if (!b.digestNotes) b.digestNotes = [];
     if (!b.views) b.views = [];
+    if (!b.rulesV2) {   // after the reviews: sending rules off unless the owner turns them on, and one ready view
+      b.rulesV2 = true;
+      b.rules.forEach((r) => { if ((r.action.kind === 'send' || r.action.kind === 'message') && !r.fired) r.on = false; });
+      if (!b.views.some((v) => v.builtin)) b.views.unshift({ name: 'חמים בלי מענה', builtin: true, tb: { f: { warm: '0', answer: 'none' }, sort: { col: 'at', dir: 1 }, cols: ['name', 'town', 'stage', 'last', 'next', 'due', 'phone'] } });
+    }
     if (!S.crmTab) S.crmTab = 'overview';
     if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'last', 'next', 'due', 'owner'] };
     if (!S.tb.v2) { S.tb.v2 = true; if (!S.tb.cols.includes('last')) S.tb.cols.splice(Math.max(0, S.tb.cols.indexOf('next')), 0, 'last'); }
+    if (S.mine === undefined) S.mine = true;
     S.leads.forEach(upgradeLead);
   }
   function upgradeLead(l) {
@@ -1502,6 +1515,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!l.contact) l.contact = { phone: '', email: '' };
     if (!l.files) l.files = [];
     if (!l.ruled) l.ruled = {};
+    if (!l.ruleHits) l.ruleHits = {};
     if (!l.queue) l.queue = [];
     if (!l.by) l.by = 'בעלים';
   }
@@ -1509,11 +1523,31 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   const stageOf = (kind) => S.biz.stages.find((s) => s.kind === kind);
   const nis = (v) => (Math.round(v || 0)).toLocaleString('he-IL') + ' ₪';
   const dateShort = (t) => { if (!t) return '—'; const d = new Date(t); return d.getDate() + '/' + (d.getMonth() + 1); };
-  /** What the lead is worth: typed in, or the average of the most valuable button tapped. */
+  /** What the lead is worth: typed in, or the average the owner set on the most valuable button tapped. Never guessed. */
   const estValue = (l) => Math.max(0, ...tagged(l).map((b) => +b.value || 0));
-  const leadValue = (l) => (l.value != null && l.value !== '' ? +l.value : estValue(l));
+  const typedValue = (l) => l.value != null && l.value !== '';
+  const leadValue = (l) => (typedValue(l) ? +l.value : estValue(l));
   const isOpenLead = (l) => !l.won && !l.lost;
-  const touched = (l) => l.log.filter((e) => /^(📞|📎|💬)/.test(e.t));
+  const many = (n, one, few) => (n === 1 ? one : n + ' ' + few);   // "פעם אחת" / "3 פעמים"
+
+  /* Contact, counted honestly. A person reached the visitor when the owner spoke with
+   * him, or sent him something by hand. A "no answer" is an attempt, not contact, and
+   * what an automation sent is the system's doing — neither may make a lead look handled. */
+  const isAuto = (t) => /^⚙️/.test(t);
+  const isTalk = (t) => /^📞 דיברנו/.test(t);
+  const isNoAnswer = (t) => /^📞 לא ענה/.test(t);
+  const isHumanSend = (t) => /^(💬|📎)/.test(t) && !/ממתין/.test(t);
+  const touched = (l) => l.log.filter((e) => isTalk(e.t) || isHumanSend(e.t));
+  const tries = (l) => l.log.filter((e) => isNoAnswer(e.t));
+  /** none · tried (no answer yet) · sent (material or a message, not spoken) · talked */
+  function answerState(l) {
+    if (l.log.some((e) => isTalk(e.t))) return 'talked';
+    if (l.log.some((e) => isHumanSend(e.t))) return 'sent';
+    if (tries(l).length) return 'tried';
+    return 'none';
+  }
+  const ANSWER = { none: 'עוד לא', tried: 'ניסינו ולא ענה', sent: 'קיבל חומר או הודעה', talked: 'דיברנו' };
+  const reached = (l) => ['sent', 'talked'].includes(answerState(l));
 
   function setStage(l, id, why) {
     if (l.stage === id) return;
@@ -1533,14 +1567,17 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
 
   // ---- automations ----
-  const TRIGGERS = { captured: 'ליד נקלט בדוכן', noanswer: 'לא ענה', idle: 'עברו ימים בלי מגע', stage: 'ליד עבר לשלב', won: 'נסגרה עסקה' };
-  const ACTIONS = { step: 'להוסיף צעד', send: 'לשלוח חומר', message: 'לשלוח הודעה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להתריע לי' };
+  const TRIGGERS = { captured: 'ליד נקלט בדוכן', noanswer: 'לא ענה', idle: 'עוברים ימים בלי מגע', stage: 'ליד עובר לשלב', won: 'נסגרה עסקה' };
+  const ACTIONS = { step: 'להוסיף צעד', send: 'לשלוח חומר', message: 'לשלוח הודעה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להוסיף להודעת הבוקר' };
+  const sendsOut = (r) => r.action.kind === 'send' || r.action.kind === 'message';
+  const tplById = (id) => S.biz.templates.find((t) => t.id === id);
   function ruleText(r) {
     const a = r.action;
-    const when = r.trigger === 'noanswer' ? `לא ענה ${r.arg} פעמים` : r.trigger === 'idle' ? `${r.arg} ימים בלי מגע` : r.trigger === 'stage' ? `עבר ל"${stageById(r.arg).name}"` : TRIGGERS[r.trigger];
+    const when = r.trigger === 'noanswer' ? `לא ענה ${many(r.arg, 'פעם אחת', 'פעמים')}` : r.trigger === 'idle' ? `עוברים ${r.arg} ימים בלי מגע` : r.trigger === 'stage' ? `ליד עובר ל"${stageById(r.arg).name}"` : r.trigger === 'captured' ? 'ליד נקלט בדוכן' : 'נסגרה עסקה';
     const c = r.cond || {};
     const conds = [c.warm != null ? words()[c.warm] : '', c.btn && btnById(c.btn) ? 'סימן "' + btnById(c.btn).label + '"' : '', c.biz === true ? 'עסק' : c.biz === false ? 'פרטי' : '', c.minValue ? 'שווה ' + nis(c.minValue) + '+' : ''].filter(Boolean);
-    const then = a.kind === 'step' ? `${STEPS[a.type].name} תוך ${a.days || 1} ימים` : a.kind === 'send' ? 'לשלוח ' + (a.mat || 'את החומר') : a.kind === 'message' ? 'לשלוח "' + ((S.biz.templates.find((t) => t.id === a.tpl) || {}).name || 'הודעה') + '"' : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להתריע לי';
+    const days = (n) => (n <= 0 ? 'היום' : n === 1 ? 'תוך יום' : `תוך ${n} ימים`);
+    const then = a.kind === 'step' ? `${STEPS[a.type].name} ${days(a.days || 1)}` : a.kind === 'send' ? 'לשלוח ' + (a.mat || 'את החומר') : a.kind === 'message' ? 'לשלוח "' + ((tplById(a.tpl) || {}).name || 'הודעה') + '"' : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להוסיף להודעת הבוקר';
     return { when: 'כש' + when + (conds.length ? ' · רק אם: ' + conds.join(', ') : ''), then };
   }
   function condOk(r, l) {
@@ -1551,30 +1588,37 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (c.minValue && leadValue(l) < c.minValue) return false;
     return true;
   }
+  const matching = (trigger, l, arg) => (S.biz.rules || []).filter((r) => r.on && r.trigger === trigger && (r.trigger !== 'noanswer' && r.trigger !== 'stage' || r.arg === arg) && condOk(r, l));
   let ruleDepth = 0;
+  let holdSends = false;   // "move it, but don't send this time"
   function runRules(trigger, l, arg) {
     if (ruleDepth > 1 || !S.biz.rules) return;   // a rule may set off one more, never a chain
     ruleDepth++;
-    S.biz.rules.filter((r) => r.on && r.trigger === trigger && (r.trigger !== 'noanswer' && r.trigger !== 'stage' || r.arg === arg) && condOk(r, l)).forEach((r) => applyRule(r, l));
+    matching(trigger, l, arg).forEach((r) => applyRule(r, l));
     ruleDepth--;
   }
   function applyRule(r, l) {
     const a = r.action;
+    if (holdSends && sendsOut(r)) return;
     r.fired = (r.fired || 0) + 1;
-    log(l, '⚙️ אוטומציה: ' + ruleText(r).then);
+    l.ruleHits = l.ruleHits || {};
+    l.ruleHits[r.id] = (l.ruleHits[r.id] || 0) + 1;
+    byRule = true;
+    if (!sendsOut(r)) log(l, '⚙️ אוטומציה: ' + ruleText(r).then);
     if (a.kind === 'step') { const s = normStep({ type: a.type, days: a.days || 1 }); addManual(l, s, dueFor(s)); }
-    else if (a.kind === 'send') { const name = a.mat || (S.biz.materials[0] || {}).name; if (name) doSend(l, name); else l.pendingMat = true; }
-    else if (a.kind === 'message') sendTemplate(l, a.tpl, true);
+    else if (a.kind === 'send') { const name = a.mat || (S.biz.materials[0] || {}).name; if (name && !l.optOut) doSend(l, name); else if (!name) l.pendingMat = true; }
+    else if (a.kind === 'message') { if (!l.optOut) sendTemplate(l, a.tpl, true); }
     else if (a.kind === 'stage') setStage(l, a.stage, 'אוטומציה');
     else if (a.kind === 'warm') { l.warmth = a.value || 0; l.warmBy = 'hand'; }
-    else if (a.kind === 'notify') toast('🔔 ' + People.rowName(l) + ': ' + ruleText(r).when);
+    else if (a.kind === 'notify') S.biz.digestNotes.push({ at: now(), text: People.rowName(l) + ' — ' + ruleText(r).when.replace(/^כש/, '') });
+    byRule = false;
   }
-  /** "N days without contact" is checked whenever the CRM is opened, once per quiet spell. */
+  /** "N days without contact" counts from the last real contact or attempt, and is checked whenever the CRM opens, once per quiet spell. */
   function runIdle() {
     const rules = (S.biz.rules || []).filter((r) => r.on && r.trigger === 'idle');
     if (!rules.length) return;
     leadsNow().filter((l) => isOpenLead(l) && !l.audience).forEach((l) => {
-      const last = Math.max(l.at, ...l.log.map((e) => e.at));
+      const last = Math.max(l.at, ...touched(l).map((e) => e.at), ...tries(l).map((e) => e.at));
       const quiet = dayNo(now()) - dayNo(last);
       rules.forEach((r) => {
         const k = r.id + ':' + dayNo(last);
@@ -1584,19 +1628,20 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
 
   // ---- messages ----
-  const CH_NAMES = { any: 'כל הערוצים הפעילים', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
-  function channelsFor(t) {
-    const on = CHANNELS.filter((c) => S.biz.channels[c.k]);
-    const fit = t.ch === 'any' ? on : on.filter((c) => (t.ch === 'wa' ? c.k === 'wa' || c.k === 'waApi' : c.k === t.ch));
-    return fit.map((c) => c.name);
-  }
-  function sendTemplate(l, tid, quiet) {
-    const t = S.biz.templates.find((x) => x.id === tid);
-    if (!t) return false;
-    const ch = channelsFor(t);
-    if (!ch.length) { if (!quiet) toast('אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".'); return false; }
-    log(l, `💬 "${t.name}" נשלח ב${ch.join(' + ')}`);
-    if (!quiet) toast(`💬 "${t.name}" נשלח ל${People.rowName(l)}`);
+  const CH_NAMES = { any: 'הערוץ הזמין הראשון', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
+  const CH_KEYS = { any: null, email: ['email'], sms: ['sms'], wa: ['wa', 'waApi'] };
+  /** The one channel this template goes out on — or '' when none is connected. */
+  const channelFor = (t) => bestChannel(CH_KEYS[t.ch] || null);
+  const OPT_OUT = 'להסרה מרשימת התפוצה השיבו "הסר".';
+  /** A template filled in for one lead. Messages to a group carry the opt-out line the law asks for. */
+  const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, (S.biz.materials[0] || {}).name || 'החומר') + (toGroup ? '\n' + OPT_OUT : '');
+  function sendTemplate(l, tid, quiet, toGroup) {
+    const t = tplById(tid);
+    if (!t || l.optOut) return false;
+    const ch = channelFor(t);
+    if (!ch) { if (!quiet) toast('אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".'); return false; }
+    log(l, `${byRule ? '⚙️ ' : ''}💬 "${t.name}" נשלח ב${ch}${byRule ? ' (אוטומטי)' : toGroup ? ' (לקבוצה)' : ''}`);
+    if (!quiet) toast(`💬 "${t.name}" נשלח ל${People.rowName(l)} · ${ch}`);
     return true;
   }
 
@@ -1643,15 +1688,19 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   // ---- shared pieces ----
   let crmFilter = null;      // the tasks tab: null = today, or everything open when nothing is due today
   let crmQuery = '';
+  let rowOpen = null;        // the task row whose "how did it go?" is open in place
+  const me = () => S.biz.team[0];
+  const mineOnly = () => S.mine && S.biz.team.length > 1;
   function openTasks(L) {
     const score = (l) => { const p = plan(l); return (p.due ? p.due.getTime() : 9e15) - (effWarm(l) === 0 ? H.DAY / 2 : 0); };
     return L.filter((l) => tasks(l).length && plan(l).type !== 'season').sort((a, b) => score(a) - score(b));
   }
   function barChart(rows, fmt) {
     const max = Math.max(1, ...rows.map((r) => r.value));
-    return `<div class="bars">${rows.map((r) => `<div class="bar-row" title="${esc(r.label)}: ${esc((fmt || String)(r.value))}">
+    return `<div class="bars">${rows.map((r) => `<div class="bar-row${r.thin ? ' thin' : ''}" title="${esc(r.label)}: ${esc((fmt || String)(r.value))}">
       <span class="bl">${esc(r.label)}</span><span class="bt"><span class="bf${r.cls ? ' ' + r.cls : ''}" style="width:${(r.value / max * 100).toFixed(1)}%"></span></span><span class="bv">${esc((fmt || String)(r.value))}${r.sub ? ' <span class="faint">' + esc(r.sub) + '</span>' : ''}</span></div>`).join('')}</div>`;
   }
+  const CRM_NAME = 'המעקב שלי';
   const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
   // Each view's ⚙️ goes straight to the settings of what it shows.
   const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'החומרים והנוסח'] };
@@ -1660,29 +1709,36 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const L = leadsNow();
     const rec = S.crmLead && leadById(S.crmLead);
     const vs = VIEW_SETTINGS[S.crmTab];
-    m.innerHTML = `<div class="crm-head"><h1>CRM</h1>
+    m.innerHTML = `<div class="crm-head"><h1>${CRM_NAME}</h1>
         <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}</span></div>
-      <nav class="crm-tabs" aria-label="CRM">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!rec && S.crmTab === k}">${t}</button>`).join('')}
+      <nav class="crm-tabs" aria-label="${CRM_NAME}">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!rec && S.crmTab === k}">${t}</button>`).join('')}
         ${!rec && vs && vs[0] !== 'auto' ? `<button class="ctab gear" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</nav>
       ${!rec ? askBox() : ''}
-      ${!rec && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות CRM אמיתי בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
+      ${!rec && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
         <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
       <div id="crm-body"></div>`;
     if (rec) return recordPage($('#crm-body'), rec);
     ({ overview: crmOverview, tasks: crmTasks, pipeline: crmPipeline, table: crmTable, segments: crmSegments, auto: crmAuto, messages: crmMessages }[S.crmTab] || crmOverview)($('#crm-body'), L);
   }
 
-  // ---- "the last time we were in touch" — from every channel, not only mail ----
-  const TOUCH_KIND = { '📞': 'שיחה', '📎': 'חומר', '💬': 'הודעה' };
+  // ---- contact, as the screens say it ----
   function lastTouch(l) {
     const t = touched(l);
     const e = t[t.length - 1];
-    return e ? { at: e.at, kind: TOUCH_KIND[[...e.t][0]] || '' } : null;
+    return e ? { at: e.at, kind: isTalk(e.t) ? 'דיברנו' : /^📎/.test(e.t) ? 'חומר' : 'הודעה' } : null;
   }
   function agoText(at) {
     if (!at) return 'עוד לא';
     const d = dayNo(now()) - dayNo(at);
     return d <= 0 ? 'היום' : d === 1 ? 'אתמול' : 'לפני ' + d + ' ימים';
+  }
+  /** "דיברנו · לפני 3 ימים" / "לא ענה ×2 · לפני 7 ימים" / "עוד לא" — one line for every list. */
+  function contactLine(l) {
+    const lt = lastTouch(l);
+    const tr = tries(l);
+    if (lt) return lt.kind + ' · ' + agoText(lt.at) + (tr.length && tr[tr.length - 1].at > lt.at ? ` · אחר כך לא ענה${tr.length > 1 ? ' ×' + tr.length : ''}` : '');
+    if (tr.length) return `לא ענה${tr.length > 1 ? ' ×' + tr.length : ''} · ${agoText(tr[tr.length - 1].at)}`;
+    return 'עוד לא היה מגע';
   }
 
   // ---- ask the data, in plain words ----
@@ -1699,17 +1755,21 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!ai || !q) return;
     ASK = { q, busy: true, answer: '', ids: [] };
     render();
-    const facts = leadsNow().slice(-150).map((l) => Object.assign(leadFacts(l), { stage: stageById(l.stage).name, value: leadValue(l), owner: l.owner, lastTouchDays: lastTouch(l) ? dayNo(now()) - dayNo(lastTouch(l).at) : null }));
-    const prompt = `You answer a business owner's question about his CRM, in Hebrew. He exhibited at a Hasidic community business fair; these are his leads.
-Today: ${H.label(new Date(now()))}. His trade: ${S.biz.trade || 'unknown'}. His goal: ${S.biz.goalNote || S.biz.goal || 'not given'}.
-Stages: ${S.biz.stages.map((s) => s.name).join(', ')}. Warmth words: ${words().join(', ')}.
-Leads (JSON): ${JSON.stringify(facts)}
-His question: """${q.slice(0, 300)}"""
-Answer from the data only — count exactly, never guess. If the data cannot answer it, say so plainly.
-Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":[ids of the leads the answer is about, if any]}`;
+    // The question first and the counts ready-made: a long list must never push the question out of the window.
+    const L = leadsNow();
+    const facts = L.slice(-100).map((l) => ({ id: l.id, name: People.rowName(l), town: People.town(l), business: l.b != null, stage: stageById(l.stage).name, warmth: effWarm(l) == null ? null : words()[effWarm(l)],
+      contact: ANSWER[answerState(l)], tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, value: leadValue(l) || undefined, owner: l.owner, next: tasks(l).length ? plan(l).label : null }));
+    const count = (f) => { const o = {}; L.forEach((l) => { const k = f(l); o[k] = (o[k] || 0) + 1; }); return o; };
+    const prompt = `Question from a business owner about his leads (answer in Hebrew): """${q.slice(0, 300)}"""
+Answer from the data below only. Count exactly; never guess. If the data cannot answer, say so plainly.
+Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":[ids of the leads the answer is about, if any]}
+
+Context: he exhibited at a Hasidic community business fair. Today: ${H.label(new Date(now()))}. Trade: ${S.biz.trade || 'unknown'}. Goal: ${S.biz.goalNote || S.biz.goal || 'not given'}.
+Totals over all ${L.length} leads — by stage: ${JSON.stringify(count((l) => stageById(l.stage).name))}; by warmth: ${JSON.stringify(count((l) => (effWarm(l) == null ? 'none' : words()[effWarm(l)])))}; by contact: ${JSON.stringify(count((l) => ANSWER[answerState(l)]))}.
+Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts)}`;
     try {
       const r = await ai.json(prompt, { modelTier: 'default' });
-      const ids = new Set(leadsNow().map((l) => l.id));
+      const ids = new Set(L.map((l) => l.id));
       ASK = { q, busy: false, answer: str(r && r.answer, 600) || 'לא התקבלה תשובה.', ids: (Array.isArray(r && r.leadIds) ? r.leadIds : []).filter((id) => ids.has(id)) };
     } catch (e) { ASK = null; aiFailed(e); }
     render();
@@ -1726,25 +1786,31 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     const hot = real.filter((l) => effWarm(l) === 0);
     const fast = hot.filter((l) => touched(l).some((e) => e.at - l.at <= 2 * H.DAY));
     const first = real.length ? Math.min(...real.map((l) => l.at)) : now();
-    const day = dayNo(now()) - dayNo(first);
-    const reached = real.filter((l) => touched(l).length).length;
-    const pipeValue = open.reduce((a, l) => a + leadValue(l), 0);
-    const kpi = (n, t, sub, cls) => `<div class="kpi${cls ? ' ' + cls : ''}"><span class="n">${n}</span><span class="t">${esc(t)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}</div>`;
+    const day = dayNo(now()) - dayNo(first) + 1;   // the fair itself is day 1
+    const st = { talked: 0, sent: 0, tried: 0, none: 0 };
+    real.forEach((l) => { st[answerState(l)]++; });
+    const typed = open.filter(typedValue).reduce((a, l) => a + +l.value, 0);
+    const est = open.filter((l) => !typedValue(l)).reduce((a, l) => a + estValue(l), 0);
+    const kpi = (n, t, sub, cls, act) => `<${act ? `button data-act="${act}"` : 'div'} class="kpi${cls ? ' ' + cls : ''}"><span class="n">${n}</span><span class="t">${esc(t)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}</${act ? 'button' : 'div'}>`;
     const stages = S.biz.stages.map((s) => ({ label: s.name, value: real.filter((l) => l.stage === s.id).length, sub: nis(real.filter((l) => l.stage === s.id).reduce((a, l) => a + leadValue(l), 0)), cls: s.kind === 'won' ? 'good' : s.kind === 'lost' ? 'muted' : '' }));
     const btnRows = S.biz.buttons.map((b) => { const ls = real.filter((l) => l.tags.includes(b.id)); return { label: b.label, value: ls.length, sub: ls.filter((l) => l.won).length ? ls.filter((l) => l.won).length + ' נסגרו' : '' }; }).filter((r) => r.value).sort((a, b) => b.value - a.value).slice(0, 8);
     const firstName = (S.account.name || '').split(' ')[0];
     const todayNames = dueToday.slice(0, 3).map((l) => People.rowName(l) + ' — ' + plan(l).label);
+    const notes = S.biz.digestNotes.slice(-3);
     box.innerHTML = `
       <div class="kpis">
-        ${kpi(real.length, 'לידים מהתערוכה', reached + ' כבר קיבלו מענה')}
-        ${kpi(dueToday.length, 'לטיפול היום', late ? late + ' באיחור' : '', late ? 'bad' : '')}
-        ${kpi(nis(pipeValue), 'שווי בצינור', open.length + ' פתוחים')}
-        ${kpi(won.length, 'עסקאות שנסגרו', nis(won.reduce((a, l) => a + leadValue(l), 0)), 'good')}
-        ${kpi(hot.length ? fast.length + '/' + hot.length : '—', 'חמים שקיבלו מענה תוך 48 שעות', hot.length ? Math.round(fast.length / hot.length * 100) + '% — המדד הכי משפיע על סגירה' : '')}
+        ${kpi(dueToday.length, 'לטיפול היום', late ? (late === 1 ? 'אחד באיחור' : late + ' באיחור') : 'לפתוח את הרשימה ←', late ? 'bad' : '', 'go-today')}
+        ${kpi(hot.length ? fast.length + '/' + hot.length : '—', 'חמים שקיבלו מענה תוך 48 שעות', hot.length ? 'המדד שהכי משפיע על סגירה' : '')}
+        ${kpi(typed + est ? nis(typed + est) : '—', 'שווי בצינור', typed + est ? `${nis(typed)} מוקלד · ${nis(est)} מוערך` : 'עוד לא הוזן שווי — אפשר לכל ליד, או ממוצע לכל כפתור')}
+        ${kpi(won.length, 'עסקאות שנסגרו', won.length ? nis(won.reduce((a, l) => a + leadValue(l), 0)) : '', 'good')}
       </div>
+      ${dueToday.length ? `<div class="actions"><button class="btn primary big" data-act="go-today">להתחיל: ${dueToday.length} לטיפול ←</button></div>` : ''}
       <section class="card" style="margin-top:14px"><h2>14 הימים שאחרי התערוכה</h2>
-        <div class="days14" aria-label="יום ${Math.min(day, 14)} מתוך 14">${Array.from({ length: 14 }, (_, i) => `<span class="${i < day ? 'past' : i === day ? 'now' : ''}"></span>`).join('')}</div>
-        <p style="margin:8px 0 0">${day > 14 ? 'עברו 14 הימים.' : `יום ${day} מתוך 14.`} חזרת ל-<b>${reached}</b> מתוך ${real.length}, נסגרו <b>${won.length}</b> עסקאות (${nis(won.reduce((a, l) => a + leadValue(l), 0))}), ונשארו <b>${open.filter((l) => !touched(l).length).length}</b> שעוד לא קיבלו שום מענה.</p></section>
+        <div class="days14" aria-label="יום ${Math.min(day, 14)} מתוך 14">${Array.from({ length: 14 }, (_, i) => `<span class="${i < day - 1 ? 'past' : i === day - 1 ? 'now' : ''}"></span>`).join('')}</div>
+        <p style="margin:8px 0 0">${day > 14 ? 'עברו 14 הימים.' : `יום ${day} מתוך 14.`} מ-${real.length} לידים מהתערוכה:
+          <b>${st.talked}</b> דיברתם, <b>${st.sent}</b> קיבלו חומר או הודעה, <b>${st.tried}</b> ${st.tried === 1 ? 'לא ענה' : 'לא ענו'}, ו-<b>${st.none}</b> ${st.none === 1 ? 'עוד לא קיבל' : 'עוד לא קיבלו'} שום מענה.
+          נסגרו <b>${won.length}</b> עסקאות${won.length ? ` (${nis(won.reduce((a, l) => a + leadValue(l), 0))})` : ''}.</p>
+        ${st.none + st.tried ? `<div class="actions"><button class="btn" data-act="view-noanswer">לראות את ${st.none + st.tried} שעוד לא קיבלו מענה</button></div>` : ''}</section>
       <div class="two-col">
         <section class="card"><h2>הצינור לפי שלבים</h2>${barChart(stages)}</section>
         <section class="card"><h2>הכפתורים שהביאו לידים</h2>${btnRows.length ? barChart(btnRows) : '<div class="empty">עוד אין סימונים.</div>'}</section>
@@ -1752,14 +1818,15 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       <section class="card digest-card" style="margin-top:14px"><h2>הודעת הבוקר שלך</h2>
         ${S.biz.digest.on ? `<div class="bubble"><b>בוקר טוב${firstName ? ' ' + esc(firstName) : ''}!</b><br>היום, ${esc(H.label(new Date(now())))}:<br>
           ${dueToday.length ? `📞 ${dueToday.length} לטיפול${late ? `, מהם ${late} באיחור` : ''}<br>${todayNames.map((t) => '• ' + esc(t)).join('<br>')}${dueToday.length > 3 ? '<br>• ועוד ' + (dueToday.length - 3) : ''}` : '✓ אין משימות להיום.'}<br>
-          💰 בצינור: ${nis(pipeValue)}</div>
-          <p class="faint">נשלח כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch])}. בדוגמית — תצוגה בלבד. <button class="link" data-act="crm-settings">שינוי</button></p>`
+          ${notes.length ? notes.map((n) => '🔔 ' + esc(n.text)).join('<br>') + '<br>' : ''}${typed + est ? '💰 בצינור: ' + nis(typed + est) : ''}</div>
+          <p class="faint">נשלח אליך כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch] || 'וואטסאפ')}, מהמספר של מערכת הדוכן. בדוגמית — תצוגה בלבד. <button class="link" data-act="crm-settings">שינוי</button></p>`
           : '<p class="muted">כבוי. <button class="link" data-act="crm-settings">להפעיל</button></p>'}</section>
       ${insightsBox('crm', 'מה כדאי לעשות')}`;
   }
 
   // ---- משימות ----
-  function crmTasks(box, L) {
+  function crmTasks(box, L0) {
+    const L = mineOnly() ? L0.filter((l) => l.owner === me()) : L0;
     const t0 = dayNo(now());
     const due = (l) => { const p = plan(l); return p.due ? dayNo(p.due.getTime()) - t0 : null; };
     const groups = {
@@ -1770,50 +1837,68 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       audience: L.filter((l) => !l.won && !tasks(l).length),
       won: L.filter((l) => l.won),
     };
-    const late = groups.today.filter((l) => due(l) < 0).length;
     const f = crmFilter || (groups.today.length ? 'today' : 'all');
     const q = People.norm(crmQuery);
     const hay = (l) => People.norm(People.rowName(l) + ' ' + People.town(l) + ' ' + tagged(l).map((b) => b.label).join(' ') + ' ' + l.roleOf + ' ' + l.notes.map((n) => n.text).join(' '));
-    const list = q ? L.filter((l) => hay(l).includes(q)) : groups[f];
-    const tab = (k, t) => `<button class="tab" data-filter="${k}" aria-pressed="${!q && f === k}">${t} <span class="n">${groups[k].length}</span></button>`;
-    const body = !list.length ? `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד.'}</div>`
-      : !q && (f === 'today' || f === 'all') ? [0, 1, null, 2].map((w) => {
-        const part = list.filter((l) => effWarm(l) === w);
-        return part.length ? `<div class="group-head">${w == null ? 'בלי חום' : esc(words()[w])} · ${part.length}</div>${crmRows(part)}` : '';
-      }).join('') : crmRows(list);
-    box.innerHTML = `<nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'השבוע')}${tab('all', 'כל הפתוחים')}</nav>
-      ${late && !q ? `<div class="late-note">${late} באיחור</div>` : ''}
-      <div class="more-tabs"><span class="faint">עוד:</span>${tab('season', 'לעונה')}${tab('audience', 'קהל ולא רלוונטי')}${tab('won', 'נסגרו')}</div>
+    const list = q ? L0.filter((l) => hay(l).includes(q)) : groups[f];
+    const tab = (k, t, minor) => (minor && !groups[k].length ? '' : `<button class="tab${minor ? ' minor' : ''}" data-filter="${k}" aria-pressed="${!q && f === k}">${t} <span class="n">${groups[k].length}</span></button>`);
+    let body;
+    if (!list.length) body = `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד.'}</div>`;
+    else if (!q && f === 'today') {
+      const late = list.filter((l) => due(l) < 0);
+      const now0 = list.filter((l) => due(l) >= 0);
+      body = (late.length ? `<div class="group-head bad">באיחור · ${late.length}</div>${crmRows(late, true)}` : '') + (now0.length ? `<div class="group-head">היום · ${now0.length}</div>${crmRows(now0, true)}` : '');
+    } else if (!q && f === 'all') {
+      body = [0, 1, null, 2].map((w) => { const part = list.filter((l) => effWarm(l) === w); return part.length ? `<div class="group-head">${w == null ? 'בלי חום' : esc(words()[w])} · ${part.length}</div>${crmRows(part, true)}` : ''; }).join('');
+    } else body = crmRows(list, true);
+    box.innerHTML = `<div class="tasks-bar"><nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'בהמשך השבוע')}${tab('all', 'כל הצעדים')}</nav>
+        ${S.biz.team.length > 1 ? `<div class="chips"><button class="chip" data-mine="1" aria-pressed="${mineOnly()}">שלי</button><button class="chip" data-mine="0" aria-pressed="${!mineOnly()}">של כולם</button></div>` : ''}</div>
+      <div class="more-tabs">${tab('season', 'לעונה', true)}${tab('audience', 'קהל ולא רלוונטי', true)}${tab('won', 'נסגרו', true)}</div>
       <input id="crm-q" class="text-input" placeholder="חיפוש בכל הלידים — שם, עיר, כפתור, מוסד או הערה" aria-label="חיפוש בלידים" value="${esc(crmQuery)}" autocomplete="off">
       ${q ? `<div class="faint" style="margin-top:6px">מחפש בכל הלידים · <button class="link" data-act="crm-clear">ניקוי</button></div>` : ''}
       <div style="margin-top:10px">${body}</div>`;
     $('#crm-q').addEventListener('input', (e) => { crmQuery = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#crm-q'); n.focus(); n.setSelectionRange(pos, pos); });
   }
-  /** Two lines a lead: who, and what is next. The reasons live in the lead's own sheet. */
-  function crmRows(list) {
+  /** Two lines a lead: who, and what is next with the last contact. With `withCall`, a 📞 that records the call in place. */
+  function crmRows(list, withCall) {
     if (!list.length) return '';
     return `<div class="rows">${list.map((l) => {
       const p = plan(l);
       const w = effWarm(l);
       const more = tasks(l).length - 1;
       const v = leadValue(l);
-      return `<button class="row" data-crmlead="${l.id}"><span><span class="dot w${w == null ? '' : w}" aria-hidden="true"></span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span> <span class="state">${esc(stageById(l.stage).name)}</span>${v ? ` <span class="money">${nis(v)}</span>` : ''}${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
-        <span class="due">${planHTML(p)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span></button>`;
+      const late = p.due && dayNo(p.due.getTime()) < dayNo(now());
+      return `<div class="row${rowOpen === l.id ? ' open' : ''}">
+        <button class="row-main" data-crmlead="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span> <span class="state">${w == null ? 'בלי חום' : esc(words()[w])}</span> <span class="state">${esc(stageById(l.stage).name)}</span>${v ? ` <span class="money">${nis(v)}</span>` : ''}${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
+          <span class="due${late ? ' late' : ''}">${late ? 'באיחור · ' : ''}${planHTML(p)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span>
+          <span class="why">${esc(contactLine(l))}${l.contact.phone ? ` · <bdi dir="ltr">${esc(l.contact.phone)}</bdi>` : ''}</span></button>
+        ${withCall && isOpenLead(l) ? `<button class="row-call" data-rowcall="${l.id}" aria-label="להתקשר ל${esc(People.rowName(l))}" aria-expanded="${rowOpen === l.id}">📞</button>` : ''}
+        ${rowOpen === l.id ? `<div class="row-out"><span class="faint">${l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</span>
+          <button class="chip" data-rowout="talk" data-lid="${l.id}">דיברנו — מה הלאה</button><button class="chip" data-rowout="noans" data-lid="${l.id}">לא ענה</button>
+          <button class="chip" data-rowout="won" data-lid="${l.id}">🎉 נסגרה עסקה</button><button class="chip" data-rowout="lost" data-lid="${l.id}">לא רלוונטי</button></div>` : ''}
+      </div>`;
     }).join('')}</div>`;
   }
 
   // ---- צינור ----
   function crmPipeline(box, L) {
-    box.innerHTML = `<p class="muted">גוררים כרטיס לשלב אחר, או נוגעים ב-⇄. נגיעה בשם פותחת את הליד.</p>
-      <div class="pipe">${S.biz.stages.map((s) => {
-        const ls = L.filter((l) => l.stage === s.id);
-        return `<section class="pcol${s.kind ? ' ' + s.kind : ''}" data-pcol="${s.id}"><header><b>${esc(s.name)}</b> <span class="faint">${ls.length} · ${nis(ls.reduce((a, l) => a + leadValue(l), 0))}</span></header>
-          <div class="pcards">${ls.map((l) => { const w = effWarm(l); const p = plan(l); return `<div class="pcard" draggable="true" data-plid="${l.id}">
-            <button class="pname" data-crmlead="${l.id}"><span class="dot w${w == null ? '' : w}" aria-hidden="true"></span>${esc(People.rowName(l))}</button>
-            <div class="faint">${esc(People.town(l))}${leadValue(l) ? ' · <b class="money">' + nis(leadValue(l)) + '</b>' : ''}</div>
-            ${p.due ? `<div class="pnext">${STEPS[p.type].icon} ${esc(p.label)} · ${esc(dateShort(p.due.getTime()))}</div>` : ''}
-            <button class="pmove" data-pmove="${l.id}" aria-label="להעביר שלב">⇄</button></div>`; }).join('') || '<div class="pempty">—</div>'}</div></section>`;
-      }).join('')}</div>`;
+    const work = S.biz.stages.filter((s) => s.kind !== 'lost');
+    const lost = stageOf('lost');
+    const card = (l) => { const w = effWarm(l); const p = plan(l); const late = p.due && dayNo(p.due.getTime()) < dayNo(now()); return `<div class="pcard" draggable="true" data-plid="${l.id}">
+      <button class="pname" data-crmlead="${l.id}">${esc(People.rowName(l))}</button>
+      <div class="faint">${w == null ? 'בלי חום' : `<b class="warm-word w${w}">${esc(words()[w])}</b>`} · ${esc(People.town(l))}${leadValue(l) ? ' · <b class="money">' + nis(leadValue(l)) + '</b>' + (typedValue(l) ? '' : ' <span class="faint">מוערך</span>') : ''}</div>
+      ${p.due ? `<div class="pnext${late ? ' late' : ''}">${late ? 'באיחור · ' : ''}${STEPS[p.type].icon} ${esc(p.label)} · ${esc(dateShort(p.due.getTime()))}</div>` : ''}
+      <button class="pmove" data-pmove="${l.id}" aria-label="להעביר את ${esc(People.rowName(l))} לשלב אחר">⇄</button></div>`; };
+    const byDue = (a, b) => ((plan(a).due || { getTime: () => 9e15 }).getTime() - (plan(b).due || { getTime: () => 9e15 }).getTime());
+    box.innerHTML = `<p class="muted"><span class="fine-only">גוררים כרטיס לשלב אחר, או </span>נוגעים ב-⇄ כדי להעביר. נגיעה בשם פותחת את הליד.</p>
+      <div class="pipe">${work.map((s) => {
+        const ls = L.filter((l) => l.stage === s.id).sort(byDue);
+        const sum = ls.reduce((a, l) => a + leadValue(l), 0);
+        const partEst = ls.some((l) => !typedValue(l) && estValue(l));
+        return `<section class="pcol${s.kind ? ' ' + s.kind : ''}" data-pcol="${s.id}"><header><b>${esc(s.name)}</b> <span class="faint">${ls.length}${sum ? ' · ' + nis(sum) + (partEst ? ' · חלקו מוערך' : '') : ''}</span></header>
+          <div class="pcards">${ls.map(card).join('') || '<div class="pempty">—</div>'}</div></section>`;
+      }).join('')}</div>
+      ${lost ? `<div class="pcol lost-zone" data-pcol="${lost.id}"><b>${esc(lost.name)}</b> <span class="faint">${L.filter((l) => l.stage === lost.id).length} · לגרור לכאן, או ⇄</span></div>` : ''}`;
     box.querySelectorAll('.pcard').forEach((c) => c.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', c.dataset.plid); c.classList.add('dragging'); }));
     box.querySelectorAll('.pcol').forEach((col) => {
       col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('over'); });
@@ -1821,18 +1906,37 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       col.addEventListener('drop', (e) => {
         e.preventDefault();
         const l = leadById(+e.dataTransfer.getData('text/plain'));
-        if (l && l.stage !== col.dataset.pcol) { const from = l.stage; undoable(People.rowName(l) + ' ➜ ' + stageById(col.dataset.pcol).name, () => setStage(l, col.dataset.pcol)); if (from !== l.stage) render(); }
+        if (l && l.stage !== col.dataset.pcol) moveLead(l, col.dataset.pcol);
         else render();
       });
     });
   }
-  function sheetCols() {
-    sheet(`<h2>עמודות בטבלה</h2><div class="opts grid2">${COLS.map((c) => `<button class="opt" data-tbcol="${c.id}" aria-pressed="${S.tb.cols.includes(c.id)}">${esc(c.t)}</button>`).join('')}</div>
-      <div class="actions"><button class="btn primary" data-act="sheet-close">סיום</button></div>`);
+  /** What a stage change would send to the visitor — shown before it happens, never after. */
+  const sendsOnStage = (l, id) => {
+    const st = stageById(id);
+    return matching('stage', l, id).concat(st.kind === 'won' ? matching('won', l) : []).filter(sendsOut).filter(() => !l.optOut);
+  };
+  function moveLead(l, id) {
+    const sends = sendsOnStage(l, id);
+    if (sends.length) return sheetMoveConfirm(l, id, sends);
+    undoable(People.rowName(l) + ' ➜ ' + stageById(id).name, () => setStage(l, id));
+    render();
   }
   function sheetMove(l) {
     sheet(`<h2>להעביר את ${esc(People.rowName(l))}</h2>
-      <div class="opts">${S.biz.stages.map((s) => `<button class="opt" data-pstage="${s.id}" data-lid="${l.id}" aria-pressed="${l.stage === s.id}">${esc(s.name)}</button>`).join('')}</div>`);
+      <div class="opts">${S.biz.stages.map((s) => { const sends = sendsOnStage(l, s.id); return `<button class="opt" data-pstage="${s.id}" data-lid="${l.id}" aria-pressed="${l.stage === s.id}">${esc(s.name)}${sends.length ? `<small>⚠️ יישלח ללקוח: ${esc(sends.map((r) => ruleText(r).then).join(', '))}</small>` : ''}</button>`; }).join('')}</div>`);
+  }
+  function sheetMoveConfirm(l, id, sends) {
+    sheet(`<h2>${esc(People.rowName(l))} ➜ ${esc(stageById(id).name)}</h2>
+      <p class="muted">המעבר הזה שולח ללקוח, לפי הכללים שלך:</p>
+      ${sends.map((r) => `<div class="bubble">${esc(r.action.kind === 'message' && tplById(r.action.tpl) ? fillFor(tplById(r.action.tpl), l) : ruleText(r).then)}</div>`).join('')}
+      <p class="faint">הודעה שיצאה אי אפשר להחזיר.</p>
+      <div class="actions"><button class="btn primary" data-act="move-send" data-lid="${l.id}" data-v="${id}">להעביר ולשלוח</button>
+        <button class="btn" data-act="move-hold" data-lid="${l.id}" data-v="${id}">להעביר בלי לשלוח</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+  }
+  function sheetCols() {
+    sheet(`<h2>עמודות בטבלה</h2><div class="opts grid2">${COLS.map((c) => `<button class="opt" data-tbcol="${c.id}" aria-pressed="${S.tb.cols.includes(c.id)}">${esc(c.t)}</button>`).join('')}</div>
+      <div class="actions"><button class="btn primary" data-act="sheet-close">סיום</button></div>`);
   }
 
   // ---- טבלה ----
@@ -1843,6 +1947,8 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     { id: 'stage', t: 'שלב', v: (l) => stageById(l.stage).name, s: (l) => S.biz.stages.findIndex((x) => x.id === l.stage) },
     { id: 'warm', t: 'חום', v: (l) => (effWarm(l) == null ? '' : words()[effWarm(l)]), s: (l) => (effWarm(l) == null ? 9 : effWarm(l)) },
     { id: 'value', t: 'שווי', v: (l) => leadValue(l), f: (v) => (v ? nis(v) : '—'), num: true },
+    { id: 'answer', t: 'מענה', v: (l) => ANSWER[answerState(l)], s: (l) => ['none', 'tried', 'sent', 'talked'].indexOf(answerState(l)) },
+    { id: 'last', t: 'מגע אחרון', v: (l) => contactLine(l), s: (l) => (lastTouch(l) ? lastTouch(l).at : 0) },
     { id: 'tags', t: 'כפתורים', v: (l) => tagged(l).map((b) => b.label).join(', ') },
     { id: 'next', t: 'צעד הבא', v: (l) => (tasks(l).length ? plan(l).label : '') },
     { id: 'due', t: 'מתי', v: (l) => (plan(l).due ? plan(l).due.getTime() : null), f: dateShort, num: true },
@@ -1853,132 +1959,188 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     { id: 'email', t: 'מייל', v: (l) => l.contact.email, ltr: true },
     { id: 'notes', t: 'הערות', v: (l) => l.notes.map((n) => n.text || n.tr).filter(Boolean).join(' | ') },
     { id: 'at', t: 'ביקר', v: (l) => l.at, f: dateShort, num: true },
-    { id: 'last', t: 'מגע אחרון', v: (l) => (lastTouch(l) ? lastTouch(l).at : null), f: (v) => agoText(v), num: true },
   ];
   const colById = (id) => COLS.find((c) => c.id === id);
   const FILTERS = {
-    stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
     warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'בלי חום']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
-    btn: { t: 'כפתור', opts: () => S.biz.buttons.map((b) => [b.id, b.label]), ok: (l, v) => l.tags.includes(v) },
-    kind: { t: 'סוג', opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
-    owner: { t: 'אחראי', opts: () => S.biz.team.map((n) => [n, n]), ok: (l, v) => l.owner === v },
-    town: { t: 'עיר', opts: () => Array.from(new Set(leadsNow().map((l) => People.town(l)))).sort().map((t) => [t, t]), ok: (l, v) => People.town(l) === v },
+    answer: { t: 'מענה', opts: () => [['none', 'עוד לא'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל חומר או הודעה'], ['talked', 'דיברנו'], ['notyet', 'עוד לא דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
+    stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
+    btn: { t: 'כפתור', more: true, opts: () => [['nobtn', 'בלי כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), ok: (l, v) => (v === 'nobtn' ? !l.tags.length : l.tags.includes(v)) },
+    kind: { t: 'סוג', more: true, opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
+    owner: { t: 'אחראי', more: true, opts: () => S.biz.team.map((n) => [n, n]), ok: (l, v) => l.owner === v },
+    town: { t: 'עיר', more: true, opts: () => Array.from(new Set(leadsNow().map((l) => People.town(l)))).sort().map((t) => [t, t]), ok: (l, v) => People.town(l) === v },
   };
   let tbQuery = '';
   let tbPage = 0;
   const tbSel = new Set();
-  let tbIds = null;   // the leads an answer to a question pointed at — a filter of its own
-  /** Stage, owner, warmth and value change right in the table. */
+  let tbIds = null;    // the leads an answer to a question, or a rule, pointed at — a filter of its own
+  let tbIdsWhy = '';
+  let tbEdit = null;   // "lid:col" — the one cell open for editing
+  /** A cell becomes a control only when tapped: scrolling a tablet must never change data. */
   function inlineCell(col, l) {
+    if (!['stage', 'owner', 'warm', 'value'].includes(col)) return '';
+    const open = tbEdit === l.id + ':' + col;
+    const shown = col === 'stage' ? stageById(l.stage).name : col === 'owner' ? l.owner : col === 'warm' ? (effWarm(l) == null ? '—' : words()[effWarm(l)]) : leadValue(l) ? nis(leadValue(l)) + (typedValue(l) ? '' : ' (מוערך)') : '—';
+    if (!open) return `<button class="cell-btn" data-ietap="${col}" data-lid="${l.id}" aria-label="לשנות ${esc(colById(col).t)}">${esc(shown)}</button>`;
     const opt = (pairs, cur) => pairs.map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('');
     if (col === 'stage') return `<select data-ie="stage" data-lid="${l.id}" aria-label="שלב">${opt(S.biz.stages.map((s) => [s.id, s.name]), l.stage)}</select>`;
     if (col === 'owner') return `<select data-ie="owner" data-lid="${l.id}" aria-label="אחראי">${opt(S.biz.team.map((t) => [t, t]), l.owner)}</select>`;
     if (col === 'warm') { const w = effWarm(l); return `<select data-ie="warm" data-lid="${l.id}" aria-label="חום">${opt([['', '—']].concat(words().map((x, k) => [k, x])), w == null ? '' : w)}</select>`; }
-    if (col === 'value') return `<input data-ie="value" data-lid="${l.id}" type="number" min="0" step="100" value="${l.value == null ? '' : esc(l.value)}" placeholder="${estValue(l) || ''}" aria-label="שווי">`;
-    return '';
+    return `<input data-ie="value" data-lid="${l.id}" type="number" min="0" step="100" value="${typedValue(l) ? esc(l.value) : ''}" placeholder="${estValue(l) || ''}" aria-label="שווי בשקלים">`;
   }
   function tableRows(L) {
     const f = S.tb.f;
     const q = People.norm(tbQuery);
-    let rows = L.filter((l) => Object.keys(f).every((k) => !f[k] || FILTERS[k].ok(l, f[k])))
+    let rows = L.filter((l) => Object.keys(f).every((k) => !f[k] || !FILTERS[k] || FILTERS[k].ok(l, f[k])))
       .filter((l) => !tbIds || tbIds.has(l.id))
       .filter((l) => !q || People.norm(COLS.map((c) => c.v(l)).join(' ')).includes(q));
     const c = colById(S.tb.sort.col) || COLS[0];
     const key = c.s || c.v;
     rows = rows.slice().sort((a, b) => {
       const x = key(a); const y = key(b);
-      if (x == null || x === '') return 1;
-      if (y == null || y === '') return -1;
+      const ex = x == null || x === '';
+      const ey = y == null || y === '';
+      if (ex || ey) return ex === ey ? 0 : (ex ? -1 : 1) * S.tb.sort.dir;   // empty values sort with the direction, not always last
       return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'he')) * S.tb.sort.dir;
     });
     return rows;
   }
+  const narrow = () => window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
   function crmTable(box, L) {
     const rows = tableRows(L);
     const per = 25;
     const pages = Math.max(1, Math.ceil(rows.length / per));
     tbPage = Math.min(tbPage, pages - 1);
     const shown = rows.slice(tbPage * per, tbPage * per + per);
-    const cols = S.tb.cols.map(colById).filter(Boolean);
-    const active = Object.keys(S.tb.f).filter((k) => S.tb.f[k]);
+    // On a tablet the default columns are the ones that decide who to call; chosen columns are kept as chosen.
+    const ids = narrow() && !S.tb.custom ? ['name', 'stage', 'last', 'next', 'due'] : S.tb.cols;
+    const cols = ids.map(colById).filter(Boolean);
+    const active = Object.keys(S.tb.f).filter((k) => S.tb.f[k] && FILTERS[k]);
     const allSel = shown.length && shown.every((l) => tbSel.has(l.id));
+    const sel = (k, F) => `<label class="tb-filter"><span class="faint">${F.t}</span><select data-tbf="${k}" aria-label="${F.t}"><option value="">הכל</option>${F.opts().map(([v, t]) => `<option value="${esc(v)}" ${S.tb.f[k] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+    const main = Object.entries(FILTERS).filter(([, F]) => !F.more);
+    const more = Object.entries(FILTERS).filter(([, F]) => F.more);
     box.innerHTML = `
       <div class="tb-bar">
-        ${Object.entries(FILTERS).map(([k, F]) => `<label class="tb-filter"><span class="faint">${F.t}</span><select data-tbf="${k}" aria-label="${F.t}"><option value="">הכל</option>${F.opts().map(([v, t]) => `<option value="${esc(v)}" ${S.tb.f[k] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('')}
         <input id="tb-q" class="text-input tb-q" placeholder="חיפוש בטבלה" aria-label="חיפוש בטבלה" value="${esc(tbQuery)}" autocomplete="off">
+        ${main.map(([k, F]) => sel(k, F)).join('')}
+        <details class="more-filters"${more.some(([k]) => S.tb.f[k]) ? ' open' : ''}><summary>עוד סינונים</summary><div class="tb-bar">${more.map(([k, F]) => sel(k, F)).join('')}</div></details>
       </div>
       <div class="tb-state">
-        <span><b>${rows.length}</b> לידים${tbIds ? ' · <button class="chip small" data-act="ask-unfilter">מתוך התשובה לשאלה ✕</button>' : ''}${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
-        <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${esc(v.name)}</button>`).join('')}
-          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button><button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">${S.tb.dense ? '▤ רגיל' : '▥ דחוס'}</button><button class="btn primary" data-act="tb-export">⬇ אקסל</button></span>
+        <span><b>${rows.length}</b> לידים${tbIds ? ` · <button class="chip small" data-act="ask-unfilter">${esc(tbIdsWhy || 'מתוך התשובה לשאלה')} ✕</button>` : ''}${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
+        <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${v.builtin ? '⭐ ' : ''}${esc(v.name)}</button>`).join('')}
+          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button>
+          <button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">צפיפות: ${S.tb.dense ? 'דחוסה ✓' : 'רגילה'}</button><button class="btn" data-act="tb-export">⬇ אקסל</button></span>
       </div>
       <div class="tb-wrap"><table class="tb${S.tb.dense ? ' dense' : ''}">
-        <thead><tr><th class="ck"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></th>${cols.map((c) => `<th${c.num ? ' class="num"' : ''}><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
-        <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור" ${tbSel.has(l.id) ? 'checked' : ''}></td>${cols.map((c) => {
+        <thead><tr><th class="ck"><label class="ck-hit"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></label></th>${cols.map((c) => `<th class="${c.num ? 'num' : ''}${c.id === 'name' ? ' stick' : ''}"><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
+        <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><label class="ck-hit"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור את ${esc(People.rowName(l))}" ${tbSel.has(l.id) ? 'checked' : ''}></label></td>${cols.map((c) => {
           const v = c.v(l);
           const txt = c.f ? c.f(v) : v == null || v === '' ? '—' : String(v);
-          if (c.id === 'name') return `<td><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>`;
-          const ie = inlineCell(c.id, l);   // edited where it stands, no form to open
+          if (c.id === 'name') return `<td class="stick"><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>`;
+          const ie = inlineCell(c.id, l);   // a tap opens it; nothing changes by scrolling past
           return ie ? `<td class="ie">${ie}</td>` : `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
         }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
       </table></div>
       ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
       ${tbSel.size ? `<div class="bulk"><b>${tbSel.size} נבחרו</b>
-        <button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button><button class="btn" data-bulk="owner">לשייך</button>
-        <button class="btn" data-bulk="step">להוסיף צעד</button><button class="btn" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="export">⬇ אקסל</button>
+        <button class="btn primary-inv" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button><button class="btn" data-bulk="owner">לשייך</button>
+        <button class="btn" data-bulk="step">להוסיף צעד</button><button class="btn" data-bulk="export">⬇ אקסל</button>
         <button class="btn ghost" data-bulk="clear">ביטול הבחירה</button></div>` : ''}`;
     $('#tb-q').addEventListener('input', (e) => { tbQuery = e.target.value; tbPage = 0; const pos = e.target.selectionStart; render(); const n = $('#tb-q'); n.focus(); n.setSelectionRange(pos, pos); });
+    const open = box.querySelector('.ie select, .ie input');
+    if (open) open.focus();
   }
   function exportLeads(list, name) {
-    const cols = COLS;
-    const rows = [cols.map((c) => c.t)].concat(list.map((l) => cols.map((c) => { const v = c.v(l); return c.id === 'due' || c.id === 'at' ? (v ? new Date(v).toLocaleDateString('he-IL') : '') : v == null ? '' : v; })));
+    const rows = [COLS.map((c) => c.t)].concat(list.map((l) => COLS.map((c) => { const v = c.v(l); return c.id === 'due' || c.id === 'at' ? (v ? new Date(v).toLocaleDateString('he-IL') : '') : v == null ? '' : v; })));
     exportXlsx(name + '-' + stamp() + '.xlsx', [{ name: 'לידים', rows }]);
   }
   function sheetBulk(kind) {
     const n = tbSel.size;
     const opts = kind === 'stage' ? S.biz.stages.map((s) => [s.id, s.name]) : kind === 'warm' ? words().map((w, k) => [String(k), w]) : kind === 'owner' ? S.biz.team.map((t) => [t, t])
       : kind === 'step' ? Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].icon + ' ' + STEPS[k].name]) : S.biz.templates.map((t) => [t.id, '💬 ' + t.name]);
-    const title = { stage: 'להעביר שלב', warm: 'לסמן חום', owner: 'לשייך ל', step: 'להוסיף צעד', message: 'לשלוח הודעה' }[kind];
+    const title = { stage: 'להעביר שלב', warm: 'לסמן חום', owner: 'לשייך ל', step: 'להוסיף צעד', message: 'איזו הודעה לשלוח' }[kind];
     sheet(`<h2>${title} — ${n} לידים</h2><div class="opts">${opts.map(([v, t]) => `<button class="opt" data-bulkdo="${kind}" data-v="${esc(v)}">${esc(t)}</button>`).join('')}</div>
       <div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
   }
   function doBulk(kind, v) {
     const list = Array.from(tbSel).map(leadById).filter(Boolean);
-    let sent = 0;
+    if (kind === 'message') return sheetSendConfirm(list, v);   // a message always passes through the confirmation
     closeSheet(false);
     undoable(`✓ ${list.length} לידים עודכנו`, () => list.forEach((l) => {
-      if (kind === 'stage') setStage(l, v, 'בפעולה על כמה');
+      if (kind === 'stage') { holdSends = true; setStage(l, v, 'בפעולה על כמה'); holdSends = false; }
       if (kind === 'warm') { l.warmth = +v; l.warmBy = 'hand'; }
       if (kind === 'owner') { l.owner = v; log(l, 'שויך ל' + v); }
       if (kind === 'step') { const s = normStep({ type: v }); addManual(l, s, dueFor(s)); log(l, 'הלאה: ' + s.label); }
-      if (kind === 'message' && sendTemplate(l, v, true)) sent++;
     }));
-    if (kind === 'message') toast(`💬 נשלח ל-${sent} מתוך ${list.length}`, null);
     render();
   }
 
+  /* Sending to a group: who gets it, who is left out and why, the text and the
+   * channel — all before anything leaves. A message that went out cannot come back. */
+  let SC = null;   // { ids, tid, withClosed }
+  function sendAudience(list, tid, withClosed) {
+    const month = now() - 30 * H.DAY;
+    const t = tplById(tid);
+    const out = [];
+    const keep = [];
+    list.forEach((l) => {
+      const why = l.optOut ? 'ביקש להסיר' : !withClosed && l.won ? 'עסקה נסגרה' : !withClosed && l.lost ? 'לא רלוונטי'
+        : t && l.log.some((e) => e.at > month && e.t.includes('"' + t.name + '"')) ? 'קיבל את ההודעה הזו החודש' : '';
+      (why ? out : keep).push({ l, why });
+    });
+    return { keep: keep.map((x) => x.l), out };
+  }
+  function sheetSendConfirm(list, tid, withClosed) {
+    SC = { ids: list.map((l) => l.id), tid, withClosed: !!withClosed };
+    const t = tplById(tid);
+    if (!t) return;
+    const { keep, out } = sendAudience(list, tid, withClosed);
+    const ch = channelFor(t);
+    const reasons = {};
+    out.forEach((x) => { reasons[x.why] = (reasons[x.why] || 0) + 1; });
+    sheet(`<h2>לשלוח "${esc(t.name)}" ל-${keep.length}${ch ? ' ב' + esc(ch) : ''}?</h2>
+      ${keep.length ? `<div class="bubble">${esc(fillFor(t, keep[0], true)).replace(/\n/g, '<br>')}</div><p class="faint">כך זה ייראה אצל ${esc(People.rowName(keep[0]))}. כל אחד מקבל את השם שלו.</p>` : ''}
+      <p>${keep.length ? 'יקבלו: ' + esc(keep.slice(0, 8).map((l) => People.rowName(l)).join(', ')) + (keep.length > 8 ? ` ועוד ${keep.length - 8}` : '') : 'אף אחד לא יקבל.'}</p>
+      ${out.length ? `<p class="muted">הוצאו ${out.length}: ${esc(Object.entries(reasons).map(([w, n]) => n + ' — ' + w).join(' · '))}</p>` : ''}
+      <label class="check-line"><input type="checkbox" data-scclosed ${SC.withClosed ? 'checked' : ''}> לשלוח גם למי שעסקה איתו נסגרה, ולמי שסומן לא רלוונטי</label>
+      ${!ch ? '<p class="warn-box">אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".</p>' : ''}
+      <div class="actions"><button class="btn primary" data-act="send-confirm" ${keep.length && ch ? '' : 'disabled'}>לשלוח ל-${keep.length}</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+  }
+  function sendConfirmed() {
+    const list = SC.ids.map(leadById).filter(Boolean);
+    const { keep } = sendAudience(list, SC.tid, SC.withClosed);
+    let n = 0;
+    keep.forEach((l) => { if (sendTemplate(l, SC.tid, true, true)) n++; });
+    SC = null; tbSel.clear();
+    save(); closeSheet(false); render();
+    toast(`💬 נשלח ל-${n}. הודעה שיצאה אי אפשר להחזיר.`);
+  }
+
   // ---- פילוח ----
-  let PV = { dim: 'stage', metric: 'count' };
+  let PV = { dim: null, metric: 'conv' };
   function dims() {
-    const d = {
-      stage: { t: 'שלב', of: (l) => [stageById(l.stage).name], filter: 'stage', key: (l) => [l.stage] },
+    const d = {};
+    liveGroups().forEach((g) => {
+      d['g:' + g.id] = { t: 'כפתורים: ' + g.title, of: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.label) : ['לא סומן']; },
+        filter: 'btn', key: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.id) : ['nobtn']; } };
+    });
+    Object.assign(d, {
       warm: { t: 'חום', of: (l) => [effWarm(l) == null ? 'בלי חום' : words()[effWarm(l)]], filter: 'warm', key: (l) => [effWarm(l) == null ? 'none' : String(effWarm(l))] },
+      answer: { t: 'מענה', of: (l) => [ANSWER[answerState(l)]], filter: 'answer', key: (l) => [answerState(l)] },
       kind: { t: 'עסק או פרטי', of: (l) => [l.b != null ? 'עסק' : 'פרטי'], filter: 'kind', key: (l) => [l.b != null ? 'biz' : 'private'] },
       town: { t: 'עיר', of: (l) => [People.town(l)], filter: 'town', key: (l) => [People.town(l)] },
       owner: { t: 'אחראי', of: (l) => [l.owner], filter: 'owner', key: (l) => [l.owner] },
       by: { t: 'מי קלט בדוכן', of: (l) => [l.by] },
-      next: { t: 'סוג הצעד הבא', of: (l) => [tasks(l).length ? STEPS[plan(l).type].name : 'אין צעד'] },
       hour: { t: 'שעת הביקור', of: (l) => [String(new Date(l.at).getHours()).padStart(2, '0') + ':00'] },
-    };
-    liveGroups().forEach((g) => {
-      d['g:' + g.id] = { t: 'כפתורים: ' + g.title, of: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.label) : ['לא סומן']; },
-        filter: 'btn', key: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.id) : ['']; } };
+      stage: { t: 'שלב', of: (l) => [stageById(l.stage).name], filter: 'stage', key: (l) => [l.stage], ordered: true },
     });
     return d;
   }
   const METRICS = { count: 'מספר לידים', value: 'שווי', won: 'עסקאות שנסגרו', conv: 'אחוז סגירה', reached: 'קיבלו מענה' };
+  const MIN_N = 10;   // below this, a percentage says more about chance than about the business
   function pivot(L) {
-    const D = dims()[PV.dim] || dims().stage;
+    const D = dims()[PV.dim];
     const map = new Map();
     L.forEach((l) => {
       const labels = D.of(l);
@@ -1988,37 +2150,48 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
         map.get(lab).ls.push(l);
       });
     });
-    return Array.from(map.values()).map((r) => {
+    const rows = Array.from(map.values()).map((r) => {
       const won = r.ls.filter((l) => l.won).length;
-      return { label: r.label, key: r.key, count: r.ls.length, value: r.ls.reduce((a, l) => a + leadValue(l), 0), won, conv: r.ls.length ? Math.round(won / r.ls.length * 100) : 0, reached: r.ls.filter((l) => touched(l).length).length };
-    }).sort((a, b) => b[PV.metric] - a[PV.metric]);
+      return { label: r.label, key: r.key, count: r.ls.length, value: r.ls.reduce((a, l) => a + leadValue(l), 0), won, conv: r.ls.length ? Math.round(won / r.ls.length * 100) : 0, reached: r.ls.filter(reached).length };
+    });
+    if (D.ordered) return rows.sort((a, b) => S.biz.stages.findIndex((s) => s.name === a.label) - S.biz.stages.findIndex((s) => s.name === b.label));
+    return rows.sort((a, b) => (b.count >= MIN_N) - (a.count >= MIN_N) || b[PV.metric] - a[PV.metric]);
   }
   function crmSegments(box, L) {
     const D = dims();
-    if (!D[PV.dim]) PV.dim = 'stage';
+    if (!PV.dim || !D[PV.dim]) PV.dim = Object.keys(D)[0];
+    const isStage = PV.dim === 'stage';
+    if (isStage && (PV.metric === 'conv' || PV.metric === 'won')) PV.metric = 'count';   // "closing rate by stage" carries no information
     const rows = pivot(L);
-    const fmt = PV.metric === 'value' ? nis : PV.metric === 'conv' ? (v) => v + '%' : String;
+    const pct = (r) => (r.count >= MIN_N ? r.conv + '%' : '—');
+    const fmt = PV.metric === 'value' ? nis : String;
+    const chartRows = rows.map((r) => ({ label: r.label, value: PV.metric === 'conv' ? (r.count >= MIN_N ? r.conv : 0) : r[PV.metric], sub: PV.metric === 'conv' ? (r.count >= MIN_N ? `(${r.won} מתוך ${r.count})` : `מעט מדי לידים (${r.count})`) : '', thin: r.count < MIN_N }));
     const canShow = !!D[PV.dim].filter;
     box.innerHTML = `<div class="tb-bar">
         <label class="tb-filter"><span class="faint">לפלח לפי</span><select data-pv="dim">${Object.entries(D).map(([k, d]) => `<option value="${k}" ${PV.dim === k ? 'selected' : ''}>${esc(d.t)}</option>`).join('')}</select></label>
-        <label class="tb-filter"><span class="faint">למדוד</span><select data-pv="metric">${Object.entries(METRICS).map(([k, t]) => `<option value="${k}" ${PV.metric === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <button class="btn primary" data-act="pv-export">⬇ אקסל</button></div>
+        <label class="tb-filter"><span class="faint">למדוד</span><select data-pv="metric">${Object.entries(METRICS).map(([k, t]) => `<option value="${k}" ${PV.metric === k ? 'selected' : ''} ${isStage && (k === 'conv' || k === 'won') ? 'disabled' : ''}>${t}</option>`).join('')}</select></label>
+        <button class="btn" data-act="pv-export">⬇ אקסל</button></div>
+      <p class="faint">אחוז סגירה מוצג רק מ-${MIN_N} לידים ומעלה, ותמיד עם המספרים עצמם.</p>
       <div class="two-col">
-        <section class="card"><h2>${esc(METRICS[PV.metric])} לפי ${esc(D[PV.dim].t)}</h2>${rows.length ? barChart(rows.map((r) => ({ label: r.label, value: r[PV.metric] })), fmt) : '<div class="empty">אין נתונים.</div>'}</section>
-        <section class="card"><div class="tb-wrap"><table class="tb">
-          <thead><tr><th>${esc(D[PV.dim].t)}</th>${Object.entries(METRICS).map(([k, t]) => `<th class="num">${t}</th>`).join('')}${canShow ? '<th></th>' : ''}</tr></thead>
-          <tbody>${rows.map((r) => `<tr><td><b>${esc(r.label)}</b></td><td class="num">${r.count}</td><td class="num">${nis(r.value)}</td><td class="num">${r.won}</td><td class="num">${r.conv}%</td><td class="num">${r.reached}</td>
-            ${canShow && r.key ? `<td><button class="link" data-pvshow="${esc(D[PV.dim].filter)}" data-v="${esc(r.key)}">לטבלה ←</button></td>` : canShow ? '<td></td>' : ''}</tr>`).join('')}</tbody>
+        <section class="card"><h2>${esc(METRICS[PV.metric])} לפי ${esc(D[PV.dim].t)}</h2>${rows.length ? barChart(chartRows, PV.metric === 'conv' ? (v) => v + '%' : fmt) : '<div class="empty">אין נתונים.</div>'}</section>
+        <section class="card"><div class="tb-wrap"><table class="tb pv">
+          <thead><tr><th>${esc(D[PV.dim].t)}</th>${Object.entries(METRICS).map(([k, t]) => `<th class="num${k === PV.metric ? ' hl' : ''}">${t}</th>`).join('')}${canShow ? '<th></th>' : ''}</tr></thead>
+          <tbody>${rows.map((r) => `<tr class="${r.count < MIN_N ? 'thin' : ''}"><td><b>${esc(r.label)}</b></td><td class="num${PV.metric === 'count' ? ' hl' : ''}">${r.count}</td><td class="num${PV.metric === 'value' ? ' hl' : ''}">${nis(r.value)}</td><td class="num${PV.metric === 'won' ? ' hl' : ''}">${r.won}</td><td class="num${PV.metric === 'conv' ? ' hl' : ''}">${pct(r)}</td><td class="num${PV.metric === 'reached' ? ' hl' : ''}">${r.reached}</td>
+            ${canShow ? `<td><button class="link" data-pvshow="${esc(D[PV.dim].filter)}" data-v="${esc(r.key)}">לטבלה ←</button></td>` : ''}</tr>`).join('')}</tbody>
         </table></div></section>
       </div>`;
   }
 
   // ---- אוטומציות ----
   function crmAuto(box) {
+    const group = (title, list, hint) => (list.length ? `<h2 class="rules-head">${title}</h2><p class="faint">${hint}</p><div class="rules">${list.map((r) => { const t = ruleText(r); return `<div class="rule${r.on ? '' : ' off'}">${toggle('rule:' + r.id, r.on, 'הפעלת הכלל')}
+        <button class="rule-body" data-ruleedit="${r.id}"><span class="when">${esc(t.when)}</span><span class="then">⚙️ ${esc(t.then)}${sendsOut(r) ? ' <span class="out-tag">יוצא ללקוח</span>' : ''}</span></button>
+        ${r.fired ? `<button class="link" data-rulehits="${r.id}">הופעל ${many(r.fired, 'פעם אחת', 'פעמים')} ←</button>` : '<span class="faint">עוד לא הופעל</span>'}</div>`; }).join('')}</div>` : '');
+    const out = S.biz.rules.filter(sendsOut);
+    const inside = S.biz.rules.filter((r) => !sendsOut(r));
     box.innerHTML = `<p class="muted">כללים שאתה כותב: כשקורה משהו — המערכת עושה משהו, לבד. כל מה שהיא עשתה נרשם בהיסטוריה של הליד עם ⚙️.</p>
-      <div class="rules">${S.biz.rules.map((r) => { const t = ruleText(r); return `<div class="rule${r.on ? '' : ' off'}">${toggle('rule:' + r.id, r.on, 'הפעלת הכלל')}
-        <button class="rule-body" data-ruleedit="${r.id}"><span class="when">${esc(t.when)}</span><span class="then">⚙️ ${esc(t.then)}</span>
-        <span class="faint">${r.fired ? 'הופעל ' + r.fired + ' פעמים' : 'עוד לא הופעל'}</span></button></div>`; }).join('')}</div>
+      ${group('שולח ללקוח', out, 'מה שהכללים האלה שולחים יוצא בשמך. אין להם "ביטול".')}
+      ${group('רק אצלי', inside, 'משימות, שלבים ותזכורות — לא יוצא מהמערכת.')}
       <div class="actions"><button class="btn primary" data-act="rule-add">+ כלל חדש</button></div>`;
   }
   let RD = null;
@@ -2027,28 +2200,32 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     RD = r ? clone(r) : { id: 'r' + Date.now(), on: true, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0, isNew: true };
     renderRule();
   }
+  /* The rule reads as a sentence, and each part of the sentence is its own menu. */
   function renderRule() {
     const r = RD;
-    const sel = (k, opts, v) => `<select class="text-input" data-rd="${k}">${opts.map(([o, t]) => `<option value="${esc(o)}" ${String(v) === String(o) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    const sel = (k, opts, v, label) => `<select class="inline-sel" data-rd="${k}" aria-label="${esc(label)}">${opts.map(([o, t]) => `<option value="${esc(o)}" ${String(v) === String(o) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
     const a = r.action;
-    const arg = r.trigger === 'noanswer' ? `<div class="label">כמה פעמים</div>${sel('arg', [[1, 'פעם אחת'], [2, 'פעמיים'], [3, '3 פעמים']], r.arg)}`
-      : r.trigger === 'idle' ? `<div class="label">כמה ימים</div>${sel('arg', [[3, '3 ימים'], [5, '5 ימים'], [7, 'שבוע'], [14, 'שבועיים'], [30, 'חודש']], r.arg)}`
-      : r.trigger === 'stage' ? `<div class="label">לאיזה שלב</div>${sel('arg', S.biz.stages.map((s) => [s.id, s.name]), r.arg)}` : '';
-    const act = a.kind === 'step' ? `${sel('a.type', Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].name]), a.type)}${sel('a.days', [[0, 'היום'], [1, 'תוך יום'], [2, 'יומיים'], [3, '3 ימים'], [7, 'שבוע']], a.days || 1)}`
-      : a.kind === 'send' ? sel('a.mat', [['', 'החומר הראשון']].concat(S.biz.materials.map((x) => [x.name, x.name])), a.mat || '')
-      : a.kind === 'message' ? sel('a.tpl', S.biz.templates.map((t) => [t.id, t.name]), a.tpl)
-      : a.kind === 'stage' ? sel('a.stage', S.biz.stages.map((s) => [s.id, s.name]), a.stage || 'contact')
-      : a.kind === 'warm' ? sel('a.value', words().map((w, k) => [k, w]), a.value || 0) : '';
+    const arg = r.trigger === 'noanswer' ? sel('arg', [[1, 'פעם אחת'], [2, 'פעמיים'], [3, '3 פעמים']], r.arg, 'כמה פעמים')
+      : r.trigger === 'idle' ? sel('arg', [[3, '3 ימים'], [5, '5 ימים'], [7, 'שבוע'], [14, 'שבועיים'], [30, 'חודש']], r.arg, 'כמה ימים')
+      : r.trigger === 'stage' ? sel('arg', S.biz.stages.map((s) => [s.id, s.name]), r.arg, 'לאיזה שלב') : '';
+    const act = a.kind === 'step' ? `${sel('a.type', Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].name]), a.type, 'איזה צעד')} ${sel('a.days', [[0, 'היום'], [1, 'תוך יום'], [2, 'תוך יומיים'], [3, 'תוך 3 ימים'], [7, 'תוך שבוע']], a.days || 1, 'מתי')}`
+      : a.kind === 'send' ? sel('a.mat', [['', 'את החומר הראשון']].concat(S.biz.materials.map((x) => [x.name, x.name])), a.mat || '', 'איזה חומר')
+      : a.kind === 'message' ? sel('a.tpl', S.biz.templates.map((t) => [t.id, t.name]), a.tpl, 'איזו הודעה')
+      : a.kind === 'stage' ? sel('a.stage', S.biz.stages.map((s) => [s.id, s.name]), a.stage || 'contact', 'לאיזה שלב')
+      : a.kind === 'warm' ? sel('a.value', words().map((w, k) => [k, w]), a.value || 0, 'איזה חום') : '';
     const c = r.cond || {};
+    const tpl = a.kind === 'message' && tplById(a.tpl);
     sheet(`<h2>${r.isNew ? 'כלל חדש' : 'עריכת כלל'}</h2>
-      <div class="label">כש…</div>${sel('trigger', Object.entries(TRIGGERS), r.trigger)}${arg}
+      <div class="rule-sentence">כש ${sel('trigger', Object.entries(TRIGGERS), r.trigger, 'מתי')} ${arg}<br>
+        אז ${sel('a.kind', Object.entries(ACTIONS), a.kind, 'מה לעשות')} ${act}</div>
+      ${tpl ? `<div class="bubble">${esc(tpl.text)}</div>` : ''}
+      ${sendsOut(r) ? '<p class="out-tag">יוצא ללקוח, בשמך</p>' : ''}
       <div class="label">רק אם <small>רשות</small></div>
-      <div class="rule-conds">${sel('c.warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), c.warm == null ? '' : c.warm)}
-        ${sel('c.btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), c.btn || '')}
-        ${sel('c.biz', [['', 'עסק או פרטי'], ['1', 'רק עסק'], ['0', 'רק פרטי']], c.biz == null ? '' : c.biz ? '1' : '0')}
-        <input class="text-input" type="number" min="0" step="100" data-rd="c.minValue" value="${c.minValue || ''}" placeholder="שווי מינימלי ₪" aria-label="שווי מינימלי"></div>
-      <div class="label">אז…</div>${sel('a.kind', Object.entries(ACTIONS), a.kind)}<div class="rule-act">${act}</div>
-      <p class="faint" id="rule-prev">${esc(ruleText(r).when)} ← ${esc(ruleText(r).then)}</p>
+      <div class="rule-conds">
+        <label><span class="faint">חום</span>${sel('c.warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), c.warm == null ? '' : c.warm, 'חום')}</label>
+        <label><span class="faint">כפתור</span>${sel('c.btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), c.btn || '', 'כפתור')}</label>
+        <label><span class="faint">עסק או פרטי</span>${sel('c.biz', [['', 'שניהם'], ['1', 'רק עסק'], ['0', 'רק פרטי']], c.biz == null ? '' : c.biz ? '1' : '0', 'עסק או פרטי')}</label>
+        <label><span class="faint">שווי מינימלי ₪</span><input class="text-input" type="number" min="0" step="100" data-rd="c.minValue" value="${c.minValue || ''}"></label></div>
       <div class="actions"><button class="btn primary" data-act="rule-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
         ${r.isNew ? '' : `<button class="btn ghost danger far" data-act="rule-del">למחוק</button>`}</div>`);
     $('#scrim .sheet').dataset.guard = '1';
@@ -2066,109 +2243,111 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     if (k === 'a.type') r.action.type = v;
     if (k === 'a.days') r.action.days = +v;
     if (k === 'a.mat') r.action.mat = v;
-    if (k === 'a.tpl') r.action.tpl = v;
+    if (k === 'a.tpl') { r.action.tpl = v; return renderRule(); }
     if (k === 'a.stage') r.action.stage = v;
     if (k === 'a.value') r.action.value = +v;
-    const p = $('#rule-prev');
-    if (p) p.textContent = ruleText(r).when + ' ← ' + ruleText(r).then;
   }
 
   // ---- הודעות ----
+  let msgFilter = 'all';
+  let grp = { stage: '', warm: '', btn: '', answer: '', tpl: '' };
+  const grpList = () => leadsNow().filter((l) => (!grp.stage || l.stage === grp.stage) && (grp.warm === '' || effWarm(l) === +grp.warm) && (!grp.btn || l.tags.includes(grp.btn)) && (!grp.answer || FILTERS.answer.ok(l, grp.answer)));
   function crmMessages(box, L) {
     const sent = [];
-    L.forEach((l) => l.log.forEach((e) => { if (/^💬/.test(e.t)) sent.push({ l, e }); }));
+    L.forEach((l) => l.log.forEach((e) => { if (/^(⚙️ )?💬/.test(e.t)) sent.push({ l, e, auto: isAuto(e.t) }); }));
     sent.sort((a, b) => b.e.at - a.e.at);
+    const shown = sent.filter((x) => msgFilter === 'all' || (msgFilter === 'auto') === x.auto);
+    if (!grp.tpl && S.biz.templates[0]) grp.tpl = S.biz.templates[0].id;
+    const aud = grpList();
+    const { keep } = sendAudience(aud, grp.tpl, false);
+    const sel = (k, opts, label) => `<select class="text-input" data-grp="${k}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${String(grp[k]) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    const sample = leadsNow()[0];
     box.innerHTML = `<div class="two-col">
-      <section class="card"><h2>תבניות</h2><p class="muted">{שם} · {עסק} · {חומר} מתמלאים לבד.</p>
-        <div class="prod-list">${S.biz.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">💬 ${esc(t.name)} <span class="faint">· ${esc(CH_NAMES[t.ch])}</span></span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('')}</div>
+      <section class="card"><h2>תבניות</h2>
+        <div class="prod-list">${S.biz.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">💬 ${esc(t.name)} <span class="faint">· ${esc(CH_NAMES[t.ch])}</span></span><span class="pnext">${esc((sample ? fillFor(t, sample) : t.text).slice(0, 90))}</span></button>`).join('')}</div>
         <div class="actions"><button class="btn" data-act="tpl-add">+ תבנית חדשה</button></div></section>
-      <section class="card"><h2>שליחה לקבוצה</h2><p class="muted">בוחרים קהל ותבנית. או: בטבלה, מסמנים לידים ← "💬 הודעה".</p>
-        <div class="label">למי</div>
-        <div class="rule-conds"><select class="text-input" id="gs-stage" aria-label="שלב"><option value="">כל השלבים</option>${S.biz.stages.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
-          <select class="text-input" id="gs-warm" aria-label="חום"><option value="">כל חום</option>${words().map((w, k) => `<option value="${k}">${esc(w)}</option>`).join('')}</select>
-          <select class="text-input" id="gs-btn" aria-label="כפתור"><option value="">כל כפתור</option>${S.biz.buttons.map((b) => `<option value="${b.id}">${esc(b.label)}</option>`).join('')}</select></div>
-        <div class="label">מה</div><select class="text-input" id="gs-tpl" aria-label="תבנית">${S.biz.templates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
-        <div class="actions"><button class="btn primary" data-act="grp-send">לשלוח…</button></div></section>
+      <section class="card"><h2>שליחה לקבוצה</h2>
+        <div class="rule-conds">
+          <label><span class="faint">שלב</span>${sel('stage', [['', 'כל השלבים']].concat(S.biz.stages.map((s) => [s.id, s.name])), 'שלב')}</label>
+          <label><span class="faint">חום</span>${sel('warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), 'חום')}</label>
+          <label><span class="faint">מענה</span>${sel('answer', [['', 'כולם']].concat(FILTERS.answer.opts()), 'מענה')}</label>
+          <label><span class="faint">כפתור</span>${sel('btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), 'כפתור')}</label></div>
+        <label class="label">מה</label>${sel('tpl', S.biz.templates.map((t) => [t.id, t.name]), 'תבנית')}
+        <p class="faint" style="margin-top:8px">יישלח ל-<b>${keep.length}</b>${aud.length - keep.length ? ` (${aud.length - keep.length} הוצאו — סגורים, לא רלוונטיים, ביקשו הסרה, או קיבלו אותה החודש)` : ''}: ${esc(keep.slice(0, 5).map((l) => People.rowName(l)).join(', '))}${keep.length > 5 ? ' ועוד ' + (keep.length - 5) : ''}</p>
+        <div class="actions"><button class="btn primary" data-act="grp-send" ${keep.length ? '' : 'disabled'}>לראות ולשלוח…</button></div></section>
     </div>
     <section class="card" style="margin-top:14px"><h2>נשלחו לאחרונה</h2>
-      ${sent.length ? `<ul class="log">${sent.slice(0, 15).map(({ l, e }) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span><button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button> · ${esc(e.t.replace(/^💬\s*/, ''))}</li>`).join('')}</ul>` : '<div class="empty">עוד לא נשלחו הודעות.</div>'}</section>`;
+      <div class="chips tl-filter">${[['all', 'הכל'], ['manual', 'ידני'], ['auto', '⚙️ אוטומטי']].map(([k, t]) => `<button class="chip small" data-msgf="${k}" aria-pressed="${msgFilter === k}">${t}</button>`).join('')}</div>
+      ${shown.length ? `<ul class="log">${shown.slice(0, 15).map(({ l, e }) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span><button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button> · ${esc(e.t.replace(/^(⚙️ )?💬\s*/, isAuto(e.t) ? '⚙️ ' : ''))}</li>`).join('')}</ul>` : '<div class="empty">עוד לא נשלחו הודעות.</div>'}</section>`;
   }
   function sheetTemplate(id) {
-    const t = id ? S.biz.templates.find((x) => x.id === id) : { id: '', name: '', ch: 'any', text: 'שלום {שם}, ' };
+    const t = id ? tplById(id) : { id: '', name: '', ch: 'any', text: 'שלום {שם}, ' };
     sheet(`<h2>${id ? 'עריכת תבנית' : 'תבנית חדשה'}</h2>
       <label class="label" for="tp-name">שם</label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
       <div class="label">ערוץ</div><div class="chips">${Object.entries(CH_NAMES).map(([k, n]) => `<button class="chip" data-tpch="${k}" aria-pressed="${t.ch === k}">${esc(n)}</button>`).join('')}</div>
-      <label class="label" for="tp-text">נוסח</label><textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
+      <label class="label" for="tp-text">נוסח</label>
+      <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ העסק שלך'], ['{חומר}', '+ חומר']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
+      <textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
+      <p class="faint">בשליחה לקבוצה נוספת לבד השורה: "${esc(OPT_OUT)}"</p>
       <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
         ${id ? `<button class="btn ghost danger far" data-act="tpl-del" data-id="${esc(id)}">למחוק</button>` : ''}</div>`);
     $('#scrim .sheet').dataset.guard = '1';
   }
   function sheetLeadMsg(l) {
     sheet(`<h2>הודעה ל${esc(People.rowName(l))}</h2>
-      <div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(channelsFor(t).join(' + ') || 'אין ערוץ פעיל')}</span><small>${esc(t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, (S.biz.materials[0] || {}).name || 'החומר'))}</small></button>`).join('')}</div>
+      ${l.optOut ? '<p class="warn-box">ביקש להסיר את עצמו מרשימת התפוצה. אפשר לשלוח רק תשובה אישית, לא מהתבניות.</p>' : `<div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(channelFor(t) || 'אין ערוץ פעיל')}</span><small>${esc(fillFor(t, l))}</small></button>`).join('')}</div>`}
       <div class="actions"><button class="btn ghost" data-act="back-crm" data-lid="${l.id}">חזרה</button></div>`, l.id);
     $('#scrim .sheet').dataset.tasks = '1';
   }
 
-  // ---- the lead's own card ----
   /* The lead's own page — the screen a business owner opens most, so it is a page
    * and not a pop-up. On top: who, the few facts that matter, and what to do.
-   * Below: the next steps, then one timeline of every channel, with the
-   * automations' own entries folded away so the human ones stand out. */
+   * Then the next steps first, the details beside them, and one timeline of every
+   * channel with the automations' own entries folded away. */
   let callOpen = false;
   let tlFilter = 'all';
   let tlAuto = false;
   const TL_KINDS = { all: 'הכל', calls: '📞 שיחות', msgs: '💬 הודעות וחומר', notes: '📝 הערות', stages: '➜ שלבים' };
-  const tlKind = (t) => (/^📞/.test(t) ? 'calls' : /^(💬|📎)/.test(t) ? 'msgs' : /^📝/.test(t) ? 'notes' : /^➜/.test(t) ? 'stages' : /^⚙️/.test(t) ? 'auto' : 'other');
+  const tlKind = (t) => (isAuto(t) ? 'auto' : /^📞/.test(t) ? 'calls' : /^(💬|📎)/.test(t) ? 'msgs' : /^📝/.test(t) ? 'notes' : /^➜/.test(t) ? 'stages' : 'other');
   function recordPage(box, l) {
     const ts = tasks(l);
     const w = effWarm(l);
     const est = estValue(l);
     const lt = lastTouch(l);
-    const autos = l.log.filter((e) => tlKind(e.t) === 'auto').length;
+    const tr = tries(l);
+    const autos = l.log.filter((e) => isAuto(e.t)).length;
     const entries = l.log.slice().reverse().filter((e) => {
       const k = tlKind(e.t);
-      if (k === 'auto') return tlAuto && (tlFilter === 'all');
+      if (k === 'auto') return tlAuto && tlFilter === 'all';
       return tlFilter === 'all' || k === tlFilter;
     });
-    const tab = TL_KINDS;
+    const audio = l.notes.filter((n) => n.audio);
     box.innerHTML = `<div class="rec">
       <div class="rec-top">
-        <button class="btn ghost" data-act="record-back">→ חזרה ל${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', 'CRM'])[1])}</button>
-        <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}</h1>
+        <div class="rec-bar"><button class="btn ghost" data-act="record-back">→ חזרה ל${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</button>
+          <button class="btn ghost" data-act="rec-menu" data-lid="${l.id}" aria-label="פעולות נוספות">⋯</button></div>
+        <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}${l.optOut ? ' <span class="badge">ביקש הסרה</span>' : ''}</h1>
           <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · מדומה' : ''}</div></div>
         <div class="rec-keys">
-          <span class="key"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)}</b></span>
-          <span class="key"><span class="faint">שווי</span><b class="money">${leadValue(l) ? nis(leadValue(l)) : '—'}</b>${l.value == null && est ? '<span class="faint">מוערך</span>' : ''}</span>
+          <button class="key" data-pmove="${l.id}" aria-label="לשנות שלב"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)} ⇄</b></button>
+          <span class="key"><span class="faint">שווי</span><b class="money">${leadValue(l) ? nis(leadValue(l)) : '—'}</b>${!typedValue(l) && est ? '<span class="faint">מוערך</span>' : ''}</span>
           <span class="key"><span class="faint">חום</span><b>${w == null ? 'בלי' : esc(words()[w])}</b></span>
-          <span class="key"><span class="faint">מגע אחרון</span><b>${esc(agoText(lt && lt.at))}</b>${lt ? `<span class="faint">${esc(lt.kind)}</span>` : ''}</span>
+          <span class="key"><span class="faint">מגע אחרון</span><b>${lt ? esc(lt.kind + ' · ' + agoText(lt.at)) : 'עוד לא'}</b>${tr.length ? `<span class="faint">ניסיון אחרון: לא ענה${tr.length > 1 ? ' ×' + tr.length : ''} · ${esc(agoText(tr[tr.length - 1].at))}</span>` : ''}</span>
           <span class="key"><span class="faint">אחראי</span><b>${esc(l.owner)}</b></span>
         </div>
         <div class="actions rec-acts"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר</button>
           <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
           <button class="btn" data-act="send" data-lid="${l.id}">📎 חומר</button>
-          <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button></div>
-        ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">איך היה?</div><div class="chips">
+          <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
+          <button class="btn" data-act="edit-tags" data-lid="${l.id}">✎ כפתורים וחום</button></div>
+        ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">${l.contact.phone ? `חייגו: <bdi dir="ltr" class="phone">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</div><div class="chips">
           <button class="chip" data-outcome="talk" data-lid="${l.id}">דיברנו — מה הלאה</button>
           <button class="chip" data-outcome="noans" data-lid="${l.id}">לא ענה</button>
           <button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
           <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></div>
-          <div class="faint" style="margin-top:6px">במערכת האמיתית — החיוג יוצא מכאן, והתוצאה נשאלת כשהשיחה נגמרת.</div></div>` : ''}
+          <div class="faint" style="margin-top:6px">מתקשרים מהטלפון שלכם, ומסמנים כאן איך היה.</div></div>` : ''}
       </div>
       <div class="rec-grid">
-        <aside class="card rec-fields">
-          <h2>פרטים</h2>
-          <label><span class="faint">שלב</span><select class="text-input" data-lstage="${l.id}">${S.biz.stages.map((s) => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-          <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${l.value == null ? '' : esc(l.value)}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
-          <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
-          <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
-          ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr" data-act="call" data-lid="${l.id}">📞 ${esc(l.contact.phone)}</a>` : ''}
-          <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
-          <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'} <button class="link" data-act="edit-tags" data-lid="${l.id}">✎ תיוג</button></span></div>
-          ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
-          <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · נקלט ע"י ${esc(l.by)}</span></div>
-          <div class="field-row"><span class="faint">קבצים</span><span>${l.files.map((f) => '📄 ' + esc(f.name)).join(' · ') || '—'} <label class="link" for="lead-file">+ קובץ</label><input id="lead-file" type="file" hidden data-lfile="${l.id}"></span></div>
-        </aside>
         <div class="rec-main">
           <section class="card"><h2>הלאה</h2>
             ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
@@ -2177,12 +2356,25 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
                 <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
               : `<p class="muted">אין צעדים פתוחים${l.won ? ' — לקוח.' : '.'}</p>`}
             <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד</button></div></section>
-          ${l.notes.length ? `<section class="card">${notesList(l)}</section>` : ''}
+          ${audio.length ? `<section class="card"><h2>הקלטות</h2><ul class="log">${audio.map((n) => `<li><span class="when">${esc(H.heDate(new Date(n.at)))}</span><button class="btn ghost" data-play="${n.id}">▶ השמעה</button> ${esc(n.text || '')}${n.tr ? `<div class="faint">תמלול: ${esc(n.tr)}</div>` : ''}</li>`).join('')}</ul></section>` : ''}
           <section class="card"><h2>ציר זמן</h2>
-            <div class="chips tl-filter">${Object.entries(tab).map(([k, t]) => `<button class="chip small" data-tl="${k}" aria-pressed="${tlFilter === k}">${t}</button>`).join('')}</div>
+            <div class="chips tl-filter">${Object.entries(TL_KINDS).map(([k, t]) => `<button class="chip" data-tl="${k}" aria-pressed="${tlFilter === k}">${t}</button>`).join('')}</div>
             <ul class="log timeline">${entries.map((e) => `<li class="tl-${tlKind(e.t)}"><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('') || '<li class="faint">אין כאן כלום.</li>'}</ul>
             ${autos && tlFilter === 'all' ? `<button class="link" data-act="tl-auto">${tlAuto ? 'להסתיר' : 'להציג'} ${autos} פעולות אוטומציה ⚙️</button>` : ''}</section>
         </div>
+        <details class="card rec-fields"${narrow() ? '' : ' open'}>
+          <summary><h2>פרטים</h2>${l.contact.phone ? ` <bdi dir="ltr" class="faint">${esc(l.contact.phone)}</bdi>` : ''}</summary>
+          <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${typedValue(l) ? esc(l.value) : ''}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
+          <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
+          ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : ''}
+          <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
+          <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'}</span></div>
+          ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
+          <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · נקלט ע"י ${esc(l.by)}</span></div>
+          <div class="field-row"><span class="faint">קבצים</span><span>${l.files.map((f) => '📄 ' + esc(f.name)).join(' · ') || '—'}</span></div>
+          <button class="btn" data-act="pick-file" data-lid="${l.id}">📄 לצרף קובץ</button><input id="lead-file" type="file" hidden data-lfile="${l.id}">
+        </details>
       </div></div>`;
   }
   /** Open a lead's page. Inside the CRM it is a page; the name stays for the callers that used to open a sheet. */
@@ -2193,19 +2385,36 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     if (S.phase !== 'live' || S.view !== 'crm') { S.phase = 'live'; S.view = 'crm'; }
     save(); render(); window.scrollTo(0, 0);
   }
+  /** Only warmth and the buttons — the whole booth card has no place on the lead's page. */
+  function sheetTags(l) {
+    const w = effWarm(l);
+    sheet(`<h2>${esc(People.rowName(l))} — כפתורים וחום</h2>
+      <div class="warmth">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</div>
+      ${liveGroups().map((g) => `<div class="label">${esc(g.title)}</div><div class="chips">${groupButtons(g.id).map((b) => `<button class="chip" data-tag="${b.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(b.id)}">${esc(b.label)}</button>`).join('')}</div>`).join('')}
+      <div class="actions"><button class="btn primary" data-act="back-crm" data-lid="${l.id}">סיום</button></div>`, l.id);
+    $('#scrim .sheet').dataset.tags = '1';
+  }
+  function sheetRecMenu(l) {
+    sheet(`<h2>${esc(People.rowName(l))}</h2>
+      <div class="opts"><button class="opt" data-act="opt-out" data-lid="${l.id}">${l.optOut ? 'להחזיר לרשימת התפוצה' : 'ביקש להסיר — לא לשלוח לו הודעות'}<small>${l.optOut ? 'יחזור לקבל הודעות מהתבניות' : 'לא ייכלל בשליחה לקבוצה ובאוטומציות'}</small></button>
+        <button class="opt danger" data-act="del-lead" data-lid="${l.id}">מחיקת הליד<small>נמחק מכל הרשימות</small></button></div>
+      <div class="actions"><button class="btn ghost" data-act="sheet-close">סגירה</button></div>`);
+  }
 
-  /* After "we talked": one sheet, a step and a day, and nothing is marked done until
-   * one is chosen — leaving without choosing changes nothing. */
+  /* After "we talked": one sheet — what was said, a step and a day. Nothing is
+   * marked done until a step is chosen, and choosing one closes the old calls. */
   let TK = null;
-  function sheetTalk(l) {
+  function sheetTalk(l, stay) {
     const seen = new Set();
     const opts = derived(l).filter((s) => s.type !== 'none' && !immediate(s))
       .concat([normStep({ type: 'call' }), normStep({ type: 'meet' }), normStep({ type: 'quote' }), normStep({ type: 'send', days: 1 })])
-      .filter((s) => { const k = s.type + s.label; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5);
-    TK = { lid: l.id, opts, i: null, days: null, date: '' };
+      .filter((s) => { if (seen.has(s.type)) return false; seen.add(s.type); return true; }).slice(0, 5);
+    TK = { lid: l.id, opts, i: null, days: null, date: '', stay: !!stay };
     const today = new Date(now());
     const toSunday = ((7 - today.getDay()) % 7) || 7;
     sheet(`<h2>דיברנו עם ${esc(People.rowName(l))}. מה הלאה?</h2>
+      <label class="label" for="tk-note">מה נאמר? <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="למשל: רוצה הצעה ל-300 איש, לפני פסח"></textarea>
+      <div class="label">הצעד הבא</div>
       <div class="chips">${opts.map((s, i) => `<button class="chip" data-tkstep="${i}" aria-pressed="false">${STEPS[s.type].icon} ${esc(s.label)}</button>`).join('')}</div>
       <div class="label">מתי</div>
       <div class="chips">${[[1, 'מחר'], [toSunday, 'יום ראשון'], [7, 'בעוד שבוע']].map(([d, t]) => `<button class="chip" data-tkdays="${d}" aria-pressed="false">${t}</button>`).join('')}
@@ -2220,22 +2429,28 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     const l = leadById(TK.lid);
     if (!l || TK.i == null) return;
     const s = TK.opts[TK.i];
-    const cur = tasks(l)[0];
-    if (cur) l.done.push(cur.key);
+    const note = ($('#tk-note') && $('#tk-note').value.trim()) || '';
+    // The call that was due is done, and so is every other "call him" — he has just been called.
+    tasks(l).filter((t, i) => i === 0 || t.type === 'call').forEach((t) => l.done.push(t.key));
     const dueAt = TK.date ? H.addDays(new Date(TK.date + 'T09:00'), 0).getTime() : H.addDays(new Date(now()), TK.days || Math.max(1, s.days || 1)).getTime();
     addManual(l, s, dueAt);
-    log(l, '📞 דיברנו — הלאה: ' + s.label + ' · ' + H.heDate(new Date(dueAt)));
+    if (note) l.notes.push({ id: 'n' + (S.nseq++), at: now(), text: note, audio: false, tr: '' });
+    log(l, '📞 דיברנו — הלאה: ' + s.label + ' · ' + H.heDate(new Date(dueAt)) + (note ? ' · ' + note.slice(0, 60) : ''));
     if (l.stage === 'new') setStage(l, 'contact');
-    if (s.type === 'quote' && ['new', 'contact'].includes(l.stage) && stageById('quote').id === 'quote') setStage(l, 'quote');
-    TK = null;
-    save(); render(); sheetCRM(l);
+    if (s.type === 'quote' && ['new', 'contact'].includes(l.stage) && S.biz.stages.some((x) => x.id === 'quote')) setStage(l, 'quote');
+    const stay = TK.stay;
+    TK = null; rowOpen = null;
+    save();
+    if (stay) { closeSheet(false); render(); } else { render(); sheetCRM(l); }
     toast('✓ ' + s.label + ' · ' + dueText(new Date(dueAt)));
   }
-  function outcome(l, kind) {
+  /** A call's outcome. With `stay`, from a row in the tasks list: the list stays, and the next row is ready. */
+  function outcome(l, kind, stay) {
     const today = new Date(now());
     const cur = tasks(l)[0];
     callOpen = false;
-    if (kind === 'talk') return sheetTalk(l);
+    if (kind === 'talk') return sheetTalk(l, stay);
+    rowOpen = null;
     if (kind === 'lost') {
       closeSheet(false);
       undoable('סומן "לא רלוונטי" · ' + People.rowName(l), () => setStage(l, (stageOf('lost') || {}).id || 'lost'));
@@ -2246,9 +2461,16 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       if (l.noAnswer >= 3) { l.audience = true; log(l, '📞 לא ענה — פעם שלישית, עבר לקהל'); }
       else { if (cur) l.moved[cur.key] = H.addDays(today, 1).getTime(); log(l, '📞 לא ענה — ננסה מחר'); }
       runRules('noanswer', l, l.noAnswer);
+      if (stay) toast('📞 ' + People.rowName(l) + ' — לא ענה, ננסה מחר');
     }
-    if (kind === 'won') setStage(l, (stageOf('won') || {}).id || 'won', 'אחרי שיחה');
+    if (kind === 'won') {
+      const sends = sendsOnStage(l, (stageOf('won') || {}).id);
+      if (sends.length) { save(); return sheetMoveConfirm(l, (stageOf('won') || {}).id, sends); }
+      setStage(l, (stageOf('won') || {}).id || 'won', 'אחרי שיחה');
+      if (stay) toast('🎉 ' + People.rowName(l) + ' — נסגרה עסקה');
+    }
     save();
+    if (stay) return render();
     if (S.view === 'crm') render();
     sheetCRM(l);
   }
@@ -2261,7 +2483,7 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     seedDay();
     const rnd = (n) => Math.floor(Math.random() * n);
     const back = 9 * H.DAY;
-    S.leads.slice(before).forEach((l, i) => {
+    S.leads.slice(before).forEach((l) => {
       l.at -= back; l.log.forEach((e) => { e.at -= back; }); l.notes.forEach((n) => { n.at -= back; });
       upgradeLead(l);
       l.owner = S.biz.team[rnd(S.biz.team.length)];
@@ -2276,7 +2498,7 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       else if (r < 0.45) { l.stage = 'quote'; ev(3, '➜ הצעה נשלחה'); }
       else if (r < 0.55) { l.stage = 'nego'; ev(3, '➜ הצעה נשלחה'); ev(5, '➜ במשא ומתן'); }
       else if (r < 0.75) { l.stage = 'contact'; ev(2, '➜ בקשר'); }
-      else if (Math.random() < 0.5) { l.noAnswer = 1 + rnd(2); ev(2, '📞 לא ענה — ננסה מחר'); }
+      else if (Math.random() < 0.5) { l.noAnswer = 1 + rnd(2); for (let k = 0; k < l.noAnswer; k++) ev(2 + k, '📞 לא ענה — ננסה מחר'); }
       if (!l.won && !l.lost && r < 0.75) {
         tasks(l).forEach((t) => l.done.push(t.key));   // someone who was spoken to has one step ahead, not the old ones
         addManual(l, normStep({ type: ['call', 'meet', 'quote'][rnd(3)] }), H.addDays(new Date(now()), rnd(7) - 2).getTime());
@@ -2295,10 +2517,10 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
           <div class="step-list">${b.stages.map((s, i) => `<div class="stage-line"><input class="text-input" data-stname="${s.id}" value="${esc(s.name)}" aria-label="שם השלב">
             ${s.kind ? `<span class="faint">${s.kind === 'won' ? 'סגירה' : 'אבוד'}</span>` : `<button class="btn ghost" data-stmove="${i}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-stmove="${i}:1" aria-label="למטה" ${b.stages[i + 1] && !b.stages[i + 1].kind ? '' : 'disabled'}>▼</button><button class="btn ghost danger" data-stdel="${s.id}" aria-label="למחוק">✕</button>`}</div>`).join('')}</div>
           <div class="add-row"><input id="new-stage" class="text-input" placeholder="+ שלב חדש" autocomplete="off"><button class="btn" data-act="stage-add">הוספה</button></div></section>
-        <section class="card"><h2>הצוות</h2><p class="muted">למי אפשר לשייך ליד.</p>
+        <section class="card"><h2>הצוות</h2><p class="muted">למי אפשר לשייך ליד. הראשון הוא אתה.</p>
           <div class="chips">${b.team.map((t, i) => `<span class="chip static">${esc(t)}${i ? ` <button class="link" data-teamdel="${i}" aria-label="להסיר">✕</button>` : ''}</span>`).join('')}</div>
           <div class="add-row"><input id="new-member" class="text-input" placeholder="+ שם" autocomplete="off"><button class="btn" data-act="team-add">הוספה</button></div></section>
-        <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
+        <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור. נשלחת אליך מהמספר של מערכת הדוכן.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
           ${b.digest.on ? `<div class="label">לאן</div><div class="chips">${['wa', 'email', 'sms'].map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
           <div class="label">באיזו שעה</div><div class="chips">${['07:00', '08:00', '09:00', '10:00'].map((h) => `<button class="chip" data-digesth="${h}" aria-pressed="${b.digest.hour === h}">${h}</button>`).join('')}</div>` : ''}</section>
       </div>`;
@@ -2418,17 +2640,20 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
     if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); render(); } return; }
-    if (d.ie) {   // a cell edited in the table
+    if (d.ie) {   // a cell edited in the table — every change can be taken back
       const l = leadById(+d.lid);
       if (!l) return;
-      if (d.ie === 'stage') setStage(l, t.value, 'מהטבלה');
-      if (d.ie === 'owner') { l.owner = t.value; log(l, 'שויך ל' + t.value); }
-      if (d.ie === 'warm') { if (t.value === '') { l.warmBy = null; l.warmth = null; } else { l.warmth = +t.value; l.warmBy = 'hand'; } }
-      if (d.ie === 'value') l.value = t.value === '' ? null : Math.max(0, +t.value);
-      save();
-      toast('✓ ' + People.rowName(l) + ' עודכן');
-      return d.ie === 'value' ? null : render();
+      tbEdit = null;
+      if (d.ie === 'stage') { if (t.value !== l.stage) moveLead(l, t.value); else render(); return; }
+      undoable('✓ ' + People.rowName(l) + ' עודכן', () => {
+        if (d.ie === 'owner') { l.owner = t.value; log(l, 'שויך ל' + t.value); }
+        if (d.ie === 'warm') { if (t.value === '') { l.warmBy = null; l.warmth = null; } else { l.warmth = +t.value; l.warmBy = 'hand'; } }
+        if (d.ie === 'value') l.value = t.value === '' ? null : Math.max(0, +t.value);
+      });
+      return render();
     }
+    if (d.grp) { grp[d.grp] = t.value; return render(); }
+    if (d.scclosed !== undefined) { const list = SC.ids.map(leadById).filter(Boolean); return sheetSendConfirm(list, SC.tid, t.checked); }
     if (d.tbsel) { const id = +d.tbsel; if (t.checked) tbSel.add(id); else tbSel.delete(id); return render(); }
     if (d.tbselall !== undefined) {
       const rows = tableRows(leadsNow()).slice(tbPage * 25, tbPage * 25 + 25);
@@ -2444,6 +2669,11 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
   document.addEventListener('focusin', (e) => { if (e.target.closest && e.target.closest('.lead input')) stopIdle(); });
   document.addEventListener('focusout', (e) => { if (e.target.closest && e.target.closest('.lead input') && openId) setTimeout(startIdle, 0); });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {   // Escape closes a sheet — unless it holds unsaved work, which has its own buttons
+      const sh = document.querySelector('#scrim .sheet');
+      if (sh && !sh.dataset.guard) { closeSheet(); if (S.phase === 'live' && S.view !== 'booth') render(); }
+      return;
+    }
     if (e.key !== 'Enter' || !e.target.dataset) return;
     if (e.target.dataset.newbtn) addButton(e.target.dataset.newbtn);
     if (e.target.id === 'new-group') addGroup();
@@ -2476,13 +2706,32 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     // ---- CRM ----
     if (d.crmtab) { S.crmTab = d.crmtab; S.crmLead = null; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
     if (d.tl) { tlFilter = d.tl; return render(); }
+    if (d.ietap) { tbEdit = d.lid + ':' + d.ietap; return render(); }
+    if (d.rowcall) { rowOpen = rowOpen === +d.rowcall ? null : +d.rowcall; return render(); }
+    if (d.rowout) { if (L) outcome(L, d.rowout, true); return; }
+    if (d.mine !== undefined) { S.mine = d.mine === '1'; save(); return render(); }
+    if (d.msgf) { msgFilter = d.msgf; return render(); }
+    if (d.rulehits) {
+      const r = S.biz.rules.find((x) => x.id === d.rulehits);
+      tbIds = new Set(leadsNow().filter((l) => l.ruleHits && l.ruleHits[d.rulehits]).map((l) => l.id));
+      tbIdsWhy = 'הכלל: ' + (r ? ruleText(r).then : '');
+      S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; save(); render(); return window.scrollTo(0, 0);
+    }
+    if (d.tplvar) {
+      const ta = $('#tp-text');
+      if (!ta) return;
+      const at = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
+      ta.value = ta.value.slice(0, at) + d.tplvar + ta.value.slice(ta.selectionEnd == null ? at : ta.selectionEnd);
+      ta.focus(); ta.setSelectionRange(at + d.tplvar.length, at + d.tplvar.length);
+      return;
+    }
     if (d.pmove) { const l = leadById(+d.pmove); if (l) sheetMove(l); return; }
-    if (d.pstage) { if (L) { closeSheet(false); undoable(People.rowName(L) + ' ➜ ' + stageById(d.pstage).name, () => setStage(L, d.pstage)); render(); } return; }
+    if (d.pstage) { if (L) { closeSheet(false); if (L.stage !== d.pstage) moveLead(L, d.pstage); } return; }
     if (d.tbsort) { const s = S.tb.sort; if (s.col === d.tbsort) s.dir = -s.dir; else { s.col = d.tbsort; s.dir = 1; } save(); return render(); }
     if (d.tbpage !== undefined) { tbPage = +d.tbpage; render(); return window.scrollTo(0, 0); }
     if (d.tbclear) { if (d.tbclear === 'all') { S.tb.f = {}; tbQuery = ''; } else S.tb.f[d.tbclear] = ''; tbPage = 0; save(); return render(); }
     if (d.tbview !== undefined) { const v = S.biz.views[+d.tbview]; if (v) { S.tb = clone(v.tb); tbPage = 0; save(); render(); toast('תצוגה: ' + v.name); } return; }
-    if (d.tbcol) { const c = S.tb.cols; S.tb.cols = c.includes(d.tbcol) ? c.filter((x) => x !== d.tbcol) : COLS.map((x) => x.id).filter((x) => c.includes(x) || x === d.tbcol); save(); render(); return sheetCols(); }
+    if (d.tbcol) { const c = S.tb.cols; S.tb.custom = true; S.tb.cols = c.includes(d.tbcol) ? c.filter((x) => x !== d.tbcol) : COLS.map((x) => x.id).filter((x) => c.includes(x) || x === d.tbcol); save(); render(); return sheetCols(); }
     if (d.bulk) {
       if (d.bulk === 'clear') { tbSel.clear(); return render(); }
       if (d.bulk === 'export') return exportLeads(Array.from(tbSel).map(leadById).filter(Boolean), 'לידים-נבחרים');
@@ -2598,7 +2847,17 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
     if (d.crmlead) { const l = leadById(+d.crmlead); if (l) sheetCRM(l); return; }
     if (d.outcome) { if (L) outcome(L, d.outcome); return; }
     if (d.play) return playNote(d.play);
-    if (d.taskdone) { if (L) { const t = tasks(L).find((x) => x.key === d.taskdone); L.done.push(d.taskdone); log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע'); if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה'); save(); afterTask(L); } return; }
+    if (d.taskdone) {
+      if (!L) return;
+      const t = tasks(L).find((x) => x.key === d.taskdone);
+      undoable('✓ ' + (t ? t.label : 'צעד') + ' — בוצע', () => {
+        L.done.push(d.taskdone);
+        log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע');
+        if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה');
+      });
+      const l2 = leadById(L.id);   // after undoable the state object is the same, but stay safe
+      return afterTask(l2 || L);
+    }
     if (d.tasksend) {
       if (!L) return;
       const t = tasks(L).find((x) => x.key === d.tasksend);
@@ -2761,8 +3020,8 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       case 'tb-dense': S.tb.dense = !S.tb.dense; save(); return render();
       case 'ask': { e.preventDefault(); const q = $('#ask-q') && $('#ask-q').value.trim(); if (q) askData(q); return; }
       case 'ask-clear': ASK = null; return render();
-      case 'ask-table': tbIds = new Set(ASK.ids); S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
-      case 'ask-unfilter': tbIds = null; return render();
+      case 'ask-table': tbIds = new Set(ASK.ids); tbIdsWhy = 'מתוך התשובה לשאלה'; S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
+      case 'ask-unfilter': tbIds = null; tbIdsWhy = ''; return render();
       case 'view-settings': {
         const vs = VIEW_SETTINGS[S.crmTab];
         if (!vs) return;
@@ -2806,15 +3065,22 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
         save(); closeSheet(false); return render();
       }
       case 'tpl-del': { const id = d.id; closeSheet(false); undoable('התבנית נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
-      case 'grp-send': {
-        const st = $('#gs-stage').value; const w = $('#gs-warm').value; const bt = $('#gs-btn').value; const tid = $('#gs-tpl').value;
-        const list = leadsNow().filter((l) => (!st || l.stage === st) && (w === '' || effWarm(l) === +w) && (!bt || l.tags.includes(bt)));
-        const t = S.biz.templates.find((x) => x.id === tid);
-        if (!list.length) return toast('אין לידים שעונים על הבחירה');
-        tbSel.clear(); list.forEach((l) => tbSel.add(l.id));
-        return sheetConfirm(`לשלוח "${t ? t.name : ''}" ל-${list.length}?`, list.slice(0, 8).map((l) => People.rowName(l)).join(', ') + (list.length > 8 ? ` ועוד ${list.length - 8}` : ''), 'grp-send-yes', `data-v="${esc(tid)}"`);
+      case 'grp-send': return sheetSendConfirm(grpList(), grp.tpl);
+      case 'send-confirm': return sendConfirmed();
+      case 'go-today': S.crmTab = 'tasks'; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
+      case 'view-noanswer': S.tb.f = { answer: 'none' }; tbIds = null; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; save(); render(); return window.scrollTo(0, 0);
+      case 'move-send': case 'move-hold': {
+        if (!L) return;
+        closeSheet(false);
+        holdSends = d.act === 'move-hold';
+        setStage(L, d.v, holdSends ? 'בלי לשלוח' : '');
+        holdSends = false;
+        save(); render();
+        return toast(People.rowName(L) + ' ➜ ' + stageById(d.v).name + (d.act === 'move-send' ? ' · נשלח' : ' · בלי לשלוח'));
       }
-      case 'grp-send-yes': return doBulk('message', d.v);
+      case 'rec-menu': { if (L) sheetRecMenu(L); return; }
+      case 'opt-out': { if (!L) return; L.optOut = !L.optOut; log(L, L.optOut ? '🚫 ביקש להסיר מרשימת התפוצה' : 'חזר לרשימת התפוצה'); save(); closeSheet(false); render(); return toast(L.optOut ? 'לא יקבל יותר הודעות מהתבניות' : 'חזר לרשימת התפוצה'); }
+      case 'pick-file': { const f = $('#lead-file'); if (f) f.click(); return; }
       case 'lead-msg': { if (L) sheetLeadMsg(L); return; }
       case 'back-crm': { if (L) sheetCRM(L); return; }
       case 'stage-add': {
@@ -2874,7 +3140,7 @@ Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":
       case 'note-cancel': closeSheet(); return;
       case 'fill-open': fillOpen = true; return render();
       case 'call': { callOpen = true; return render(); }
-      case 'edit-tags': { if (L) sheet(leadBody(L, true), L.id); return; }
+      case 'edit-tags': { if (L) sheetTags(L); return; }
       case 'del-lead': { const l = L || leadById(openId); return l && sheetConfirm('למחוק את ' + People.rowName(l) + '?', 'הליד יימחק מהרשימה.', 'del-lead-yes', `data-lid="${l.id}"`); }
       case 'del-lead-yes': {
         const id = +d.lid;
