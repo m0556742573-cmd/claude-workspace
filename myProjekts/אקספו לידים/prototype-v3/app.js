@@ -378,8 +378,40 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const replyTo = () => S.biz.mail.replyTo || S.account.email;
   const stepsOf = (b) => (b && b.steps && b.steps.length ? b.steps : S.biz.defSteps).map(normStep);
 
+  const aiReady = (a) => { ai = a; if ($('#say-actions')) renderSayActions(); else if (S.phase === 'live' && S.view !== 'booth') render(); };
+  /* Two ways to reach the AI, one interface (`ai.json(prompt)`):
+   *   inside a Claude viewer — the `sample` capability;
+   *   on Cloudflare — our own worker (_worker.js), which holds the API key.
+   * Anywhere else (the local server) neither answers, and the word list is all there is. */
+  const CODEKEY = 'expo-demo3-ai-code';
+  const aiCode = () => { try { return localStorage.getItem(CODEKEY) || ''; } catch (e) { return ''; } };
+  const serverAI = {
+    async json(prompt) {
+      let r;
+      try {
+        r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', 'x-access-code': aiCode() }, body: JSON.stringify({ prompt }) });
+      } catch (e) { throw { code: 'network' }; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw { code: data.code || 'upstream' };
+      // The model answers in text; take the JSON object out of it, fences and all.
+      const t = String(data.text || '');
+      const a = t.indexOf('{');
+      const z = t.lastIndexOf('}');
+      try { return JSON.parse(t.slice(a, z + 1)); } catch (e) { throw { code: 'invalid_json' }; }
+    },
+  };
   if (window.claude && typeof window.claude.use === 'function') {
-    window.claude.use('sample').then((s) => { if (!s) return; ai = s; if ($('#say-actions')) renderSayActions(); else if (S.phase === 'live' && S.view !== 'booth') render(); }).catch(() => {});
+    window.claude.use('sample').then((s) => { if (s) aiReady(s); }).catch(() => {});
+  } else if (location.protocol !== 'file:') {
+    fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"ping":1}' })
+      .then((r) => (r.ok ? r.json() : null)).then((p) => { if (p && p.configured) aiReady(serverAI); }).catch(() => {});
+  }
+  function sheetCode() {
+    sheet(`<h2>קוד גישה לבינה המלאכותית</h2>
+      <p class="muted">כדי שרק מי שקיבל ממך את הקישור ישתמש בבינה המלאכותית. פעם אחת בכל מכשיר.</p>
+      <input id="ai-code" class="text-input ltr" autocomplete="off">
+      <div class="actions"><button class="btn primary" data-act="ai-code-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+    if (FINE) setTimeout(() => $('#ai-code') && $('#ai-code').focus(), 30);
   }
 
   /* Voice notes live in IndexedDB — a minute of audio is too big for localStorage. */
@@ -572,7 +604,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     box.innerHTML = ai
       ? `<div class="actions"><button class="btn primary big" data-act="ai-read" id="ai-btn">✨ תבין אותי</button>
           <span class="faint" id="ai-note">${stale ? 'שינית משהו — לחץ שוב כדי שאקרא מחדש' : S.biz.by === 'ai' ? 'הובן ע"י בינה מלאכותית' : 'עד שתלחץ — טיוטה מהירה לפי מילים'}</span></div>`
-      : `<p class="honest">כאן הטקסט נקרא לפי רשימת מילים, שמזהה בערך רבע מהעסקים, ואת המטרה היא לא קוראת. בתוך קלוד — בינה מלאכותית קוראת את שניהם.</p>`;
+      : `<p class="honest">כאן הטקסט נקרא לפי רשימת מילים, שמזהה בערך רבע מהעסקים, ואת המטרה היא לא קוראת. בתוך קלוד, או כשהבינה המלאכותית מחוברת בשרת — היא קוראת את שניהם.</p>`;
   }
   /** Merge a fresh reading into what is there, keeping every hand edit, every removal, and the ids leads are tagged with. */
   function applyReading(r, text) {
@@ -632,7 +664,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const code = e && e.code;
     if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
       ai = null; toast('הבינה המלאכותית לא זמינה כאן.'); render();
-    } else if (code === 'rate_limited') toast('יותר מדי בקשות. אפשר לנסות שוב בעוד רגע.');
+    } else if (code === 'need_code') sheetCode();
+    else if (code === 'not_configured') { ai = null; toast('הבינה המלאכותית עוד לא הוגדרה בשרת.'); render(); }
+    else if (code === 'rate_limited') toast('יותר מדי בקשות. אפשר לנסות שוב בעוד רגע.');
     else toast('לא הצלחתי עכשיו. אפשר לנסות שוב.');
   }
   function renderPreview() {
@@ -1269,7 +1303,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="ask" style="margin-top:10px">${fixed.map((x, i) => card(x, i, 'fixed')).join('')}
         ${got ? got.items.map((x, i) => card(x, i, 'ai')).join('') || '<div class="faint">לא נמצא משהו מיוחד.</div>' : ''}
         ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? 'לבדוק שוב' : 'לבקש מהבינה המלאכותית לעבור על הכל'}</button></div>`
-          : '<p class="honest">כאן רק התובנות הקבועות. בתוך קלוד — גם בינה מלאכותית שעוברת על הלידים.</p>'}
+          : '<p class="honest">כאן רק התובנות הקבועות. כשהבינה המלאכותית מחוברת — גם היא עוברת על הלידים.</p>'}
         ${!fixed.length && !got && !ai ? '<div class="faint">אין כרגע.</div>' : ''}</div>`;
   }
   const actionText = (a) => (a.kind === 'shift' ? 'להעביר למחר' : a.kind === 'warm' ? 'לסמן ' + words()[a.value] : 'להוסיף צעד: ' + STEPS[a.type].name);
@@ -1612,6 +1646,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       case 'menu': return toggleMenu();
       case 'ai-read': return understandAI();
       case 'ai-insights': return aiInsights(d.scope);
+      case 'ai-code-save': { const v = ($('#ai-code') && $('#ai-code').value.trim()) || ''; try { localStorage.setItem(CODEKEY, v); } catch (er) { /* private window */ } closeSheet(false); return toast('נשמר. לחץ שוב על הכפתור.'); }
       case 'setup-next': {
         if (S.step === 'account') {
           if (!S.account.name) return toast('מה השם שלך?');
@@ -1774,6 +1809,6 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   });
 
   // Test hooks: the readers and the planner, checkable from the console.
-  window.Demo3 = { parse: parseWords, clean: cleanAI, plan: (id) => plan(leadById(id)), tasks: (id) => tasks(leadById(id)), state: () => S };
+  window.Demo3 = { parse: parseWords, clean: cleanAI, useServerAI: () => aiReady(serverAI), plan: (id) => plan(leadById(id)), tasks: (id) => tasks(leadById(id)), state: () => S };
   render();
 })();

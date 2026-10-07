@@ -5,7 +5,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out="$here/dist"
 mkdir -p "$out"
-cp "$here/app.css" "$here/app.js" "$here/people.js" "$here/hebcal.js" "$out/"
+cp "$here/app.css" "$here/app.js" "$here/people.js" "$here/hebcal.js" "$here/_worker.js" "$out/"
 cat > "$out/index.html" <<'HTML'
 <!doctype html>
 <html lang="he" dir="rtl">
