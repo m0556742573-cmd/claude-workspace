@@ -528,7 +528,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Shell
   // ------------------------------------------------------------------
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית'], ['try', 'ניסיון']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'חומרים ונוסח']];
+  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'חומרים ונוסח'], ['crm', 'שלבים, צוות ובוקר']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'CRM']];
   function render() {
     renderTop();
@@ -763,7 +763,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   function viewCustom(m) {
     m.innerHTML = `<nav class="subtabs" aria-label="התאמה אישית">${SUBS.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>`;
-    ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, materials: viewMaterials }[S.sub] || viewButtons)($('#subview'));
+    ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, materials: viewMaterials, crm: viewCrmSettings }[S.sub] || viewButtons)($('#subview'));
   }
 
   // ---- buttons, in groups ----
@@ -815,7 +815,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function sheetSteps(ctx) {
     if (ctx) {
       const x = ctx.kind === 'btn' ? btnById(ctx.id) : null;
-      D = { kind: ctx.kind, id: ctx.id, label: x ? x.label : '', weight: x ? x.weight || 0 : 0, steps: (x ? stepsOf(x) : stepsOf(null)).map((s) => Object.assign({}, s)) };
+      D = { kind: ctx.kind, id: ctx.id, label: x ? x.label : '', weight: x ? x.weight || 0 : 0, value: x ? x.value || '' : '', steps: (x ? stepsOf(x) : stepsOf(null)).map((s) => Object.assign({}, s)) };
     }
     const isBtn = D.kind === 'btn';
     sheet(`<h2>${isBtn ? esc(D.label) : 'מי שלא סומן לו כלום'}</h2>
@@ -825,12 +825,17 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <button class="btn ghost danger" data-delstep="${i}" aria-label="להסיר צעד">✕</button></div>`).join('') || '<div class="faint">אין צעד — מי שיסומן כאן ייכנס לקהל.</div>'}</div>
       <button class="chip add" data-act="add-step" style="margin-top:8px">+ צעד נוסף</button>
       ${isBtn ? `<div class="label">כמה פונה כזה שווה לך <small>מחמם את הליד לבד</small></div>
-        <div class="chips">${WEIGHT.map((w, k) => `<button class="chip" data-esweight="${k}" aria-pressed="${D.weight === k}">${esc(w)}</button>`).join('')}</div>` : ''}
+        <div class="chips">${WEIGHT.map((w, k) => `<button class="chip" data-esweight="${k}" aria-pressed="${D.weight === k}">${esc(w)}</button>`).join('')}</div>
+        <label class="label" for="eb-value">שווי עסקה ממוצע ₪ <small>רשות — כך ה-CRM מעריך את שווי הצינור</small></label>
+        <input id="eb-value" class="text-input" type="number" min="0" step="100" value="${esc(D.value)}" placeholder="למשל 2500">` : ''}
       <div class="actions"><button class="btn primary" data-act="save-steps">שמירה</button><button class="btn ghost" data-act="steps-cancel">ביטול</button>
         ${isBtn ? `<button class="btn ghost danger far" data-act="del-btn" data-id="${D.id}">להסיר את הכפתור</button>` : ""}</div>`);
     $("#scrim .sheet").dataset.guard = "1";
   }
-  const keepDraft = () => { if (D && $('#eb-name')) D.label = $('#eb-name').value.trim() || D.label; };
+  const keepDraft = () => {
+    if (D && $('#eb-name')) D.label = $('#eb-name').value.trim() || D.label;
+    if (D && $('#eb-value')) D.value = $('#eb-value').value === '' ? '' : +$('#eb-value').value;
+  };
 
   /* One editor for a single step: a button's, the default's, or a lead's own. */
   let ES = null;
@@ -1011,7 +1016,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     slot.innerHTML = lastBar + again + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more;
   }
   const newLead = (key, r) => ({ id: S.seq++, key, i: r.i, b: r.b, at: now(), lastAt: now(), created: Date.now(), visits: 1, warmth: null, warmBy: null, tags: [],
-    eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, audience: false, notes: [] });
+    eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, audience: false, notes: [],
+    stage: 'new', value: null, owner: S.biz.team ? S.biz.team[0] : 'אני', contact: { phone: '', email: '' }, files: [], ruled: {}, by: worker() ? 'עובד' : 'בעלים' });
   function pick(key) {
     let l = leadByKey(key);
     if (!l) {
@@ -1043,7 +1049,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /** The card closes: what it queued goes out now, and it stays reopenable for a minute. */
   function closeLead() {
     if (!openId) return;
-    flushSends(leadById(openId));
+    const l = leadById(openId);
+    flushSends(l);
+    if (l && !l.capRun && !l.practice) { l.capRun = true; runRules('captured', l); save(); }   // the "lead captured" automations run once, when the card closes
     lastClosed = { id: openId, at: Date.now() };
     openId = null;
     stopIdle();
@@ -1442,16 +1450,260 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
 
   // ------------------------------------------------------------------
-  // CRM — every lead, by what is due
+  // CRM — the part a business owner opens every day after the fair.
+  //   סקירה    numbers, the 14 days, the morning message
+  //   משימות   who to talk to today
+  //   צינור    stages, dragged across
+  //   טבלה     every column, filters, saved views, bulk actions, Excel
+  //   פילוח    any dimension against any measure
+  //   אוטומציות rules the owner writes: when X, do Y
+  //   הודעות   templates, and sending to a group
   // ------------------------------------------------------------------
-  let crmFilter = null;      // null: today, or everything open when nothing is due today
+  const DEF_STAGES = [
+    { id: 'new', name: 'ליד חדש' }, { id: 'contact', name: 'בקשר' }, { id: 'quote', name: 'הצעה נשלחה' },
+    { id: 'nego', name: 'במשא ומתן' }, { id: 'won', name: 'נסגר', kind: 'won' }, { id: 'lost', name: 'לא רלוונטי', kind: 'lost' },
+  ];
+  const DEF_TEMPLATES = [
+    { id: 't1', name: 'תודה על הביקור', ch: 'any', text: 'שלום {שם}, תודה שעברת בדוכן של {עסק} בתערוכה. נשמח לעמוד לשירותך.' },
+    { id: 't2', name: 'כמו שדיברנו', ch: 'any', text: 'שלום {שם}, כמו שדיברנו — מצורף {חומר}. לכל שאלה אני כאן.' },
+    { id: 't3', name: 'תזכורת לפגישה', ch: 'wa', text: 'שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!' },
+    { id: 't4', name: 'לפני העונה', ch: 'any', text: 'שלום {שם}, העונה מתקרבת — זה הזמן להזמין. נשמח לשמוע ממך.' },
+  ];
+  const DEF_RULES = [
+    { id: 'r1', on: true, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'send', mat: '' }, fired: 0 },
+    { id: 'r2', on: true, trigger: 'captured', arg: null, cond: { warm: 0 }, action: { kind: 'step', type: 'meet', days: 1 }, fired: 0 },
+    { id: 'r3', on: true, trigger: 'idle', arg: 7, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0 },
+    { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't1' }, fired: 0 },
+  ];
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  /** Older saved states lack the CRM's fields; fill them in rather than throw the data away. */
+  function upgrade() {
+    const b = S.biz;
+    if (!b.stages) b.stages = clone(DEF_STAGES);
+    if (!b.team) b.team = ['אני'];
+    if (!b.templates) b.templates = clone(DEF_TEMPLATES);
+    if (!b.rules) b.rules = clone(DEF_RULES);
+    if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
+    if (!b.views) b.views = [];
+    if (!S.crmTab) S.crmTab = 'overview';
+    if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'next', 'due', 'owner'] };
+    S.leads.forEach(upgradeLead);
+  }
+  function upgradeLead(l) {
+    if (!l.stage) l.stage = l.won ? 'won' : l.lost ? 'lost' : 'new';
+    if (l.value === undefined) l.value = null;
+    if (!l.owner) l.owner = S.biz.team[0];
+    if (!l.contact) l.contact = { phone: '', email: '' };
+    if (!l.files) l.files = [];
+    if (!l.ruled) l.ruled = {};
+    if (!l.queue) l.queue = [];
+    if (!l.by) l.by = 'בעלים';
+  }
+  const stageById = (id) => S.biz.stages.find((s) => s.id === id) || S.biz.stages[0];
+  const stageOf = (kind) => S.biz.stages.find((s) => s.kind === kind);
+  const nis = (v) => (Math.round(v || 0)).toLocaleString('he-IL') + ' ₪';
+  const dateShort = (t) => { if (!t) return '—'; const d = new Date(t); return d.getDate() + '/' + (d.getMonth() + 1); };
+  /** What the lead is worth: typed in, or the average of the most valuable button tapped. */
+  const estValue = (l) => Math.max(0, ...tagged(l).map((b) => +b.value || 0));
+  const leadValue = (l) => (l.value != null && l.value !== '' ? +l.value : estValue(l));
+  const isOpenLead = (l) => !l.won && !l.lost;
+  const touched = (l) => l.log.filter((e) => /^(📞|📎|💬)/.test(e.t));
+
+  function setStage(l, id, why) {
+    if (l.stage === id) return;
+    const st = stageById(id);
+    l.stage = st.id;
+    const wasWon = l.won;
+    l.won = st.kind === 'won';
+    l.lost = st.kind === 'lost';
+    log(l, '➜ ' + st.name + (why ? ' · ' + why : ''));
+    if (l.won && !wasWon) {
+      tasks(l).forEach((t) => l.done.push(t.key));
+      const regular = tagged(l).some((b) => stepsOf(b).some((s) => s.type === 'regular')) || S.biz.buttons.some((b) => stepsOf(b).some((s) => s.type === 'regular'));
+      if (regular) addManual(l, { type: 'regular', label: 'לבדוק אם צריך עוד', days: 28 }, H.addDays(new Date(now()), 28).getTime());
+      runRules('won', l);
+    }
+    runRules('stage', l, st.id);
+  }
+
+  // ---- automations ----
+  const TRIGGERS = { captured: 'ליד נקלט בדוכן', noanswer: 'לא ענה', idle: 'עברו ימים בלי מגע', stage: 'ליד עבר לשלב', won: 'נסגרה עסקה' };
+  const ACTIONS = { step: 'להוסיף צעד', send: 'לשלוח חומר', message: 'לשלוח הודעה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להתריע לי' };
+  function ruleText(r) {
+    const a = r.action;
+    const when = r.trigger === 'noanswer' ? `לא ענה ${r.arg} פעמים` : r.trigger === 'idle' ? `${r.arg} ימים בלי מגע` : r.trigger === 'stage' ? `עבר ל"${stageById(r.arg).name}"` : TRIGGERS[r.trigger];
+    const c = r.cond || {};
+    const conds = [c.warm != null ? words()[c.warm] : '', c.btn && btnById(c.btn) ? 'סימן "' + btnById(c.btn).label + '"' : '', c.biz === true ? 'עסק' : c.biz === false ? 'פרטי' : '', c.minValue ? 'שווה ' + nis(c.minValue) + '+' : ''].filter(Boolean);
+    const then = a.kind === 'step' ? `${STEPS[a.type].name} תוך ${a.days || 1} ימים` : a.kind === 'send' ? 'לשלוח ' + (a.mat || 'את החומר') : a.kind === 'message' ? 'לשלוח "' + ((S.biz.templates.find((t) => t.id === a.tpl) || {}).name || 'הודעה') + '"' : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להתריע לי';
+    return { when: 'כש' + when + (conds.length ? ' · רק אם: ' + conds.join(', ') : ''), then };
+  }
+  function condOk(r, l) {
+    const c = r.cond || {};
+    if (c.warm != null && effWarm(l) !== c.warm) return false;
+    if (c.btn && !l.tags.includes(c.btn)) return false;
+    if (c.biz != null && (l.b != null) !== c.biz) return false;
+    if (c.minValue && leadValue(l) < c.minValue) return false;
+    return true;
+  }
+  let ruleDepth = 0;
+  function runRules(trigger, l, arg) {
+    if (ruleDepth > 1 || !S.biz.rules) return;   // a rule may set off one more, never a chain
+    ruleDepth++;
+    S.biz.rules.filter((r) => r.on && r.trigger === trigger && (r.trigger !== 'noanswer' && r.trigger !== 'stage' || r.arg === arg) && condOk(r, l)).forEach((r) => applyRule(r, l));
+    ruleDepth--;
+  }
+  function applyRule(r, l) {
+    const a = r.action;
+    r.fired = (r.fired || 0) + 1;
+    log(l, '⚙️ אוטומציה: ' + ruleText(r).then);
+    if (a.kind === 'step') { const s = normStep({ type: a.type, days: a.days || 1 }); addManual(l, s, dueFor(s)); }
+    else if (a.kind === 'send') { const name = a.mat || (S.biz.materials[0] || {}).name; if (name) doSend(l, name); else l.pendingMat = true; }
+    else if (a.kind === 'message') sendTemplate(l, a.tpl, true);
+    else if (a.kind === 'stage') setStage(l, a.stage, 'אוטומציה');
+    else if (a.kind === 'warm') { l.warmth = a.value || 0; l.warmBy = 'hand'; }
+    else if (a.kind === 'notify') toast('🔔 ' + People.rowName(l) + ': ' + ruleText(r).when);
+  }
+  /** "N days without contact" is checked whenever the CRM is opened, once per quiet spell. */
+  function runIdle() {
+    const rules = (S.biz.rules || []).filter((r) => r.on && r.trigger === 'idle');
+    if (!rules.length) return;
+    leadsNow().filter((l) => isOpenLead(l) && !l.audience).forEach((l) => {
+      const last = Math.max(l.at, ...l.log.map((e) => e.at));
+      const quiet = dayNo(now()) - dayNo(last);
+      rules.forEach((r) => {
+        const k = r.id + ':' + dayNo(last);
+        if (quiet >= r.arg && !l.ruled[k] && condOk(r, l)) { l.ruled[k] = true; applyRule(r, l); }
+      });
+    });
+  }
+
+  // ---- messages ----
+  const CH_NAMES = { any: 'כל הערוצים הפעילים', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
+  function channelsFor(t) {
+    const on = CHANNELS.filter((c) => S.biz.channels[c.k]);
+    const fit = t.ch === 'any' ? on : on.filter((c) => (t.ch === 'wa' ? c.k === 'wa' || c.k === 'waApi' : c.k === t.ch));
+    return fit.map((c) => c.name);
+  }
+  function sendTemplate(l, tid, quiet) {
+    const t = S.biz.templates.find((x) => x.id === tid);
+    if (!t) return false;
+    const ch = channelsFor(t);
+    if (!ch.length) { if (!quiet) toast('אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".'); return false; }
+    log(l, `💬 "${t.name}" נשלח ב${ch.join(' + ')}`);
+    if (!quiet) toast(`💬 "${t.name}" נשלח ל${People.rowName(l)}`);
+    return true;
+  }
+
+  // ---- Excel ----
+  let downloads = null;
+  if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then((d) => { downloads = d; }).catch(() => {});
+  let xlsxP = null;
+  const loadXLSX = () => xlsxP || (xlsxP = new Promise((res, rej) => {
+    if (window.XLSX) return res(window.XLSX);
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res(window.XLSX);
+    s.onerror = () => { xlsxP = null; rej(new Error('load')); };
+    document.head.appendChild(s);
+  }));
+  async function saveFile(filename, blob) {
+    if (downloads) {
+      try { await downloads.save({ filename, data: blob }); return true; } catch (e) { if (e && e.code === 'declined') return false; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    return true;
+  }
+  /** sheets: [{ name, rows: [[header…], [cell…]…] }] — one workbook, right-to-left. */
+  async function exportXlsx(filename, sheets) {
+    toast('מכין קובץ אקסל…');
+    try {
+      const X = await loadXLSX();
+      const wb = X.utils.book_new();
+      sheets.forEach((sh) => {
+        const ws = X.utils.aoa_to_sheet(sh.rows);
+        ws['!cols'] = sh.rows[0].map((_, i) => ({ wch: Math.min(45, Math.max(8, ...sh.rows.map((r) => String(r[i] == null ? '' : r[i]).length + 2))) }));
+        X.utils.book_append_sheet(wb, ws, sh.name.slice(0, 31));
+      });
+      wb.Workbook = { Views: [{ RTL: true }] };
+      const buf = X.write(wb, { bookType: 'xlsx', type: 'array' });
+      if (await saveFile(filename, new Blob([buf]))) toast('✓ ' + filename);
+    } catch (e) { toast('לא הצלחתי ליצור את קובץ האקסל כאן.'); }
+  }
+  const stamp = () => { const d = new Date(now()); return d.getDate() + '-' + (d.getMonth() + 1); };
+
+  // ---- shared pieces ----
+  let crmFilter = null;      // the tasks tab: null = today, or everything open when nothing is due today
   let crmQuery = '';
   function openTasks(L) {
     const score = (l) => { const p = plan(l); return (p.due ? p.due.getTime() : 9e15) - (effWarm(l) === 0 ? H.DAY / 2 : 0); };
     return L.filter((l) => tasks(l).length && plan(l).type !== 'season').sort((a, b) => score(a) - score(b));
   }
+  function barChart(rows, fmt) {
+    const max = Math.max(1, ...rows.map((r) => r.value));
+    return `<div class="bars">${rows.map((r) => `<div class="bar-row" title="${esc(r.label)}: ${esc((fmt || String)(r.value))}">
+      <span class="bl">${esc(r.label)}</span><span class="bt"><span class="bf${r.cls ? ' ' + r.cls : ''}" style="width:${(r.value / max * 100).toFixed(1)}%"></span></span><span class="bv">${esc((fmt || String)(r.value))}${r.sub ? ' <span class="faint">' + esc(r.sub) + '</span>' : ''}</span></div>`).join('')}</div>`;
+  }
+  const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
   function viewCRM(m) {
+    runIdle();
     const L = leadsNow();
+    m.innerHTML = `<div class="crm-head"><h1>CRM</h1>
+        <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}</span></div>
+      <nav class="crm-tabs" aria-label="CRM">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${S.crmTab === k}">${t}</button>`).join('')}</nav>
+      ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות CRM אמיתי בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
+        <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
+      <div id="crm-body"></div>`;
+    ({ overview: crmOverview, tasks: crmTasks, pipeline: crmPipeline, table: crmTable, segments: crmSegments, auto: crmAuto, messages: crmMessages }[S.crmTab] || crmOverview)($('#crm-body'), L);
+  }
+
+  // ---- סקירה ----
+  function crmOverview(box, L) {
+    const real = L.filter((l) => !l.practice);
+    const open = real.filter(isOpenLead);
+    const won = real.filter((l) => l.won);
+    const t0 = dayNo(now());
+    const dueToday = openTasks(real).filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) <= t0);
+    const late = dueToday.filter((l) => dayNo(plan(l).due.getTime()) < t0).length;
+    const hot = real.filter((l) => effWarm(l) === 0);
+    const fast = hot.filter((l) => touched(l).some((e) => e.at - l.at <= 2 * H.DAY));
+    const first = real.length ? Math.min(...real.map((l) => l.at)) : now();
+    const day = dayNo(now()) - dayNo(first);
+    const reached = real.filter((l) => touched(l).length).length;
+    const pipeValue = open.reduce((a, l) => a + leadValue(l), 0);
+    const kpi = (n, t, sub, cls) => `<div class="kpi${cls ? ' ' + cls : ''}"><span class="n">${n}</span><span class="t">${esc(t)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}</div>`;
+    const stages = S.biz.stages.map((s) => ({ label: s.name, value: real.filter((l) => l.stage === s.id).length, sub: nis(real.filter((l) => l.stage === s.id).reduce((a, l) => a + leadValue(l), 0)), cls: s.kind === 'won' ? 'good' : s.kind === 'lost' ? 'muted' : '' }));
+    const btnRows = S.biz.buttons.map((b) => { const ls = real.filter((l) => l.tags.includes(b.id)); return { label: b.label, value: ls.length, sub: ls.filter((l) => l.won).length ? ls.filter((l) => l.won).length + ' נסגרו' : '' }; }).filter((r) => r.value).sort((a, b) => b.value - a.value).slice(0, 8);
+    const firstName = (S.account.name || '').split(' ')[0];
+    const todayNames = dueToday.slice(0, 3).map((l) => People.rowName(l) + ' — ' + plan(l).label);
+    box.innerHTML = `
+      <div class="kpis">
+        ${kpi(real.length, 'לידים מהתערוכה', reached + ' כבר קיבלו מענה')}
+        ${kpi(dueToday.length, 'לטיפול היום', late ? late + ' באיחור' : '', late ? 'bad' : '')}
+        ${kpi(nis(pipeValue), 'שווי בצינור', open.length + ' פתוחים')}
+        ${kpi(won.length, 'עסקאות שנסגרו', nis(won.reduce((a, l) => a + leadValue(l), 0)), 'good')}
+        ${kpi(hot.length ? fast.length + '/' + hot.length : '—', 'חמים שקיבלו מענה תוך 48 שעות', hot.length ? Math.round(fast.length / hot.length * 100) + '% — המדד הכי משפיע על סגירה' : '')}
+      </div>
+      <section class="card" style="margin-top:14px"><h2>14 הימים שאחרי התערוכה</h2>
+        <div class="days14" aria-label="יום ${Math.min(day, 14)} מתוך 14">${Array.from({ length: 14 }, (_, i) => `<span class="${i < day ? 'past' : i === day ? 'now' : ''}"></span>`).join('')}</div>
+        <p style="margin:8px 0 0">${day > 14 ? 'עברו 14 הימים.' : `יום ${day} מתוך 14.`} חזרת ל-<b>${reached}</b> מתוך ${real.length}, נסגרו <b>${won.length}</b> עסקאות (${nis(won.reduce((a, l) => a + leadValue(l), 0))}), ונשארו <b>${open.filter((l) => !touched(l).length).length}</b> שעוד לא קיבלו שום מענה.</p></section>
+      <div class="two-col">
+        <section class="card"><h2>הצינור לפי שלבים</h2>${barChart(stages)}</section>
+        <section class="card"><h2>הכפתורים שהביאו לידים</h2>${btnRows.length ? barChart(btnRows) : '<div class="empty">עוד אין סימונים.</div>'}</section>
+      </div>
+      <section class="card digest-card" style="margin-top:14px"><h2>הודעת הבוקר שלך</h2>
+        ${S.biz.digest.on ? `<div class="bubble"><b>בוקר טוב${firstName ? ' ' + esc(firstName) : ''}!</b><br>היום, ${esc(H.label(new Date(now())))}:<br>
+          ${dueToday.length ? `📞 ${dueToday.length} לטיפול${late ? `, מהם ${late} באיחור` : ''}<br>${todayNames.map((t) => '• ' + esc(t)).join('<br>')}${dueToday.length > 3 ? '<br>• ועוד ' + (dueToday.length - 3) : ''}` : '✓ אין משימות להיום.'}<br>
+          💰 בצינור: ${nis(pipeValue)}</div>
+          <p class="faint">נשלח כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch])}. בדוגמית — תצוגה בלבד. <button class="link" data-act="crm-settings">שינוי</button></p>`
+          : '<p class="muted">כבוי. <button class="link" data-act="crm-settings">להפעיל</button></p>'}</section>
+      ${insightsBox('crm', 'מה כדאי לעשות')}`;
+  }
+
+  // ---- משימות ----
+  function crmTasks(box, L) {
     const t0 = dayNo(now());
     const due = (l) => { const p = plan(l); return p.due ? dayNo(p.due.getTime()) - t0 : null; };
     const groups = {
@@ -1459,31 +1711,26 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       week: openTasks(L).filter((l) => due(l) > 0 && due(l) <= 7),
       all: openTasks(L),
       season: L.filter((l) => plan(l).type === 'season'),
-      audience: L.filter((l) => !l.won && !tasks(l).length),   // audience, and those marked not relevant
+      audience: L.filter((l) => !l.won && !tasks(l).length),
       won: L.filter((l) => l.won),
     };
     const late = groups.today.filter((l) => due(l) < 0).length;
     const f = crmFilter || (groups.today.length ? 'today' : 'all');
     const q = People.norm(crmQuery);
-    // A search looks through every lead, whatever the tab — or a lead put aside could never be found again.
     const hay = (l) => People.norm(People.rowName(l) + ' ' + People.town(l) + ' ' + tagged(l).map((b) => b.label).join(' ') + ' ' + l.roleOf + ' ' + l.notes.map((n) => n.text).join(' '));
     const list = q ? L.filter((l) => hay(l).includes(q)) : groups[f];
     const tab = (k, t) => `<button class="tab" data-filter="${k}" aria-pressed="${!q && f === k}">${t} <span class="n">${groups[k].length}</span></button>`;
-    // Today is grouped by warmth: everything from one fair falls on the same date.
-    const body = !list.length ? `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד' + (L.length ? '.' : ' — עוד לא נקלטו לידים.')}</div>`
+    const body = !list.length ? `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד.'}</div>`
       : !q && (f === 'today' || f === 'all') ? [0, 1, null, 2].map((w) => {
         const part = list.filter((l) => effWarm(l) === w);
         return part.length ? `<div class="group-head">${w == null ? 'בלי חום' : esc(words()[w])} · ${part.length}</div>${crmRows(part)}` : '';
       }).join('') : crmRows(list);
-    m.innerHTML = `<div class="crm-head"><h1>CRM</h1>
-        <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}</span></div>
-      <nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'השבוע')}${tab('all', 'כל הפתוחים')}</nav>
+    box.innerHTML = `<nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'השבוע')}${tab('all', 'כל הפתוחים')}</nav>
       ${late && !q ? `<div class="late-note">${late} באיחור</div>` : ''}
       <div class="more-tabs"><span class="faint">עוד:</span>${tab('season', 'לעונה')}${tab('audience', 'קהל ולא רלוונטי')}${tab('won', 'נסגרו')}</div>
       <input id="crm-q" class="text-input" placeholder="חיפוש בכל הלידים — שם, עיר, כפתור, מוסד או הערה" aria-label="חיפוש בלידים" value="${esc(crmQuery)}" autocomplete="off">
       ${q ? `<div class="faint" style="margin-top:6px">מחפש בכל הלידים · <button class="link" data-act="crm-clear">ניקוי</button></div>` : ''}
-      <div style="margin-top:10px">${body}</div>
-      ${insightsBox('crm', 'מה כדאי לעשות')}`;
+      <div style="margin-top:10px">${body}</div>`;
     $('#crm-q').addEventListener('input', (e) => { crmQuery = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#crm-q'); n.focus(); n.setSelectionRange(pos, pos); });
   }
   /** Two lines a lead: who, and what is next. The reasons live in the lead's own sheet. */
@@ -1493,38 +1740,344 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       const p = plan(l);
       const w = effWarm(l);
       const more = tasks(l).length - 1;
-      const state = l.lost ? 'לא רלוונטי' : l.won ? '🎉 נסגר' : w != null ? words()[w] : 'בלי חום';
-      return `<button class="row" data-crmlead="${l.id}"><span><span class="dot w${w == null ? '' : w}" aria-hidden="true"></span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span> <span class="state">${esc(state)}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
+      const v = leadValue(l);
+      return `<button class="row" data-crmlead="${l.id}"><span><span class="dot w${w == null ? '' : w}" aria-hidden="true"></span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span> <span class="state">${esc(stageById(l.stage).name)}</span>${v ? ` <span class="money">${nis(v)}</span>` : ''}${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
         <span class="due">${planHTML(p)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span></button>`;
     }).join('')}</div>`;
   }
+
+  // ---- צינור ----
+  function crmPipeline(box, L) {
+    box.innerHTML = `<p class="muted">גוררים כרטיס לשלב אחר, או נוגעים ב-⇄. נגיעה בשם פותחת את הליד.</p>
+      <div class="pipe">${S.biz.stages.map((s) => {
+        const ls = L.filter((l) => l.stage === s.id);
+        return `<section class="pcol${s.kind ? ' ' + s.kind : ''}" data-pcol="${s.id}"><header><b>${esc(s.name)}</b> <span class="faint">${ls.length} · ${nis(ls.reduce((a, l) => a + leadValue(l), 0))}</span></header>
+          <div class="pcards">${ls.map((l) => { const w = effWarm(l); const p = plan(l); return `<div class="pcard" draggable="true" data-plid="${l.id}">
+            <button class="pname" data-crmlead="${l.id}"><span class="dot w${w == null ? '' : w}" aria-hidden="true"></span>${esc(People.rowName(l))}</button>
+            <div class="faint">${esc(People.town(l))}${leadValue(l) ? ' · <b class="money">' + nis(leadValue(l)) + '</b>' : ''}</div>
+            ${p.due ? `<div class="pnext">${STEPS[p.type].icon} ${esc(p.label)} · ${esc(dateShort(p.due.getTime()))}</div>` : ''}
+            <button class="pmove" data-pmove="${l.id}" aria-label="להעביר שלב">⇄</button></div>`; }).join('') || '<div class="pempty">—</div>'}</div></section>`;
+      }).join('')}</div>`;
+    box.querySelectorAll('.pcard').forEach((c) => c.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', c.dataset.plid); c.classList.add('dragging'); }));
+    box.querySelectorAll('.pcol').forEach((col) => {
+      col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('over'); });
+      col.addEventListener('dragleave', () => col.classList.remove('over'));
+      col.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const l = leadById(+e.dataTransfer.getData('text/plain'));
+        if (l && l.stage !== col.dataset.pcol) { const from = l.stage; undoable(People.rowName(l) + ' ➜ ' + stageById(col.dataset.pcol).name, () => setStage(l, col.dataset.pcol)); if (from !== l.stage) render(); }
+        else render();
+      });
+    });
+  }
+  function sheetCols() {
+    sheet(`<h2>עמודות בטבלה</h2><div class="opts grid2">${COLS.map((c) => `<button class="opt" data-tbcol="${c.id}" aria-pressed="${S.tb.cols.includes(c.id)}">${esc(c.t)}</button>`).join('')}</div>
+      <div class="actions"><button class="btn primary" data-act="sheet-close">סיום</button></div>`);
+  }
+  function sheetMove(l) {
+    sheet(`<h2>להעביר את ${esc(People.rowName(l))}</h2>
+      <div class="opts">${S.biz.stages.map((s) => `<button class="opt" data-pstage="${s.id}" data-lid="${l.id}" aria-pressed="${l.stage === s.id}">${esc(s.name)}</button>`).join('')}</div>`);
+  }
+
+  // ---- טבלה ----
+  const COLS = [
+    { id: 'name', t: 'שם', v: (l) => People.rowName(l) },
+    { id: 'town', t: 'עיר', v: (l) => People.town(l) },
+    { id: 'kind', t: 'סוג', v: (l) => (l.b != null ? 'עסק' : 'פרטי') },
+    { id: 'stage', t: 'שלב', v: (l) => stageById(l.stage).name, s: (l) => S.biz.stages.findIndex((x) => x.id === l.stage) },
+    { id: 'warm', t: 'חום', v: (l) => (effWarm(l) == null ? '' : words()[effWarm(l)]), s: (l) => (effWarm(l) == null ? 9 : effWarm(l)) },
+    { id: 'value', t: 'שווי', v: (l) => leadValue(l), f: (v) => (v ? nis(v) : '—'), num: true },
+    { id: 'tags', t: 'כפתורים', v: (l) => tagged(l).map((b) => b.label).join(', ') },
+    { id: 'next', t: 'צעד הבא', v: (l) => (tasks(l).length ? plan(l).label : '') },
+    { id: 'due', t: 'מתי', v: (l) => (plan(l).due ? plan(l).due.getTime() : null), f: dateShort, num: true },
+    { id: 'owner', t: 'אחראי', v: (l) => l.owner },
+    { id: 'by', t: 'נקלט ע"י', v: (l) => l.by },
+    { id: 'visits', t: 'ביקורים', v: (l) => l.visits, num: true },
+    { id: 'phone', t: 'טלפון', v: (l) => l.contact.phone, ltr: true },
+    { id: 'email', t: 'מייל', v: (l) => l.contact.email, ltr: true },
+    { id: 'notes', t: 'הערות', v: (l) => l.notes.map((n) => n.text || n.tr).filter(Boolean).join(' | ') },
+    { id: 'at', t: 'ביקר', v: (l) => l.at, f: dateShort, num: true },
+  ];
+  const colById = (id) => COLS.find((c) => c.id === id);
+  const FILTERS = {
+    stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
+    warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'בלי חום']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
+    btn: { t: 'כפתור', opts: () => S.biz.buttons.map((b) => [b.id, b.label]), ok: (l, v) => l.tags.includes(v) },
+    kind: { t: 'סוג', opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
+    owner: { t: 'אחראי', opts: () => S.biz.team.map((n) => [n, n]), ok: (l, v) => l.owner === v },
+    town: { t: 'עיר', opts: () => Array.from(new Set(leadsNow().map((l) => People.town(l)))).sort().map((t) => [t, t]), ok: (l, v) => People.town(l) === v },
+  };
+  let tbQuery = '';
+  let tbPage = 0;
+  const tbSel = new Set();
+  function tableRows(L) {
+    const f = S.tb.f;
+    const q = People.norm(tbQuery);
+    let rows = L.filter((l) => Object.keys(f).every((k) => !f[k] || FILTERS[k].ok(l, f[k])))
+      .filter((l) => !q || People.norm(COLS.map((c) => c.v(l)).join(' ')).includes(q));
+    const c = colById(S.tb.sort.col) || COLS[0];
+    const key = c.s || c.v;
+    rows = rows.slice().sort((a, b) => {
+      const x = key(a); const y = key(b);
+      if (x == null || x === '') return 1;
+      if (y == null || y === '') return -1;
+      return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'he')) * S.tb.sort.dir;
+    });
+    return rows;
+  }
+  function crmTable(box, L) {
+    const rows = tableRows(L);
+    const per = 25;
+    const pages = Math.max(1, Math.ceil(rows.length / per));
+    tbPage = Math.min(tbPage, pages - 1);
+    const shown = rows.slice(tbPage * per, tbPage * per + per);
+    const cols = S.tb.cols.map(colById).filter(Boolean);
+    const active = Object.keys(S.tb.f).filter((k) => S.tb.f[k]);
+    const allSel = shown.length && shown.every((l) => tbSel.has(l.id));
+    box.innerHTML = `
+      <div class="tb-bar">
+        ${Object.entries(FILTERS).map(([k, F]) => `<label class="tb-filter"><span class="faint">${F.t}</span><select data-tbf="${k}" aria-label="${F.t}"><option value="">הכל</option>${F.opts().map(([v, t]) => `<option value="${esc(v)}" ${S.tb.f[k] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('')}
+        <input id="tb-q" class="text-input tb-q" placeholder="חיפוש בטבלה" aria-label="חיפוש בטבלה" value="${esc(tbQuery)}" autocomplete="off">
+      </div>
+      <div class="tb-state">
+        <span><b>${rows.length}</b> לידים${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
+        <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${esc(v.name)}</button>`).join('')}
+          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button><button class="btn primary" data-act="tb-export">⬇ אקסל</button></span>
+      </div>
+      <div class="tb-wrap"><table class="tb">
+        <thead><tr><th class="ck"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></th>${cols.map((c) => `<th${c.num ? ' class="num"' : ''}><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
+        <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור" ${tbSel.has(l.id) ? 'checked' : ''}></td>${cols.map((c) => {
+          const v = c.v(l);
+          const txt = c.f ? c.f(v) : v == null || v === '' ? '—' : String(v);
+          return c.id === 'name' ? `<td><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>` : `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
+        }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
+      </table></div>
+      ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
+      ${tbSel.size ? `<div class="bulk"><b>${tbSel.size} נבחרו</b>
+        <button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button><button class="btn" data-bulk="owner">לשייך</button>
+        <button class="btn" data-bulk="step">להוסיף צעד</button><button class="btn" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="export">⬇ אקסל</button>
+        <button class="btn ghost" data-bulk="clear">ביטול הבחירה</button></div>` : ''}`;
+    $('#tb-q').addEventListener('input', (e) => { tbQuery = e.target.value; tbPage = 0; const pos = e.target.selectionStart; render(); const n = $('#tb-q'); n.focus(); n.setSelectionRange(pos, pos); });
+  }
+  function exportLeads(list, name) {
+    const cols = COLS;
+    const rows = [cols.map((c) => c.t)].concat(list.map((l) => cols.map((c) => { const v = c.v(l); return c.id === 'due' || c.id === 'at' ? (v ? new Date(v).toLocaleDateString('he-IL') : '') : v == null ? '' : v; })));
+    exportXlsx(name + '-' + stamp() + '.xlsx', [{ name: 'לידים', rows }]);
+  }
+  function sheetBulk(kind) {
+    const n = tbSel.size;
+    const opts = kind === 'stage' ? S.biz.stages.map((s) => [s.id, s.name]) : kind === 'warm' ? words().map((w, k) => [String(k), w]) : kind === 'owner' ? S.biz.team.map((t) => [t, t])
+      : kind === 'step' ? Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].icon + ' ' + STEPS[k].name]) : S.biz.templates.map((t) => [t.id, '💬 ' + t.name]);
+    const title = { stage: 'להעביר שלב', warm: 'לסמן חום', owner: 'לשייך ל', step: 'להוסיף צעד', message: 'לשלוח הודעה' }[kind];
+    sheet(`<h2>${title} — ${n} לידים</h2><div class="opts">${opts.map(([v, t]) => `<button class="opt" data-bulkdo="${kind}" data-v="${esc(v)}">${esc(t)}</button>`).join('')}</div>
+      <div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+  }
+  function doBulk(kind, v) {
+    const list = Array.from(tbSel).map(leadById).filter(Boolean);
+    let sent = 0;
+    closeSheet(false);
+    undoable(`✓ ${list.length} לידים עודכנו`, () => list.forEach((l) => {
+      if (kind === 'stage') setStage(l, v, 'בפעולה על כמה');
+      if (kind === 'warm') { l.warmth = +v; l.warmBy = 'hand'; }
+      if (kind === 'owner') { l.owner = v; log(l, 'שויך ל' + v); }
+      if (kind === 'step') { const s = normStep({ type: v }); addManual(l, s, dueFor(s)); log(l, 'הלאה: ' + s.label); }
+      if (kind === 'message' && sendTemplate(l, v, true)) sent++;
+    }));
+    if (kind === 'message') toast(`💬 נשלח ל-${sent} מתוך ${list.length}`, null);
+    render();
+  }
+
+  // ---- פילוח ----
+  let PV = { dim: 'stage', metric: 'count' };
+  function dims() {
+    const d = {
+      stage: { t: 'שלב', of: (l) => [stageById(l.stage).name], filter: 'stage', key: (l) => [l.stage] },
+      warm: { t: 'חום', of: (l) => [effWarm(l) == null ? 'בלי חום' : words()[effWarm(l)]], filter: 'warm', key: (l) => [effWarm(l) == null ? 'none' : String(effWarm(l))] },
+      kind: { t: 'עסק או פרטי', of: (l) => [l.b != null ? 'עסק' : 'פרטי'], filter: 'kind', key: (l) => [l.b != null ? 'biz' : 'private'] },
+      town: { t: 'עיר', of: (l) => [People.town(l)], filter: 'town', key: (l) => [People.town(l)] },
+      owner: { t: 'אחראי', of: (l) => [l.owner], filter: 'owner', key: (l) => [l.owner] },
+      by: { t: 'מי קלט בדוכן', of: (l) => [l.by] },
+      next: { t: 'סוג הצעד הבא', of: (l) => [tasks(l).length ? STEPS[plan(l).type].name : 'אין צעד'] },
+      hour: { t: 'שעת הביקור', of: (l) => [String(new Date(l.at).getHours()).padStart(2, '0') + ':00'] },
+    };
+    liveGroups().forEach((g) => {
+      d['g:' + g.id] = { t: 'כפתורים: ' + g.title, of: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.label) : ['לא סומן']; },
+        filter: 'btn', key: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.id) : ['']; } };
+    });
+    return d;
+  }
+  const METRICS = { count: 'מספר לידים', value: 'שווי', won: 'עסקאות שנסגרו', conv: 'אחוז סגירה', reached: 'קיבלו מענה' };
+  function pivot(L) {
+    const D = dims()[PV.dim] || dims().stage;
+    const map = new Map();
+    L.forEach((l) => {
+      const labels = D.of(l);
+      const keys = D.key ? D.key(l) : labels;
+      labels.forEach((lab, i) => {
+        if (!map.has(lab)) map.set(lab, { label: lab, key: keys[i], ls: [] });
+        map.get(lab).ls.push(l);
+      });
+    });
+    return Array.from(map.values()).map((r) => {
+      const won = r.ls.filter((l) => l.won).length;
+      return { label: r.label, key: r.key, count: r.ls.length, value: r.ls.reduce((a, l) => a + leadValue(l), 0), won, conv: r.ls.length ? Math.round(won / r.ls.length * 100) : 0, reached: r.ls.filter((l) => touched(l).length).length };
+    }).sort((a, b) => b[PV.metric] - a[PV.metric]);
+  }
+  function crmSegments(box, L) {
+    const D = dims();
+    if (!D[PV.dim]) PV.dim = 'stage';
+    const rows = pivot(L);
+    const fmt = PV.metric === 'value' ? nis : PV.metric === 'conv' ? (v) => v + '%' : String;
+    const canShow = !!D[PV.dim].filter;
+    box.innerHTML = `<div class="tb-bar">
+        <label class="tb-filter"><span class="faint">לפלח לפי</span><select data-pv="dim">${Object.entries(D).map(([k, d]) => `<option value="${k}" ${PV.dim === k ? 'selected' : ''}>${esc(d.t)}</option>`).join('')}</select></label>
+        <label class="tb-filter"><span class="faint">למדוד</span><select data-pv="metric">${Object.entries(METRICS).map(([k, t]) => `<option value="${k}" ${PV.metric === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <button class="btn primary" data-act="pv-export">⬇ אקסל</button></div>
+      <div class="two-col">
+        <section class="card"><h2>${esc(METRICS[PV.metric])} לפי ${esc(D[PV.dim].t)}</h2>${rows.length ? barChart(rows.map((r) => ({ label: r.label, value: r[PV.metric] })), fmt) : '<div class="empty">אין נתונים.</div>'}</section>
+        <section class="card"><div class="tb-wrap"><table class="tb">
+          <thead><tr><th>${esc(D[PV.dim].t)}</th>${Object.entries(METRICS).map(([k, t]) => `<th class="num">${t}</th>`).join('')}${canShow ? '<th></th>' : ''}</tr></thead>
+          <tbody>${rows.map((r) => `<tr><td><b>${esc(r.label)}</b></td><td class="num">${r.count}</td><td class="num">${nis(r.value)}</td><td class="num">${r.won}</td><td class="num">${r.conv}%</td><td class="num">${r.reached}</td>
+            ${canShow && r.key ? `<td><button class="link" data-pvshow="${esc(D[PV.dim].filter)}" data-v="${esc(r.key)}">לטבלה ←</button></td>` : canShow ? '<td></td>' : ''}</tr>`).join('')}</tbody>
+        </table></div></section>
+      </div>`;
+  }
+
+  // ---- אוטומציות ----
+  function crmAuto(box) {
+    box.innerHTML = `<p class="muted">כללים שאתה כותב: כשקורה משהו — המערכת עושה משהו, לבד. כל מה שהיא עשתה נרשם בהיסטוריה של הליד עם ⚙️.</p>
+      <div class="rules">${S.biz.rules.map((r) => { const t = ruleText(r); return `<div class="rule${r.on ? '' : ' off'}">${toggle('rule:' + r.id, r.on, 'הפעלת הכלל')}
+        <button class="rule-body" data-ruleedit="${r.id}"><span class="when">${esc(t.when)}</span><span class="then">⚙️ ${esc(t.then)}</span>
+        <span class="faint">${r.fired ? 'הופעל ' + r.fired + ' פעמים' : 'עוד לא הופעל'}</span></button></div>`; }).join('')}</div>
+      <div class="actions"><button class="btn primary" data-act="rule-add">+ כלל חדש</button></div>`;
+  }
+  let RD = null;
+  function sheetRule(id) {
+    const r = id ? S.biz.rules.find((x) => x.id === id) : null;
+    RD = r ? clone(r) : { id: 'r' + Date.now(), on: true, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0, isNew: true };
+    renderRule();
+  }
+  function renderRule() {
+    const r = RD;
+    const sel = (k, opts, v) => `<select class="text-input" data-rd="${k}">${opts.map(([o, t]) => `<option value="${esc(o)}" ${String(v) === String(o) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    const a = r.action;
+    const arg = r.trigger === 'noanswer' ? `<div class="label">כמה פעמים</div>${sel('arg', [[1, 'פעם אחת'], [2, 'פעמיים'], [3, '3 פעמים']], r.arg)}`
+      : r.trigger === 'idle' ? `<div class="label">כמה ימים</div>${sel('arg', [[3, '3 ימים'], [5, '5 ימים'], [7, 'שבוע'], [14, 'שבועיים'], [30, 'חודש']], r.arg)}`
+      : r.trigger === 'stage' ? `<div class="label">לאיזה שלב</div>${sel('arg', S.biz.stages.map((s) => [s.id, s.name]), r.arg)}` : '';
+    const act = a.kind === 'step' ? `${sel('a.type', Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].name]), a.type)}${sel('a.days', [[0, 'היום'], [1, 'תוך יום'], [2, 'יומיים'], [3, '3 ימים'], [7, 'שבוע']], a.days || 1)}`
+      : a.kind === 'send' ? sel('a.mat', [['', 'החומר הראשון']].concat(S.biz.materials.map((x) => [x.name, x.name])), a.mat || '')
+      : a.kind === 'message' ? sel('a.tpl', S.biz.templates.map((t) => [t.id, t.name]), a.tpl)
+      : a.kind === 'stage' ? sel('a.stage', S.biz.stages.map((s) => [s.id, s.name]), a.stage || 'contact')
+      : a.kind === 'warm' ? sel('a.value', words().map((w, k) => [k, w]), a.value || 0) : '';
+    const c = r.cond || {};
+    sheet(`<h2>${r.isNew ? 'כלל חדש' : 'עריכת כלל'}</h2>
+      <div class="label">כש…</div>${sel('trigger', Object.entries(TRIGGERS), r.trigger)}${arg}
+      <div class="label">רק אם <small>רשות</small></div>
+      <div class="rule-conds">${sel('c.warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), c.warm == null ? '' : c.warm)}
+        ${sel('c.btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), c.btn || '')}
+        ${sel('c.biz', [['', 'עסק או פרטי'], ['1', 'רק עסק'], ['0', 'רק פרטי']], c.biz == null ? '' : c.biz ? '1' : '0')}
+        <input class="text-input" type="number" min="0" step="100" data-rd="c.minValue" value="${c.minValue || ''}" placeholder="שווי מינימלי ₪" aria-label="שווי מינימלי"></div>
+      <div class="label">אז…</div>${sel('a.kind', Object.entries(ACTIONS), a.kind)}<div class="rule-act">${act}</div>
+      <p class="faint" id="rule-prev">${esc(ruleText(r).when)} ← ${esc(ruleText(r).then)}</p>
+      <div class="actions"><button class="btn primary" data-act="rule-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
+        ${r.isNew ? '' : `<button class="btn ghost danger far" data-act="rule-del">למחוק</button>`}</div>`);
+    $('#scrim .sheet').dataset.guard = '1';
+  }
+  function readRuleField(k, v) {
+    const r = RD;
+    const num = (x) => (x === '' ? null : +x);
+    if (k === 'trigger') { r.trigger = v; r.arg = v === 'noanswer' ? 2 : v === 'idle' ? 7 : v === 'stage' ? 'contact' : null; return renderRule(); }
+    if (k === 'arg') r.arg = r.trigger === 'stage' ? v : +v;
+    if (k === 'c.warm') r.cond.warm = num(v);
+    if (k === 'c.btn') r.cond.btn = v || null;
+    if (k === 'c.biz') r.cond.biz = v === '' ? null : v === '1';
+    if (k === 'c.minValue') r.cond.minValue = num(v);
+    if (k === 'a.kind') { r.action = { kind: v, type: 'call', days: 1, mat: '', tpl: (S.biz.templates[0] || {}).id, stage: 'contact', value: 0 }; return renderRule(); }
+    if (k === 'a.type') r.action.type = v;
+    if (k === 'a.days') r.action.days = +v;
+    if (k === 'a.mat') r.action.mat = v;
+    if (k === 'a.tpl') r.action.tpl = v;
+    if (k === 'a.stage') r.action.stage = v;
+    if (k === 'a.value') r.action.value = +v;
+    const p = $('#rule-prev');
+    if (p) p.textContent = ruleText(r).when + ' ← ' + ruleText(r).then;
+  }
+
+  // ---- הודעות ----
+  function crmMessages(box, L) {
+    const sent = [];
+    L.forEach((l) => l.log.forEach((e) => { if (/^💬/.test(e.t)) sent.push({ l, e }); }));
+    sent.sort((a, b) => b.e.at - a.e.at);
+    box.innerHTML = `<div class="two-col">
+      <section class="card"><h2>תבניות</h2><p class="muted">{שם} · {עסק} · {חומר} מתמלאים לבד.</p>
+        <div class="prod-list">${S.biz.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">💬 ${esc(t.name)} <span class="faint">· ${esc(CH_NAMES[t.ch])}</span></span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('')}</div>
+        <div class="actions"><button class="btn" data-act="tpl-add">+ תבנית חדשה</button></div></section>
+      <section class="card"><h2>שליחה לקבוצה</h2><p class="muted">בוחרים קהל ותבנית. או: בטבלה, מסמנים לידים ← "💬 הודעה".</p>
+        <div class="label">למי</div>
+        <div class="rule-conds"><select class="text-input" id="gs-stage" aria-label="שלב"><option value="">כל השלבים</option>${S.biz.stages.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
+          <select class="text-input" id="gs-warm" aria-label="חום"><option value="">כל חום</option>${words().map((w, k) => `<option value="${k}">${esc(w)}</option>`).join('')}</select>
+          <select class="text-input" id="gs-btn" aria-label="כפתור"><option value="">כל כפתור</option>${S.biz.buttons.map((b) => `<option value="${b.id}">${esc(b.label)}</option>`).join('')}</select></div>
+        <div class="label">מה</div><select class="text-input" id="gs-tpl" aria-label="תבנית">${S.biz.templates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
+        <div class="actions"><button class="btn primary" data-act="grp-send">לשלוח…</button></div></section>
+    </div>
+    <section class="card" style="margin-top:14px"><h2>נשלחו לאחרונה</h2>
+      ${sent.length ? `<ul class="log">${sent.slice(0, 15).map(({ l, e }) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span><button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button> · ${esc(e.t.replace(/^💬\s*/, ''))}</li>`).join('')}</ul>` : '<div class="empty">עוד לא נשלחו הודעות.</div>'}</section>`;
+  }
+  function sheetTemplate(id) {
+    const t = id ? S.biz.templates.find((x) => x.id === id) : { id: '', name: '', ch: 'any', text: 'שלום {שם}, ' };
+    sheet(`<h2>${id ? 'עריכת תבנית' : 'תבנית חדשה'}</h2>
+      <label class="label" for="tp-name">שם</label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
+      <div class="label">ערוץ</div><div class="chips">${Object.entries(CH_NAMES).map(([k, n]) => `<button class="chip" data-tpch="${k}" aria-pressed="${t.ch === k}">${esc(n)}</button>`).join('')}</div>
+      <label class="label" for="tp-text">נוסח</label><textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
+      <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
+        ${id ? `<button class="btn ghost danger far" data-act="tpl-del" data-id="${esc(id)}">למחוק</button>` : ''}</div>`);
+    $('#scrim .sheet').dataset.guard = '1';
+  }
+  function sheetLeadMsg(l) {
+    sheet(`<h2>הודעה ל${esc(People.rowName(l))}</h2>
+      <div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(channelsFor(t).join(' + ') || 'אין ערוץ פעיל')}</span><small>${esc(t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, (S.biz.materials[0] || {}).name || 'החומר'))}</small></button>`).join('')}</div>
+      <div class="actions"><button class="btn ghost" data-act="back-crm" data-lid="${l.id}">חזרה</button></div>`, l.id);
+    $('#scrim .sheet').dataset.tasks = '1';
+  }
+
+  // ---- the lead's own card ----
   let callOpen = false;
   function crmBody(l) {
     const ts = tasks(l);
     const w = effWarm(l);
     const why = tagged(l).map((b) => b.label).concat(l.roleOf ? [l.roleOf] : [], l.visits > 1 ? ['חזר לדוכן'] : [], l.noAnswer ? ['לא ענה ×' + l.noAnswer] : []).join(' · ');
-    const phone = People.phone ? People.phone(l) : '';
+    const est = estValue(l);
     return `<div class="lead-head"><div><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>
         <div class="faint">${esc(People.rowMeta(l))}</div>
-        <div class="faint">${w != null ? esc(words()[w]) : 'בלי חום'}${why ? ' · ' + esc(why) : ''}</div>
-        ${phone ? `<a class="phone" href="tel:${esc(phone)}" dir="ltr" data-act="call" data-lid="${l.id}">${esc(phone)}</a>` : '<div class="faint">📞 הטלפון מרשימת המארגנים יופיע כאן — בדוגמית אין טלפונים.</div>'}</div>
+        <div class="faint">${w != null ? esc(words()[w]) : 'בלי חום'}${why ? ' · ' + esc(why) : ''}${l.demo ? ' · מדומה' : ''}</div></div>
         <button class="btn" data-act="sheet-close">סגירה</button></div>
+      <div class="lead-grid">
+        <label><span class="faint">שלב</span><select class="text-input" data-lstage="${l.id}" aria-label="שלב">${S.biz.stages.map((s) => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+        <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${l.value == null ? '' : esc(l.value)}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
+        <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}" aria-label="אחראי">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+        <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
+        <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
+        ${l.contact.phone && !l.demo ? `<a class="btn" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : '<span></span>'}
+      </div>
       <button class="next-line" data-act="tasks" data-lid="${l.id}" data-ret="crm"><span class="faint">הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${ts.length - 1}</span>` : ''}</button>
       <div class="actions"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר עכשיו</button>
-        <button class="btn" data-act="send" data-lid="${l.id}">📎 לשלוח חומר</button>
+        <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
+        <button class="btn" data-act="send" data-lid="${l.id}">📎 חומר</button>
         <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
-        <button class="btn" data-act="edit-tags" data-lid="${l.id}">✎ תיוג</button></div>
+        <button class="btn" data-act="edit-tags" data-lid="${l.id}">✎ תיוג</button>
+        <label class="btn" for="lead-file">📄 קובץ</label><input id="lead-file" type="file" hidden data-lfile="${l.id}"></div>
       ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">איך היה?</div><div class="chips">
         <button class="chip" data-outcome="talk" data-lid="${l.id}">דיברנו — מה הלאה</button>
         <button class="chip" data-outcome="noans" data-lid="${l.id}">לא ענה</button>
         <button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
         <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></div>
         <div class="faint" style="margin-top:6px">במערכת האמיתית — החיוג יוצא מכאן, והתוצאה נשאלת כשהשיחה נגמרת.</div></div>` : ''}
+      ${l.files.length ? `<div class="label">קבצים</div><div class="chips">${l.files.map((f) => `<span class="chip static">📄 ${esc(f.name)}</span>`).join('')}</div>` : ''}
       ${notesList(l)}
-      <div class="label">מה היה עד עכשיו</div>
-      <ul class="log">${l.log.slice().reverse().map((e) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('')}</ul>`;
+      <div class="label">ציר זמן</div>
+      <ul class="log timeline">${l.log.slice().reverse().map((e) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('')}</ul>`;
   }
-  function sheetCRM(l) { callOpen = false; sheet(crmBody(l), l.id, true); }
+  function sheetCRM(l) { callOpen = false; sheet(crmBody(l), l.id, true); $('#scrim .sheet').classList.add('wide'); }
 
   /* After "we talked": one sheet, a step and a day, and nothing is marked done until
    * one is chosen — leaving without choosing changes nothing. */
@@ -1557,6 +2110,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const dueAt = TK.date ? H.addDays(new Date(TK.date + 'T09:00'), 0).getTime() : H.addDays(new Date(now()), TK.days || Math.max(1, s.days || 1)).getTime();
     addManual(l, s, dueAt);
     log(l, '📞 דיברנו — הלאה: ' + s.label + ' · ' + H.heDate(new Date(dueAt)));
+    if (l.stage === 'new') setStage(l, 'contact');
+    if (s.type === 'quote' && ['new', 'contact'].includes(l.stage) && stageById('quote').id === 'quote') setStage(l, 'quote');
     TK = null;
     save(); render(); sheetCRM(l);
     toast('✓ ' + s.label + ' · ' + dueText(new Date(dueAt)));
@@ -1568,24 +2123,70 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (kind === 'talk') return sheetTalk(l);
     if (kind === 'lost') {
       closeSheet(false);
-      undoable('סומן "לא רלוונטי" · ' + People.rowName(l), () => { l.lost = true; log(l, 'לא רלוונטי'); });
+      undoable('סומן "לא רלוונטי" · ' + People.rowName(l), () => setStage(l, (stageOf('lost') || {}).id || 'lost'));
       return render();
     }
     if (kind === 'noans') {
       l.noAnswer = (l.noAnswer || 0) + 1;
       if (l.noAnswer >= 3) { l.audience = true; log(l, '📞 לא ענה — פעם שלישית, עבר לקהל'); }
       else { if (cur) l.moved[cur.key] = H.addDays(today, 1).getTime(); log(l, '📞 לא ענה — ננסה מחר'); }
+      runRules('noanswer', l, l.noAnswer);
     }
-    if (kind === 'won') {
-      l.won = true;
-      tasks(l).forEach((t) => l.done.push(t.key));
-      const regular = tagged(l).some((b) => stepsOf(b).some((s) => s.type === 'regular')) || S.biz.buttons.some((b) => stepsOf(b).some((s) => s.type === 'regular'));
-      if (regular) addManual(l, { type: 'regular', label: 'לבדוק אם צריך עוד', days: 28 }, H.addDays(today, 28).getTime());
-      log(l, '🎉 נסגרה עסקה' + (regular ? ' — בדיקה חוזרת בעוד 4 שבועות' : ''));
-    }
+    if (kind === 'won') setStage(l, (stageOf('won') || {}).id || 'won', 'אחרי שיחה');
     save();
     if (S.view === 'crm') render();
     sheetCRM(l);
+  }
+
+  // ---- demo: two weeks after the fair ----
+  function seedProgress() {
+    if (S.biz.team.length < 2) S.biz.team.push('יוסי');
+    if (!S.biz.buttons.some((b) => b.value)) S.biz.buttons.forEach((b, i) => { b.value = [1500, 4000, 800, 12000, 2500, 6000][i % 6]; });
+    const before = S.leads.length;
+    seedDay();
+    const rnd = (n) => Math.floor(Math.random() * n);
+    const back = 9 * H.DAY;
+    S.leads.slice(before).forEach((l, i) => {
+      l.at -= back; l.log.forEach((e) => { e.at -= back; }); l.notes.forEach((n) => { n.at -= back; });
+      upgradeLead(l);
+      l.owner = S.biz.team[rnd(S.biz.team.length)];
+      l.by = Math.random() < 0.7 ? 'בעלים' : 'עובד';
+      l.contact = { phone: '050-000-' + String(1000 + rnd(9000)), email: 'demo' + l.id + '@example.com' };
+      if (Math.random() < 0.3) l.value = [800, 1500, 2500, 4000, 7500, 12000, 20000][rnd(7)];
+      const ev = (d, t) => l.log.push({ at: l.at + d * H.DAY + rnd(6) * 3600000, t });
+      const r = Math.random();
+      if (r < 0.75) ev(1, (Math.random() < 0.5 ? '📞 דיברנו' : '📎 מחירון — נשלח במייל'));
+      if (r < 0.15) { l.stage = 'won'; l.won = true; ev(4, '➜ הצעה נשלחה'); ev(6, '➜ נסגר · אחרי שיחה'); l.done.push(...tasks(l).map((t) => t.key)); }
+      else if (r < 0.25) { l.stage = 'lost'; l.lost = true; ev(3, '➜ לא רלוונטי'); }
+      else if (r < 0.45) { l.stage = 'quote'; ev(3, '➜ הצעה נשלחה'); }
+      else if (r < 0.55) { l.stage = 'nego'; ev(3, '➜ הצעה נשלחה'); ev(5, '➜ במשא ומתן'); }
+      else if (r < 0.75) { l.stage = 'contact'; ev(2, '➜ בקשר'); }
+      else if (Math.random() < 0.5) { l.noAnswer = 1 + rnd(2); ev(2, '📞 לא ענה — ננסה מחר'); }
+      if (!l.won && !l.lost && r < 0.75) {
+        tasks(l).forEach((t) => l.done.push(t.key));   // someone who was spoken to has one step ahead, not the old ones
+        addManual(l, normStep({ type: ['call', 'meet', 'quote'][rnd(3)] }), H.addDays(new Date(now()), rnd(7) - 2).getTime());
+      }
+      l.log.sort((a, b) => a.at - b.at);
+    });
+    save();
+  }
+
+  // ---- settings: stages, team, morning message ----
+  function viewCrmSettings(m) {
+    const b = S.biz;
+    m.innerHTML = `<h1>שלבים, צוות ובוקר</h1>
+      <div class="stack" style="margin-top:14px">
+        <section class="card"><h2>שלבי הצינור</h2><p class="muted">השמות שלך. "נסגר" ו"לא רלוונטי" קבועים בסוף.</p>
+          <div class="step-list">${b.stages.map((s, i) => `<div class="stage-line"><input class="text-input" data-stname="${s.id}" value="${esc(s.name)}" aria-label="שם השלב">
+            ${s.kind ? `<span class="faint">${s.kind === 'won' ? 'סגירה' : 'אבוד'}</span>` : `<button class="btn ghost" data-stmove="${i}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-stmove="${i}:1" aria-label="למטה" ${b.stages[i + 1] && !b.stages[i + 1].kind ? '' : 'disabled'}>▼</button><button class="btn ghost danger" data-stdel="${s.id}" aria-label="למחוק">✕</button>`}</div>`).join('')}</div>
+          <div class="add-row"><input id="new-stage" class="text-input" placeholder="+ שלב חדש" autocomplete="off"><button class="btn" data-act="stage-add">הוספה</button></div></section>
+        <section class="card"><h2>הצוות</h2><p class="muted">למי אפשר לשייך ליד.</p>
+          <div class="chips">${b.team.map((t, i) => `<span class="chip static">${esc(t)}${i ? ` <button class="link" data-teamdel="${i}" aria-label="להסיר">✕</button>` : ''}</span>`).join('')}</div>
+          <div class="add-row"><input id="new-member" class="text-input" placeholder="+ שם" autocomplete="off"><button class="btn" data-act="team-add">הוספה</button></div></section>
+        <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
+          ${b.digest.on ? `<div class="label">לאן</div><div class="chips">${['wa', 'email', 'sms'].map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
+          <div class="label">באיזו שעה</div><div class="chips">${['07:00', '08:00', '09:00', '10:00'].map((h) => `<button class="chip" data-digesth="${h}" aria-pressed="${b.digest.hour === h}">${h}</button>`).join('')}</div>` : ''}</section>
+      </div>`;
   }
 
   // ------------------------------------------------------------------
@@ -1683,6 +2284,36 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       S.biz.mail[d.mail] = e.target.value.trim(); save();
       if ($('#mail-prev')) $('#mail-prev').textContent = mailPreview(S.biz.mail.prefix || 'info');
     }
+    if (d.lf) {   // a field on the lead's CRM card, saved as typed
+      const l = leadById(+d.lid);
+      if (!l) return;
+      if (d.lf === 'value') l.value = e.target.value === '' ? null : Math.max(0, +e.target.value);
+      else l.contact[d.lf] = e.target.value.trim();
+      save();
+    }
+    if (d.stname) { const s = S.biz.stages.find((x) => x.id === d.stname); if (s) { s.name = e.target.value.trim() || s.name; save(); } }
+    if (d.rd === 'c.minValue') readRuleField(d.rd, e.target.value);
+  });
+  /* Selects, checkboxes and files report on "change". */
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    const d = t.dataset || {};
+    if (d.tbf) { S.tb.f[d.tbf] = t.value; tbPage = 0; tbSel.clear(); save(); return render(); }
+    if (d.pv) { PV[d.pv] = t.value; return render(); }
+    if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
+    if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
+    if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); } return; }
+    if (d.tbsel) { const id = +d.tbsel; if (t.checked) tbSel.add(id); else tbSel.delete(id); return render(); }
+    if (d.tbselall !== undefined) {
+      const rows = tableRows(leadsNow()).slice(tbPage * 25, tbPage * 25 + 25);
+      rows.forEach((l) => (t.checked ? tbSel.add(l.id) : tbSel.delete(l.id)));
+      return render();
+    }
+    if (d.lfile) {
+      const l = leadById(+d.lfile);
+      const f = t.files && t.files[0];
+      if (l && f) { l.files.push({ name: f.name, at: now() }); log(l, '📄 צורף קובץ: ' + f.name); save(); refreshLead(l); toast('📄 ' + f.name + ' צורף'); }
+    }
   });
   document.addEventListener('focusin', (e) => { if (e.target.closest && e.target.closest('.lead input')) stopIdle(); });
   document.addEventListener('focusout', (e) => { if (e.target.closest && e.target.closest('.lead input') && openId) setTimeout(startIdle, 0); });
@@ -1714,6 +2345,46 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (d.view) { S.view = d.view; closeLead(); closeSheet(false); fillOpen = false; filled.clear(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
+
+    // ---- CRM ----
+    if (d.crmtab) { S.crmTab = d.crmtab; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.pmove) { const l = leadById(+d.pmove); if (l) sheetMove(l); return; }
+    if (d.pstage) { if (L) { closeSheet(false); undoable(People.rowName(L) + ' ➜ ' + stageById(d.pstage).name, () => setStage(L, d.pstage)); render(); } return; }
+    if (d.tbsort) { const s = S.tb.sort; if (s.col === d.tbsort) s.dir = -s.dir; else { s.col = d.tbsort; s.dir = 1; } save(); return render(); }
+    if (d.tbpage !== undefined) { tbPage = +d.tbpage; render(); return window.scrollTo(0, 0); }
+    if (d.tbclear) { if (d.tbclear === 'all') { S.tb.f = {}; tbQuery = ''; } else S.tb.f[d.tbclear] = ''; tbPage = 0; save(); return render(); }
+    if (d.tbview !== undefined) { const v = S.biz.views[+d.tbview]; if (v) { S.tb = clone(v.tb); tbPage = 0; save(); render(); toast('תצוגה: ' + v.name); } return; }
+    if (d.tbcol) { const c = S.tb.cols; S.tb.cols = c.includes(d.tbcol) ? c.filter((x) => x !== d.tbcol) : COLS.map((x) => x.id).filter((x) => c.includes(x) || x === d.tbcol); save(); render(); return sheetCols(); }
+    if (d.bulk) {
+      if (d.bulk === 'clear') { tbSel.clear(); return render(); }
+      if (d.bulk === 'export') return exportLeads(Array.from(tbSel).map(leadById).filter(Boolean), 'לידים-נבחרים');
+      return sheetBulk(d.bulk);
+    }
+    if (d.bulkdo) return doBulk(d.bulkdo, d.v);
+    if (d.pvshow) { S.tb.f = { [d.pvshow]: d.v }; S.crmTab = 'table'; tbPage = 0; save(); render(); return window.scrollTo(0, 0); }
+    if (d.ruleedit) return sheetRule(d.ruleedit);
+    if (d.tpledit) return sheetTemplate(d.tpledit);
+    if (d.tpch) { document.querySelectorAll('[data-tpch]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
+    if (d.sendtpl) { if (L && sendTemplate(L, d.sendtpl)) { save(); render(); sheetCRM(L); } return; }
+    if (d.stmove) {
+      const [i, dir] = d.stmove.split(':').map(Number);
+      const st = S.biz.stages;
+      [st[i], st[i + dir]] = [st[i + dir], st[i]];
+      save(); return render();
+    }
+    if (d.stdel) {
+      const s = stageById(d.stdel);
+      const n = S.leads.filter((l) => l.stage === s.id).length;
+      undoable(`השלב "${s.name}" הוסר${n ? ` — ${n} לידים עברו ל"${S.biz.stages[0].id === s.id ? S.biz.stages[1].name : S.biz.stages[0].name}"` : ''}`, () => {
+        S.biz.stages = S.biz.stages.filter((x) => x.id !== s.id);
+        S.leads.forEach((l) => { if (l.stage === s.id) l.stage = S.biz.stages[0].id; });
+      });
+      return render();
+    }
+    if (d.teamdel !== undefined) { const name = S.biz.team[+d.teamdel]; undoable(name + ' הוסר מהצוות', () => { S.biz.team.splice(+d.teamdel, 1); S.leads.forEach((l) => { if (l.owner === name) l.owner = S.biz.team[0]; }); }); return render(); }
+    if (d.digestch) { S.biz.digest.ch = d.digestch; save(); return render(); }
+    if (d.digesth) { S.biz.digest.hour = d.digesth; save(); return render(); }
+
     if (d.ex) {
       const say = $('#say');
       if (say.value.trim() && say.value.trim() !== EXAMPLES[d.ex]) { exPending = d.ex; return sheetConfirm('להחליף את מה שכתבת?', 'הטקסט שכתבת על העסק יוחלף בדוגמה.', 'ex-yes'); }
@@ -1750,6 +2421,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       const k = d.toggle;
       if (k.startsWith('season:')) { const id = k.slice(7); const s = S.biz.seasons; S.biz.seasons = s.includes(id) ? s.filter((x) => x !== id) : s.concat(id); S.biz.seasonsByHand = true; }
       else if (k.startsWith('ch:')) { const c = k.slice(3); S.biz.channels[c] = !S.biz.channels[c]; }
+      else if (k.startsWith('rule:')) { const r = S.biz.rules.find((x) => x.id === k.slice(5)); if (r) r.on = !r.on; }
+      else if (k === 'digest') S.biz.digest.on = !S.biz.digest.on;
       else S.biz[k] = !S.biz[k];
       save(); return render();
     }
@@ -1797,7 +2470,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (d.crmlead) { const l = leadById(+d.crmlead); if (l) sheetCRM(l); return; }
     if (d.outcome) { if (L) outcome(L, d.outcome); return; }
     if (d.play) return playNote(d.play);
-    if (d.taskdone) { if (L) { const t = tasks(L).find((x) => x.key === d.taskdone); L.done.push(d.taskdone); log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע'); save(); sheetTasks(L, tasksRet); } return; }
+    if (d.taskdone) { if (L) { const t = tasks(L).find((x) => x.key === d.taskdone); L.done.push(d.taskdone); log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע'); if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה'); save(); sheetTasks(L, tasksRet); } return; }
     if (d.tasksend) {
       if (!L) return;
       const t = tasks(L).find((x) => x.key === d.tasksend);
@@ -1870,7 +2543,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       case 'save-steps': {
         keepDraft();
         if (D.kind === 'def') { S.biz.defSteps = D.steps; S.biz.defByHand = true; }
-        else { const x = btnById(D.id); if (x) { x.label = D.label; x.steps = D.steps; x.weight = D.weight; x.byHand = true; x.unsure = false; } }
+        else { const x = btnById(D.id); if (x) { x.label = D.label; x.steps = D.steps; x.weight = D.weight; x.value = D.value; x.byHand = true; x.unsure = false; } }
         D = null; save(); closeSheet(false); return render();
       }
       case 'save-step': {
@@ -1953,6 +2626,62 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         return;
       }
       case 'toast-undo': { const f = undoFn; undoFn = null; if (f) f(); return; }
+      case 'seed-progress': seedProgress(); return render();
+      case 'crm-settings': if (worker()) return ownerOnly('ההגדרות'); S.phase = 'settings'; S.step = 'custom'; S.sub = 'crm'; save(); return render();
+      case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');
+      case 'tb-cols': return sheetCols();
+      case 'tb-saveview': return sheet(`<h2>לשמור את התצוגה</h2><p class="muted">הסינון, המיון והעמודות של עכשיו — בנגיעה אחת מעכשיו.</p>
+        <label class="label" for="view-name">שם</label><input id="view-name" class="text-input" placeholder="למשל: מוסדות חמים" autocomplete="off">
+        <div class="actions"><button class="btn primary" data-act="tb-saveview-yes">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+      case 'tb-saveview-yes': {
+        const name = ($('#view-name') && $('#view-name').value.trim()) || 'תצוגה ' + (S.biz.views.length + 1);
+        S.biz.views.push({ name, tb: clone(S.tb) });
+        save(); closeSheet(false); render(); return toast('✓ נשמרה: ' + name);
+      }
+      case 'pv-export': {
+        const rows = pivot(leadsNow());
+        const D = dims()[PV.dim];
+        return exportXlsx('פילוח-' + stamp() + '.xlsx', [{ name: 'פילוח', rows: [[D.t].concat(Object.values(METRICS))].concat(rows.map((r) => [r.label, r.count, Math.round(r.value), r.won, r.conv / 100, r.reached])) }]);
+      }
+      case 'rule-add': return sheetRule(null);
+      case 'rule-save': {
+        const r = RD;
+        delete r.isNew;
+        const i = S.biz.rules.findIndex((x) => x.id === r.id);
+        if (i >= 0) S.biz.rules[i] = r; else S.biz.rules.push(r);
+        RD = null; save(); closeSheet(false); render(); return toast('✓ הכלל נשמר');
+      }
+      case 'rule-del': { const id = RD.id; RD = null; closeSheet(false); undoable('הכלל נמחק', () => { S.biz.rules = S.biz.rules.filter((x) => x.id !== id); }); return render(); }
+      case 'tpl-add': return sheetTemplate(null);
+      case 'tpl-save': {
+        const name = ($('#tp-name') && $('#tp-name').value.trim()) || 'תבנית';
+        const text = ($('#tp-text') && $('#tp-text').value.trim()) || '';
+        const ch = (document.querySelector('[data-tpch][aria-pressed="true"]') || {}).dataset;
+        const t = d.id ? S.biz.templates.find((x) => x.id === d.id) : null;
+        if (t) Object.assign(t, { name, text, ch: ch ? ch.tpch : t.ch });
+        else S.biz.templates.push({ id: 't' + Date.now(), name, text, ch: ch ? ch.tpch : 'any' });
+        save(); closeSheet(false); return render();
+      }
+      case 'tpl-del': { const id = d.id; closeSheet(false); undoable('התבנית נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
+      case 'grp-send': {
+        const st = $('#gs-stage').value; const w = $('#gs-warm').value; const bt = $('#gs-btn').value; const tid = $('#gs-tpl').value;
+        const list = leadsNow().filter((l) => (!st || l.stage === st) && (w === '' || effWarm(l) === +w) && (!bt || l.tags.includes(bt)));
+        const t = S.biz.templates.find((x) => x.id === tid);
+        if (!list.length) return toast('אין לידים שעונים על הבחירה');
+        tbSel.clear(); list.forEach((l) => tbSel.add(l.id));
+        return sheetConfirm(`לשלוח "${t ? t.name : ''}" ל-${list.length}?`, list.slice(0, 8).map((l) => People.rowName(l)).join(', ') + (list.length > 8 ? ` ועוד ${list.length - 8}` : ''), 'grp-send-yes', `data-v="${esc(tid)}"`);
+      }
+      case 'grp-send-yes': return doBulk('message', d.v);
+      case 'lead-msg': { if (L) sheetLeadMsg(L); return; }
+      case 'back-crm': { if (L) sheetCRM(L); return; }
+      case 'stage-add': {
+        const v = $('#new-stage') && $('#new-stage').value.trim();
+        if (!v) return;
+        const at = S.biz.stages.findIndex((s) => s.kind);
+        S.biz.stages.splice(at < 0 ? S.biz.stages.length : at, 0, { id: 's' + Date.now(), name: v });
+        save(); return render();
+      }
+      case 'team-add': { const v = $('#new-member') && $('#new-member').value.trim(); if (v && !S.biz.team.includes(v)) { S.biz.team.push(v); save(); render(); } return; }
       case 'ex-yes': closeSheet(false); return useExample(exPending);
       case 'crm-clear': crmQuery = ''; return render();
       case 'tk-save': return tkSave();
@@ -2022,11 +2751,12 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       case 'reset':
         if (worker()) return ownerOnly('איפוס');
         return sheetConfirm('איפוס מערכת?', 'כל הלידים, הכפתורים וההגדרות יימחקו, וחוזרים להקמה.', 'reset-yes');
-      case 'reset-yes': S = fresh(); openId = null; D = null; stopIdle(); closeSheet(false); save(); return render();
+      case 'reset-yes': S = fresh(); upgrade(); openId = null; D = null; stopIdle(); closeSheet(false); save(); return render();
     }
   });
 
   // Test hooks: the readers and the planner, checkable from the console.
   window.Demo3 = { parse: parseWords, clean: cleanAI, useServerAI: () => aiReady(serverAI), plan: (id) => plan(leadById(id)), tasks: (id) => tasks(leadById(id)), state: () => S };
+  upgrade();
   render();
 })();
