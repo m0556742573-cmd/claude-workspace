@@ -1099,7 +1099,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /** Redraw wherever this lead is being edited. */
   function refreshLead(l) {
     const sh = $('#scrim .sheet[data-lead]');
-    if (sh && +sh.dataset.lead === l.id && !sh.dataset.tasks && !sh.dataset.note) { sh.innerHTML = sh.dataset.crm ? crmBody(l) : leadBody(l, true); return; }
+    if (sh && +sh.dataset.lead === l.id && !sh.dataset.tasks && !sh.dataset.note) { sh.innerHTML = leadBody(l, true); return; }
     if ($('#slot') && openId === l.id) renderLead();
     else if (S.phase === 'live' && S.view !== 'booth') render();
   }
@@ -1269,6 +1269,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         ${ts.length ? `<button class="btn ghost" data-act="task-audience" data-lid="${l.id}">בלי צעדים — לקהל</button>` : ''}
         <button class="btn primary" data-act="tasks-close" data-lid="${l.id}">סיום</button></div>`, l.id);
     $('#scrim .sheet').dataset.tasks = '1';
+  }
+  /** After a step is done, changed or added: back to the lead's page if that is where it started, else the steps sheet. */
+  function afterTask(l) {
+    if (tasksRet === 'page' || (!$('#scrim') && S.view === 'crm' && S.crmLead === l.id)) { tasksRet = null; closeSheet(false); return render(); }
+    sheetTasks(l, tasksRet);
   }
   function backFromTasks(l) {
     closeSheet(false);
@@ -1486,7 +1491,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
     if (!b.views) b.views = [];
     if (!S.crmTab) S.crmTab = 'overview';
-    if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'next', 'due', 'owner'] };
+    if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'last', 'next', 'due', 'owner'] };
+    if (!S.tb.v2) { S.tb.v2 = true; if (!S.tb.cols.includes('last')) S.tb.cols.splice(Math.max(0, S.tb.cols.indexOf('next')), 0, 'last'); }
     S.leads.forEach(upgradeLead);
   }
   function upgradeLead(l) {
@@ -1647,16 +1653,66 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       <span class="bl">${esc(r.label)}</span><span class="bt"><span class="bf${r.cls ? ' ' + r.cls : ''}" style="width:${(r.value / max * 100).toFixed(1)}%"></span></span><span class="bv">${esc((fmt || String)(r.value))}${r.sub ? ' <span class="faint">' + esc(r.sub) + '</span>' : ''}</span></div>`).join('')}</div>`;
   }
   const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
+  // Each view's ⚙️ goes straight to the settings of what it shows.
+  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'החומרים והנוסח'] };
   function viewCRM(m) {
     runIdle();
     const L = leadsNow();
+    const rec = S.crmLead && leadById(S.crmLead);
+    const vs = VIEW_SETTINGS[S.crmTab];
     m.innerHTML = `<div class="crm-head"><h1>CRM</h1>
         <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}</span></div>
-      <nav class="crm-tabs" aria-label="CRM">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${S.crmTab === k}">${t}</button>`).join('')}</nav>
-      ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות CRM אמיתי בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
+      <nav class="crm-tabs" aria-label="CRM">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!rec && S.crmTab === k}">${t}</button>`).join('')}
+        ${!rec && vs && vs[0] !== 'auto' ? `<button class="ctab gear" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</nav>
+      ${!rec ? askBox() : ''}
+      ${!rec && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות CRM אמיתי בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
         <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
       <div id="crm-body"></div>`;
+    if (rec) return recordPage($('#crm-body'), rec);
     ({ overview: crmOverview, tasks: crmTasks, pipeline: crmPipeline, table: crmTable, segments: crmSegments, auto: crmAuto, messages: crmMessages }[S.crmTab] || crmOverview)($('#crm-body'), L);
+  }
+
+  // ---- "the last time we were in touch" — from every channel, not only mail ----
+  const TOUCH_KIND = { '📞': 'שיחה', '📎': 'חומר', '💬': 'הודעה' };
+  function lastTouch(l) {
+    const t = touched(l);
+    const e = t[t.length - 1];
+    return e ? { at: e.at, kind: TOUCH_KIND[[...e.t][0]] || '' } : null;
+  }
+  function agoText(at) {
+    if (!at) return 'עוד לא';
+    const d = dayNo(now()) - dayNo(at);
+    return d <= 0 ? 'היום' : d === 1 ? 'אתמול' : 'לפני ' + d + ' ימים';
+  }
+
+  // ---- ask the data, in plain words ----
+  let ASK = null;   // { q, busy, answer, ids }
+  function askBox() {
+    if (!ai) return `<div class="askbox off"><span>✨ אפשר לשאול את הנתונים בשפה חופשית — בתוך קלוד, או כשהבינה המלאכותית מחוברת.</span></div>`;
+    return `<form class="askbox" data-askform><input id="ask-q" class="text-input" placeholder="✨ לשאול את הנתונים: כמה מוסדות חמים עוד לא קיבלו מענה?" aria-label="שאלה על הנתונים" value="${esc(ASK ? ASK.q : '')}" autocomplete="off">
+      <button class="btn primary" data-act="ask" ${ASK && ASK.busy ? 'disabled' : ''}>${ASK && ASK.busy ? 'חושב…' : 'לשאול'}</button></form>
+      ${ASK && ASK.answer ? `<div class="ask-answer"><div>${esc(ASK.answer)}</div>
+        ${ASK.ids.length ? `<div class="faint" style="margin-top:6px">${ASK.ids.map(leadById).filter(Boolean).slice(0, 8).map((l) => `<button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}${ASK.ids.length > 8 ? ' ועוד ' + (ASK.ids.length - 8) : ''}</div>
+          <div class="actions"><button class="btn" data-act="ask-table">להציג את ${ASK.ids.length} בטבלה</button><button class="btn ghost" data-act="ask-clear">סגירה</button></div>` : '<div class="actions"><button class="btn ghost" data-act="ask-clear">סגירה</button></div>'}</div>` : ''}`;
+  }
+  async function askData(q) {
+    if (!ai || !q) return;
+    ASK = { q, busy: true, answer: '', ids: [] };
+    render();
+    const facts = leadsNow().slice(-150).map((l) => Object.assign(leadFacts(l), { stage: stageById(l.stage).name, value: leadValue(l), owner: l.owner, lastTouchDays: lastTouch(l) ? dayNo(now()) - dayNo(lastTouch(l).at) : null }));
+    const prompt = `You answer a business owner's question about his CRM, in Hebrew. He exhibited at a Hasidic community business fair; these are his leads.
+Today: ${H.label(new Date(now()))}. His trade: ${S.biz.trade || 'unknown'}. His goal: ${S.biz.goalNote || S.biz.goal || 'not given'}.
+Stages: ${S.biz.stages.map((s) => s.name).join(', ')}. Warmth words: ${words().join(', ')}.
+Leads (JSON): ${JSON.stringify(facts)}
+His question: """${q.slice(0, 300)}"""
+Answer from the data only — count exactly, never guess. If the data cannot answer it, say so plainly.
+Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":[ids of the leads the answer is about, if any]}`;
+    try {
+      const r = await ai.json(prompt, { modelTier: 'default' });
+      const ids = new Set(leadsNow().map((l) => l.id));
+      ASK = { q, busy: false, answer: str(r && r.answer, 600) || 'לא התקבלה תשובה.', ids: (Array.isArray(r && r.leadIds) ? r.leadIds : []).filter((id) => ids.has(id)) };
+    } catch (e) { ASK = null; aiFailed(e); }
+    render();
   }
 
   // ---- סקירה ----
@@ -1797,6 +1853,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     { id: 'email', t: 'מייל', v: (l) => l.contact.email, ltr: true },
     { id: 'notes', t: 'הערות', v: (l) => l.notes.map((n) => n.text || n.tr).filter(Boolean).join(' | ') },
     { id: 'at', t: 'ביקר', v: (l) => l.at, f: dateShort, num: true },
+    { id: 'last', t: 'מגע אחרון', v: (l) => (lastTouch(l) ? lastTouch(l).at : null), f: (v) => agoText(v), num: true },
   ];
   const colById = (id) => COLS.find((c) => c.id === id);
   const FILTERS = {
@@ -1810,10 +1867,21 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   let tbQuery = '';
   let tbPage = 0;
   const tbSel = new Set();
+  let tbIds = null;   // the leads an answer to a question pointed at — a filter of its own
+  /** Stage, owner, warmth and value change right in the table. */
+  function inlineCell(col, l) {
+    const opt = (pairs, cur) => pairs.map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('');
+    if (col === 'stage') return `<select data-ie="stage" data-lid="${l.id}" aria-label="שלב">${opt(S.biz.stages.map((s) => [s.id, s.name]), l.stage)}</select>`;
+    if (col === 'owner') return `<select data-ie="owner" data-lid="${l.id}" aria-label="אחראי">${opt(S.biz.team.map((t) => [t, t]), l.owner)}</select>`;
+    if (col === 'warm') { const w = effWarm(l); return `<select data-ie="warm" data-lid="${l.id}" aria-label="חום">${opt([['', '—']].concat(words().map((x, k) => [k, x])), w == null ? '' : w)}</select>`; }
+    if (col === 'value') return `<input data-ie="value" data-lid="${l.id}" type="number" min="0" step="100" value="${l.value == null ? '' : esc(l.value)}" placeholder="${estValue(l) || ''}" aria-label="שווי">`;
+    return '';
+  }
   function tableRows(L) {
     const f = S.tb.f;
     const q = People.norm(tbQuery);
     let rows = L.filter((l) => Object.keys(f).every((k) => !f[k] || FILTERS[k].ok(l, f[k])))
+      .filter((l) => !tbIds || tbIds.has(l.id))
       .filter((l) => !q || People.norm(COLS.map((c) => c.v(l)).join(' ')).includes(q));
     const c = colById(S.tb.sort.col) || COLS[0];
     const key = c.s || c.v;
@@ -1840,16 +1908,18 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         <input id="tb-q" class="text-input tb-q" placeholder="חיפוש בטבלה" aria-label="חיפוש בטבלה" value="${esc(tbQuery)}" autocomplete="off">
       </div>
       <div class="tb-state">
-        <span><b>${rows.length}</b> לידים${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
+        <span><b>${rows.length}</b> לידים${tbIds ? ' · <button class="chip small" data-act="ask-unfilter">מתוך התשובה לשאלה ✕</button>' : ''}${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
         <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${esc(v.name)}</button>`).join('')}
-          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button><button class="btn primary" data-act="tb-export">⬇ אקסל</button></span>
+          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button><button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">${S.tb.dense ? '▤ רגיל' : '▥ דחוס'}</button><button class="btn primary" data-act="tb-export">⬇ אקסל</button></span>
       </div>
-      <div class="tb-wrap"><table class="tb">
+      <div class="tb-wrap"><table class="tb${S.tb.dense ? ' dense' : ''}">
         <thead><tr><th class="ck"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></th>${cols.map((c) => `<th${c.num ? ' class="num"' : ''}><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
         <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור" ${tbSel.has(l.id) ? 'checked' : ''}></td>${cols.map((c) => {
           const v = c.v(l);
           const txt = c.f ? c.f(v) : v == null || v === '' ? '—' : String(v);
-          return c.id === 'name' ? `<td><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>` : `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
+          if (c.id === 'name') return `<td><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>`;
+          const ie = inlineCell(c.id, l);   // edited where it stands, no form to open
+          return ie ? `<td class="ie">${ie}</td>` : `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
         }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
       </table></div>
       ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
@@ -2041,43 +2111,88 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
 
   // ---- the lead's own card ----
+  /* The lead's own page — the screen a business owner opens most, so it is a page
+   * and not a pop-up. On top: who, the few facts that matter, and what to do.
+   * Below: the next steps, then one timeline of every channel, with the
+   * automations' own entries folded away so the human ones stand out. */
   let callOpen = false;
-  function crmBody(l) {
+  let tlFilter = 'all';
+  let tlAuto = false;
+  const TL_KINDS = { all: 'הכל', calls: '📞 שיחות', msgs: '💬 הודעות וחומר', notes: '📝 הערות', stages: '➜ שלבים' };
+  const tlKind = (t) => (/^📞/.test(t) ? 'calls' : /^(💬|📎)/.test(t) ? 'msgs' : /^📝/.test(t) ? 'notes' : /^➜/.test(t) ? 'stages' : /^⚙️/.test(t) ? 'auto' : 'other');
+  function recordPage(box, l) {
     const ts = tasks(l);
     const w = effWarm(l);
-    const why = tagged(l).map((b) => b.label).concat(l.roleOf ? [l.roleOf] : [], l.visits > 1 ? ['חזר לדוכן'] : [], l.noAnswer ? ['לא ענה ×' + l.noAnswer] : []).join(' · ');
     const est = estValue(l);
-    return `<div class="lead-head"><div><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>
-        <div class="faint">${esc(People.rowMeta(l))}</div>
-        <div class="faint">${w != null ? esc(words()[w]) : 'בלי חום'}${why ? ' · ' + esc(why) : ''}${l.demo ? ' · מדומה' : ''}</div></div>
-        <button class="btn" data-act="sheet-close">סגירה</button></div>
-      <div class="lead-grid">
-        <label><span class="faint">שלב</span><select class="text-input" data-lstage="${l.id}" aria-label="שלב">${S.biz.stages.map((s) => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-        <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${l.value == null ? '' : esc(l.value)}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
-        <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}" aria-label="אחראי">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
-        <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
-        <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
-        ${l.contact.phone && !l.demo ? `<a class="btn" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : '<span></span>'}
+    const lt = lastTouch(l);
+    const autos = l.log.filter((e) => tlKind(e.t) === 'auto').length;
+    const entries = l.log.slice().reverse().filter((e) => {
+      const k = tlKind(e.t);
+      if (k === 'auto') return tlAuto && (tlFilter === 'all');
+      return tlFilter === 'all' || k === tlFilter;
+    });
+    const tab = TL_KINDS;
+    box.innerHTML = `<div class="rec">
+      <div class="rec-top">
+        <button class="btn ghost" data-act="record-back">→ חזרה ל${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', 'CRM'])[1])}</button>
+        <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}</h1>
+          <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · מדומה' : ''}</div></div>
+        <div class="rec-keys">
+          <span class="key"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)}</b></span>
+          <span class="key"><span class="faint">שווי</span><b class="money">${leadValue(l) ? nis(leadValue(l)) : '—'}</b>${l.value == null && est ? '<span class="faint">מוערך</span>' : ''}</span>
+          <span class="key"><span class="faint">חום</span><b>${w == null ? 'בלי' : esc(words()[w])}</b></span>
+          <span class="key"><span class="faint">מגע אחרון</span><b>${esc(agoText(lt && lt.at))}</b>${lt ? `<span class="faint">${esc(lt.kind)}</span>` : ''}</span>
+          <span class="key"><span class="faint">אחראי</span><b>${esc(l.owner)}</b></span>
+        </div>
+        <div class="actions rec-acts"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר</button>
+          <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
+          <button class="btn" data-act="send" data-lid="${l.id}">📎 חומר</button>
+          <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button></div>
+        ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">איך היה?</div><div class="chips">
+          <button class="chip" data-outcome="talk" data-lid="${l.id}">דיברנו — מה הלאה</button>
+          <button class="chip" data-outcome="noans" data-lid="${l.id}">לא ענה</button>
+          <button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
+          <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></div>
+          <div class="faint" style="margin-top:6px">במערכת האמיתית — החיוג יוצא מכאן, והתוצאה נשאלת כשהשיחה נגמרת.</div></div>` : ''}
       </div>
-      <button class="next-line" data-act="tasks" data-lid="${l.id}" data-ret="crm"><span class="faint">הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${ts.length - 1}</span>` : ''}</button>
-      <div class="actions"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר עכשיו</button>
-        <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
-        <button class="btn" data-act="send" data-lid="${l.id}">📎 חומר</button>
-        <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
-        <button class="btn" data-act="edit-tags" data-lid="${l.id}">✎ תיוג</button>
-        <label class="btn" for="lead-file">📄 קובץ</label><input id="lead-file" type="file" hidden data-lfile="${l.id}"></div>
-      ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">איך היה?</div><div class="chips">
-        <button class="chip" data-outcome="talk" data-lid="${l.id}">דיברנו — מה הלאה</button>
-        <button class="chip" data-outcome="noans" data-lid="${l.id}">לא ענה</button>
-        <button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
-        <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></div>
-        <div class="faint" style="margin-top:6px">במערכת האמיתית — החיוג יוצא מכאן, והתוצאה נשאלת כשהשיחה נגמרת.</div></div>` : ''}
-      ${l.files.length ? `<div class="label">קבצים</div><div class="chips">${l.files.map((f) => `<span class="chip static">📄 ${esc(f.name)}</span>`).join('')}</div>` : ''}
-      ${notesList(l)}
-      <div class="label">ציר זמן</div>
-      <ul class="log timeline">${l.log.slice().reverse().map((e) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('')}</ul>`;
+      <div class="rec-grid">
+        <aside class="card rec-fields">
+          <h2>פרטים</h2>
+          <label><span class="faint">שלב</span><select class="text-input" data-lstage="${l.id}">${S.biz.stages.map((s) => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+          <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${l.value == null ? '' : esc(l.value)}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
+          <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
+          ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr" data-act="call" data-lid="${l.id}">📞 ${esc(l.contact.phone)}</a>` : ''}
+          <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
+          <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'} <button class="link" data-act="edit-tags" data-lid="${l.id}">✎ תיוג</button></span></div>
+          ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
+          <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · נקלט ע"י ${esc(l.by)}</span></div>
+          <div class="field-row"><span class="faint">קבצים</span><span>${l.files.map((f) => '📄 ' + esc(f.name)).join(' · ') || '—'} <label class="link" for="lead-file">+ קובץ</label><input id="lead-file" type="file" hidden data-lfile="${l.id}"></span></div>
+        </aside>
+        <div class="rec-main">
+          <section class="card"><h2>הלאה</h2>
+            ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
+              <span class="task-acts">${t.type === 'send' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
+                <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ בוצע</button>
+                <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
+              : `<p class="muted">אין צעדים פתוחים${l.won ? ' — לקוח.' : '.'}</p>`}
+            <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד</button></div></section>
+          ${l.notes.length ? `<section class="card">${notesList(l)}</section>` : ''}
+          <section class="card"><h2>ציר זמן</h2>
+            <div class="chips tl-filter">${Object.entries(tab).map(([k, t]) => `<button class="chip small" data-tl="${k}" aria-pressed="${tlFilter === k}">${t}</button>`).join('')}</div>
+            <ul class="log timeline">${entries.map((e) => `<li class="tl-${tlKind(e.t)}"><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('') || '<li class="faint">אין כאן כלום.</li>'}</ul>
+            ${autos && tlFilter === 'all' ? `<button class="link" data-act="tl-auto">${tlAuto ? 'להסתיר' : 'להציג'} ${autos} פעולות אוטומציה ⚙️</button>` : ''}</section>
+        </div>
+      </div></div>`;
   }
-  function sheetCRM(l) { callOpen = false; sheet(crmBody(l), l.id, true); $('#scrim .sheet').classList.add('wide'); }
+  /** Open a lead's page. Inside the CRM it is a page; the name stays for the callers that used to open a sheet. */
+  function sheetCRM(l) {
+    closeSheet(false);
+    callOpen = false;
+    S.crmLead = l.id;
+    if (S.phase !== 'live' || S.view !== 'crm') { S.phase = 'live'; S.view = 'crm'; }
+    save(); render(); window.scrollTo(0, 0);
+  }
 
   /* After "we talked": one sheet, a step and a day, and nothing is marked done until
    * one is chosen — leaving without choosing changes nothing. */
@@ -2302,7 +2417,18 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (d.pv) { PV[d.pv] = t.value; return render(); }
     if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
-    if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); } return; }
+    if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); render(); } return; }
+    if (d.ie) {   // a cell edited in the table
+      const l = leadById(+d.lid);
+      if (!l) return;
+      if (d.ie === 'stage') setStage(l, t.value, 'מהטבלה');
+      if (d.ie === 'owner') { l.owner = t.value; log(l, 'שויך ל' + t.value); }
+      if (d.ie === 'warm') { if (t.value === '') { l.warmBy = null; l.warmth = null; } else { l.warmth = +t.value; l.warmBy = 'hand'; } }
+      if (d.ie === 'value') l.value = t.value === '' ? null : Math.max(0, +t.value);
+      save();
+      toast('✓ ' + People.rowName(l) + ' עודכן');
+      return d.ie === 'value' ? null : render();
+    }
     if (d.tbsel) { const id = +d.tbsel; if (t.checked) tbSel.add(id); else tbSel.delete(id); return render(); }
     if (d.tbselall !== undefined) {
       const rows = tableRows(leadsNow()).slice(tbPage * 25, tbPage * 25 + 25);
@@ -2334,6 +2460,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     save(); render();
   }
 
+  document.addEventListener('submit', (e) => e.preventDefault());   // the ask box is a form only so Enter works
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) { const mn = $('#menu'); if (mn && !e.target.closest('#menu')) { mn.remove(); if (openId && $('#slot')) startIdle(); } return; }
@@ -2347,7 +2474,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (d.sub) { S.sub = d.sub; save(); return render(); }
 
     // ---- CRM ----
-    if (d.crmtab) { S.crmTab = d.crmtab; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.crmtab) { S.crmTab = d.crmtab; S.crmLead = null; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.tl) { tlFilter = d.tl; return render(); }
     if (d.pmove) { const l = leadById(+d.pmove); if (l) sheetMove(l); return; }
     if (d.pstage) { if (L) { closeSheet(false); undoable(People.rowName(L) + ' ➜ ' + stageById(d.pstage).name, () => setStage(L, d.pstage)); render(); } return; }
     if (d.tbsort) { const s = S.tb.sort; if (s.col === d.tbsort) s.dir = -s.dir; else { s.col = d.tbsort; s.dir = 1; } save(); return render(); }
@@ -2470,16 +2598,17 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (d.crmlead) { const l = leadById(+d.crmlead); if (l) sheetCRM(l); return; }
     if (d.outcome) { if (L) outcome(L, d.outcome); return; }
     if (d.play) return playNote(d.play);
-    if (d.taskdone) { if (L) { const t = tasks(L).find((x) => x.key === d.taskdone); L.done.push(d.taskdone); log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע'); if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה'); save(); sheetTasks(L, tasksRet); } return; }
+    if (d.taskdone) { if (L) { const t = tasks(L).find((x) => x.key === d.taskdone); L.done.push(d.taskdone); log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע'); if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה'); save(); afterTask(L); } return; }
     if (d.tasksend) {
       if (!L) return;
       const t = tasks(L).find((x) => x.key === d.tasksend);
       const name = t && t.mat ? t.mat : S.biz.materials.length === 1 ? S.biz.materials[0].name : '';
       if (!name) return sheetMaterials(L);
-      doSend(L, name); L.done.push(d.tasksend); save(); return sheetTasks(L, tasksRet);
+      doSend(L, name); L.done.push(d.tasksend); save(); return afterTask(L);
     }
     if (d.taskedit) {
       if (!L) return;
+      if (!$('#scrim')) tasksRet = 'page';   // editing from the lead's page: come back to the page, not to a sheet
       const t = tasks(L).find((x) => x.key === d.taskedit);
       if (!t) return;
       const days = Math.max(0, dayNo(t.due.getTime()) - dayNo(now()));
@@ -2559,12 +2688,12 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         else addManual(l, s, s.type === 'season' ? dueFor(s) : H.addDays(new Date(now()), Math.max(1, s.days || 0)).getTime());
         log(l, 'הלאה: ' + s.label);
         save();
-        return sheetTasks(l, tasksRet);
+        return afterTask(l);
       }
       case 'step-back': {
         const c = ES && ES.ctx;
         if (c && c.kind === 'draft') { if (c.isNew) D.steps.splice(c.i, 1); return sheetSteps(); }
-        if (c && c.lid) return sheetTasks(leadById(c.lid), tasksRet);
+        if (c && c.lid) return afterTask(leadById(c.lid));
         closeSheet(false); return render();
       }
       case 'del-btn': {
@@ -2580,7 +2709,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       }
       case 'tasks': { if (L) sheetTasks(L, d.ret || (S.view === 'crm' && S.phase === 'live' ? 'crm' : null)); return; }
       case 'tasks-close': { if (L) backFromTasks(L); return; }
-      case 'task-add': { if (L) sheetStep({ title: 'צעד חדש ל' + People.rowName(L), step: normStep({ type: 'call' }), ctx: { kind: 'task', lid: L.id, key: null } }); return; }
+      case 'task-add': { if (L && !$('#scrim')) tasksRet = 'page'; if (L) sheetStep({ title: 'צעד חדש ל' + People.rowName(L), step: normStep({ type: 'call' }), ctx: { kind: 'task', lid: L.id, key: null } }); return; }
       case 'task-audience': { if (L) { L.audience = true; log(L, 'הועבר לקהל'); save(); backFromTasks(L); } return; }
       case 'add-season': {
         const id = 'c' + Date.now();
@@ -2627,6 +2756,20 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       }
       case 'toast-undo': { const f = undoFn; undoFn = null; if (f) f(); return; }
       case 'seed-progress': seedProgress(); return render();
+      case 'record-back': S.crmLead = null; callOpen = false; save(); render(); return window.scrollTo(0, 0);
+      case 'tl-auto': tlAuto = !tlAuto; return render();
+      case 'tb-dense': S.tb.dense = !S.tb.dense; save(); return render();
+      case 'ask': { e.preventDefault(); const q = $('#ask-q') && $('#ask-q').value.trim(); if (q) askData(q); return; }
+      case 'ask-clear': ASK = null; return render();
+      case 'ask-table': tbIds = new Set(ASK.ids); S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
+      case 'ask-unfilter': tbIds = null; return render();
+      case 'view-settings': {
+        const vs = VIEW_SETTINGS[S.crmTab];
+        if (!vs) return;
+        if (vs[0] === 'cols') return sheetCols();
+        if (worker()) return ownerOnly('ההגדרות');
+        S.phase = 'settings'; S.step = 'custom'; S.sub = vs[0]; save(); render(); return window.scrollTo(0, 0);
+      }
       case 'crm-settings': if (worker()) return ownerOnly('ההגדרות'); S.phase = 'settings'; S.step = 'custom'; S.sub = 'crm'; save(); return render();
       case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');
       case 'tb-cols': return sheetCols();
@@ -2730,7 +2873,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       case 'note-save': { if (L) saveNote(L); return; }
       case 'note-cancel': closeSheet(); return;
       case 'fill-open': fillOpen = true; return render();
-      case 'call': { callOpen = true; const sh = $('#scrim .sheet'); if (sh && L) sh.innerHTML = crmBody(L); return; }
+      case 'call': { callOpen = true; return render(); }
       case 'edit-tags': { if (L) sheet(leadBody(L, true), L.id); return; }
       case 'del-lead': { const l = L || leadById(openId); return l && sheetConfirm('למחוק את ' + People.rowName(l) + '?', 'הליד יימחק מהרשימה.', 'del-lead-yes', `data-lid="${l.id}"`); }
       case 'del-lead-yes': {

@@ -360,3 +360,33 @@ select.text-input { appearance: auto; }
 .sheet.wide { width: min(760px, 100%); }
 .timeline li { border-inline-start: 2px solid var(--line); padding-inline-start: 10px; }
 .stage-line { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center; }
+
+/* ---------- the lead's page, asking the data, inline edits ---------- */
+.ctab.gear { margin-inline-start: auto; font-size: 18px; }
+.askbox { display: flex; gap: 8px; margin-top: 14px; }
+.askbox input { flex: 1; }
+.askbox.off { font-size: 14px; color: var(--muted); background: var(--surface-2); border-radius: 12px; padding: 10px 14px; }
+.ask-answer { margin-top: 8px; background: var(--ai-soft); border-inline-start: 5px solid var(--ai); border-radius: 12px; padding: 12px 16px; font-size: 17px; }
+.rec-top { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
+.rec-top > .btn.ghost { padding-inline: 0; }
+.rec-title h1 { font-size: 26px; }
+.rec-keys { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; }
+.rec-keys .key { display: grid; gap: 0; min-width: 90px; }
+.rec-keys .key b { font-size: 18px; }
+.rec-keys .key .faint { font-size: 13px; }
+.rec-acts { margin-top: 12px; }
+.rec-grid { display: grid; grid-template-columns: minmax(240px, 300px) 1fr; gap: 14px; margin-top: 14px; align-items: start; }
+@media (max-width: 860px) { .rec-grid { grid-template-columns: 1fr; } }
+.rec-fields { display: grid; gap: 10px; }
+.rec-fields label { display: grid; gap: 2px; font-size: 13px; }
+.field-row { display: grid; gap: 2px; font-size: 15px; }
+.field-row .faint { font-size: 13px; }
+.rec-main { display: grid; gap: 14px; }
+.tl-filter { margin: 8px 0; }
+.timeline li.tl-auto { color: var(--muted); }
+.tb td.ie { padding: 4px 6px; }
+.tb td.ie select, .tb td.ie input { min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 0 6px; font: inherit; max-width: 150px; }
+.tb td.ie input { width: 100px; }
+.tb.dense td { padding: 3px 10px; }
+.tb.dense td.ie select, .tb.dense td.ie input { min-height: 32px; }
+.tb.dense th .th { min-height: 36px; padding: 6px 10px; }
