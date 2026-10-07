@@ -176,7 +176,8 @@ window.People = (function () {
     }
     hits.sort((a, b) => b.score - a.score || rowName(a).length - rowName(b).length);
     const skipped = skip ? hits.filter((h) => skip(h.key)) : [];
-    return { hits: hits.filter((h) => !skip || !skip(h.key)).slice(0, limit || 6), skipped };
+    const shown = hits.filter((h) => !skip || !skip(h.key));
+    return { hits: shown.slice(0, limit || 6), skipped, total: shown.length };
   }
   function meta(p) {
     const parts = [];
