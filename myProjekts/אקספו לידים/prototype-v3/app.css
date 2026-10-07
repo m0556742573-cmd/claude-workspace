@@ -127,7 +127,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 120px; box-sizing: 
 .ask-card .q { font-size: 19px; font-weight: 700; }
 .ask-card.done { opacity: .65; border-inline-start-color: var(--good); }
 .rows { display: grid; gap: 6px; }
-.row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.row { display: grid; grid-template-columns: 1fr; gap: 4px 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .row .nm { font-weight: 800; }
 .row .why { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
 .row .due { font-size: 14px; font-weight: 700; color: var(--accent-deep); }
@@ -163,7 +163,7 @@ details.held { margin-top: 10px; } details.held summary { cursor: pointer; font-
 
 /* ---------- products you can correct ---------- */
 .prod-list { display: grid; gap: 6px; }
-.prod-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-height: 48px; }
+.prod-row { display: grid; justify-items: start; gap: 2px; text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-height: 48px; }
 .prod-row .pn { font-weight: 800; }
 .prod-row .pnext { color: var(--muted); font-size: 15px; }
 .prod-row .q { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--warm-soft); color: var(--warm); font-size: 13px; font-weight: 800; }
@@ -174,7 +174,7 @@ button.row { width: 100%; text-align: start; font: inherit; color: inherit; curs
 .link { border: 0; background: transparent; padding: 6px 0; text-align: start; min-height: 44px; }
 
 /* ---------- setup and settings ---------- */
-.next-bar { position: sticky; bottom: 0; display: flex; justify-content: flex-end; padding: 14px 0 8px; margin-top: 18px; background: linear-gradient(to bottom, transparent, var(--bg) 35%); }
+.next-bar { position: sticky; bottom: 0; display: flex; justify-content: flex-start; padding: 14px 0 8px; margin-top: 18px; background: linear-gradient(to bottom, transparent, var(--bg) 35%); }
 .axes { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); margin-top: 14px; }
 .axis h2 small { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--faint); }
 .axis .prod-list { margin-top: 10px; }
@@ -190,11 +190,11 @@ button.row { width: 100%; text-align: start; font: inherit; color: inherit; curs
 .toggle::after { content: ""; position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: right .15s; }
 .toggle[aria-pressed="true"] { background: var(--accent); }
 .toggle[aria-pressed="true"]::after { right: 27px; }
-.season-row { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.season-row { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .season-row:first-child { border-top: 0; }
 .season-row .link b { display: block; }
 .season-row .rng { display: block; font-size: 14px; color: var(--muted); }
-.season-row .nx { font-size: 13px; font-weight: 700; color: var(--accent-deep); text-align: end; }
+.season-row .nx { display: block; font-size: 13px; font-weight: 700; color: var(--accent-deep); }
 .range-in { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .range-in input { width: 70px; }
 .range-in select { width: auto; flex: 1; min-width: 100px; }
@@ -226,7 +226,27 @@ button.stat[aria-pressed="true"] { border: 2px solid var(--accent); background: 
 .insight .q { font-weight: 700; font-size: 17px; }
 .crm-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .date-now { font-size: 14px; color: var(--muted); }
-.row .due { text-align: end; }
+.row .due { grid-column: 1 / -1; text-align: start; }
 .log { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 4px; font-size: 14px; }
 .log .when { color: var(--faint); margin-inline-end: 8px; }
 @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .row .due { text-align: start; } }
+
+/* ---------- registration, connections, groups, steps, notes ---------- */
+#app, .card, .sheet, .row, .result, .opt, .prod-row { text-align: right; }
+.card.narrow { max-width: 560px; }
+.ltr { direction: ltr; text-align: left; }
+.prompts { margin: 4px 0 10px; padding-inline-start: 20px; color: var(--muted); font-size: 15px; }
+.mail-from { display: flex; align-items: center; gap: 6px; }
+.mail-from input { flex: 1; }
+.mail-from span { font-weight: 700; color: var(--muted); white-space: nowrap; }
+.subtabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.group-title { display: flex; align-items: baseline; gap: 10px; width: 100%; border: 0; background: transparent; padding: 0; text-align: right; }
+.group-title .faint { margin-inline-start: auto; }
+.step-list { display: grid; gap: 6px; }
+.step-line { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.task-line { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.task-line.first { border: 2px solid var(--accent); background: var(--accent-soft); }
+.task-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.note-peek { margin-top: 10px; font-size: 15px; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 8px 12px; }
+.sent-note { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--good-soft); color: var(--good); font-weight: 700; }
+.tr-box { margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: var(--ai-soft); font-size: 15px; }
