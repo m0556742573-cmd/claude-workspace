@@ -262,7 +262,7 @@
   }
   const normStep = (s) => {
     const t = s && STEPS[s.type] ? s.type : 'call';
-    const out = { type: t, label: (s && s.label) || STEPS[t].label, days: s && s.days != null ? s.days : STEPS[t].days, mat: (s && s.mat) || '' };
+    const out = { type: t, label: (s && s.label) || STEPS[t].label, days: s && s.days != null ? s.days : STEPS[t].days, pkg: (s && s.pkg) || '' };
     if (t === 'date') out.before = s && s.before != null ? s.before : 4;   // weeks before the simcha
     return out;
   };
@@ -593,11 +593,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return rel + H.label(d) + ' (' + d.getDate() + '/' + (d.getMonth() + 1) + ')';
   }
   const daysWord = (s) => (s.type === 'none' ? 'בלי משימה' : s.type === 'season' ? 'לפני העונה' : s.days === 0 ? 'מיד' : s.days === 1 ? 'תוך יום' : 'תוך ' + s.days + ' ימים');
-  const stepText = (s) => STEPS[s.type].icon + ' ' + s.label + (s.mat ? ' (' + s.mat + ')' : '') + ' · ' + daysWord(s);
+  const stepText = (s) => STEPS[s.type].icon + ' ' + s.label + (s.pkg && pkgById(s.pkg) ? ' (' + pkgById(s.pkg).name + ')' : '') + ' · ' + daysWord(s);
   const stepsText = (ss) => ss.map(stepText).join('  +  ');
   const planHTML = (p, bare) => `${STEPS[p.type].icon} <b>${esc(p.label)}</b>${p.due && !bare ? ' · ' + esc(dueText(p.due)) : ''}${p.season ? ' · לקראת ' + esc(p.season) : ''}`;
   const log = (l, t) => l.log.push({ at: now(), t });
-  const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, mat: s.mat || '', before: s.before, phase: s.phase || '', dueAt }); };
+  const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, pkg: s.pkg || '', before: s.before, phase: s.phase || '', dueAt }); };
   function dueFor(s) {
     if (s.type === 'season') { const d = seasonDue(); return d ? d.getTime() : H.addDays(new Date(now()), 3).getTime(); }
     return H.addDays(new Date(now()), Math.max(1, s.days || 0), talk(s.type)).getTime();
@@ -607,7 +607,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Shell
   // ------------------------------------------------------------------
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית'], ['try', 'ניסיון']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'חומרים ונוסח'], ['crm', 'שלבים, צוות ובוקר']];
+  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים, צוות ובוקר']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
@@ -921,7 +921,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /* One editor for a single step: a button's, the default's, or a lead's own. */
   let ES = null;
   function sheetStep(o) {
-    ES = { type: o.step.type, days: o.step.days, mat: o.step.mat || '', before: o.step.before != null ? o.step.before : 4, ctx: o.ctx };
+    ES = { type: o.step.type, days: o.step.days, pkg: o.step.pkg || '', before: o.step.before != null ? o.step.before : 4, ctx: o.ctx };
     sheet(`<h2>${esc(o.title)}</h2>
       <div class="label">סוג הצעד <small>לפי זה המערכת פועלת</small></div>
       <div class="step-grid">${Object.entries(STEPS).map(([k, v]) => `<button class="opt" data-steptype="${k}" aria-pressed="${ES.type === k}">${v.icon} ${esc(v.name)}</button>`).join('')}</div>
@@ -935,32 +935,31 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function renderStepExtra() {
     const box = $('#es-extra');
     if (!box) return;
-    const mats = S.biz.materials;
+    const pkgs = S.biz.templates;
     const days = ES.type === 'none' || ES.type === 'season'
       ? `<p class="faint" style="margin-top:10px">${ES.type === 'season' ? 'יחזור אליך ' + S.biz.remindWeeks + ' שבועות לפני העונה שלך.' : 'לא נכנס לרשימת המשימות. נשמר בקהל.'}</p>`
       : `<div class="label">מתי</div><div class="chips">${[0, 1, 2, 3, 5, 7, 14, 30].map((d) =>
         `<button class="chip" data-esdays="${d}" aria-pressed="${ES.days === d}">${d === 0 ? 'מיד' : d === 1 ? 'תוך יום' : d + ' ימים'}</button>`).join('')}</div>
         ${ES.type === 'send' && ES.days === 0 ? '<p class="faint" style="margin-top:6px">יישלח ברגע שנוגעים בכפתור בדוכן. בכרטיס לא יופיע כפתור "שלח חומר".</p>' : ''}`;
-    const mat = ES.type !== 'send' ? '' : `<div class="label">מה לשלוח</div>
-      <div class="chips">${mats.map((x) => `<button class="chip" data-esmat="${esc(x.name)}" aria-pressed="${ES.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}
-        <button class="chip" data-esmat="" aria-pressed="${!ES.mat}">${mats.length === 1 ? 'החומר היחיד' : 'לבחור בזמן השליחה'}</button></div>
-      <div class="add-row" style="margin-top:8px"><input id="es-mat-name" class="text-input" placeholder="+ חומר חדש — קטלוג, מחירון, תמונות" autocomplete="off">
+    const mat = ES.type !== 'send' ? '' : `<div class="label">איזו חבילה לשלוח</div>
+      <div class="chips">${pkgs.map((x) => `<button class="chip" data-espkg="${esc(x.id)}" aria-pressed="${ES.pkg === x.id}">${x.mat ? '📎' : '💬'} ${esc(x.name)}</button>`).join('')}
+        <button class="chip" data-espkg="" aria-pressed="${!ES.pkg}">ברירת המחדל של הערוץ</button></div>
+      <div class="add-row" style="margin-top:8px"><input id="es-mat-name" class="text-input" placeholder="+ חבילה חדשה עם קובץ — קטלוג, מחירון" autocomplete="off">
         <label class="btn" for="es-mat-file">📷 קובץ</label></div><input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
     const before = ES.type !== 'date' ? '' : `<div class="label">כמה לפני השמחה</div><div class="chips">${[1, 2, 4, 8, 12].map((w) =>
       `<button class="chip" data-esbefore="${w}" aria-pressed="${ES.before === w}">${w === 1 ? 'שבוע' : w + ' שבועות'}</button>`).join('')}</div>
       <p class="faint" style="margin-top:6px">בדוכן נשאל "מתי השמחה?". אם לא נמסר תאריך — לפי "מתי" שלמעלה.</p>`;
     box.innerHTML = days + before + mat;
-    // A new material can be added right here, and is chosen for this step at once — no trip to "חומרים ונוסח".
+    // A new package with its file can be made right here, and is chosen for this step at once.
     const f = $('#es-mat-file');
     if (f) f.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const name = (($('#es-mat-name') && $('#es-mat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '')).slice(0, 30);
-      if (!S.biz.materials.some((x) => x.name === name)) S.biz.materials.push({ name, file: file.name });
-      ES.mat = name; save(); renderStepExtra(); toast(name + ' נשמר ונבחר');
+      ES.pkg = addPackageWithFile(name, file.name); save(); renderStepExtra(); toast(name + ' נשמר ונבחר');
     });
   }
-  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, mat: ES.mat, before: ES.before });
+  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, pkg: ES.pkg, before: ES.before });
 
   // ---- warmth and the booth ----
   function viewBoothSettings(m) {
@@ -1017,30 +1016,34 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ---- material and the message ----
   function viewMaterials(m) {
     const b = S.biz;
-    m.innerHTML = `<h1>חומרים ונוסח</h1>
+    const groups = [['wa', 'וואטסאפ', b.channels.wa || b.channels.waApi], ['email', 'מייל', b.channels.email], ['sms', 'SMS', b.channels.sms]].filter((g) => g[2]);
+    const pkgOpts = (sel) => `<option value="" ${!sel ? 'selected' : ''}>—</option>` + b.templates.map((t) => `<option value="${esc(t.id)}" ${sel === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
+    m.innerHTML = `<h1>הודעות וחומרים</h1>
+      <p class="muted">כל מה שיוצא למבקר הוא <b>חבילה</b>: הודעה, ואפשר לצרף לה קובץ. בדוכן, בכפתור, במשימה ובשליחה לקבוצה — בוחרים חבילה לפי השם.</p>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>מה אפשר לשלוח</h2><p class="muted">כל כפתור יכול לשלוח חומר אחר — בוחרים בצעד "לשלוח חומר" של הכפתור.</p>
-          <div class="prod-list">${b.materials.map((x, i) => `<div class="prod-row"><span class="pn">📎 ${esc(x.name)}</span><span class="pnext">${esc(x.file)} <button class="btn ghost danger" data-act="del-mat" data-i="${i}">הסרה</button></span></div>`).join('') || '<div class="faint">עוד אין חומר. אפשר גם להוסיף בדוכן, בשליחה הראשונה.</div>'}</div>
+        <section class="card"><h2>החבילות</h2>
+          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין חבילות.</div>'}</div>
+          <div class="actions"><button class="btn" data-act="tpl-add">+ חבילה חדשה</button></div></section>
+        <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו חבילה</h2>
+          ${groups.length ? groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')
+            : '<p class="faint">אין ערוץ מחובר. מחברים ב"חיבורים".</p>'}</section>
+        <section class="card"><h2>הקבצים</h2><p class="muted">כל קובץ חדש נהיה גם חבילה משלו. אפשר לצרף אותו לכל חבילה אחרת.</p>
+          <div class="prod-list">${b.materials.map((x, i) => `<div class="prod-row"><span class="pn">📎 ${esc(x.name)}</span><span class="pnext">${esc(x.file)} <button class="btn ghost danger" data-act="del-mat" data-i="${i}">הסרה</button></span></div>`).join('') || '<div class="faint">עוד אין קבצים. אפשר גם להוסיף בדוכן, בשליחה הראשונה.</div>'}</div>
           <div class="add-row"><input id="mat-name" class="text-input" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
             <label class="btn" for="mat-file">📷 קובץ</label></div><input id="mat-file" type="file" accept="image/*,application/pdf" hidden></section>
-        <section class="card"><h2>נוסח ההודעה</h2><p class="muted">{שם} · {עסק} · {חומר} מתמלאים לבד.</p>
-          <textarea id="tpl" class="say small">${esc(b.template)}</textarea>
-          <p class="faint" id="tpl-prev">${esc(fillTpl('משה כהן', 'קטלוג'))}</p></section>
       </div>`;
-    $('#tpl').addEventListener('input', (e) => { S.biz.template = e.target.value; save(); $('#tpl-prev').textContent = fillTpl('משה כהן', 'קטלוג'); });
     bindMatFile(null);
   }
-  const fillTpl = (name, mat) => S.biz.template.replace(/\{שם\}/g, name).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, mat);
   function bindMatFile(l) {
     const f = $('#mat-file');
     if (!f) return;
     f.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const name = (($('#mat-name') && $('#mat-name').value.trim()) || 'קטלוג').slice(0, 30);
-      if (S.biz.materials.some((x) => x.name === name)) return toast('כבר יש חומר בשם הזה');
-      S.biz.materials.push({ name, file: file.name });
-      if (l) doSend(l, name);
+      const name = (($('#mat-name') && $('#mat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '') || 'קטלוג').slice(0, 30);
+      if (S.biz.materials.some((x) => x.name === name)) return toast('כבר יש קובץ בשם הזה');
+      const id = addPackageWithFile(name, file.name);
+      if (l) sendPackage(l, id);
       save();
       if (l) { sheetMaterials(l); refreshLead(l); } else render();
       toast(name + ' נשמר');
@@ -1159,7 +1162,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const roley = bs.some((b) => b.axis === 'who' && b.weight >= 2);
     const autoSent = bs.some((b) => stepsOf(b).some(immediate));
     const ts = tasks(l);
-    const queued = (l.queue || []).map((q) => q.mat);
+    const queued = (l.queue || []).map((q) => (pkgById(q.pkg) || { name: 'ברירת המחדל' }).name);
     const sendBtn = autoSent
       ? `<span class="sent-note">📎 ${queued.length ? 'יישלח בסגירה: ' + esc(queued.join(', ')) : l.sent.length ? 'נשלח: ' + esc(l.sent.join(', ')) : l.pendingMat ? 'ממתין לחומר' : 'יישלח'}</span>`
       : `<button class="btn" data-act="send" data-lid="${l.id}">${esc(l.sent.length ? '📎 נשלח: ' + l.sent.join(', ') : l.pendingMat ? '📎 ממתין לחומר' : '📎 שלח חומר')}</button>`;
@@ -1225,51 +1228,78 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const chOrder = () => S.biz.chOrder || CH_ORDER;
   const chName = (k) => CHANNELS.find((c) => c.k === k).name;
   const bestChannel = (keys) => { const k = chOrder().find((c) => S.biz.channels[c] && (!keys || keys.includes(c))); return k ? chName(k) : ''; };
-  /** Where one send goes: the first channel, or every connected one — and WhatsApp once, the official engine before the other. */
-  function sendChannels() {
+  /** The channels one send goes out on: the first connected, or every connected one — and WhatsApp once, the official engine first. */
+  function sendKeys() {
     const on = chOrder().filter((c) => S.biz.channels[c]);
-    if (!S.biz.sendAll) return on.slice(0, 1).map(chName);
-    return on.filter((c) => !(c === 'wa' && S.biz.channels.waApi)).map(chName);
+    if (!S.biz.sendAll) return on.slice(0, 1);
+    return on.filter((c) => !(c === 'wa' && S.biz.channels.waApi));
+  }
+  const sendChannels = () => sendKeys().map(chName);
+
+  /* Packages (08/10): a message and the material attached to it travel together, under a name the owner gives.
+   * Whatever goes to a visitor — from the booth, a button, a task, a rule or a group send — is a package.
+   * Each channel has a default package: what goes out on it when no package was chosen. */
+  const PKG_TEXT = 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}.';
+  const pkgById = (id) => S.biz.templates.find((t) => t.id === id);
+  const CH_GROUP = { wa: 'wa', waApi: 'wa', email: 'email', sms: 'sms' };
+  const pkgFor = (id, k) => pkgById(id) || pkgById((S.biz.chDefault || {})[CH_GROUP[k]]) || (S.biz.templates.length === 1 ? S.biz.templates[0] : null);
+  /** A file brought in anywhere becomes a material and a package of its own, with the default words. Returns the package id. */
+  function addPackageWithFile(name, file) {
+    if (!S.biz.materials.some((x) => x.name === name)) S.biz.materials.push({ name, file });
+    let p = S.biz.templates.find((t) => t.mat === name);
+    if (!p) { p = { id: 'p' + (S.biz.bseq++), name, mat: name, text: PKG_TEXT }; S.biz.templates.unshift(p); }
+    return p.id;
   }
   let byRule = false;   // set while an automation acts: what it sends is logged as the system's, not the owner's
-  function doSend(l, name) {
-    if (l.sent.includes(name)) return;
-    const chs = sendChannels();
-    if (!chs.length) { l.pendingMat = true; if (!byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return; }
-    const ch = chs.join(' + ');
-    l.sent.push(name); l.pendingMat = false;
-    log(l, `${byRule ? '⚙️ ' : ''}📎 ${name} — נשלח ב${ch}${byRule ? ' (אוטומטי)' : ''}`);
-    if (!byRule) toast(`📎 ${name} נשלח ל${People.rowName(l)} · ${ch}`);
+  /** Send one package (or each channel's default) to one lead. o: { quiet, toGroup }. False when nothing went out. */
+  function sendPackage(l, id, o) {
+    o = o || {};
+    const chosen = pkgById(id);
+    if (l.optOut && (o.toGroup || byRule)) return false;
+    if (chosen && !o.toGroup && l.sent.includes(chosen.name)) return true;   // already has it
+    const keys = sendKeys();
+    if (!keys.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return false; }
+    const out = keys.map((k) => [k, pkgFor(id, k)]).filter(([, p]) => p);
+    if (!out.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין חבילה לשליחה. מגדירים ב"הודעות וחומרים".'); return false; }
+    l.pendingMat = false;
+    out.forEach(([k, p]) => {
+      if (!l.sent.includes(p.name)) l.sent.push(p.name);
+      log(l, `${byRule ? '⚙️ ' : ''}${p.mat ? '📎' : '💬'} "${p.name}" נשלח ב${chName(k)}${byRule ? ' (אוטומטי)' : o.toGroup ? ' (לקבוצה)' : ''}`);
+    });
+    if (!o.quiet && !byRule) toast(`${out[0][1].mat ? '📎' : '💬'} "${[...new Set(out.map(([, p]) => p.name))].join('", "')}" נשלח ל${People.rowName(l)} · ${out.map(([k]) => chName(k)).join(' + ')}`);
+    return true;
   }
-  /* A button whose step is "send at once" queues its own material, and the queue goes
+  /* A button whose step is "send at once" queues its package, and the queue goes
    * out when the card closes. Until then, untapping the button takes it back — a
    * message that has left cannot be. */
   function autoSend(l, b) {
     stepsOf(b).filter(immediate).forEach((s) => {
-      const mats = S.biz.materials;
-      const name = s.mat && mats.some((x) => x.name === s.mat) ? s.mat : mats.length === 1 ? mats[0].name : '';
-      if (name) { if (!l.sent.includes(name)) l.queue = (l.queue || []).filter((q) => q.mat !== name).concat({ btn: b.id, mat: name }); }
-      else if (!l.pendingMat) { l.pendingMat = true; log(l, '📎 ממתין לחומר'); toast('📎 ' + (mats.length ? 'יש כמה חומרים — לבחור בצעד של הכפתור' : 'עוד אין חומר — סומן "ממתין לחומר"')); }
+      const has = pkgById(s.pkg) || keysHaveDefault();
+      if (has) l.queue = (l.queue || []).filter((q) => q.btn !== b.id).concat({ btn: b.id, pkg: s.pkg || '' });
+      else if (!l.pendingMat) { l.pendingMat = true; log(l, '📎 ממתין לחומר'); toast('📎 עוד אין חבילה לשליחה — סומן "ממתין לחומר"'); }
     });
   }
+  const keysHaveDefault = () => sendKeys().some((k) => pkgFor('', k));
   const unqueue = (l, b) => { l.queue = (l.queue || []).filter((q) => q.btn !== b.id); };
   function flushSends(l) {
     if (!l || !(l.queue || []).length) return;
     const q = l.queue;
     l.queue = [];
-    q.forEach((x) => doSend(l, x.mat));
+    q.forEach((x) => sendPackage(l, x.pkg));
     save();
   }
   window.addEventListener('pagehide', () => { if (openId) flushSends(leadById(openId)); });
+  /** "What to send" — the owner's packages by name; the one tapped goes out with its message and its file. */
   function sheetMaterials(l) {
-    const mats = S.biz.materials;
+    const pkgs = S.biz.templates;
+    const withFile = pkgs.filter((x) => x.mat).length;
     sheet(`<h2>מה לשלוח${l ? ' ל' + esc(People.rowName(l)) : ''}?</h2>
-      ${mats.length ? `<div class="opts">${mats.map((x) => `<button class="opt" data-sendmat="${esc(x.name)}" data-lid="${l ? l.id : ''}" aria-pressed="${l ? l.sent.includes(x.name) : false}">📎 ${esc(x.name)}<small>${esc(x.file)}</small></button>`).join('')}</div>` : '<p class="muted">עוד אין חומר לשליחה.</p>'}
-      ${worker() ? '' : `<div class="label">${mats.length ? 'להוסיף חומר' : 'להוסיף עכשיו'}</div>
-        <input id="mat-name" class="text-input" value="${mats.length ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
+      ${pkgs.length ? `<div class="opts">${pkgs.map((x) => `<button class="opt" data-sendmat="${esc(x.id)}" data-lid="${l ? l.id : ''}" aria-pressed="${l ? l.sent.includes(x.name) : false}">${x.mat ? '📎' : '💬'} ${esc(x.name)}<small>${esc(x.mat ? 'עם ' + x.mat : 'הודעה בלבד')}</small></button>`).join('')}</div>` : '<p class="muted">עוד אין מה לשלוח.</p>'}
+      ${worker() ? '' : `<div class="label">${withFile ? 'חבילה חדשה עם קובץ' : 'להוסיף קטלוג עכשיו'}</div>
+        <input id="mat-name" class="text-input" value="${withFile ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
         <div class="opts"><label class="opt" for="mat-file">📷 לצלם או לבחור קובץ<small>תמונה או PDF</small></label></div>
         <input id="mat-file" type="file" accept="image/*,application/pdf" hidden>`}
-      ${!mats.length && l ? `<div class="opts"><button class="opt" data-act="mat-later" data-lid="${l.id}">לא עכשיו<small>יסומן "ממתין לחומר", ויופיע בדשבורד</small></button></div>` : ''}
+      ${!withFile && l ? `<div class="opts"><button class="opt" data-act="mat-later" data-lid="${l.id}">לא עכשיו<small>יסומן "ממתין לחומר", ויופיע בדשבורד</small></button></div>` : ''}
       <div class="actions"><button class="btn" data-act="sheet-close">סיום</button></div>`);
     bindMatFile(l);
   }
@@ -1420,7 +1450,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const left = rows.filter(isEmpty).length;
     if (rows.length) out.push({ fill: true, q: left ? `${left} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ הכל מסומן.', leads: rows });
     const waiting = L.filter((l) => l.pendingMat);
-    if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.materials.length ? '' : ', ועוד אין חומר'}.` });
+    if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.templates.length ? '' : ', ועוד אין מה לשלוח'}.` });
     return out;
   }
   /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
@@ -1457,7 +1487,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function dashCard(a) {
     let body = '';
     if (a.fill) body = fillOpen ? fillList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open">להשלים</button></div>';
-    else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.materials.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
+    else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
     return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
   }
   function fillList(leads) {
@@ -1582,14 +1612,14 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     { id: 'nego', name: 'במשא ומתן' }, { id: 'won', name: 'נסגר', kind: 'won' }, { id: 'lost', name: 'לא רלוונטי', kind: 'lost' },
   ];
   const DEF_TEMPLATES = [
-    { id: 't1', name: 'תודה על הביקור', ch: 'any', text: 'שלום {שם}, תודה שעברת בדוכן של {עסק} בתערוכה. נשמח לעמוד לשירותך.' },
-    { id: 't2', name: 'כמו שדיברנו', ch: 'any', text: 'שלום {שם}, כמו שדיברנו — מצורף {חומר}. לכל שאלה אני כאן.' },
-    { id: 't3', name: 'תזכורת לפגישה', ch: 'wa', text: 'שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!' },
-    { id: 't4', name: 'לפני העונה', ch: 'any', text: 'שלום {שם}, העונה מתקרבת — זה הזמן להזמין. נשמח לשמוע ממך.' },
+    { id: 't1', name: 'תודה על הביקור', mat: '', text: 'שלום {שם}, תודה שעברת בדוכן של {עסק} בתערוכה. נשמח לעמוד לשירותך.' },
+    { id: 't2', name: 'כמו שדיברנו', mat: '', text: 'שלום {שם}, כמו שדיברנו — לכל שאלה אני כאן.' },
+    { id: 't3', name: 'תזכורת לפגישה', mat: '', text: 'שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!' },
+    { id: 't4', name: 'לפני העונה', mat: '', text: 'שלום {שם}, העונה מתקרבת — זה הזמן להזמין. נשמח לשמוע ממך.' },
   ];
   // Rules that send something to the visitor start switched off: the owner turns them on knowingly.
   const DEF_RULES = [
-    { id: 'r1', on: false, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'send', mat: '' }, fired: 0 },
+    { id: 'r1', on: false, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'message', tpl: '' }, fired: 0 },
     { id: 'r2', on: true, trigger: 'captured', arg: null, cond: { warm: 0 }, action: { kind: 'step', type: 'meet', days: 1 }, fired: 0 },
     { id: 'r3', on: true, trigger: 'idle', arg: 7, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0 },
     { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't1' }, fired: 0 },
@@ -1607,6 +1637,26 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (b.afterSale === undefined) b.afterSale = 7;   // days after a deal to ask how it went; 0 = never
     S.leads.forEach((l) => (l.manual || []).forEach((s) => { if (!STEPS[s.type]) s.type = 'call'; }));   // the regular-customer step is gone
     if (!b.views) b.views = [];
+    if (!b.pkgV) {   // 08/10: a message and its material travel together, as one named package
+      b.pkgV = 1;
+      const wrap = b.template || 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}.';
+      b.templates.forEach((t) => { delete t.ch; if (t.mat === undefined) t.mat = ''; });
+      const byMat = {};
+      (b.materials || []).forEach((m) => {
+        let p = b.templates.find((t) => t.mat === m.name);
+        if (!p) { p = { id: 'p' + (b.bseq++), name: m.name, mat: m.name, text: wrap }; b.templates.unshift(p); }
+        byMat[m.name] = p.id;
+      });
+      // An old template that says "attached" gets the first file, so it never promises a file it does not carry.
+      b.templates.forEach((t) => { if (!t.mat && /{חומר}/.test(t.text) && b.materials.length) t.mat = b.materials[0].name; });
+      const fix = (s) => { if (s && 'mat' in s) { if (s.mat && byMat[s.mat]) s.pkg = byMat[s.mat]; delete s.mat; } };
+      b.buttons.forEach((x) => (x.steps || []).forEach(fix));
+      (b.defSteps || []).forEach(fix);
+      S.leads.forEach((l) => { (l.manual || []).forEach(fix); (l.queue || []).forEach((q) => { if (q.mat) q.pkg = byMat[q.mat]; delete q.mat; }); });
+      b.rules.forEach((r) => { if (r.action.kind === 'send') { r.action.kind = 'message'; r.action.tpl = byMat[r.action.mat] || ''; } delete r.action.mat; });
+      if (!b.chDefault) b.chDefault = {};
+      delete b.template; delete b.sendWhen;
+    }
     if (!b.rulesV2) {   // after the reviews: sending rules off unless the owner turns them on, and one ready view
       b.rulesV2 = true;
       b.rules.forEach((r) => { if ((r.action.kind === 'send' || r.action.kind === 'message') && !r.fired) r.on = false; });
@@ -1678,7 +1728,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ---- automations ----
   const TRIGGERS = { captured: 'ליד נקלט בדוכן', noanswer: 'לא ענה', idle: 'עוברים ימים בלי מגע', stage: 'ליד עובר לשלב', won: 'נסגרה עסקה' };
-  const ACTIONS = { step: 'להוסיף צעד', send: 'לשלוח חומר', message: 'לשלוח הודעה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להוסיף להודעת הבוקר' };
+  const ACTIONS = { step: 'להוסיף צעד', message: 'לשלוח חבילה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להוסיף להודעת הבוקר' };
   const sendsOut = (r) => r.action.kind === 'send' || r.action.kind === 'message';
   const tplById = (id) => S.biz.templates.find((t) => t.id === id);
   function ruleText(r) {
@@ -1687,7 +1737,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const c = r.cond || {};
     const conds = [c.warm != null ? words()[c.warm] : '', c.btn && btnById(c.btn) ? 'סימן "' + btnById(c.btn).label + '"' : '', c.biz === true ? 'עסק' : c.biz === false ? 'פרטי' : '', c.minValue ? 'שווה ' + nis(c.minValue) + '+' : ''].filter(Boolean);
     const days = (n) => (n <= 0 ? 'היום' : n === 1 ? 'תוך יום' : `תוך ${n} ימים`);
-    const then = a.kind === 'step' ? `${STEPS[a.type].name} ${days(a.days || 1)}` : a.kind === 'send' ? 'לשלוח ' + (a.mat || 'את החומר') : a.kind === 'message' ? 'לשלוח "' + ((tplById(a.tpl) || {}).name || 'הודעה') + '"' : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להוסיף להודעת הבוקר';
+    const then = a.kind === 'step' ? `${STEPS[a.type].name} ${days(a.days || 1)}` : a.kind === 'message' ? (tplById(a.tpl) ? 'לשלוח "' + tplById(a.tpl).name + '"' : 'לשלוח את ברירת המחדל של הערוץ') : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להוסיף להודעת הבוקר';
     return { when: 'כש' + when + (conds.length ? ' · רק אם: ' + conds.join(', ') : ''), then };
   }
   function condOk(r, l) {
@@ -1716,8 +1766,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     byRule = true;
     if (!sendsOut(r)) log(l, '⚙️ אוטומציה: ' + ruleText(r).then);
     if (a.kind === 'step') { const s = normStep({ type: a.type, days: a.days || 1 }); addManual(l, s, dueFor(s)); }
-    else if (a.kind === 'send') { const name = a.mat || (S.biz.materials[0] || {}).name; if (name && !l.optOut) doSend(l, name); else if (!name) l.pendingMat = true; }
-    else if (a.kind === 'message') { if (!l.optOut) sendTemplate(l, a.tpl, true); }
+    else if (a.kind === 'message') sendPackage(l, a.tpl, { quiet: true });
     else if (a.kind === 'stage') setStage(l, a.stage, 'אוטומציה');
     else if (a.kind === 'warm') { l.warmth = a.value || 0; l.warmBy = 'hand'; }
     else if (a.kind === 'notify') S.biz.digestNotes.push({ at: now(), text: People.rowName(l) + ' — ' + ruleText(r).when.replace(/^כש/, '') });
@@ -1739,21 +1788,10 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ---- messages ----
   const CH_NAMES = { any: 'הערוץ הזמין הראשון', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
-  const CH_KEYS = { any: null, email: ['email'], sms: ['sms'], wa: ['wa', 'waApi'] };
-  /** The one channel this template goes out on — or '' when none is connected. */
-  const channelFor = (t) => bestChannel(CH_KEYS[t.ch] || null);
   const OPT_OUT = 'להסרה מרשימת התפוצה השיבו "הסר".';
   /** A template filled in for one lead. Messages to a group carry the opt-out line the law asks for. */
-  const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, (S.biz.materials[0] || {}).name || 'החומר') + (toGroup ? '\n' + OPT_OUT : '');
-  function sendTemplate(l, tid, quiet, toGroup) {
-    const t = tplById(tid);
-    if (!t || l.optOut) return false;
-    const ch = channelFor(t);
-    if (!ch) { if (!quiet) toast('אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".'); return false; }
-    log(l, `${byRule ? '⚙️ ' : ''}💬 "${t.name}" נשלח ב${ch}${byRule ? ' (אוטומטי)' : toGroup ? ' (לקבוצה)' : ''}`);
-    if (!quiet) toast(`💬 "${t.name}" נשלח ל${People.rowName(l)} · ${ch}`);
-    return true;
-  }
+  const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, t.mat || 'החומר') + (toGroup ? '\n' + OPT_OUT : '');
+  const sendTemplate = (l, tid, quiet, toGroup) => sendPackage(l, tid, { quiet, toGroup });
 
   // ---- Excel ----
   let downloads = null;
@@ -1813,7 +1851,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   const CRM_NAME = 'המעקב שלי';
   const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
   // Each view's ⚙️ goes straight to the settings of what it shows.
-  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'החומרים והנוסח'] };
+  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'ההודעות והחומרים'] };
   function viewCRM(m) {
     runIdle();
     const L = leadsNow();
@@ -2225,14 +2263,14 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const t = tplById(tid);
     if (!t) return;
     const { keep, out } = sendAudience(list, tid, withClosed);
-    const ch = channelFor(t);
+    const ch = sendChannels().join(' + ');
     const reasons = {};
     out.forEach((x) => { reasons[x.why] = (reasons[x.why] || 0) + 1; });
     sheet(`<h2>לשלוח "${esc(t.name)}" ל-${keep.length}${ch ? ' ב' + esc(ch) : ''}?</h2>
       ${keep.length ? `<div class="bubble">${esc(fillFor(t, keep[0], true)).replace(/\n/g, '<br>')}</div><p class="faint">כך זה ייראה אצל ${esc(People.rowName(keep[0]))}. כל אחד מקבל את השם שלו.</p>` : ''}
       <p>${keep.length ? 'יקבלו: ' + esc(keep.slice(0, 8).map((l) => People.rowName(l)).join(', ')) + (keep.length > 8 ? ` ועוד ${keep.length - 8}` : '') : 'אף אחד לא יקבל.'}</p>
       ${out.length ? `<p class="muted">הוצאו ${out.length}: ${esc(Object.entries(reasons).map(([w, n]) => n + ' — ' + w).join(' · '))}</p>` : ''}
-      <label class="check-line"><input type="checkbox" data-scclosed ${SC.withClosed ? 'checked' : ''}> לשלוח גם למי שעסקה איתו נסגרה, ולמי שסומן לא רלוונטי</label>
+      <label class="check-line"><input type="checkbox" data-scclosed ${SC.withClosed ? 'checked' : ''}> לשלוח גם למי שעסקה איתו נסגרה</label>
       ${!ch ? '<p class="warn-box">אין ערוץ פעיל להודעה הזו. מפעילים ב"חיבורים".</p>' : ''}
       <div class="actions"><button class="btn primary" data-act="send-confirm" ${keep.length && ch ? '' : 'disabled'}>לשלוח ל-${keep.length}</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
   }
@@ -2338,8 +2376,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       : r.trigger === 'idle' ? sel('arg', [[3, '3 ימים'], [5, '5 ימים'], [7, 'שבוע'], [14, 'שבועיים'], [30, 'חודש']], r.arg, 'כמה ימים')
       : r.trigger === 'stage' ? sel('arg', S.biz.stages.map((s) => [s.id, s.name]), r.arg, 'לאיזה שלב') : '';
     const act = a.kind === 'step' ? `${sel('a.type', Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].name]), a.type, 'איזה צעד')} ${sel('a.days', [[0, 'היום'], [1, 'תוך יום'], [2, 'תוך יומיים'], [3, 'תוך 3 ימים'], [7, 'תוך שבוע']], a.days || 1, 'מתי')}`
-      : a.kind === 'send' ? sel('a.mat', [['', 'את החומר הראשון']].concat(S.biz.materials.map((x) => [x.name, x.name])), a.mat || '', 'איזה חומר')
-      : a.kind === 'message' ? sel('a.tpl', S.biz.templates.map((t) => [t.id, t.name]), a.tpl, 'איזו הודעה')
+      : a.kind === 'message' ? sel('a.tpl', [['', 'ברירת המחדל של הערוץ']].concat(S.biz.templates.map((t) => [t.id, t.name])), a.tpl || '', 'איזו חבילה')
       : a.kind === 'stage' ? sel('a.stage', S.biz.stages.map((s) => [s.id, s.name]), a.stage || 'contact', 'לאיזה שלב')
       : a.kind === 'warm' ? sel('a.value', words().map((w, k) => [k, w]), a.value || 0, 'איזה חום') : '';
     const c = r.cond || {};
@@ -2368,10 +2405,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (k === 'c.btn') r.cond.btn = v || null;
     if (k === 'c.biz') r.cond.biz = v === '' ? null : v === '1';
     if (k === 'c.minValue') r.cond.minValue = num(v);
-    if (k === 'a.kind') { r.action = { kind: v, type: 'call', days: 1, mat: '', tpl: (S.biz.templates[0] || {}).id, stage: 'contact', value: 0 }; return renderRule(); }
+    if (k === 'a.kind') { r.action = { kind: v, type: 'call', days: 1, tpl: (S.biz.templates[0] || {}).id, stage: 'contact', value: 0 }; return renderRule(); }
     if (k === 'a.type') r.action.type = v;
     if (k === 'a.days') r.action.days = +v;
-    if (k === 'a.mat') r.action.mat = v;
     if (k === 'a.tpl') { r.action.tpl = v; return renderRule(); }
     if (k === 'a.stage') r.action.stage = v;
     if (k === 'a.value') r.action.value = +v;
@@ -2383,7 +2419,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   const grpList = () => leadsNow().filter((l) => (!grp.stage || l.stage === grp.stage) && (grp.warm === '' || effWarm(l) === +grp.warm) && (!grp.btn || l.tags.includes(grp.btn)) && (!grp.answer || FILTERS.answer.ok(l, grp.answer)));
   function crmMessages(box, L) {
     const sent = [];
-    L.forEach((l) => l.log.forEach((e) => { if (/^(⚙️ )?💬/.test(e.t)) sent.push({ l, e, auto: isAuto(e.t) }); }));
+    L.forEach((l) => l.log.forEach((e) => { if (/^(⚙️ )?(💬|📎)/.test(e.t)) sent.push({ l, e, auto: isAuto(e.t) }); }));
     sent.sort((a, b) => b.e.at - a.e.at);
     const shown = sent.filter((x) => msgFilter === 'all' || (msgFilter === 'auto') === x.auto);
     if (!grp.tpl && S.biz.templates[0]) grp.tpl = S.biz.templates[0].id;
@@ -2392,17 +2428,16 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const sel = (k, opts, label) => `<select class="text-input" data-grp="${k}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${String(grp[k]) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
     const sample = leadsNow()[0];
     box.innerHTML = `<div class="two-col">
-      <section class="card"><h2>תבניות</h2>
-        <div class="prod-list">${S.biz.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">💬 ${esc(t.name)} <span class="faint">· ${esc(CH_NAMES[t.ch])}</span></span><span class="pnext">${esc((sample ? fillFor(t, sample) : t.text).slice(0, 90))}</span></button>`).join('')}</div>
-        <div class="actions"><button class="btn" data-act="tpl-add">+ תבנית חדשה</button></div></section>
+      <section class="card"><h2>החבילות</h2><p class="muted">${S.biz.templates.length} חבילות: ${esc(S.biz.templates.map((t) => t.name).join(' · '))}</p>
+        <div class="actions"><button class="btn" data-act="view-settings">⚙️ לנהל בהגדרות</button></div></section>
       <section class="card"><h2>שליחה לקבוצה</h2>
         <div class="rule-conds">
           <label><span class="faint">שלב</span>${sel('stage', [['', 'כל השלבים']].concat(S.biz.stages.map((s) => [s.id, s.name])), 'שלב')}</label>
           <label><span class="faint">חום</span>${sel('warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), 'חום')}</label>
           <label><span class="faint">מענה</span>${sel('answer', [['', 'כולם']].concat(FILTERS.answer.opts()), 'מענה')}</label>
           <label><span class="faint">כפתור</span>${sel('btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), 'כפתור')}</label></div>
-        <label class="label">מה</label>${sel('tpl', S.biz.templates.map((t) => [t.id, t.name]), 'תבנית')}
-        <p class="faint" style="margin-top:8px">יישלח ל-<b>${keep.length}</b>${aud.length - keep.length ? ` (${aud.length - keep.length} הוצאו — סגורים, לא רלוונטיים, ביקשו הסרה, או קיבלו אותה החודש)` : ''}: ${esc(keep.slice(0, 5).map((l) => People.rowName(l)).join(', '))}${keep.length > 5 ? ' ועוד ' + (keep.length - 5) : ''}</p>
+        <label class="label">איזו חבילה</label>${sel('tpl', S.biz.templates.map((t) => [t.id, (t.mat ? '📎 ' : '💬 ') + t.name]), 'חבילה')}
+        <p class="faint" style="margin-top:8px">יישלח ל-<b>${keep.length}</b>${aud.length - keep.length ? ` (${aud.length - keep.length} הוצאו — עסקה נסגרה, ביקשו הסרה, או קיבלו אותה החודש)` : ''}: ${esc(keep.slice(0, 5).map((l) => People.rowName(l)).join(', '))}${keep.length > 5 ? ' ועוד ' + (keep.length - 5) : ''}</p>
         <div class="actions"><button class="btn primary" data-act="grp-send" ${keep.length ? '' : 'disabled'}>לראות ולשלוח…</button></div></section>
     </div>
     <section class="card" style="margin-top:14px"><h2>נשלחו לאחרונה</h2>
@@ -2410,13 +2445,15 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       ${shown.length ? `<ul class="log">${shown.slice(0, 15).map(({ l, e }) => `<li><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span><button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button> · ${esc(e.t.replace(/^(⚙️ )?💬\s*/, isAuto(e.t) ? '⚙️ ' : ''))}</li>`).join('')}</ul>` : '<div class="empty">עוד לא נשלחו הודעות.</div>'}</section>`;
   }
   function sheetTemplate(id) {
-    const t = id ? tplById(id) : { id: '', name: '', ch: 'any', text: 'שלום {שם}, ' };
-    sheet(`<h2>${id ? 'עריכת תבנית' : 'תבנית חדשה'}</h2>
-      <label class="label" for="tp-name">שם</label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
-      <div class="label">ערוץ</div><div class="chips">${Object.entries(CH_NAMES).map(([k, n]) => `<button class="chip" data-tpch="${k}" aria-pressed="${t.ch === k}">${esc(n)}</button>`).join('')}</div>
-      <label class="label" for="tp-text">נוסח</label>
+    const t = id ? tplById(id) : { id: '', name: '', mat: '', text: 'שלום {שם}, ' };
+    sheet(`<h2>${id ? 'עריכת חבילה' : 'חבילה חדשה'}</h2>
+      <label class="label" for="tp-name">שם <small>כך היא תופיע בדוכן</small></label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
+      <div class="label">קובץ מצורף</div><div class="chips"><button class="chip" data-tpmat="" aria-pressed="${!t.mat}">בלי קובץ</button>${S.biz.materials.map((x) => `<button class="chip" data-tpmat="${esc(x.name)}" aria-pressed="${t.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}</div>
+      ${S.biz.materials.length ? '' : '<p class="faint" style="margin-top:6px">עוד אין קבצים. מוסיפים ב"הודעות וחומרים", או בדוכן.</p>'}
+      <label class="label" for="tp-text">ההודעה</label>
       <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ העסק שלך'], ['{חומר}', '+ חומר']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
       <textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
+      <p class="faint">{חומר} = שם הקובץ המצורף. בלי קובץ מצורף — עדיף לא לכתוב "מצורף".</p>
       <p class="faint">בשליחה לקבוצה נוספת לבד השורה: "${esc(OPT_OUT)}"</p>
       <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
         ${id ? `<button class="btn ghost danger far" data-act="tpl-del" data-id="${esc(id)}">למחוק</button>` : ''}</div>`);
@@ -2785,6 +2822,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.pv) { PV[d.pv] = t.value; return render(); }
     if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
+    if (d.chdef) { S.biz.chDefault = Object.assign({}, S.biz.chDefault, { [d.chdef]: t.value }); save(); return toast('נשמר'); }
     if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); render(); } return; }
     if (d.ie) {   // a cell edited in the table — every change can be taken back
       const l = leadById(+d.lid);
@@ -2887,7 +2925,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.pvshow) { S.tb.f = { [d.pvshow]: d.v }; S.crmTab = 'table'; tbPage = 0; save(); render(); return window.scrollTo(0, 0); }
     if (d.ruleedit) return sheetRule(d.ruleedit);
     if (d.tpledit) return sheetTemplate(d.tpledit);
-    if (d.tpch) { document.querySelectorAll('[data-tpch]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
+    if (d.tpmat !== undefined) { document.querySelectorAll('[data-tpmat]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
     if (d.sendtpl) { if (L && sendTemplate(L, d.sendtpl)) { save(); render(); sheetCRM(L); } return; }
     if (d.stmove) {
       const [i, dir] = d.stmove.split(':').map(Number);
@@ -2939,7 +2977,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     }
     if (d.esdays !== undefined) { ES.days = +d.esdays; return renderStepExtra(); }
     if (d.esbefore !== undefined) { ES.before = +d.esbefore; return renderStepExtra(); }
-    if (d.esmat !== undefined) { ES.mat = d.esmat; return renderStepExtra(); }
+    if (d.espkg !== undefined) { ES.pkg = d.espkg; return renderStepExtra(); }
     if (d.esweight !== undefined) { D.weight = +d.esweight; document.querySelectorAll('[data-esweight]').forEach((x) => x.setAttribute('aria-pressed', +x.dataset.esweight === D.weight)); return; }
     if (d.toggle) {
       const k = d.toggle;
@@ -2998,7 +3036,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       save(); refreshLead(l);
       return;
     }
-    if (d.sendmat) { if (L) { doSend(L, d.sendmat); save(); sheetMaterials(L); refreshLead(L); } return; }
+    if (d.sendmat) { if (L) { sendPackage(L, d.sendmat); save(); sheetMaterials(L); refreshLead(L); } return; }
     if (d.openlead) { const l = leadById(+d.openlead); if (l) sheet(leadBody(l, true), l.id); return; }
     if (d.crmlead) { const l = leadById(+d.crmlead); if (l) sheetCRM(l); return; }
     if (d.outcome) { if (L) outcome(L, d.outcome); return; }
@@ -3026,9 +3064,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.tasksend) {
       if (!L) return;
       const t = tasks(L).find((x) => x.key === d.tasksend);
-      const name = t && t.mat ? t.mat : S.biz.materials.length === 1 ? S.biz.materials[0].name : '';
-      if (!name) return sheetMaterials(L);
-      doSend(L, name); L.done.push(d.tasksend); save(); return afterTask(L);
+      if (!(t && pkgById(t.pkg)) && !keysHaveDefault()) return sheetMaterials(L);
+      if (!sendPackage(L, t ? t.pkg : '')) return sheetMaterials(L);
+      L.done.push(d.tasksend); save(); return afterTask(L);
     }
     if (d.taskedit) {
       if (!L) return;
@@ -3106,7 +3144,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         if (!l) return;
         if (c.key && !c.key.startsWith('m')) l.done.push(c.key);             // a step from a button: replaced by the lead's own
         if (c.key && c.key.startsWith('m')) l.manual = l.manual.filter((x) => x.key !== c.key);
-        if (immediate(s)) { const name = s.mat || (S.biz.materials.length === 1 ? S.biz.materials[0].name : ''); if (name) doSend(l, name); else { save(); return sheetMaterials(l); } }
+        if (immediate(s)) { if (!sendPackage(l, s.pkg)) { save(); return sheetMaterials(l); } }
         else if (s.type === 'none') l.audience = true;
         else addManual(l, s, s.type === 'season' ? dueFor(s) : H.addDays(new Date(now()), Math.max(1, s.days || 0)).getTime());
         log(l, 'הלאה: ' + s.label);
@@ -3162,8 +3200,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'del-mat': {
         const x = S.biz.materials[+d.i];
         if (!x) return;
-        const using = S.biz.buttons.filter((y) => stepsOf(y).some((s) => s.mat === x.name)).length;
-        undoable(`${x.name} הוסר${using ? ` — שימו לב: ${using} כפתורים שלחו אותו, ועכשיו ישאלו מה לשלוח` : ''}`, () => { S.biz.materials.splice(+d.i, 1); });
+        const using = S.biz.templates.filter((t) => t.mat === x.name).length;
+        undoable(`${x.name} הוסר${using ? ` — ${using} חבילות שצירפו אותו יישלחו מעכשיו בלי קובץ` : ''}`, () => { S.biz.materials.splice(+d.i, 1); S.biz.templates.forEach((t) => { if (t.mat === x.name) t.mat = ''; }); });
         return render();
       }
       case 'close-lead':
@@ -3220,15 +3258,16 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'rule-del': { const id = RD.id; RD = null; closeSheet(false); undoable('הכלל נמחק', () => { S.biz.rules = S.biz.rules.filter((x) => x.id !== id); }); return render(); }
       case 'tpl-add': return sheetTemplate(null);
       case 'tpl-save': {
-        const name = ($('#tp-name') && $('#tp-name').value.trim()) || 'תבנית';
+        const name = ($('#tp-name') && $('#tp-name').value.trim()) || 'חבילה';
         const text = ($('#tp-text') && $('#tp-text').value.trim()) || '';
-        const ch = (document.querySelector('[data-tpch][aria-pressed="true"]') || {}).dataset;
+        const pm = document.querySelector('[data-tpmat][aria-pressed="true"]');
+        const mat = pm ? pm.dataset.tpmat : '';
         const t = d.id ? S.biz.templates.find((x) => x.id === d.id) : null;
-        if (t) Object.assign(t, { name, text, ch: ch ? ch.tpch : t.ch });
-        else S.biz.templates.push({ id: 't' + Date.now(), name, text, ch: ch ? ch.tpch : 'any' });
+        if (t) Object.assign(t, { name, text, mat });
+        else S.biz.templates.push({ id: 't' + Date.now(), name, text, mat });
         save(); closeSheet(false); return render();
       }
-      case 'tpl-del': { const id = d.id; closeSheet(false); undoable('התבנית נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
+      case 'tpl-del': { const id = d.id; closeSheet(false); undoable('החבילה נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
       case 'grp-send': return sheetSendConfirm(grpList(), grp.tpl);
       case 'send-confirm': return sendConfirmed();
       case 'go-today': S.crmTab = 'tasks'; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
@@ -3293,26 +3332,26 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         S.phase = 'live'; S.view = 'booth'; openId = null; stopIdle(); closeSheet(false); save(); render();
         return toast('יום התערוכה. בהצלחה!');
       case 'send-all': {
-        const name = d.mat;
+        const p = pkgById(d.mat);
         const waiting = leadsNow().filter((l) => l.pendingMat);
-        waiting.forEach((l) => doSend(l, name));
+        const n = waiting.filter((l) => sendPackage(l, d.mat, { quiet: true })).length;
         save(); closeSheet(false); render();
-        return toast(`📎 ${name} נשלח ל-${waiting.length}`);
+        return toast(`📎 "${p ? p.name : 'ברירת המחדל'}" נשלח ל-${n}`);
       }
       case 'send': {
         const l = L || leadById(openId);
         if (!l) return;
-        if (!S.biz.materials.length && worker()) { l.pendingMat = true; save(); refreshLead(l); return toast('סומן "ממתין לחומר".'); }
-        if (S.biz.materials.length === 1 && !l.sent.length) { doSend(l, S.biz.materials[0].name); save(); return refreshLead(l); }
+        if (!S.biz.templates.length && worker()) { l.pendingMat = true; save(); refreshLead(l); return toast('סומן "ממתין לחומר".'); }
+        if (S.biz.templates.length === 1 && !l.sent.length) { sendPackage(l, S.biz.templates[0].id); save(); return refreshLead(l); }
         return sheetMaterials(l);
       }
       case 'mat-later': { if (L) { L.pendingMat = true; save(); closeSheet(); refreshLead(L); } return toast('סומן "ממתין לחומר". יופיע בדשבורד.'); }
       case 'mat-evening': {
-        if (!S.biz.materials.length) return sheetMaterials(null);
+        if (!S.biz.templates.length) return sheetMaterials(null);
         const waiting = leadsNow().filter((l) => l.pendingMat);
         return sheet(`<h2>לשלוח ל-${waiting.length} שמחכים לחומר</h2>
           <div class="label">מה לשלוח</div>
-          <div class="opts">${S.biz.materials.map((x) => `<button class="opt" data-act="send-all" data-mat="${esc(x.name)}">📎 ${esc(x.name)} — לשלוח ל-${waiting.length}<small>${esc(fillTpl('…', x.name))}</small></button>`).join('')}</div>
+          <div class="opts">${S.biz.templates.map((x) => `<button class="opt" data-act="send-all" data-mat="${esc(x.id)}">${x.mat ? '📎' : '💬'} ${esc(x.name)} — לשלוח ל-${waiting.length}<small>${esc(x.text.slice(0, 70))}</small></button>`).join('')}</div>
           <p class="faint" style="margin-top:8px">יוצא ב${esc(channelsOn().join(' + ') || '— אין ערוץ פעיל')}. מקבלים: ${esc(waiting.map((l) => People.rowName(l)).join(', '))}</p>
           <div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
       }
