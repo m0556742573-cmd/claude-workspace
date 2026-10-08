@@ -1322,12 +1322,17 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.materials.length ? '' : ', ועוד אין חומר'}.` });
     return out;
   }
-  /** "מחר בבוקר" when the next tasks are tomorrow; after a Thursday they are on Sunday, and the title says so. */
-  function nextDayTitle(L) {
-    const l = openTasks(L)[0];
-    const t = l && plan(l);
-    if (!t || !t.due || dayNo(t.due.getTime()) - dayNo(now()) <= 1) return 'מחר בבוקר';
-    return 'הבא בתור: ' + H.label(t.due);
+  /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
+  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'שליחות חומר', date: 'בדיקות תאריך', register: 'פרטי הרשמה', regular: 'הצעות אספקה קבועה' };
+  function nextDayLine(L) {
+    const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
+    if (!all.length) return 'אין משימות.';
+    const first = Math.min(...all.map((t) => dayNo(t.due.getTime())));
+    const day = all.filter((t) => dayNo(t.due.getTime()) === first);
+    const n = {};
+    day.forEach((t) => { n[t.type] = (n[t.type] || 0) + 1; });
+    const when = first - dayNo(now()) === 1 ? 'מחר' : first <= dayNo(now()) ? 'היום' : 'ב' + H.label(day[0].due);
+    return `<b>${esc(when)}:</b> ${PRI.filter((k) => n[k]).map((k) => n[k] + ' ' + (PLURAL[k] || STEPS[k].name)).join(' · ')}`;
   }
   function viewDash(m) {
     const L = leadsNow();
@@ -1342,9 +1347,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
       <div class="ask" style="margin-top:10px">${asks.map(dashCard).join('') || '<div class="empty">הכל מסומן.</div>'}</div>
       ${insightsBox('dash', 'מה רואים בתיוג של היום')}
-      <h2 style="margin-top:26px">${nextDayTitle(L)}</h2>
-      ${crmRows(openTasks(L).slice(0, 5)) || '<div class="empty">אין משימות.</div>'}
-      <div class="actions"><button class="btn" data-view="crm">לרשימה המלאה במעקב ←</button></div>`;
+      <h2 style="margin-top:26px">מה מחכה</h2>
+      <div class="ask-card" style="margin-top:10px"><div class="q">${nextDayLine(L)}</div>
+        <div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div></div>`;
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
