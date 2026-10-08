@@ -1320,9 +1320,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (rows.length) out.push({ fill: true, q: left ? `${left} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ הכל מסומן.', leads: rows });
     const waiting = L.filter((l) => l.pendingMat);
     if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.materials.length ? '' : ', ועוד אין חומר'}.` });
-    const groups = {};
-    L.forEach((l) => { if (l.roleOf) (groups[l.roleOf] = groups[l.roleOf] || []).push(l); });
-    Object.keys(groups).filter((g) => groups[g].length >= 2).forEach((g) => out.push({ info: true, q: `${groups[g].length} אנשים מ${g}. כדאי לדבר איתם כאחד.`, leads: groups[g] }));
     return out;
   }
   /** "מחר בבוקר" when the next tasks are tomorrow; after a Thursday they are on Sunday, and the title says so. */
@@ -1355,7 +1352,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     let body = '';
     if (a.fill) body = fillOpen ? fillList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open">להשלים</button></div>';
     else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.materials.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
-    else if (a.info) body = `<div class="faint" style="margin-top:6px">${a.leads.map((l) => `<button class="link" data-openlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}</div>`;
     return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
   }
   function fillList(leads) {
@@ -1387,6 +1383,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       if (held.length) { const p = plan(held[0]); out.push({ text: `${held.length} שמורים ל${p.season || 'עונה'}. יחזרו אליך ב${H.label(p.due)}.`, leadIds: held.map((l) => l.id), action: null }); }
       const twice = L.filter((l) => l.noAnswer >= 2 && !l.sent.length && tasks(l).length);
       if (twice.length) out.push({ text: `${twice.length} לא ענו פעמיים. לשלוח להם חומר במקום עוד שיחה?`, leadIds: twice.map((l) => l.id), action: { kind: 'step', type: 'send' } });
+      const groups = {};   // one institution, several people: one approach for all of them
+      L.forEach((l) => { if (l.roleOf && tasks(l).length) (groups[l.roleOf] = groups[l.roleOf] || []).push(l); });
+      Object.keys(groups).filter((g) => groups[g].length >= 2).forEach((g) => out.push({ text: `${groups[g].length} אנשים מ${g}. כדאי לדבר איתם כאחד.`, leadIds: groups[g].map((l) => l.id), action: null }));
     }
     return out;
   }
