@@ -941,10 +941,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       : `<div class="label">מתי</div><div class="chips">${[0, 1, 2, 3, 5, 7, 14, 30].map((d) =>
         `<button class="chip" data-esdays="${d}" aria-pressed="${ES.days === d}">${d === 0 ? 'מיד' : d === 1 ? 'תוך יום' : d + ' ימים'}</button>`).join('')}</div>
         ${ES.type === 'send' && ES.days === 0 ? '<p class="faint" style="margin-top:6px">יישלח ברגע שנוגעים בכפתור בדוכן. בכרטיס לא יופיע כפתור "שלח חומר".</p>' : ''}`;
-    const mat = ES.type !== 'send' ? '' : `<div class="label">איזו חבילה לשלוח</div>
+    const mat = ES.type !== 'send' ? '' : `<div class="label">איזו הודעה לשלוח</div>
       <div class="chips">${pkgs.map((x) => `<button class="chip" data-espkg="${esc(x.id)}" aria-pressed="${ES.pkg === x.id}">${x.mat ? '📎' : '💬'} ${esc(x.name)}</button>`).join('')}
         <button class="chip" data-espkg="" aria-pressed="${!ES.pkg}">ברירת המחדל של הערוץ</button></div>
-      <div class="label">חבילה חדשה <small>שם, ואפשר לצרף קובץ</small></div>
+      <div class="label">הודעה חדשה <small>שם, ואפשר לצרף קובץ</small></div>
       <div class="add-row"><input id="es-pk-name" class="text-input" value="${esc(ES.newName || '')}" placeholder="למשל: קטלוג מטבחים" autocomplete="off">
         <label class="btn" for="es-mat-file">📎 ${ES.newFile ? esc(ES.newFile.name) : 'לצרף קובץ'}</label><button class="btn" data-act="es-pk-add">הוספה</button></div>
       <input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
@@ -1022,15 +1022,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const groups = [['wa', 'וואטסאפ', b.channels.wa || b.channels.waApi], ['email', 'מייל', b.channels.email], ['sms', 'SMS', b.channels.sms]].filter((g) => g[2]);
     const pkgOpts = (sel) => `<option value="" ${!sel ? 'selected' : ''}>—</option>` + b.templates.map((t) => `<option value="${esc(t.id)}" ${sel === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     m.innerHTML = `<h1>הודעות וחומרים</h1>
-      <p class="muted">כל מה שיוצא למבקר הוא <b>חבילה</b>: הודעה, ואפשר לצרף לה קובץ. בדוכן, בכפתור, במשימה ובשליחה לקבוצה — בוחרים חבילה לפי השם.</p>
+      <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בדוכן, בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם.</p>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>החבילות</h2>
-          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין חבילות.</div>'}</div>
-          <div class="actions"><button class="btn" data-act="tpl-add">+ חבילה חדשה</button></div></section>
-        <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו חבילה</h2>
+        <section class="card"><h2>ההודעות</h2>
+          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
+          <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button></div></section>
+        <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו הודעה</h2>
           ${groups.length ? groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')
             : '<p class="faint">אין ערוץ מחובר. מחברים ב"חיבורים".</p>'}</section>
-        <section class="card"><h2>הקבצים</h2><p class="muted">קבצים שאפשר לצרף לחבילות. קובץ לבדו לא נשלח — הוא יוצא רק בתוך חבילה.</p>
+        <section class="card"><h2>הקבצים</h2><p class="muted">קבצים שאפשר לצרף להודעות. קובץ לבדו לא נשלח — הוא יוצא רק עם הודעה.</p>
           <div class="prod-list">${b.materials.map((x, i) => `<div class="prod-row"><span class="pn">📎 ${esc(x.name)}</span><span class="pnext">${esc(x.file)} <button class="btn ghost danger" data-act="del-mat" data-i="${i}">הסרה</button></span></div>`).join('') || '<div class="faint">עוד אין קבצים. אפשר גם להוסיף בדוכן, בשליחה הראשונה.</div>'}</div>
           <div class="add-row"><input id="mat-name" class="text-input" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
             <label class="btn" for="mat-file">📷 קובץ</label></div><input id="mat-file" type="file" accept="image/*,application/pdf" hidden></section>
@@ -1264,7 +1264,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const keys = sendKeys();
     if (!keys.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return false; }
     const out = keys.map((k) => [k, pkgFor(id, k)]).filter(([, p]) => p);
-    if (!out.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין חבילה לשליחה. מגדירים ב"הודעות וחומרים".'); return false; }
+    if (!out.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין הודעה לשליחה. מגדירים ב"הודעות וחומרים".'); return false; }
     l.pendingMat = false;
     out.forEach(([k, p]) => {
       if (!l.sent.includes(p.name)) l.sent.push(p.name);
@@ -1280,7 +1280,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     stepsOf(b).filter(immediate).forEach((s) => {
       const has = pkgById(s.pkg) || keysHaveDefault();
       if (has) l.queue = (l.queue || []).filter((q) => q.btn !== b.id).concat({ btn: b.id, pkg: s.pkg || '' });
-      else if (!l.pendingMat) { l.pendingMat = true; log(l, '📎 ממתין לחומר'); toast('📎 עוד אין חבילה לשליחה — סומן "ממתין לחומר"'); }
+      else if (!l.pendingMat) { l.pendingMat = true; log(l, '📎 ממתין לחומר'); toast('📎 עוד אין הודעה לשליחה — סומן "ממתין לחומר"'); }
     });
   }
   const keysHaveDefault = () => sendKeys().some((k) => pkgFor('', k));
@@ -1299,7 +1299,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const withFile = pkgs.filter((x) => x.mat).length;
     sheet(`<h2>מה לשלוח${l ? ' ל' + esc(People.rowName(l)) : ''}?</h2>
       ${pkgs.length ? `<div class="opts">${pkgs.map((x) => `<button class="opt" data-sendmat="${esc(x.id)}" data-lid="${l ? l.id : ''}" aria-pressed="${l ? l.sent.includes(x.name) : false}">${x.mat ? '📎' : '💬'} ${esc(x.name)}<small>${esc(x.mat ? 'עם ' + x.mat : 'הודעה בלבד')}</small></button>`).join('')}</div>` : '<p class="muted">עוד אין מה לשלוח.</p>'}
-      ${worker() ? '' : `<div class="label">${withFile ? 'חבילה חדשה עם קובץ' : 'להוסיף קטלוג עכשיו'}</div>
+      ${worker() ? '' : `<div class="label">${withFile ? 'הודעה חדשה עם קובץ' : 'להוסיף קטלוג עכשיו'}</div>
         <input id="mat-name" class="text-input" value="${withFile ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
         <div class="opts"><label class="opt" for="mat-file">📷 לצלם או לבחור קובץ<small>תמונה או PDF</small></label></div>
         <input id="mat-file" type="file" accept="image/*,application/pdf" hidden>`}
@@ -1732,7 +1732,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ---- automations ----
   const TRIGGERS = { captured: 'ליד נקלט בדוכן', noanswer: 'לא ענה', idle: 'עוברים ימים בלי מגע', stage: 'ליד עובר לשלב', won: 'נסגרה עסקה' };
-  const ACTIONS = { step: 'להוסיף צעד', message: 'לשלוח חבילה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להוסיף להודעת הבוקר' };
+  const ACTIONS = { step: 'להוסיף צעד', message: 'לשלוח הודעה', stage: 'להעביר לשלב', warm: 'לסמן חום', notify: 'להוסיף להודעת הבוקר' };
   const sendsOut = (r) => r.action.kind === 'send' || r.action.kind === 'message';
   const tplById = (id) => S.biz.templates.find((t) => t.id === id);
   function ruleText(r) {
@@ -2380,7 +2380,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       : r.trigger === 'idle' ? sel('arg', [[3, '3 ימים'], [5, '5 ימים'], [7, 'שבוע'], [14, 'שבועיים'], [30, 'חודש']], r.arg, 'כמה ימים')
       : r.trigger === 'stage' ? sel('arg', S.biz.stages.map((s) => [s.id, s.name]), r.arg, 'לאיזה שלב') : '';
     const act = a.kind === 'step' ? `${sel('a.type', Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].name]), a.type, 'איזה צעד')} ${sel('a.days', [[0, 'היום'], [1, 'תוך יום'], [2, 'תוך יומיים'], [3, 'תוך 3 ימים'], [7, 'תוך שבוע']], a.days || 1, 'מתי')}`
-      : a.kind === 'message' ? sel('a.tpl', [['', 'ברירת המחדל של הערוץ']].concat(S.biz.templates.map((t) => [t.id, t.name])), a.tpl || '', 'איזו חבילה')
+      : a.kind === 'message' ? sel('a.tpl', [['', 'ברירת המחדל של הערוץ']].concat(S.biz.templates.map((t) => [t.id, t.name])), a.tpl || '', 'איזו הודעה')
       : a.kind === 'stage' ? sel('a.stage', S.biz.stages.map((s) => [s.id, s.name]), a.stage || 'contact', 'לאיזה שלב')
       : a.kind === 'warm' ? sel('a.value', words().map((w, k) => [k, w]), a.value || 0, 'איזה חום') : '';
     const c = r.cond || {};
@@ -2432,7 +2432,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const sel = (k, opts, label) => `<select class="text-input" data-grp="${k}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${String(grp[k]) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
     const sample = leadsNow()[0];
     box.innerHTML = `<div class="two-col">
-      <section class="card"><h2>החבילות</h2><p class="muted">${S.biz.templates.length} חבילות: ${esc(S.biz.templates.map((t) => t.name).join(' · '))}</p>
+      <section class="card"><h2>ההודעות</h2><p class="muted">${S.biz.templates.length} הודעות: ${esc(S.biz.templates.map((t) => t.name).join(' · '))}</p>
         <div class="actions"><button class="btn" data-act="view-settings">⚙️ לנהל בהגדרות</button></div></section>
       <section class="card"><h2>שליחה לקבוצה</h2>
         <div class="rule-conds">
@@ -2440,7 +2440,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           <label><span class="faint">חום</span>${sel('warm', [['', 'כל חום']].concat(words().map((w, k) => [k, w])), 'חום')}</label>
           <label><span class="faint">מענה</span>${sel('answer', [['', 'כולם']].concat(FILTERS.answer.opts()), 'מענה')}</label>
           <label><span class="faint">כפתור</span>${sel('btn', [['', 'כל כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), 'כפתור')}</label></div>
-        <label class="label">איזו חבילה</label>${sel('tpl', S.biz.templates.map((t) => [t.id, (t.mat ? '📎 ' : '💬 ') + t.name]), 'חבילה')}
+        <label class="label">איזו הודעה</label>${sel('tpl', S.biz.templates.map((t) => [t.id, (t.mat ? '📎 ' : '💬 ') + t.name]), 'הודעה')}
         <p class="faint" style="margin-top:8px">יישלח ל-<b>${keep.length}</b>${aud.length - keep.length ? ` (${aud.length - keep.length} הוצאו — עסקה נסגרה, ביקשו הסרה, או קיבלו אותה החודש)` : ''}: ${esc(keep.slice(0, 5).map((l) => People.rowName(l)).join(', '))}${keep.length > 5 ? ' ועוד ' + (keep.length - 5) : ''}</p>
         <div class="actions"><button class="btn primary" data-act="grp-send" ${keep.length ? '' : 'disabled'}>לראות ולשלוח…</button></div></section>
     </div>
@@ -2450,7 +2450,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   }
   function sheetTemplate(id) {
     const t = id ? tplById(id) : { id: '', name: '', mat: '', text: 'שלום {שם}, ' };
-    sheet(`<h2>${id ? 'עריכת חבילה' : 'חבילה חדשה'}</h2>
+    sheet(`<h2>${id ? 'עריכת הודעה' : 'הודעה חדשה'}</h2>
       <label class="label" for="tp-name">שם <small>כך היא תופיע בדוכן</small></label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
       <div class="label">קובץ מצורף</div><div class="chips" id="tp-mats"><button class="chip" data-tpmat="" aria-pressed="${!t.mat}">בלי קובץ</button>${S.biz.materials.map((x) => `<button class="chip" data-tpmat="${esc(x.name)}" aria-pressed="${t.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}</div>
       <div class="actions" style="margin-top:6px"><label class="btn" for="tp-file">📎 לצרף קובץ חדש</label></div><input id="tp-file" type="file" accept="image/*,application/pdf" hidden>
@@ -3217,7 +3217,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         const x = S.biz.materials[+d.i];
         if (!x) return;
         const using = S.biz.templates.filter((t) => t.mat === x.name).length;
-        undoable(`${x.name} הוסר${using ? ` — ${using} חבילות שצירפו אותו יישלחו מעכשיו בלי קובץ` : ''}`, () => { S.biz.materials.splice(+d.i, 1); S.biz.templates.forEach((t) => { if (t.mat === x.name) t.mat = ''; }); });
+        undoable(`${x.name} הוסר${using ? ` — ${using} הודעות שצירפו אותו יישלחו מעכשיו בלי קובץ` : ''}`, () => { S.biz.materials.splice(+d.i, 1); S.biz.templates.forEach((t) => { if (t.mat === x.name) t.mat = ''; }); });
         return render();
       }
       case 'close-lead':
@@ -3274,7 +3274,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'rule-del': { const id = RD.id; RD = null; closeSheet(false); undoable('הכלל נמחק', () => { S.biz.rules = S.biz.rules.filter((x) => x.id !== id); }); return render(); }
       case 'tpl-add': return sheetTemplate(null);
       case 'tpl-save': {
-        const name = ($('#tp-name') && $('#tp-name').value.trim()) || 'חבילה';
+        const name = ($('#tp-name') && $('#tp-name').value.trim()) || 'הודעה';
         const text = ($('#tp-text') && $('#tp-text').value.trim()) || '';
         const pm = document.querySelector('[data-tpmat][aria-pressed="true"]');
         const mat = pm ? pm.dataset.tpmat : '';
@@ -3283,7 +3283,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         else S.biz.templates.push({ id: 't' + Date.now(), name, text, mat });
         save(); closeSheet(false); return render();
       }
-      case 'tpl-del': { const id = d.id; closeSheet(false); undoable('החבילה נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
+      case 'tpl-del': { const id = d.id; closeSheet(false); undoable('ההודעה נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
       case 'grp-send': return sheetSendConfirm(grpList(), grp.tpl);
       case 'send-confirm': return sendConfirmed();
       case 'go-today': S.crmTab = 'tasks'; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
@@ -3329,7 +3329,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
       case 'es-pk-add': {
         const name = (($('#es-pk-name') && $('#es-pk-name').value.trim()) || (ES.newFile && ES.newFile.name) || '').slice(0, 30);
-        if (!name) return toast('איך לקרוא לחבילה?');
+        if (!name) return toast('איך לקרוא להודעה?');
         let mat = '';
         if (ES.newFile) { mat = ES.newFile.name; if (!S.biz.materials.some((x) => x.name === mat)) S.biz.materials.push({ name: mat, file: ES.newFile.file }); }
         const id = 'p' + (S.biz.bseq++);
