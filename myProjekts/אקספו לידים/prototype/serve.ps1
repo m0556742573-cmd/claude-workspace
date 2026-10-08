@@ -3,9 +3,10 @@ $root = "C:\Users\user"
 $allowed = @("expo-data/", "claude/myProjekts/אקספו לידים/prototype/", "claude/myProjekts/אקספו לידים/prototype-v3/")
 $types = @{ ".html" = "text/html; charset=utf-8"; ".js" = "text/javascript; charset=utf-8"; ".css" = "text/css; charset=utf-8" }
 $l = New-Object System.Net.HttpListener
-$l.Prefixes.Add("http://localhost:8765/")
+$port = $(if ($env:PORT) { $env:PORT } else { "8765" })
+$l.Prefixes.Add("http://localhost:$port/")
 $l.Start()
-Write-Host "serving on http://localhost:8765/"
+Write-Host "serving on http://localhost:$port/"
 while ($l.IsListening) {
   $ctx = $l.GetContext()
   $rel = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath.TrimStart('/'))

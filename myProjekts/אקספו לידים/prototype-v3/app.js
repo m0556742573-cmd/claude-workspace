@@ -28,6 +28,74 @@
   document.documentElement.lang = 'he';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* Icons drawn for the "דוכן חכם" language: a 24 grid, line only, square caps and
+   * sharp joins, 90° and 45° only, every curve a quarter circle of radius 3, 5 or 8.
+   * The code and the log keep their emoji as words (the log is read by them: "📞 דיברנו");
+   * only the screen turns them into these icons. A message as the customer will get it
+   * (.bubble) keeps its emoji, and a <select> option, which cannot hold a drawing, drops them. */
+  const ICONS = {
+    phone: 'M7 3h10v18H7zM10 6h4M11 18h2',
+    message: 'M3 4h18v12h-9l-5 5v-5H3z',
+    attach: 'M17 9v7a5 5 0 0 1-10 0V6a3 3 0 0 1 6 0v10',
+    check: 'M4 12l5 5L20 6',
+    close: 'M6 6l12 12M18 6L6 18',
+    note: 'M5 3h9l5 5v13H5zM9 12h6M9 16h6',
+    file: 'M5 3h9l5 5v13H5zM14 3v5h5',
+    auto: 'M15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM17 12a5 5 0 1 1-10 0 5 5 0 1 1 10 0zM12 4v3M12 17v3M4 12h3M17 12h3M6.3 6.3l2.2 2.2M15.5 15.5l2.2 2.2M17.7 6.3l-2.2 2.2M8.5 15.5l-2.2 2.2',
+    arrowL: 'M20 12H4M10 6l-6 6 6 6',
+    arrowR: 'M4 12h16M14 6l6 6-6 6',
+    won: 'M6 21V3h12l-4 4 4 4H6',
+    ai: 'M12 4a8 8 0 0 0 8 8 8 8 0 0 0-8 8 8 8 0 0 0-8-8 8 8 0 0 0 8-8z',
+    mic: 'M9 6a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0zM7 11a5 5 0 0 0 10 0M12 16v5M8 21h8',
+    swap: 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4',
+    download: 'M12 3v13M6 10l6 6 6-6M4 21h16',
+    more: 'M4 11h2v2H4zM11 11h2v2h-2zM18 11h2v2h-2z',
+    warn: 'M12 3l9 9-9 9-9-9zM12 8v5M12 16v.5',
+    lock: 'M5 11h14v10H5zM9 11V7a3 3 0 0 1 6 0v4',
+    play: 'M8 4l8 8-8 8z',
+    up: 'M6 15l6-6 6 6',
+    down: 'M6 9l6 6 6-6',
+    next: 'M19 6l-6 6 6 6M12 6l-6 6 6 6',
+    mail: 'M3 5h18v14H3zM3 5l9 9 9-9',
+    again: 'M12 4a8 8 0 1 1-8 8M1 9l3 3 3-3',
+    camera: 'M3 8h4l3-3h4l3 3h4v11H3zM15 13a3 3 0 1 1-6 0 3 3 0 1 1 6 0z',
+    meet: 'M12 8a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM4 20v-1a5 5 0 0 1 10 0v1M15 5a3 3 0 0 1 0 6M17 14a3 3 0 0 1 3 3v3',
+    bookmark: 'M6 3h12v18l-6-6-6 6z',
+    bell: 'M7 17v-6a5 5 0 0 1 10 0v6M4 17h16M10 20h4',
+    repeat: 'M4 11V7h14M15 4l3 3-3 3M20 13v4H6M9 20l-3-3 3-3',
+    calendar: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4',
+    pen: 'M5 19v-4L16 4l4 4L9 19zM13 7l4 4',
+    tag: 'M3 3h9l9 9-9 9-9-9zM7 7h1',
+    receipt: 'M6 3h12v18l-2-2-2 2-2-2-2 2-2-2-2 2zM9 8h6M9 12h6',
+    stop: 'M6 6h12v12H6z',
+    save: 'M4 4h13l3 3v13H4zM8 4v5h7V4M8 20v-6h8v6',
+    ban: 'M20 12a8 8 0 1 1-16 0 8 8 0 1 1 16 0zM6.3 6.3l11.4 11.4',
+  };
+  const GLYPH = { '📞': 'phone', '💬': 'message', '🟢': 'message', '📎': 'attach', '✓': 'check', '✅': 'check', '✕': 'close', '📝': 'note', '📄': 'file',
+    '⚙': 'auto', '➜': 'arrowL', '←': 'arrowL', '→': 'arrowR', '🎉': 'won', '✨': 'ai', '🎙': 'mic', '⇄': 'swap', '⬇': 'download', '⋯': 'more',
+    '⚠': 'warn', '🔒': 'lock', '▶': 'play', '▲': 'up', '▼': 'down', '⏩': 'next', '📧': 'mail', '↺': 'again', '📷': 'camera', '🤝': 'meet',
+    '⭐': 'bookmark', '🔔': 'bell', '🔁': 'repeat', '📅': 'calendar', '🗓': 'calendar', '✍': 'pen', '✎': 'pen', '💰': 'tag', '🧾': 'receipt',
+    '⏹': 'stop', '💾': 'save', '🚫': 'ban' };
+  const GLYPH_RE = new RegExp('(' + Object.keys(GLYPH).join('|') + ')\\uFE0F?', 'g');
+  const icon = (name) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+  function iconize(root) {
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const hits = [];
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) { GLYPH_RE.lastIndex = 0; if (GLYPH_RE.test(n.data)) hits.push(n); }
+    for (const n of hits) {
+      const p = n.parentElement;
+      if (!p || p.closest('textarea, script, style, title, .bubble')) continue;
+      if (p.closest('select')) { n.data = n.data.replace(GLYPH_RE, '').trim(); continue; }
+      const t = document.createElement('template');
+      t.innerHTML = esc(n.data).replace(GLYPH_RE, (m, g) => icon(GLYPH[g]));
+      n.replaceWith(t.content);
+    }
+  }
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((a) => {
+    if (a.nodeType === 1) iconize(a);
+    else if (a.nodeType === 3 && a.parentElement) iconize(a.parentElement);
+  }))).observe(document.body, { childList: true, subtree: true });
   const FINE = window.matchMedia && window.matchMedia('(pointer: fine)').matches; // a mouse, not a finger
 
   // ------------------------------------------------------------------
@@ -1854,9 +1922,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     else if (!q && f === 'today') {
       const late = list.filter((l) => due(l) < 0);
       const now0 = list.filter((l) => due(l) >= 0);
-      body = (late.length ? `<div class="group-head bad">באיחור · ${late.length}</div>${crmRows(late, true)}` : '') + (now0.length ? `<div class="group-head">היום · ${now0.length}</div>${crmRows(now0, true)}` : '');
+      body = crmRows(late, true, 'באיחור', true) + crmRows(now0, true, 'היום');
     } else if (!q && f === 'all') {
-      body = [0, 1, null, 2].map((w) => { const part = list.filter((l) => effWarm(l) === w); return part.length ? `<div class="group-head">${w == null ? 'בלי חום' : esc(words()[w])} · ${part.length}</div>${crmRows(part, true)}` : ''; }).join('');
+      body = [0, 1, null, 2].map((w) => { const part = list.filter((l) => effWarm(l) === w); return crmRows(part, true, w == null ? 'בלי חום' : words()[w]); }).join('');
     } else body = crmRows(list, true);
     box.innerHTML = `<div class="tasks-bar"><nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'בהמשך השבוע')}${tab('all', 'כל הצעדים')}</nav>
         ${S.biz.team.length > 1 ? `<div class="chips"><button class="chip" data-mine="1" aria-pressed="${mineOnly()}">שלי</button><button class="chip" data-mine="0" aria-pressed="${!mineOnly()}">של כולם</button></div>` : ''}</div>
@@ -1866,19 +1934,28 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <div style="margin-top:10px">${body}</div>`;
     $('#crm-q').addEventListener('input', (e) => { crmQuery = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#crm-q'); n.focus(); n.setSelectionRange(pos, pos); });
   }
-  /** Two lines a lead: who, and what is next with the last contact. With `withCall`, a 📞 that records the call in place. */
-  function crmRows(list, withCall) {
+  /** Two lines a lead: who, and what is next with the last contact. With `withCall`, a 📞 that records the call in place.
+   * A value every row in the group shares — the warmth, the stage, the day — is said once, in the
+   * group's heading, so each row keeps only what tells one lead from the next. */
+  function crmRows(list, withCall, head, bad) {
     if (!list.length) return '';
-    return `<div class="rows">${list.map((l) => {
+    const dayOf = (l) => { const p = plan(l); return p.due ? dueText(p.due) : ''; };
+    const same = (f) => (list.length > 1 && list.every((l) => f(l) === f(list[0])) ? f(list[0]) : '');
+    const sWarm = same((l) => (effWarm(l) == null ? 'בלי חום' : words()[effWarm(l)]));
+    const sStage = same((l) => stageById(l.stage).name);
+    const sDay = same(dayOf);
+    const sWhy = same(contactLine);
+    const title = [head, sWarm !== head ? sWarm : '', sStage, sDay, sWhy].filter(Boolean).join(' · ');
+    return (title ? `<div class="group-head${bad ? ' bad' : ''}"><span>${esc(title)}</span><span>${list.length}</span></div>` : '') + `<div class="rows">${list.map((l) => {
       const p = plan(l);
       const w = effWarm(l);
       const more = tasks(l).length - 1;
       const v = leadValue(l);
       const late = p.due && dayNo(p.due.getTime()) < dayNo(now());
       return `<div class="row${rowOpen === l.id ? ' open' : ''}">
-        <button class="row-main" data-crmlead="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span> <span class="state">${w == null ? 'בלי חום' : esc(words()[w])}</span> <span class="state">${esc(stageById(l.stage).name)}</span>${v ? ` <span class="money">${nis(v)}</span>` : ''}${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
-          <span class="due${late ? ' late' : ''}">${late ? 'באיחור · ' : ''}${planHTML(p)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span>
-          <span class="why">${esc(contactLine(l))}${l.contact.phone ? ` · <bdi dir="ltr">${esc(l.contact.phone)}</bdi>` : ''}</span></button>
+        <button class="row-main" data-crmlead="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>${sWarm || head === (w == null ? 'בלי חום' : words()[w]) ? '' : ` <span class="state">${w == null ? 'בלי חום' : esc(words()[w])}</span>`}${sStage ? '' : ` <span class="state">${esc(stageById(l.stage).name)}</span>`}${v ? ` <span class="money">${nis(v)}</span>` : ''}${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
+          <span class="due${late ? ' late' : ''}">${late && !bad ? 'באיחור · ' : ''}${planHTML(sDay ? { ...p, due: null } : p)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span>
+          ${sWhy && !l.contact.phone ? '' : `<span class="why">${[sWhy ? '' : esc(contactLine(l)), l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi>` : ''].filter(Boolean).join(' · ')}</span>`}</button>
         ${withCall && isOpenLead(l) ? `<button class="row-call" data-rowcall="${l.id}" aria-label="להתקשר ל${esc(People.rowName(l))}" aria-expanded="${rowOpen === l.id}">📞</button>` : ''}
         ${rowOpen === l.id ? `<div class="row-out"><span class="faint">${l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</span>
           <button class="chip" data-rowout="talk" data-lid="${l.id}">דיברנו — מה הלאה</button><button class="chip" data-rowout="noans" data-lid="${l.id}">לא ענה</button>
