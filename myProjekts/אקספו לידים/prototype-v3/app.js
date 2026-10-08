@@ -606,17 +606,23 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   // Shell
   // ------------------------------------------------------------------
-  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית'], ['try', 'ניסיון']];
+  // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
+  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['try', 'ניסיון']];
+  const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
   const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים, צוות ובוקר']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
     const m = $('#main');
     if (S.phase !== 'live') {
-      ({ account: viewAccount, biz: viewBiz, connect: viewConnect, custom: viewCustom, try: viewTry }[S.step] || viewAccount)(m);
-      if (S.phase === 'setup' && S.step !== 'try') {
+      ({ account: viewAccount, biz: viewBiz, send: viewSend, connect: viewConnect, custom: viewCustom, try: viewTry }[S.step] || viewAccount)(m);
+      if (S.phase === 'setup') {
         const i = SETUP.findIndex(([k]) => k === S.step);
-        m.insertAdjacentHTML('beforeend', `<div class="next-bar"><button class="btn primary big" data-act="setup-next">הבא: ${esc(SETUP[i + 1][1])} ←</button></div>`);
+        const back = SETUP.find(([k]) => k === S.backTo) || SETUP[2];
+        if (S.step === 'biz') m.insertAdjacentHTML('beforeend', tuneLinks([['buttons', 'להתאים אישית את הכפתורים והצעדים']]));
+        // A customization screen reached from a step leads back to that step, not on to the next one.
+        if (i < 0) m.insertAdjacentHTML('beforeend', `<div class="next-bar"><button class="btn primary big" data-act="back-flow">← חזרה ל${esc(back[1])}</button></div>`);
+        else if (S.step !== 'try') m.insertAdjacentHTML('beforeend', `<div class="next-bar"><button class="btn primary big" data-act="setup-next">הבא: ${esc(SETUP[i + 1][1])} ←</button></div>`);
       }
       return;
     }
@@ -625,7 +631,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function renderTop() {
     const nav = S.phase === 'live'
       ? LIVE.map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('')
-      : SETUP.filter(([k]) => S.phase === 'setup' || k !== 'try').map(([k, t], n) =>
+      : (S.phase === 'setup' ? SETUP : SETTINGS_NAV).map(([k, t], n) =>
         `<button class="moment" data-step="${k}" aria-current="${S.step === k}" ${S.phase === 'setup' && k !== 'account' && !accountOk() ? 'disabled title="קודם הרשמה"' : ''}>${S.phase === 'setup' ? `<span class="n">${n + 1}</span>` : ''}${t}</button>`).join('');
     $('#top').innerHTML = `<div class="top-in">
       <div class="brand">${esc(S.biz.name || 'הדוכן שלי')}${S.phase === 'settings' ? ' <span class="faint">· הגדרות</span>' : S.phase === 'setup' ? ' <span class="faint">· הקמה</span>' : ''}</div>
@@ -837,6 +843,47 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <p class="muted">רק למי שכבר יש לו חשבון. נכנסים עם החשבון הקיים ומאשרים למערכת לשלוח בשמו. אפשר להמשיך להשתמש בוואטסאפ בטלפון במקביל.</p>
         <div class="opts"><button class="opt" data-act="connect-yes" data-ch="waApi">יש לי חשבון — להתחבר<small>בדוגמית — מדומה</small></button><button class="opt" data-act="sheet-close">אין לי — לא עכשיו</button></div>`);
     }
+  }
+
+  /** The way out to customization, from inside a setup step: plain to see, never in the way of "next". */
+  const tuneLinks = (list) => `<div class="card tune" style="margin-top:14px"><span class="faint">רוצה לכוונן?</span> ${list.map(([sub, t]) =>
+    `<button class="link" data-act="tune" data-tune="${sub}">${esc(t)} ←</button>`).join(' · ')}</div>`;
+
+  // ------------------------------------------------------------------
+  // Setup 3 — what goes out, and how: one channel, the catalogue, its words
+  // ------------------------------------------------------------------
+  function viewSend(m) {
+    const b = S.biz;
+    const cat = b.templates.find((t) => t.mat);
+    const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{חומר\}/g, t.mat || 'החומר');
+    m.innerHTML = `<h1>מה שולחים ואיך</h1>
+      <p class="muted">שלושה דברים, וכולם ניתנים לשינוי אחר כך.</p>
+      <div class="stack" style="margin-top:14px">
+        <section class="card"><h2>1. ערוץ</h2><p class="muted">איך מה שהמבקר ביקש יגיע אליו. אחד מספיק.</p>
+          <div class="chips">${CHANNELS.map((c) => `<button class="chip" data-quickch="${c.k}" aria-pressed="${!!b.channels[c.k]}">${c.ic} ${esc(c.name)}</button>`).join('')}</div>
+          ${b.channels.email ? `<p class="faint" style="margin-top:8px">מייל: ${esc(mailPreview(b.mail.prefix || 'info'))}</p>` : ''}</section>
+        <section class="card"><h2>2. הקטלוג</h2>
+          ${cat ? `<p>📎 <b>${esc(cat.mat)}</b> — מצורף להודעה "${esc(cat.name)}".</p>` : '<p class="muted">מה שמבקרים יבקשו בדוכן: קטלוג, מחירון, תמונות. אפשר גם לדלג ולהוסיף בדוכן.</p>'}
+          <div class="add-row"><input id="cat-name" class="text-input" value="${cat ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
+            <label class="btn" for="cat-file">📷 ${cat ? 'עוד קובץ' : 'קובץ'}</label></div><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></section>
+        ${cat ? `<section class="card"><h2>3. הנוסח</h2><p class="muted">מה המבקר יקבל יחד עם הקובץ. {שם} ו-{עסק} מתמלאים לבד.</p>
+          <textarea id="cat-text" class="say small">${esc(cat.text)}</textarea>
+          <p class="faint" id="cat-prev">${esc(sample(cat))}</p></section>` : ''}
+      </div>
+      ${tuneLinks([['materials', 'כל ההודעות, והודעה לכל ערוץ'], ['connect', 'הגדרות מתקדמות של הערוצים']])}`;
+    const txt = $('#cat-text');
+    if (txt) txt.addEventListener('input', (e) => { cat.text = e.target.value; save(); $('#cat-prev').textContent = sample(cat); });
+    $('#cat-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const name = (($('#cat-name') && $('#cat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '') || 'קטלוג').slice(0, 30);
+      if (b.materials.some((x) => x.name === name)) return toast('כבר יש קובץ בשם הזה');
+      const id = addPackageWithFile(name, file.name);
+      // The first catalogue is what goes out on every channel when nothing else was chosen.
+      b.chDefault = b.chDefault || {};
+      ['wa', 'email', 'sms'].forEach((k) => { if (!b.chDefault[k]) b.chDefault[k] = id; });
+      save(); render(); toast(name + ' נשמר');
+    });
   }
 
   // ------------------------------------------------------------------
@@ -1059,7 +1106,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   function viewTry(m) {
     m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> מה שתקלוט כאן יימחק כשתתחיל את יום התערוכה.</span>
-      <button class="btn primary" data-act="go-live">סיימתי — ליום התערוכה ←</button></div><div id="boothwrap"></div>`;
+      <button class="btn primary" data-act="go-live">סיימתי — ליום התערוכה ←</button></div>
+      ${tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לכוונן?', '<b>הכל מוכן.</b> רוצה לכוונן לפני?')}<div id="boothwrap"></div>`;
     viewBooth($('#boothwrap'));
   }
 
@@ -2902,6 +2950,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.view) { S.view = d.view; closeLead(); closeSheet(false); fillOpen = false; filled.clear(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
+    // Setup step 3: a channel in one tap. WhatsApp goes through its own sheet, with the warning or the existing account.
+    if (d.quickch) { const k = d.quickch; if (!S.biz.channels[k] && (k === 'wa' || k === 'waApi')) return sheetConnect(k); S.biz.channels[k] = !S.biz.channels[k]; save(); return render(); }
 
     // ---- CRM ----
     if (d.crmtab) { S.crmTab = d.crmtab; S.crmLead = null; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
@@ -3327,6 +3377,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'tune': {
+        if (SETUP.some(([k]) => k === S.step)) S.backTo = S.step;
+        if (d.tune === 'connect') S.step = 'connect'; else { S.step = 'custom'; S.sub = d.tune; }
+        openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0);
+      }
+      case 'back-flow': S.step = S.backTo || 'send'; S.backTo = null; save(); render(); return window.scrollTo(0, 0);
       case 'es-pk-add': {
         const name = (($('#es-pk-name') && $('#es-pk-name').value.trim()) || (ES.newFile && ES.newFile.name) || '').slice(0, 30);
         if (!name) return toast('איך לקרוא להודעה?');
