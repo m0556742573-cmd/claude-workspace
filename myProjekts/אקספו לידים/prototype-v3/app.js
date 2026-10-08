@@ -263,7 +263,9 @@
   }
   const normStep = (s) => {
     const t = s && STEPS[s.type] ? s.type : 'call';
-    return { type: t, label: (s && s.label) || STEPS[t].label, days: s && s.days != null ? s.days : STEPS[t].days, mat: (s && s.mat) || '' };
+    const out = { type: t, label: (s && s.label) || STEPS[t].label, days: s && s.days != null ? s.days : STEPS[t].days, mat: (s && s.mat) || '' };
+    if (t === 'date') out.before = s && s.before != null ? s.before : 4;   // weeks before the simcha
+    return out;
   };
   // "Send material — at once" is not a task. It happens the moment the button is tapped.
   const immediate = (s) => s.type === 'send' && s.days === 0;
@@ -555,6 +557,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const talk = (t) => t === 'call' || t === 'meet';
   function dueOf(l, s) {
     if (l.moved[s.key]) return new Date(l.moved[s.key]);
+    // "Depends on a date": like a season, but his own — X weeks before the simcha. Checked before a stored day,
+    // so a date filled in later still moves a step that was added by hand.
+    if (s.type === 'date' && l.eventDate) {
+      const d = H.addDays(new Date(new Date(l.eventDate + 'T09:00').getTime() - (s.before || 4) * 7 * H.DAY), 0);
+      return d.getTime() > now() ? d : H.addDays(new Date(now()), 1);
+    }
     if (s.dueAt) return new Date(s.dueAt);
     if (s.type === 'season') return seasonDue() || H.addDays(new Date(l.at), 3);
     let days = s.days == null ? 2 : s.days;
@@ -590,7 +598,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const stepsText = (ss) => ss.map(stepText).join('  +  ');
   const planHTML = (p, bare) => `${STEPS[p.type].icon} <b>${esc(p.label)}</b>${p.due && !bare ? ' · ' + esc(dueText(p.due)) : ''}${p.season ? ' · לקראת ' + esc(p.season) : ''}`;
   const log = (l, t) => l.log.push({ at: now(), t });
-  const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, mat: s.mat || '', dueAt }); };
+  const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, mat: s.mat || '', before: s.before, phase: s.phase || '', dueAt }); };
   function dueFor(s) {
     if (s.type === 'season') { const d = seasonDue(); return d ? d.getTime() : H.addDays(new Date(now()), 3).getTime(); }
     return H.addDays(new Date(now()), Math.max(1, s.days || 0), talk(s.type)).getTime();
@@ -914,7 +922,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /* One editor for a single step: a button's, the default's, or a lead's own. */
   let ES = null;
   function sheetStep(o) {
-    ES = { type: o.step.type, days: o.step.days, mat: o.step.mat || '', ctx: o.ctx };
+    ES = { type: o.step.type, days: o.step.days, mat: o.step.mat || '', before: o.step.before != null ? o.step.before : 4, ctx: o.ctx };
     sheet(`<h2>${esc(o.title)}</h2>
       <div class="label">סוג הצעד <small>לפי זה המערכת פועלת</small></div>
       <div class="step-grid">${Object.entries(STEPS).map(([k, v]) => `<button class="opt" data-steptype="${k}" aria-pressed="${ES.type === k}">${v.icon} ${esc(v.name)}</button>`).join('')}</div>
@@ -939,7 +947,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <button class="chip" data-esmat="" aria-pressed="${!ES.mat}">${mats.length === 1 ? 'החומר היחיד' : 'לבחור בזמן השליחה'}</button></div>
       <div class="add-row" style="margin-top:8px"><input id="es-mat-name" class="text-input" placeholder="+ חומר חדש — קטלוג, מחירון, תמונות" autocomplete="off">
         <label class="btn" for="es-mat-file">📷 קובץ</label></div><input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
-    box.innerHTML = days + mat;
+    const before = ES.type !== 'date' ? '' : `<div class="label">כמה לפני השמחה</div><div class="chips">${[1, 2, 4, 8, 12].map((w) =>
+      `<button class="chip" data-esbefore="${w}" aria-pressed="${ES.before === w}">${w === 1 ? 'שבוע' : w + ' שבועות'}</button>`).join('')}</div>
+      <p class="faint" style="margin-top:6px">בדוכן נשאל "מתי השמחה?". אם לא נמסר תאריך — לפי "מתי" שלמעלה.</p>`;
+    box.innerHTML = days + before + mat;
     // A new material can be added right here, and is chosen for this step at once — no trip to "חומרים ונוסח".
     const f = $('#es-mat-file');
     if (f) f.addEventListener('change', (e) => {
@@ -950,7 +961,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       ES.mat = name; save(); renderStepExtra(); toast(name + ' נשמר ונבחר');
     });
   }
-  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, mat: ES.mat });
+  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, mat: ES.mat, before: ES.before });
 
   // ---- warmth and the booth ----
   function viewBoothSettings(m) {
@@ -1145,7 +1156,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const w = effWarm(l);
     const auto = l.warmBy !== 'hand' && S.biz.derive && w != null;
     const bs = tagged(l);
-    const datey = bs.some((b) => stepsOf(b).some((s) => s.type === 'date'));
+    const datey = bs.some((b) => stepsOf(b).some((s) => s.type === 'date')) || (l.manual || []).some((s) => s.type === 'date' && !l.done.includes(s.key));
     const roley = bs.some((b) => b.axis === 'who' && b.weight >= 2);
     const autoSent = bs.some((b) => stepsOf(b).some(immediate));
     const ts = tasks(l);
@@ -1359,8 +1370,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const ts = tasks(l);
     sheet(`<h2>${esc(title || 'מה הלאה עם ' + People.rowName(l) + '?')}</h2>
       ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
-        <span class="task-acts">${t.type === 'send' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
-          <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ בוצע</button>
+        <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
+          <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
           <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
         : '<p class="muted">אין צעדים פתוחים. הוא ב' + (l.won ? 'לקוחות' : 'קהל') + '.</p>'}
       <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד נוסף</button>
@@ -1657,7 +1668,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     log(l, '➜ ' + st.name + (why ? ' · ' + why : ''));
     if (l.won && !wasWon) {
       tasks(l).forEach((t) => l.done.push(t.key));
-      const regular = tagged(l).some((b) => stepsOf(b).some((s) => s.type === 'regular')) || S.biz.buttons.some((b) => stepsOf(b).some((s) => s.type === 'regular'));
+      const regular = tagged(l).some((b) => stepsOf(b).some((s) => s.type === 'regular'));   // only a lead tagged with such a button
       if (regular) addManual(l, { type: 'regular', label: 'לבדוק אם צריך עוד', days: 28 }, H.addDays(new Date(now()), 28).getTime());
       runRules('won', l);
     }
@@ -2202,7 +2213,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const out = [];
     const keep = [];
     list.forEach((l) => {
-      const why = l.optOut ? 'ביקש להסיר' : !withClosed && l.won ? 'עסקה נסגרה' : !withClosed && l.lost ? 'לא רלוונטי'
+      const why = l.optOut ? 'ביקש להסיר' : !withClosed && l.won ? 'עסקה נסגרה'   // "not relevant" stays in the audience: future leads (יצחק, 08/10)
         : t && l.log.some((e) => e.at > month && e.t.includes('"' + t.name + '"')) ? 'קיבל את ההודעה הזו החודש' : '';
       (why ? out : keep).push({ l, why });
     });
@@ -2468,8 +2479,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <div class="rec-main">
           <section class="card"><h2>הלאה</h2>
             ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
-              <span class="task-acts">${t.type === 'send' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
-                <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ בוצע</button>
+              <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
+                <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
                 <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
               : `<p class="muted">אין צעדים פתוחים${l.won ? ' — לקוח.' : '.'}</p>`}
             <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד</button></div></section>
@@ -2488,6 +2499,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
           <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'}</span></div>
           ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
+          ${l.eventDate || tasks(l).some((t) => t.type === 'date') ? `<label><span class="faint">תאריך השמחה</span><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}"></label>` : ''}
           <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · נקלט ע"י ${esc(l.by)}</span></div>
           <div class="field-row"><span class="faint">קבצים</span><span>${l.files.map((f) => '📄 ' + esc(f.name)).join(' · ') || '—'}</span></div>
           <button class="btn" data-act="pick-file" data-lid="${l.id}">📄 לצרף קובץ</button><input id="lead-file" type="file" hidden data-lfile="${l.id}">
@@ -2521,39 +2533,53 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   /* After "we talked": one sheet — what was said, a step and a day. Nothing is
    * marked done until a step is chosen, and choosing one closes the old calls. */
   let TK = null;
-  function sheetTalk(l, stay) {
+  /* The same sheet closes every finished step that leaves nothing open: a lead never falls out of the pipeline without a choice — a next step, a deal, or not relevant. `done` names that step. */
+  function sheetTalk(l, stay, done) {
     const seen = new Set();
     const opts = derived(l).filter((s) => s.type !== 'none' && !immediate(s))
-      .concat([normStep({ type: 'call' }), normStep({ type: 'meet' }), normStep({ type: 'quote' }), normStep({ type: 'send', days: 1 })])
-      .filter((s) => { if (seen.has(s.type)) return false; seen.add(s.type); return true; }).slice(0, 5);
-    TK = { lid: l.id, opts, i: null, days: null, date: '', stay: !!stay };
+      .concat([normStep({ type: 'call' }), normStep({ type: 'meet' }), normStep({ type: 'quote' }), normStep({ type: 'send', days: 1 })], S.biz.seasons.length ? [normStep({ type: 'season' })] : [])
+      .filter((s) => { if (seen.has(s.type)) return false; seen.add(s.type); return true; }).slice(0, 6);
+    TK = { lid: l.id, opts, i: null, days: null, date: '', stay: !!stay, done: done || '' };
     const today = new Date(now());
     const toSunday = ((7 - today.getDay()) % 7) || 7;
-    sheet(`<h2>דיברנו עם ${esc(People.rowName(l))}. מה הלאה?</h2>
-      <label class="label" for="tk-note">מה נאמר? <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="למשל: רוצה הצעה ל-300 איש, לפני פסח"></textarea>
+    sheet(`<h2>${done ? `✓ ${esc(done)}. מה הלאה עם ${esc(People.rowName(l))}?` : `דיברנו עם ${esc(People.rowName(l))}. מה הלאה?`}</h2>
+      <label class="label" for="tk-note">${done ? "מה קרה?" : "מה נאמר?"} <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="למשל: רוצה הצעה ל-300 איש, לפני פסח"></textarea>
       <div class="label">הצעד הבא</div>
       <div class="chips">${opts.map((s, i) => `<button class="chip" data-tkstep="${i}" aria-pressed="false">${STEPS[s.type].icon} ${esc(s.label)}</button>`).join('')}</div>
       <div class="label">מתי</div>
       <div class="chips">${[[1, 'מחר'], [toSunday, 'יום ראשון'], [7, 'בעוד שבוע']].map(([d, t]) => `<button class="chip" data-tkdays="${d}" aria-pressed="false">${t}</button>`).join('')}
         <label class="chip date-chip">תאריך… <input type="date" id="tk-date" aria-label="תאריך"></label></div>
       <div class="actions"><button class="btn primary" data-act="tk-save" id="tk-save" disabled>שמירה</button><button class="btn ghost" data-act="tk-back">חזרה</button></div>
-      <div class="opts"><button class="opt" data-act="tk-won">🎉 בעצם נסגרה עסקה</button><button class="opt" data-act="tk-none">בלי המשך — להעביר לקהל</button></div>`, l.id);
+      <div class="opts"><button class="opt" data-act="tk-won">🎉 נסגרה עסקה</button><button class="opt" data-act="tk-lost">לא רלוונטי<small>נשאר בקהל, לעתיד</small></button><button class="opt" data-act="tk-none">בלי צעד עכשיו — לקהל</button></div>`, l.id);
     $('#scrim .sheet').dataset.guard = '1';
     $('#tk-date').addEventListener('change', (e) => { TK.date = e.target.value; TK.days = null; document.querySelectorAll('[data-tkdays]').forEach((x) => x.setAttribute('aria-pressed', 'false')); tkReady(); });
   }
   const tkReady = () => { const b = $('#tk-save'); if (b) b.disabled = TK.i == null; };
+  /** What "done" means for this step, in the words on its button. */
+  const doneWord = (t) => (!t ? 'בוצע' : t.type === 'quote' ? 'הוכנה ונשלחה' : t.type === 'meet' && t.phase !== 'held' ? 'תואם' : t.type === 'meet' ? 'התקיימה' : 'בוצע');
+  /* A meeting that was arranged needs its day: on that day the system asks how it went, and the pipeline goes on from there. */
+  let MD = null;
+  function sheetMeetDate(l) {
+    MD = { lid: l.id };
+    sheet(`<h2>הפגישה עם ${esc(People.rowName(l))} תואמה. מתי היא?</h2>
+      <div class="label">התאריך</div><input type="date" id="md-date" class="text-input">
+      <p class="faint" style="margin-top:6px">ביום הפגישה תופיע משימה: "איך הלכה הפגישה?" — ומשם ממשיכים.</p>
+      <div class="actions"><button class="btn primary" data-act="md-save">שמירה</button></div>
+      <div class="opts"><button class="opt" data-act="md-later">עוד לא נקבע יום<small>מה הלאה במקום</small></button></div>`, l.id);
+    $('#scrim .sheet').dataset.guard = '1';
+  }
   function tkSave() {
     const l = leadById(TK.lid);
     if (!l || TK.i == null) return;
     const s = TK.opts[TK.i];
     const note = ($('#tk-note') && $('#tk-note').value.trim()) || '';
     // The call that was due is done, and so is every other "call him" — he has just been called.
-    tasks(l).filter((t, i) => i === 0 || t.type === 'call').forEach((t) => l.done.push(t.key));
+    if (!TK.done) tasks(l).filter((t, i) => i === 0 || t.type === 'call').forEach((t) => l.done.push(t.key));
     const dueAt = TK.date ? H.addDays(new Date(TK.date + 'T09:00'), 0).getTime() : H.addDays(new Date(now()), TK.days || Math.max(1, s.days || 1), talk(s.type)).getTime();
     addManual(l, s, dueAt);
     if (note) l.notes.push({ id: 'n' + (S.nseq++), at: now(), text: note, audio: false, tr: '' });
-    log(l, '📞 דיברנו — הלאה: ' + s.label + ' · ' + H.heDate(new Date(dueAt)) + (note ? ' · ' + note.slice(0, 60) : ''));
-    if (l.stage === 'new') setStage(l, 'contact');
+    log(l, (TK.done ? '✓ ' + TK.done + ' — הלאה: ' : '📞 דיברנו — הלאה: ') + s.label + ' · ' + H.heDate(new Date(dueAt)) + (note ? ' · ' + note.slice(0, 60) : ''));
+    if (l.stage === 'new' && !TK.done) setStage(l, 'contact');
     if (s.type === 'quote' && ['new', 'contact'].includes(l.stage) && S.biz.stages.some((x) => x.id === 'quote')) setStage(l, 'quote');
     const stay = TK.stay;
     TK = null; rowOpen = null;
@@ -2729,7 +2755,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   document.addEventListener('input', (e) => {
     const d = e.target.dataset || {};
     if (d.roleof) { const l = leadById(+d.roleof); if (l) { l.roleOf = e.target.value.trim(); save(); } }
-    if (d.eventdate) { const l = leadById(+d.eventdate); if (l) { l.eventDate = e.target.value; save(); } }
+    if (d.eventdate) { const l = leadById(+d.eventdate); if (l) { l.eventDate = e.target.value; log(l, '📅 תאריך השמחה: ' + (l.eventDate ? H.heDate(new Date(l.eventDate + 'T09:00')) : '—')); save(); refreshLead(l); } }
     if (d.acc) { S.account[d.acc] = e.target.value.trim(); save(); }
     if (d.bizname !== undefined) { S.biz.name = e.target.value.trim(); save(); renderTop(); }
     if (d.smsname !== undefined) { e.target.value = e.target.value.replace(/[^A-Za-z0-9 ]/g, ''); S.biz.smsName = e.target.value; save(); }
@@ -2909,6 +2935,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       return renderStepExtra();
     }
     if (d.esdays !== undefined) { ES.days = +d.esdays; return renderStepExtra(); }
+    if (d.esbefore !== undefined) { ES.before = +d.esbefore; return renderStepExtra(); }
     if (d.esmat !== undefined) { ES.mat = d.esmat; return renderStepExtra(); }
     if (d.esweight !== undefined) { D.weight = +d.esweight; document.querySelectorAll('[data-esweight]').forEach((x) => x.setAttribute('aria-pressed', +x.dataset.esweight === D.weight)); return; }
     if (d.toggle) {
@@ -2975,13 +3002,21 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.taskdone) {
       if (!L) return;
       const t = tasks(L).find((x) => x.key === d.taskdone);
-      undoable('✓ ' + (t ? t.label : 'צעד') + ' — בוצע', () => {
+      const label = t ? t.label : 'צעד';
+      undoable('✓ ' + label + ' — ' + doneWord(t), () => {
         L.done.push(d.taskdone);
-        log(L, '✓ ' + (t ? t.label : 'צעד') + ' — בוצע');
-        if (t && t.type === 'quote' && ['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה הוכנה');
+        log(L, '✓ ' + label + ' — ' + doneWord(t));
+        // A quote that went out, and registration details that went out, each bring their own check a few days on.
+        if (t && t.type === 'quote') {
+          if (['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה נשלחה');
+          addManual(L, { type: 'call', label: 'לבדוק אם קיבל את ההצעה', days: 3 }, H.addDays(new Date(now()), 3, true).getTime());
+        }
+        if (t && t.type === 'register') addManual(L, { type: 'call', label: 'לבדוק אם נרשם', days: 3 }, H.addDays(new Date(now()), 3, true).getTime());
       });
-      const l2 = leadById(L.id);   // after undoable the state object is the same, but stay safe
-      return afterTask(l2 || L);
+      const l2 = leadById(L.id) || L;   // after undoable the state object is the same, but stay safe
+      if (t && t.type === 'meet' && t.phase !== 'held') return sheetMeetDate(l2);
+      if (!l2.won && !l2.lost && !l2.audience && !tasks(l2).length) return sheetTalk(l2, false, t && t.type === 'meet' ? 'הפגישה התקיימה' : label.replace(/[?.]+$/, ''));
+      return afterTask(l2);
     }
     if (d.tasksend) {
       if (!L) return;
@@ -3220,6 +3255,26 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'tk-save': return tkSave();
       case 'tk-back': { const l = TK && leadById(TK.lid); TK = null; return l ? sheetCRM(l) : closeSheet(false); }
       case 'tk-won': { const l = TK && leadById(TK.lid); TK = null; if (l) outcome(l, 'won'); return; }
+      case 'md-save': {
+        const l = MD && leadById(MD.lid);
+        const v = $('#md-date') && $('#md-date').value;
+        if (!l) return;
+        if (!v) return toast('בחר תאריך, או "עוד לא נקבע יום"');
+        const at = H.addDays(new Date(v + 'T09:00'), 0).getTime();
+        addManual(l, { type: 'meet', label: 'איך הלכה הפגישה?', days: 0, phase: 'held' }, at);
+        log(l, '🤝 פגישה נקבעה · ' + H.heDate(new Date(at)));
+        MD = null; save(); closeSheet(false); render();
+        return toast('🤝 נקבע · ' + dueText(new Date(at)));
+      }
+      case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'tk-lost': {
+        const l = TK && leadById(TK.lid);
+        TK = null;
+        if (!l) return;
+        closeSheet(false);
+        undoable('סומן "לא רלוונטי" · ' + People.rowName(l), () => setStage(l, (stageOf('lost') || {}).id || 'lost'));
+        return render();
+      }
       case 'tk-none': {
         const l = TK && leadById(TK.lid);
         TK = null;
