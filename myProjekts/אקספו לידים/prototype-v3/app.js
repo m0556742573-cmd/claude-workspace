@@ -481,13 +481,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }));
     return out;
   }
+  // Friday is short and busy before Shabbat: a call or a meeting moves to Sunday. Messages and preparation still may land on it.
+  const talk = (t) => t === 'call' || t === 'meet';
   function dueOf(l, s) {
     if (l.moved[s.key]) return new Date(l.moved[s.key]);
     if (s.dueAt) return new Date(s.dueAt);
     if (s.type === 'season') return seasonDue() || H.addDays(new Date(l.at), 3);
     let days = s.days == null ? 2 : s.days;
     if (effWarm(l) === 0) days = Math.min(days, 1);
-    return H.addDays(new Date(l.at), Math.max(1, days));
+    return H.addDays(new Date(l.at), Math.max(1, days), talk(s.type));
   }
   /** Everything still to do for this lead, soonest first. Empty: the lead is audience. */
   function tasks(l) {
@@ -521,7 +523,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, mat: s.mat || '', dueAt }); };
   function dueFor(s) {
     if (s.type === 'season') { const d = seasonDue(); return d ? d.getTime() : H.addDays(new Date(now()), 3).getTime(); }
-    return H.addDays(new Date(now()), Math.max(1, s.days || 0)).getTime();
+    return H.addDays(new Date(now()), Math.max(1, s.days || 0), talk(s.type)).getTime();
   }
 
   // ------------------------------------------------------------------
@@ -1318,30 +1320,32 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (rows.length) out.push({ fill: true, q: left ? `${left} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ הכל מסומן.', leads: rows });
     const waiting = L.filter((l) => l.pendingMat);
     if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.materials.length ? '' : ', ועוד אין חומר'}.` });
-    S.biz.buttons.map((b) => [b, L.filter((l) => l.tags.includes(b.id)).length, stepsOf(b).findIndex((s) => !immediate(s) && s.type !== 'none' && s.type !== 'season')])
-      .filter(([, n, i]) => n >= 3 && i >= 0).sort((a, b) => b[1] - a[1]).slice(0, 2)   // the two busiest buttons; more is noise
-      .forEach(([b, n, i]) => { const s = stepsOf(b)[i]; out.push({ days: b.id, idx: i, q: `${n} סימנו "${b.label}". ${s.label} — תוך כמה זמן?`, note: `משנה את הכפתור "${b.label}": חל על כל מי שמסומן בו, גם מעכשיו.`, cur: s.days }); });
     const groups = {};
     L.forEach((l) => { if (l.roleOf) (groups[l.roleOf] = groups[l.roleOf] || []).push(l); });
     Object.keys(groups).filter((g) => groups[g].length >= 2).forEach((g) => out.push({ info: true, q: `${groups[g].length} אנשים מ${g}. כדאי לדבר איתם כאחד.`, leads: groups[g] }));
     return out;
+  }
+  /** "מחר בבוקר" when the next tasks are tomorrow; after a Thursday they are on Sunday, and the title says so. */
+  function nextDayTitle(L) {
+    const l = openTasks(L)[0];
+    const t = l && plan(l);
+    if (!t || !t.due || dayNo(t.due.getTime()) - dayNo(now()) <= 1) return 'מחר בבוקר';
+    return 'הבא בתור: ' + H.label(t.due);
   }
   function viewDash(m) {
     const L = leadsNow();
     const demo = L.filter((l) => l.demo).length;
     const ws = [0, 1, 2, null].map((k) => L.filter((l) => effWarm(l) === k).length);
     const asks = dashAsks(L);
-    const top = S.biz.buttons.map((b) => [b, L.filter((l) => l.tags.includes(b.id)).length]).filter(([, n]) => n).sort((a, b) => b[1] - a[1]).slice(0, 6);
     m.innerHTML = `<h1>היום בדוכן: ${L.length - demo} אנשים${demo ? ` <span class="faint">(ועוד ${demo} מדומים)</span>` : ''}</h1>
       ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות איך נראה יום אמיתי, אפשר להוסיף 20 מבקרים מדומים.</div>
         <div class="actions"><button class="btn" data-act="seed">להוסיף מבקרים מדומים</button></div></div>` : ''}
       <div class="stats">${words().map((t, k) => `<div class="stat static"><span class="n">${ws[k]}</span><span class="t">${esc(t)}</span></div>`).join('')}
         <div class="stat static"><span class="n">${ws[3]}</span><span class="t">בלי חום</span></div></div>
-      ${top.length ? `<div class="faint">הכי הרבה סימנו: ${top.map(([b, n]) => esc(b.label) + ' (' + n + ')').join(' · ')}</div>` : ''}
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
       <div class="ask" style="margin-top:10px">${asks.map(dashCard).join('') || '<div class="empty">הכל מסומן.</div>'}</div>
       ${insightsBox('dash', 'מה רואים בתיוג של היום')}
-      <h2 style="margin-top:26px">מחר בבוקר</h2>
+      <h2 style="margin-top:26px">${nextDayTitle(L)}</h2>
       ${crmRows(openTasks(L).slice(0, 5)) || '<div class="empty">אין משימות.</div>'}
       <div class="actions"><button class="btn" data-view="crm">לרשימה המלאה במעקב ←</button></div>`;
   }
@@ -1351,8 +1355,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     let body = '';
     if (a.fill) body = fillOpen ? fillList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open">להשלים</button></div>';
     else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.materials.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
-    else if (a.days) body = `<div class="chips" style="margin-top:8px">${[[1, 'עד מחר'], [3, 'תוך 3 ימים'], [7, 'השבוע']].map(([d, t]) =>
-      `<button class="chip" data-btndays="${a.days}" data-i="${a.idx}" data-d="${d}" aria-pressed="${a.cur === d}">${t}</button>`).join('')}</div><div class="faint" style="margin-top:6px">${esc(a.note)}</div>`;
     else if (a.info) body = `<div class="faint" style="margin-top:6px">${a.leads.map((l) => `<button class="link" data-openlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}</div>`;
     return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
   }
@@ -1391,6 +1393,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function insightsBox(scope, title) {
     const fixed = fixedInsights(scope);
     const got = S.ai[scope];
+    if (!fixed.length && !got && !ai) return '';   // nothing to show and no one to ask: no empty box
     const card = (x, i, src) => `<div class="insight ${src}"><div class="q">${esc(x.text)}</div>
       ${x.leadIds && x.leadIds.length ? `<div class="faint">${x.leadIds.map(leadById).filter(Boolean).slice(0, 6).map((l) => `<button class="link" data-openlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}${x.leadIds.length > 6 ? ' ועוד ' + (x.leadIds.length - 6) : ''}</div>` : ''}
       ${x.action ? (x.done ? '<div class="faint">✓ בוצע</div>' : `<div class="actions"><button class="btn primary" data-insight="${src}:${i}" data-scope="${scope}">${esc(actionText(x.action))}</button></div>`) : ''}</div>`;
@@ -2432,7 +2435,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const note = ($('#tk-note') && $('#tk-note').value.trim()) || '';
     // The call that was due is done, and so is every other "call him" — he has just been called.
     tasks(l).filter((t, i) => i === 0 || t.type === 'call').forEach((t) => l.done.push(t.key));
-    const dueAt = TK.date ? H.addDays(new Date(TK.date + 'T09:00'), 0).getTime() : H.addDays(new Date(now()), TK.days || Math.max(1, s.days || 1)).getTime();
+    const dueAt = TK.date ? H.addDays(new Date(TK.date + 'T09:00'), 0).getTime() : H.addDays(new Date(now()), TK.days || Math.max(1, s.days || 1), talk(s.type)).getTime();
     addManual(l, s, dueAt);
     if (note) l.notes.push({ id: 'n' + (S.nseq++), at: now(), text: note, audio: false, tr: '' });
     log(l, '📞 דיברנו — הלאה: ' + s.label + ' · ' + H.heDate(new Date(dueAt)) + (note ? ' · ' + note.slice(0, 60) : ''));
@@ -2459,7 +2462,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (kind === 'noans') {
       l.noAnswer = (l.noAnswer || 0) + 1;
       if (l.noAnswer >= 3) { l.audience = true; log(l, '📞 לא ענה — פעם שלישית, עבר לקהל'); }
-      else { if (cur) l.moved[cur.key] = H.addDays(today, 1).getTime(); log(l, '📞 לא ענה — ננסה מחר'); }
+      else { if (cur) l.moved[cur.key] = H.addDays(today, 1, true).getTime(); log(l, "📞 לא ענה — ננסה ביום העבודה הבא"); }
       runRules('noanswer', l, l.noAnswer);
       if (stay) toast('📞 ' + People.rowName(l) + ' — לא ענה, ננסה מחר');
     }
@@ -2873,7 +2876,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       const days = Math.max(0, dayNo(t.due.getTime()) - dayNo(now()));
       return sheetStep({ title: 'שינוי: ' + t.label, step: Object.assign({}, t, { days }), ctx: { kind: 'task', lid: L.id, key: t.key } });
     }
-    if (d.btndays) { const t = btnById(d.btndays); if (t) { const ss = stepsOf(t); ss[+d.i].days = +d.d; t.steps = ss; save(); render(); } return; }
     if (d.filter) { crmFilter = d.filter; crmQuery = ''; return render(); }
     if (d.insight) return applyInsight(d.scope, d.insight);
     if (d.devrole) {

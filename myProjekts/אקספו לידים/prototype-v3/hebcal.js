@@ -50,10 +50,10 @@ window.HebCal = (function () {
     return YOMTOV.includes(parts(date).key);
   }
   const startOf = (date) => { const x = new Date(date); x.setHours(9, 0, 0, 0); return x; };
-  /** n days on, moved forward past Shabbat and Yom Tov. */
-  function addDays(from, n) {
+  /** n days on, moved forward past Shabbat and Yom Tov — and past Friday for `talk`, a call or a meeting. */
+  function addDays(from, n, talk) {
     let x = startOf(new Date(from.getTime() + n * DAY));
-    while (isRest(x)) x = new Date(x.getTime() + DAY);
+    while (isRest(x) || (talk && x.getDay() === 5)) x = new Date(x.getTime() + DAY);
     return x;
   }
 
