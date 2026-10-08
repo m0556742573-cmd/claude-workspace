@@ -109,7 +109,7 @@ window.People = (function () {
   }
 
   /** Scores one index row against the typed words. null when it does not match. */
-  function scoreRow(toks, ix) {
+  function scoreRow(toks, ix, biz) {
     let score = 0;
     let variant = false;
     for (let t = 0; t < toks.length; t++) {
@@ -118,7 +118,7 @@ window.People = (function () {
         score += m.exact ? 3 : 2;
         if (m.how === 'skel') { score -= 1; variant = true; } // a spelling variant ranks below a direct hit
         if (m.how === 'deep') { score -= 2; variant = true; }
-        if (t === 0 && m.w === 0) score += 2;              // first typed word hits the first name
+        if (t === 0 && m.w === 0 && !biz) score += 2;      // first typed word hits the first name (a business name has none)
         if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
         continue;
       }
@@ -171,10 +171,10 @@ window.People = (function () {
       if (r) hits.push({ key: 'p:' + i, i, b: null, score: r.score });
     }
     for (let b = 0; b < BIZ_INDEX.length; b++) {
-      const r = scoreRow(toks, BIZ_INDEX[b]);
+      const r = scoreRow(toks, BIZ_INDEX[b], true);
       if (r) hits.push({ key: 'b:' + b, i: BUSINESSES[b].pid, b, score: r.score });
     }
-    hits.sort((a, b) => b.score - a.score || rowName(a).length - rowName(b).length);
+    hits.sort((a, b) => b.score - a.score || (a.b != null) - (b.b != null) || rowName(a).length - rowName(b).length);   // on a tie, a person before a business
     const skipped = skip ? hits.filter((h) => skip(h.key)) : [];
     const shown = hits.filter((h) => !skip || !skip(h.key));
     return { hits: shown.slice(0, limit || 6), skipped, total: shown.length };

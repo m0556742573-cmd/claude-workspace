@@ -973,7 +973,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const leadByKey = (key) => leadsNow().find((l) => l.key === key);
 
   function viewBooth(m) {
-    m.innerHTML = `<input id="q" class="search" type="search" placeholder="שתיים-שלוש אותיות מהשם, או שם העסק" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
+    m.innerHTML = `<input id="q" class="search" type="search" placeholder="שם המשפחה, ועוד אותיות עד שהשם עולה" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
       <div id="slot"></div><p class="foot" id="foot"></p>`;
     const q = $('#q');
     q.addEventListener('input', () => { openId = null; stopIdle(); renderResults(q.value); });
@@ -995,7 +995,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const last = lastClosed && Date.now() - lastClosed.at < 60000 ? leadById(lastClosed.id) : null;
     const lastBar = last ? `<div class="last-bar"><span>האחרון: <b>${esc(People.rowName(last))}</b> · ${esc(People.town(last))}</span><button class="btn" data-reopen="${last.id}">לפתוח</button></div>` : '';
     if (!People.norm(query)) {
-      slot.innerHTML = lastBar + '<div class="empty">מישהו ניגש? שתיים-שלוש אותיות מהשם, ונגיעה בשם.<br>כל השאר רשות.</div>';
+      slot.innerHTML = lastBar + '<div class="empty">סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם.<br>כל השאר רשות.</div>';
       return;
     }
     const { hits, skipped, total } = People.search(query, 6, S.biz.hideVisited ? (k) => !!leadByKey(k) : null);
