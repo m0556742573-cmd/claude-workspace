@@ -244,18 +244,17 @@
     meet:     { name: 'פגישה או ביקור', days: 3, icon: '🤝', label: 'לתאם פגישה' },
     date:     { name: 'תלוי תאריך', days: 1, icon: '📅', label: 'לבדוק תאריך' },
     register: { name: 'הרשמה', days: 1, icon: '✍️', label: 'לשלוח פרטי הרשמה' },
-    regular:  { name: 'לקוח קבוע', days: 7, icon: '🔁', label: 'להציע אספקה קבועה' },
     season:   { name: 'לעונה', days: null, icon: '🗓', label: 'לחזור לפני העונה' },
     none:     { name: 'בלי משימה — קהל', days: null, icon: '·', label: 'קהל' },
   };
   // When two steps fall on the same day, the more committing one comes first.
-  const PRI = ['meet', 'quote', 'date', 'register', 'regular', 'send', 'call', 'season', 'none'];
+  const PRI = ['meet', 'quote', 'date', 'register', 'send', 'call', 'season', 'none'];
   function typeOfNext(s) {
     s = String(s || '');
     if (/הצעת מחיר|להכין הצעה|לשלוח הצעה/.test(s)) return 'quote';
     if (/הרשמ|שיעור ראשון/.test(s)) return 'register';
     if (/תאריך/.test(s)) return 'date';
-    if (/קבוע/.test(s)) return 'regular';
+    if (/קבוע/.test(s)) return 'call';   // "a regular customer" is a goal, not a step (יצחק, 08/10)
     if (/לשלוח|מחירון|דוגמאות|קטלוג/.test(s)) return 'send';
     if (/מדיד|ביקור|פגיש|לתאם|בדיק|טעימ|הדגמ|תיקון/.test(s)) return 'meet';
     if (/לפני ה|לעונה/.test(s)) return 'season';
@@ -347,8 +346,8 @@ While talking to a visitor he taps buttons on the tablet. Decide which of these 
 - "when": timing (e.g. עכשיו, לשמחה בתאריך, לעונה).
 
 Each button: {"label": 1-3 Hebrew words, "weight": 0-3 how valuable this visitor is to him GIVEN HIS GOAL, "steps": one or two steps}.
-Each step: {"step": one of "call","send","quote","meet","date","register","regular","season","none", "stepLabel": what HE does, 2-4 Hebrew words in his trade's language, "days": after how many days (0 = at once)}.
-Step meanings: call = phone him back; send = send material (days 0 = sent from the booth at once); quote = prepare a price quote; meet = meeting, visit, tasting, measuring, demo; date = depends on a date (an event); register = sign up; regular = recurring supply, repeat customer; season = come back before his busy season; none = no task.
+Each step: {"step": one of "call","send","quote","meet","date","register","season","none", "stepLabel": what HE does, 2-4 Hebrew words in his trade's language, "days": after how many days (0 = at once)}.
+Step meanings: call = phone him back; send = send material (days 0 = sent from the booth at once); quote = prepare a price quote; meet = meeting, visit, tasting, measuring, demo; date = depends on a date (an event); register = sign up; season = come back before his busy season; none = no task.
 Two steps are welcome where they fit, e.g. send the price list at once AND call after three days.
 
 Read community Hebrew correctly: "מזונות" = pastries and cakes (the mezonot blessing), not food or catering. "משווק", "סוכן", "מפיץ", "יבואן" = he sells goods made by others; he does not produce or cook them. "בוטיק" = small premium makers. Audiences and occasions (לבתים, לעסקים, למוסדות, לאירועים, לשמחות, "לכל מי שצריך") are visitors, never products. Never add a product or service he did not say.
@@ -1425,7 +1424,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return out;
   }
   /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
-  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'שליחות חומר', date: 'בדיקות תאריך', register: 'פרטי הרשמה', regular: 'הצעות אספקה קבועה' };
+  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'שליחות חומר', date: 'בדיקות תאריך', register: 'פרטי הרשמה' };
   function nextDayLine(L) {
     const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
     if (!all.length) return 'אין משימות.';
@@ -1548,7 +1547,7 @@ His buttons: ${S.biz.buttons.map((b) => b.label + ' → ' + stepsOf(b).map((s) =
 His leads (JSON): ${JSON.stringify(L)}
 ${focus}
 Give at most 4 short, concrete observations in Hebrew, each about specific leads, judged against his goal. Skip anything obvious or already handled.
-Reply with ONLY JSON: {"insights":[{"text":"one Hebrew sentence","leadIds":[ids],"action":null | {"kind":"warm","value":0|1|2} | {"kind":"step","type":"call|send|quote|meet|date|register|regular|season|none"}}]}
+Reply with ONLY JSON: {"insights":[{"text":"one Hebrew sentence","leadIds":[ids],"action":null | {"kind":"warm","value":0|1|2} | {"kind":"step","type":"call|send|quote|meet|date|register|season|none"}}]}
 warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step action ADDS that step to those leads.`;
     try {
       const r = await ai.json(prompt, { modelTier: 'quick' });
@@ -1605,6 +1604,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!b.rules) b.rules = clone(DEF_RULES);
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
     if (!b.digestNotes) b.digestNotes = [];
+    if (b.afterSale === undefined) b.afterSale = 7;   // days after a deal to ask how it went; 0 = never
+    S.leads.forEach((l) => (l.manual || []).forEach((s) => { if (!STEPS[s.type]) s.type = 'call'; }));   // the regular-customer step is gone
     if (!b.views) b.views = [];
     if (!b.rulesV2) {   // after the reviews: sending rules off unless the owner turns them on, and one ready view
       b.rulesV2 = true;
@@ -1668,8 +1669,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     log(l, '➜ ' + st.name + (why ? ' · ' + why : ''));
     if (l.won && !wasWon) {
       tasks(l).forEach((t) => l.done.push(t.key));
-      const regular = tagged(l).some((b) => stepsOf(b).some((s) => s.type === 'regular'));   // only a lead tagged with such a button
-      if (regular) addManual(l, { type: 'regular', label: 'לבדוק אם צריך עוד', days: 28 }, H.addDays(new Date(now()), 28).getTime());
+      // After a deal: one check on how it went — the moment a happy customer orders again. A setting of the business, not a button.
+      if (S.biz.afterSale) addManual(l, { type: 'call', label: 'איך היה? בדיקה אחרי מכירה', days: S.biz.afterSale, phase: 'after' }, H.addDays(new Date(now()), S.biz.afterSale, true).getTime());
       runRules('won', l);
     }
     runRules('stage', l, st.id);
@@ -2663,6 +2664,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <section class="card"><h2>הצוות</h2><p class="muted">למי אפשר לשייך ליד. הראשון הוא אתה.</p>
           <div class="chips">${b.team.map((t, i) => `<span class="chip static">${esc(t)}${i ? ` <button class="link" data-teamdel="${i}" aria-label="להסיר">✕</button>` : ''}</span>`).join('')}</div>
           <div class="add-row"><input id="new-member" class="text-input" placeholder="+ שם" autocomplete="off"><button class="btn" data-act="team-add">הוספה</button></div></section>
+        <section class="card"><h2>אחרי עסקה שנסגרה</h2><p class="muted">בדיקה אחת: איך היה? לקוח מרוצה — זה הרגע להציע את ההזמנה הבאה.</p>
+          <div class="chips">${[[0, "לא לבדוק"], [3, "אחרי 3 ימים"], [7, "אחרי שבוע"], [14, "אחרי שבועיים"], [30, "אחרי חודש"]].map(([d, t]) => `<button class="chip" data-aftersale="${d}" aria-pressed="${b.afterSale === d}">${t}</button>`).join("")}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור. נשלחת אליך מהמספר של מערכת הדוכן.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
           ${b.digest.on ? `<div class="label">לאן</div><div class="chips">${['wa', 'email', 'sms'].map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
           <div class="label">באיזו שעה</div><div class="chips">${['07:00', '08:00', '09:00', '10:00'].map((h) => `<button class="chip" data-digesth="${h}" aria-pressed="${b.digest.hour === h}">${h}</button>`).join('')}</div>` : ''}</section>
@@ -2949,6 +2952,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     }
     if (d.idle) { S.biz.idleSec = +d.idle; save(); return render(); }
     if (d.remind) { S.biz.remindWeeks = +d.remind; save(); return render(); }
+    if (d.aftersale !== undefined) { S.biz.afterSale = +d.aftersale; save(); return render(); }
     if (d.chmove) {
       const [k, dir] = d.chmove.split(':');
       const on = chOrder().filter((c) => S.biz.channels[c]);
@@ -3015,6 +3019,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       });
       const l2 = leadById(L.id) || L;   // after undoable the state object is the same, but stay safe
       if (t && t.type === 'meet' && t.phase !== 'held') return sheetMeetDate(l2);
+      if (t && t.phase === 'after') return sheetTalk(l2, false, 'בדיקה אחרי מכירה');   // a happy customer: the next order starts here
       if (!l2.won && !l2.lost && !l2.audience && !tasks(l2).length) return sheetTalk(l2, false, t && t.type === 'meet' ? 'הפגישה התקיימה' : label.replace(/[?.]+$/, ''));
       return afterTask(l2);
     }
