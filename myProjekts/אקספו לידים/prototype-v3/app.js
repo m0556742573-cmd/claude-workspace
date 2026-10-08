@@ -944,19 +944,22 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const mat = ES.type !== 'send' ? '' : `<div class="label">איזו חבילה לשלוח</div>
       <div class="chips">${pkgs.map((x) => `<button class="chip" data-espkg="${esc(x.id)}" aria-pressed="${ES.pkg === x.id}">${x.mat ? '📎' : '💬'} ${esc(x.name)}</button>`).join('')}
         <button class="chip" data-espkg="" aria-pressed="${!ES.pkg}">ברירת המחדל של הערוץ</button></div>
-      <div class="add-row" style="margin-top:8px"><input id="es-mat-name" class="text-input" placeholder="+ חבילה חדשה עם קובץ — קטלוג, מחירון" autocomplete="off">
-        <label class="btn" for="es-mat-file">📷 קובץ</label></div><input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
+      <div class="label">חבילה חדשה <small>שם, ואפשר לצרף קובץ</small></div>
+      <div class="add-row"><input id="es-pk-name" class="text-input" value="${esc(ES.newName || '')}" placeholder="למשל: קטלוג מטבחים" autocomplete="off">
+        <label class="btn" for="es-mat-file">📎 ${ES.newFile ? esc(ES.newFile.name) : 'לצרף קובץ'}</label><button class="btn" data-act="es-pk-add">הוספה</button></div>
+      <input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
     const before = ES.type !== 'date' ? '' : `<div class="label">כמה לפני השמחה</div><div class="chips">${[1, 2, 4, 8, 12].map((w) =>
       `<button class="chip" data-esbefore="${w}" aria-pressed="${ES.before === w}">${w === 1 ? 'שבוע' : w + ' שבועות'}</button>`).join('')}</div>
       <p class="faint" style="margin-top:6px">בדוכן נשאל "מתי השמחה?". אם לא נמסר תאריך — לפי "מתי" שלמעלה.</p>`;
     box.innerHTML = days + before + mat;
-    // A new package with its file can be made right here, and is chosen for this step at once.
+    // A new package can be made right here — a name, and a file if he wants one — and is chosen for this step at once.
     const f = $('#es-mat-file');
     if (f) f.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const name = (($('#es-mat-name') && $('#es-mat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '')).slice(0, 30);
-      ES.pkg = addPackageWithFile(name, file.name); save(); renderStepExtra(); toast(name + ' נשמר ונבחר');
+      ES.newName = ($('#es-pk-name') && $('#es-pk-name').value.trim()) || '';
+      ES.newFile = { name: file.name.replace(/\.[^.]+$/, '').slice(0, 30), file: file.name };
+      renderStepExtra();
     });
   }
   const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, pkg: ES.pkg, before: ES.before });
@@ -1027,7 +1030,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו חבילה</h2>
           ${groups.length ? groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')
             : '<p class="faint">אין ערוץ מחובר. מחברים ב"חיבורים".</p>'}</section>
-        <section class="card"><h2>הקבצים</h2><p class="muted">כל קובץ חדש נהיה גם חבילה משלו. אפשר לצרף אותו לכל חבילה אחרת.</p>
+        <section class="card"><h2>הקבצים</h2><p class="muted">קבצים שאפשר לצרף לחבילות. קובץ לבדו לא נשלח — הוא יוצא רק בתוך חבילה.</p>
           <div class="prod-list">${b.materials.map((x, i) => `<div class="prod-row"><span class="pn">📎 ${esc(x.name)}</span><span class="pnext">${esc(x.file)} <button class="btn ghost danger" data-act="del-mat" data-i="${i}">הסרה</button></span></div>`).join('') || '<div class="faint">עוד אין קבצים. אפשר גם להוסיף בדוכן, בשליחה הראשונה.</div>'}</div>
           <div class="add-row"><input id="mat-name" class="text-input" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
             <label class="btn" for="mat-file">📷 קובץ</label></div><input id="mat-file" type="file" accept="image/*,application/pdf" hidden></section>
@@ -1042,8 +1045,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       if (!file) return;
       const name = (($('#mat-name') && $('#mat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '') || 'קטלוג').slice(0, 30);
       if (S.biz.materials.some((x) => x.name === name)) return toast('כבר יש קובץ בשם הזה');
-      const id = addPackageWithFile(name, file.name);
-      if (l) sendPackage(l, id);
+      // In settings a file only joins the library. At the booth, a name and a file are a new package, sent at once.
+      if (l) sendPackage(l, addPackageWithFile(name, file.name));
+      else S.biz.materials.push({ name, file: file.name });
       save();
       if (l) { sheetMaterials(l); refreshLead(l); } else render();
       toast(name + ' נשמר');
@@ -2448,8 +2452,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const t = id ? tplById(id) : { id: '', name: '', mat: '', text: 'שלום {שם}, ' };
     sheet(`<h2>${id ? 'עריכת חבילה' : 'חבילה חדשה'}</h2>
       <label class="label" for="tp-name">שם <small>כך היא תופיע בדוכן</small></label><input id="tp-name" class="text-input" value="${esc(t.name)}" autocomplete="off">
-      <div class="label">קובץ מצורף</div><div class="chips"><button class="chip" data-tpmat="" aria-pressed="${!t.mat}">בלי קובץ</button>${S.biz.materials.map((x) => `<button class="chip" data-tpmat="${esc(x.name)}" aria-pressed="${t.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}</div>
-      ${S.biz.materials.length ? '' : '<p class="faint" style="margin-top:6px">עוד אין קבצים. מוסיפים ב"הודעות וחומרים", או בדוכן.</p>'}
+      <div class="label">קובץ מצורף</div><div class="chips" id="tp-mats"><button class="chip" data-tpmat="" aria-pressed="${!t.mat}">בלי קובץ</button>${S.biz.materials.map((x) => `<button class="chip" data-tpmat="${esc(x.name)}" aria-pressed="${t.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}</div>
+      <div class="actions" style="margin-top:6px"><label class="btn" for="tp-file">📎 לצרף קובץ חדש</label></div><input id="tp-file" type="file" accept="image/*,application/pdf" hidden>
       <label class="label" for="tp-text">ההודעה</label>
       <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ העסק שלך'], ['{חומר}', '+ חומר']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
       <textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
@@ -2458,6 +2462,18 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
         ${id ? `<button class="btn ghost danger far" data-act="tpl-del" data-id="${esc(id)}">למחוק</button>` : ''}</div>`);
     $('#scrim .sheet').dataset.guard = '1';
+    // A new file joins the library and is attached here at once; the name and the words typed so far stay.
+    $('#tp-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const name = (file.name.replace(/\.[^.]+$/, '') || file.name).slice(0, 30);
+      if (!S.biz.materials.some((x) => x.name === name)) S.biz.materials.push({ name, file: file.name });
+      save();
+      document.querySelectorAll('[data-tpmat]').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+      let chip = [...document.querySelectorAll('[data-tpmat]')].find((x) => x.dataset.tpmat === name);
+      if (!chip) { chip = document.createElement('button'); chip.className = 'chip'; chip.dataset.tpmat = name; chip.textContent = '📎 ' + name; $('#tp-mats').appendChild(chip); }
+      chip.setAttribute('aria-pressed', 'true');
+    });
   }
   function sheetLeadMsg(l) {
     sheet(`<h2>הודעה ל${esc(People.rowName(l))}</h2>
@@ -3311,6 +3327,16 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'es-pk-add': {
+        const name = (($('#es-pk-name') && $('#es-pk-name').value.trim()) || (ES.newFile && ES.newFile.name) || '').slice(0, 30);
+        if (!name) return toast('איך לקרוא לחבילה?');
+        let mat = '';
+        if (ES.newFile) { mat = ES.newFile.name; if (!S.biz.materials.some((x) => x.name === mat)) S.biz.materials.push({ name: mat, file: ES.newFile.file }); }
+        const id = 'p' + (S.biz.bseq++);
+        S.biz.templates.push({ id, name, mat, text: mat ? PKG_TEXT : 'שלום {שם}, ' });
+        ES.pkg = id; ES.newFile = null; ES.newName = '';
+        save(); renderStepExtra(); return toast('"' + name + '" נוספה ונבחרה');
+      }
       case 'tk-lost': {
         const l = TK && leadById(TK.lid);
         TK = null;
