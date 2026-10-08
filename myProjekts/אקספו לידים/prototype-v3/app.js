@@ -937,8 +937,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const mat = ES.type !== 'send' ? '' : `<div class="label">מה לשלוח</div>
       <div class="chips">${mats.map((x) => `<button class="chip" data-esmat="${esc(x.name)}" aria-pressed="${ES.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}
         <button class="chip" data-esmat="" aria-pressed="${!ES.mat}">${mats.length === 1 ? 'החומר היחיד' : 'לבחור בזמן השליחה'}</button></div>
-      ${mats.length ? '' : '<p class="faint" style="margin-top:6px">עוד אין חומרים. מוסיפים ב"חומרים ונוסח".</p>'}`;
+      <div class="add-row" style="margin-top:8px"><input id="es-mat-name" class="text-input" placeholder="+ חומר חדש — קטלוג, מחירון, תמונות" autocomplete="off">
+        <label class="btn" for="es-mat-file">📷 קובץ</label></div><input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
     box.innerHTML = days + mat;
+    // A new material can be added right here, and is chosen for this step at once — no trip to "חומרים ונוסח".
+    const f = $('#es-mat-file');
+    if (f) f.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const name = (($('#es-mat-name') && $('#es-mat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '')).slice(0, 30);
+      if (!S.biz.materials.some((x) => x.name === name)) S.biz.materials.push({ name, file: file.name });
+      ES.mat = name; save(); renderStepExtra(); toast(name + ' נשמר ונבחר');
+    });
   }
   const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, mat: ES.mat });
 
