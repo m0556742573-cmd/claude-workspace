@@ -422,7 +422,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         grades: 'classic', derive: true, idleSec: 12, hideVisited: true,
         materials: [], channels: { email: true, sms: false, wa: false, waApi: false },
         mail: { replyTo: '', prefix: '' }, smsName: '',
-        sendWhen: 'now', template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}. נשמח לעמוד לשירותך.',
+        chOrder: ['wa', 'waApi', 'email', 'sms'], sendAll: false, template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}. נשמח לעמוד לשירותך.',
         devices: 1,
       },
       leads: [], seq: 1, nseq: 1, ai: { dash: null, crm: null },
@@ -791,8 +791,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function viewConnect(m) {
     const b = S.biz;
     const prefix = b.mail.prefix || 'info';
+    const on = chOrder().filter((c) => b.channels[c]);
     m.innerHTML = `<h1>חיבורים</h1>
-      <p class="muted">איך החומר והתשובות יוצאים למבקר. כל ערוץ פעיל יוצא <b>במקביל</b>, לא במקום השני.</p>
+      <p class="muted">איך החומר והתשובות יוצאים למבקר. אפשר לחבר כמה ערוצים, ולבחור באיזה קודם.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><div class="toggle-row"><div><h2>📧 מייל</h2><p class="muted">לכל מבקר יש מייל ברשימת המארגנים. יוצא מהמערכת, בשם העסק שלך.</p></div>${toggle('ch:email', b.channels.email, 'מייל')}</div>
           ${b.channels.email ? `<div class="label">הכתובת שממנה זה יוצא</div>
@@ -807,9 +808,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           ${b.channels.wa ? '<button class="btn" data-act="disconnect" data-ch="wa">מחובר · לנתק</button>' : '<button class="btn primary" data-act="connect" data-ch="wa">לחבר</button>'}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>✅ וואטסאפ עסקי רשמי</h2><p class="muted">רק אם כבר יש לך חשבון רשמי. מתחברים אליו, לא פותחים חדש.</p></div>
           ${b.channels.waApi ? '<button class="btn" data-act="disconnect" data-ch="waApi">מחובר · לנתק</button>' : '<button class="btn primary" data-act="connect" data-ch="waApi">לחבר</button>'}</div></section>
-        <section class="card"><h2>מתי זה יוצא</h2>
-          <div class="chips" style="margin-top:8px"><button class="chip" data-sendwhen="now" aria-pressed="${b.sendWhen === 'now'}">מיד, בדוכן</button>
-            <button class="chip" data-sendwhen="evening" aria-pressed="${b.sendWhen === 'evening'}">בערב, הכל ביחד</button></div></section>
+        ${on.length > 1 ? `<section class="card"><h2>באיזה ערוץ קודם</h2><p class="muted">חומר יוצא בערוץ הראשון ברשימה שמחובר.</p>
+          <div class="step-list">${on.map((k, i) => `<div class="stage-line"><span class="pn">${i + 1}. ${esc(chName(k))}</span>
+            <button class="btn ghost" data-chmove="${k}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-chmove="${k}:1" aria-label="למטה" ${i < on.length - 1 ? '' : 'disabled'}>▼</button></div>`).join('')}</div>
+          <div class="toggle-row" style="margin-top:12px"><div><b>לשלוח בכל הערוצים</b><p class="muted">המבקר יקבל את אותו חומר בכל ערוץ מחובר. וואטסאפ — פעם אחת בלבד.</p></div>${toggle('sendAll', b.sendAll, 'לשלוח בכל הערוצים')}</div></section>` : ''}
       </div>
       ${Object.values(b.channels).some(Boolean) ? "" : `<p class="warn-box" style="margin-top:14px">⚠️ אין אף ערוץ פעיל. בלי ערוץ, חומר לא יישלח מהדוכן — רק יסומן "ממתין".</p>`}
       <p class="honest">בדוגמית שום דבר לא נשלח באמת, והחיבורים מדומים.</p>`;
@@ -1196,17 +1198,26 @@ Reply with ONLY one JSON object, all strings in Hebrew:
 
   // ---- sending ----
   const channelsOn = () => CHANNELS.filter((c) => S.biz.channels[c.k]).map((c) => c.name);
-  // One message goes out on one channel: WhatsApp first, then mail, then SMS — never the same text three times.
+  // The owner orders his channels: a message goes out on the first one connected — or on all of them, only if he chose that.
   const CH_ORDER = ['wa', 'waApi', 'email', 'sms'];
-  const bestChannel = (keys) => { const k = CH_ORDER.find((c) => S.biz.channels[c] && (!keys || keys.includes(c))); return k ? CHANNELS.find((c) => c.k === k).name : ''; };
+  const chOrder = () => S.biz.chOrder || CH_ORDER;
+  const chName = (k) => CHANNELS.find((c) => c.k === k).name;
+  const bestChannel = (keys) => { const k = chOrder().find((c) => S.biz.channels[c] && (!keys || keys.includes(c))); return k ? chName(k) : ''; };
+  /** Where one send goes: the first channel, or every connected one — and WhatsApp once, the official engine before the other. */
+  function sendChannels() {
+    const on = chOrder().filter((c) => S.biz.channels[c]);
+    if (!S.biz.sendAll) return on.slice(0, 1).map(chName);
+    return on.filter((c) => !(c === 'wa' && S.biz.channels.waApi)).map(chName);
+  }
   let byRule = false;   // set while an automation acts: what it sends is logged as the system's, not the owner's
   function doSend(l, name) {
     if (l.sent.includes(name)) return;
-    const ch = bestChannel();
-    if (!ch) { l.pendingMat = true; if (!byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return; }
+    const chs = sendChannels();
+    if (!chs.length) { l.pendingMat = true; if (!byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return; }
+    const ch = chs.join(' + ');
     l.sent.push(name); l.pendingMat = false;
-    log(l, `${byRule ? '⚙️ ' : ''}📎 ${name} — ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ב${ch}${byRule ? ' (אוטומטי)' : ''}`);
-    if (!byRule) toast(`📎 ${name} ${S.biz.sendWhen === 'now' ? 'נשלח' : 'יישלח בערב'} ל${People.rowName(l)} · ${ch}`);
+    log(l, `${byRule ? '⚙️ ' : ''}📎 ${name} — נשלח ב${ch}${byRule ? ' (אוטומטי)' : ''}`);
+    if (!byRule) toast(`📎 ${name} נשלח ל${People.rowName(l)} · ${ch}`);
   }
   /* A button whose step is "send at once" queues its own material, and the queue goes
    * out when the card closes. Until then, untapping the button takes it back — a
@@ -2889,7 +2900,15 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     }
     if (d.idle) { S.biz.idleSec = +d.idle; save(); return render(); }
     if (d.remind) { S.biz.remindWeeks = +d.remind; save(); return render(); }
-    if (d.sendwhen) { S.biz.sendWhen = d.sendwhen; save(); return render(); }
+    if (d.chmove) {
+      const [k, dir] = d.chmove.split(':');
+      const on = chOrder().filter((c) => S.biz.channels[c]);
+      const i = on.indexOf(k), j = i + +dir;
+      if (i < 0 || j < 0 || j >= on.length) return;
+      [on[i], on[j]] = [on[j], on[i]];
+      S.biz.chOrder = on.concat(chOrder().filter((c) => !on.includes(c)));
+      save(); return render();
+    }
     if (d.editseason) return sheetSeason(d.editseason);
     if (d.grades) { S.biz.grades = d.grades; save(); return render(); }
     if (d.pick) return pick(d.pick);
