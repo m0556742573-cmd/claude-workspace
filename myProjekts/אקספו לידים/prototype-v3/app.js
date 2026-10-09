@@ -264,6 +264,7 @@
     const t = s && STEPS[s.type] ? s.type : 'call';
     const out = { type: t, label: (s && s.label) || STEPS[t].label, days: s && s.days != null ? s.days : STEPS[t].days, pkg: (s && s.pkg) || '' };
     if (t === 'date') out.before = s && s.before != null ? s.before : 4;   // weeks before the simcha
+    if (s && s.sid) out.sid = s.sid;   // the step's own id: "done" stays on it however the list is reordered (L3)
     return out;
   };
   // "Send material — at once" is not a task. It happens the moment the button is tapped.
@@ -435,7 +436,34 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   try { S = JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch (e) { S = fresh(); }
   let DEV;
   try { DEV = JSON.parse(localStorage.getItem(DEVKEY)) || { role: 'owner' }; } catch (e) { DEV = { role: 'owner' }; }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem(DEVKEY, JSON.stringify(DEV)); } catch (e) { /* private window, or full */ } };
+  /* L3: every step of a button (and of the default) gets an id of its own. A step that had none was known by its
+   * place ("k3:0"); when it gets its id, what leads marked on that place moves to the id, so nothing done is lost. */
+  function ensureSids() {
+    if (!S || !S.biz) return;
+    const fix = (owner, steps) => (steps || []).forEach((s, i) => {
+      if (!s || s.sid) return;
+      s.sid = 's' + (S.biz.bseq++);
+      const from = owner + ':' + i;
+      const to = owner + ':' + s.sid;
+      S.leads.forEach((l) => {
+        if (l.done && l.done.includes(from)) l.done = l.done.map((k) => (k === from ? to : k));
+        if (l.moved && l.moved[from] != null) { l.moved[to] = l.moved[from]; delete l.moved[from]; }
+      });
+    });
+    fix('def', S.biz.defSteps);
+    (S.biz.buttons || []).forEach((b) => fix(b.id, b.steps));
+    // L1: a button with no steps of its own used to carry the default under its own name ("k5:0"); the default is now
+    // the default's own ("def:<id>"), so what was marked on it moves there and does not come back as a new task.
+    (S.biz.buttons || []).filter((b) => !(b.steps && b.steps.length)).forEach((b) => (S.biz.defSteps || []).forEach((s, i) => {
+      const from = b.id + ':' + i;
+      const to = 'def:' + s.sid;
+      S.leads.forEach((l) => {
+        if (l.done && l.done.includes(from)) l.done = l.done.filter((k) => k !== from).concat(l.done.includes(to) ? [] : [to]);
+        if (l.moved && l.moved[from] != null) { if (l.moved[to] == null) l.moved[to] = l.moved[from]; delete l.moved[from]; }
+      });
+    }));
+  }
+  const save = () => { ensureSids(); try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem(DEVKEY, JSON.stringify(DEV)); } catch (e) { /* private window, or full */ } };
   const words = () => GRADES[S.biz.grades].words;
   const worker = () => DEV.role === 'worker';
   const ownerOnly = (what) => toast('🔒 ' + what + ' — רק בטאבלט של הבעלים');
@@ -544,15 +572,17 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   };
   /** The steps the buttons give this lead, each with a key so it can be done or moved. */
   function derived(l) {
-    const bs = tagged(l);
-    const src = bs.length ? bs.map((b) => [b.id, stepsOf(b)]) : [['def', stepsOf(null)]];
+    // A button with no steps of its own adds nothing when another tapped button gives a step (L1):
+    // "פרטי" + "מטבחים" is one measuring visit, not a visit and a call. The default comes in only when no button gives one.
+    const own = tagged(l).filter((b) => b.steps && b.steps.length);
+    const src = own.length ? own.map((b) => [b.id, stepsOf(b)]) : [['def', stepsOf(null)]];
     const seen = new Set();
     const out = [];
     src.forEach(([id, ss]) => ss.forEach((s, i) => {
       const sig = s.type + '|' + s.label;
       if (seen.has(sig)) return;
       seen.add(sig);
-      out.push(Object.assign({}, s, { key: id + ':' + i }));
+      out.push(Object.assign({}, s, { key: id + ':' + (s.sid || i) }));   // L3: a step keeps its key when the steps are reordered
     }));
     return out;
   }
@@ -580,7 +610,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const saidNone = list.some((s) => s.type === 'none');
     list = list.filter((s) => s.type !== 'none' && !immediate(s));
     // Buttons that only send at once still leave someone to follow up with.
-    if (!list.length && w !== 2 && !saidNone && tagged(l).length) list = stepsOf(null).map((s, i) => Object.assign({}, s, { key: 'def:' + i })).filter((s) => s.type !== 'none' && !immediate(s));
+    if (!list.length && w !== 2 && !saidNone && tagged(l).length) list = stepsOf(null).map((s, i) => Object.assign({}, s, { key: 'def:' + (s.sid || i) })).filter((s) => s.type !== 'none' && !immediate(s));
     const season = seasonStart();
     return list.concat(l.manual).filter((s) => !l.done.includes(s.key))
       .map((s) => Object.assign({}, s, { due: dueOf(l, s), season: s.type === 'season' && season ? season.name : undefined }))
@@ -599,7 +629,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const daysWord = (s) => (s.type === 'none' ? 'בלי משימה' : s.type === 'season' ? 'לפני העונה' : s.days === 0 ? 'מיד' : s.days === 1 ? 'תוך יום' : 'תוך ' + s.days + ' ימים');
   const stepText = (s) => STEPS[s.type].icon + ' ' + s.label + (s.pkg && pkgById(s.pkg) ? ' (' + pkgById(s.pkg).name + ')' : '') + ' · ' + daysWord(s);
   const stepsText = (ss) => ss.map(stepText).join('  +  ');
-  const planHTML = (p, bare) => `${STEPS[p.type].icon} <b>${esc(p.label)}</b>${p.due && !bare ? ' · ' + esc(dueText(p.due)) : ''}${p.season ? ' · לקראת ' + esc(p.season) : ''}`;
+  const planHTML = (p, bare) => `${STEPS[p.type].icon} <b>${esc(p.label)}</b>${p.due && !bare ? ' · ' + esc(dueText(p.due)) : ''}${p.season ? ' · לקראת ' + esc(p.season) : p.type === 'season' && p.due ? ' · אין עונה מוגדרת' : ''}`;
   const log = (l, t) => l.log.push({ at: now(), t });
   const addManual = (l, s, dueAt) => { l.manual.push({ key: 'm' + (S.nseq++), type: s.type, label: s.label, days: s.days, pkg: s.pkg || '', before: s.before, phase: s.phase || '', dueAt }); };
   function dueFor(s) {
@@ -931,7 +961,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return `<section class="card axis"><button class="group-title" data-editgroup="${g.id}"><h2>${esc(g.title)} <small>${esc(g.hint || '')}${g.multi ? ' · אפשר כמה' : ''}</small></h2><span class="faint">עריכה</span></button>
       <div class="prod-list">${groupButtons(g.id).map((x) => `<button class="prod-row" data-editbtn="${x.id}">
         <span class="pn">${esc(x.label)}${x.unsure ? ' <span class="q">?</span>' : ''}${x.weight >= 2 ? ` <span class="wt">${esc(WEIGHT[x.weight])}</span>` : ''}</span>
-        <span class="pnext">${esc(stepsText(stepsOf(x)))}</span></button>`).join('')}</div>
+        <span class="pnext">${esc(x.steps && x.steps.length ? stepsText(stepsOf(x)) : 'ברירת המחדל · ' + (stepsText(stepsOf(null)) || 'קהל'))}</span></button>`).join('')}</div>
       <div class="add-row"><input class="text-input" data-newbtn="${g.id}" placeholder="+ כפתור חדש" autocomplete="off"><button class="btn" data-addbtn="${g.id}">הוספה</button></div></section>`;
   }
   function addButton(gid) {
@@ -964,14 +994,14 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function sheetSteps(ctx) {
     if (ctx) {
       const x = ctx.kind === 'btn' ? btnById(ctx.id) : null;
-      D = { kind: ctx.kind, id: ctx.id, label: x ? x.label : '', weight: x ? x.weight || 0 : 0, value: x ? x.value || '' : '', steps: (x ? stepsOf(x) : stepsOf(null)).map((s) => Object.assign({}, s)) };
+      D = { kind: ctx.kind, id: ctx.id, label: x ? x.label : '', weight: x ? x.weight || 0 : 0, value: x ? x.value || '' : '', steps: (x ? (x.steps || []).map(normStep) : stepsOf(null)).map((s) => Object.assign({}, s)) /* a button's OWN steps: the default is not copied into it */ };
     }
     const isBtn = D.kind === 'btn';
     sheet(`<h2>${isBtn ? esc(D.label) : 'מי שלא סומן לו כלום'}</h2>
       ${isBtn ? `<div class="label">שם הכפתור</div><input id="eb-name" class="text-input" value="${esc(D.label)}" autocomplete="off">` : ''}
       <div class="label">מה עושים אחר כך <small>אפשר כמה צעדים</small></div>
       <div class="step-list">${D.steps.map((s, i) => `<div class="step-line"><button class="prod-row" data-editstep="${i}"><span class="pn">${esc(stepText(s))}</span></button>
-        <button class="btn ghost danger" data-delstep="${i}" aria-label="להסיר צעד">✕</button></div>`).join('') || '<div class="faint">אין צעד — מי שיסומן כאן ייכנס לקהל.</div>'}</div>
+        <button class="btn ghost danger" data-delstep="${i}" aria-label="להסיר צעד">✕</button></div>`).join('') || (isBtn ? `<div class="faint">אין צעד משלו — יקבל את ברירת המחדל: ${esc(stepsText(stepsOf(null)) || 'אין')}. כדי שייכנס לקהל: צעד "בלי משימה — קהל".</div>` : '<div class="faint">אין צעד — מי שלא סומן לו כלום ייכנס לקהל.</div>')}</div>
       <button class="chip add" data-act="add-step" style="margin-top:8px">+ צעד נוסף</button>
       ${isBtn ? `<div class="label">כמה פונה כזה חשוב לך <small>קובע את הסדר ברשימות — לא את החום</small></div>
         <div class="chips">${WEIGHT.map((w, k) => `<button class="chip" data-esweight="${k}" aria-pressed="${D.weight === k}">${esc(w)}</button>`).join('')}</div>
@@ -989,7 +1019,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /* One editor for a single step: a button's, the default's, or a lead's own. */
   let ES = null;
   function sheetStep(o) {
-    ES = { type: o.step.type, days: o.step.days, pkg: o.step.pkg || '', before: o.step.before != null ? o.step.before : 4, ctx: o.ctx };
+    ES = { sid: o.step.sid, type: o.step.type, days: o.step.days, pkg: o.step.pkg || '', before: o.step.before != null ? o.step.before : 4, ctx: o.ctx };
     sheet(`<h2>${esc(o.title)}</h2>
       <div class="label">סוג הצעד <small>לפי זה המערכת פועלת</small></div>
       <div class="step-grid">${Object.entries(STEPS).map(([k, v]) => `<button class="opt" data-steptype="${k}" aria-pressed="${ES.type === k}">${v.icon} ${esc(v.name)}</button>`).join('')}</div>
@@ -999,14 +1029,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="actions"><button class="btn primary" data-act="save-step">אישור</button><button class="btn ghost" data-act="step-back">חזרה</button></div>`);
     renderStepExtra();
     $("#scrim .sheet").dataset.guard = "1";
+    $('#es-label').addEventListener('input', () => { ES.typed = true; });
   }
   function renderStepExtra() {
     const box = $('#es-extra');
     if (!box) return;
     const pkgs = S.biz.templates;
     const days = ES.type === 'none' || ES.type === 'season'
-      ? `<p class="faint" style="margin-top:10px">${ES.type === 'season' ? 'יחזור אליך ' + S.biz.remindWeeks + ' שבועות לפני העונה שלך.' : 'לא נכנס לרשימת המשימות. נשמר בקהל.'}</p>`
-      : `<div class="label">מתי</div><div class="chips">${[0, 1, 2, 3, 5, 7, 14, 30].map((d) =>
+      ? `<p class="faint" style="margin-top:10px">${ES.type === 'season' ? (S.biz.seasons.length ? 'יחזור אליך ' + S.biz.remindWeeks + ' שבועות לפני העונה שלך.' : '⚠️ אין לך עונות מוגדרות, ולכן הצעד ייקבע לעוד 3 ימים. מגדירים ב"עונות".') : 'לא נכנס לרשימת המשימות. נשמר בקהל.'}</p>`
+      : `<div class="label">מתי</div><div class="chips">${(ES.type === 'send' ? [0] : []).concat([1, 2, 3, 5, 7, 14, 30]).map((d) =>
         `<button class="chip" data-esdays="${d}" aria-pressed="${ES.days === d}">${d === 0 ? 'מיד' : d === 1 ? 'תוך יום' : d + ' ימים'}</button>`).join('')}</div>
         ${ES.type === 'send' && ES.days === 0 ? '<p class="faint" style="margin-top:6px">יישלח ברגע שנוגעים בכפתור בדוכן. בכרטיס לא יופיע כפתור "שלח חומר".</p>' : ''}`;
     const mat = ES.type !== 'send' ? '' : `<div class="label">איזו הודעה לשלוח</div>
@@ -1030,7 +1061,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       renderStepExtra();
     });
   }
-  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, pkg: ES.pkg, before: ES.before });
+  const readStep = () => normStep({ type: ES.type, label: ($('#es-label') && $('#es-label').value.trim()) || STEPS[ES.type].label, days: ES.days == null ? STEPS[ES.type].days : ES.days, pkg: ES.pkg, before: ES.before, sid: ES.sid });
 
   // ---- warmth and the booth ----
   function viewBoothSettings(m) {
@@ -1139,6 +1170,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   let idleTimer = null;
   let lastClosed = null;   // { id, at } — the card that just closed, one tap away for a minute
   let held = null;         // the card left open when he started typing the next name — saved, or gone back to
+  let againAll = false;    // "and N more who visited" was opened for this search
+  let cardSnap = null;     // { id, before } — the open card as it was when opened; before is null for a visitor just added
   let micState = navigator.mediaDevices && window.MediaRecorder ? null : "none";   // "none" once we know there is no microphone
   const IDLE = () => S.biz.idleSec * 1000;
   const leadByKey = (key) => leadsNow().find((l) => l.key === key);
@@ -1148,7 +1181,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div id="slot"></div><p class="foot" id="foot"></p>`;
     const q = $('#q');
     // Typing while a card is open does not drop it: the card is held, and a bar asks to save it or go back to it (K2).
-    q.addEventListener('input', () => { if (openId) { held = openId; openId = null; } stopIdle(); renderResults(q.value); });
+    q.addEventListener('input', () => { if (openId) { held = openId; openId = null; } againAll = false; stopIdle(); renderResults(q.value); });
     if (openId && leadById(openId)) renderLead(); else { openId = null; renderResults(''); }
     updateFoot();
     if (FINE) setTimeout(() => q.focus(), 30);
@@ -1180,12 +1213,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }).join('');
     // Above the results, with the town and the family line: two men of the same name must not be confused.
     // Opening one records nothing; "came back" is its own button, and only after half an hour.
-    const again = skipped.length ? `<div class="again"><div class="label" style="margin:0">ביקרו כבר</div>${skipped.slice(0, 3).map((h) => {
+    // L11: three are shown, and "and N more" opens the rest — no one who visited is out of reach.
+    const shownAgain = againAll ? skipped : skipped.slice(0, 3);
+    const againMore = skipped.length > shownAgain.length ? `<button class="btn ghost" data-act="again-all">ועוד ${skipped.length - shownAgain.length} שביקרו ←</button>` : '';
+    const again = skipped.length ? `<div class="again"><div class="label" style="margin:0">ביקרו כבר</div>${shownAgain.map((h) => {
       const l = leadByKey(h.key);
       const can = l && now() - (l.lastAt || l.at) > 30 * 60000;
       return `<div class="again-row"><button class="result small" data-reopen="${l.id}"><span><span class="nm">${esc(People.rowName(h))}</span> <span class="city">${esc(People.town(h))}</span><span class="mt">${esc(People.rowMeta(h))}</span></span><span class="badge">לפתוח</span></button>
         ${can ? `<button class="btn" data-again="${h.key}">↺ חזר שוב</button>` : ''}</div>`;
-    }).join('')}</div>` : '';
+    }).join('')}${againMore}</div>` : '';
     const more = total > hits.length ? `<div class="more">ועוד ${total - hits.length} — להוסיף אות משם המשפחה</div>` : '';
     // Visitors added here by hand are not in the organisers' list, so the search finds them among the leads.
     const nq = People.norm(query);
@@ -1205,6 +1241,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       log(l, 'ביקר בדוכן');
       S.leads.push(l);
       toast('✓ נשמר: ' + People.rowName(l));
+      save();
+      return openLead(l, true);
     }
     save();
     openLead(l);
@@ -1232,7 +1270,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     S.leads.push(l);
     save(); closeSheet(false);
     toast('✓ נשמר: ' + People.rowName(l));
-    openLead(l);
+    openLead(l, true);
   }
   function cameBack(key) {
     const l = leadByKey(key);
@@ -1243,10 +1281,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     toast('↺ ' + People.rowName(l) + ' חזר — סומן');
     openLead(l);
   }
-  function openLead(l) {
+  function openLead(l, isNew) {
     // Another card replaces this one: the old one closes for real (sent, rules run), and a held one too — unless it is the one coming back.
-    if (held === l.id) held = null; else closeHeld();
+    const back = held === l.id;
+    if (back) held = null; else closeHeld();
     if (openId && openId !== l.id) closeLead();
+    // "Undo the changes" takes the card back to how it opened: a new visitor is not kept, a known one returns as he was.
+    if (!back || !cardSnap || cardSnap.id !== l.id) cardSnap = { id: l.id, before: isNew ? null : JSON.parse(JSON.stringify(l)) };
     openId = l.id;
     lastClosed = null;
     if ($('#q')) $('#q').value = '';
@@ -1268,6 +1309,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     flushSends(l);
     if (l && !l.capRun && !l.practice) { l.capRun = true; runRules('captured', l); save(); }   // the "lead captured" automations run once, when the card closes
     lastClosed = { id: openId, at: Date.now() };
+    if (cardSnap && cardSnap.id === openId) cardSnap = null;
     openId = null;
     stopIdle();
   }
@@ -1300,8 +1342,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="actions">${sendBtn}
         <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
         <button class="btn" data-act="note-rec" data-lid="${l.id}" ${micState === 'none' ? 'disabled title="אין מיקרופון במכשיר הזה"' : ''}>🎙️ ${micState === 'none' ? 'אין מיקרופון' : 'הקלטה'}</button>
-        ${!inSheet && Date.now() - l.created < 6000 && l.visits === 1
-          ? `<button class="btn ghost danger far" data-act="undo-lead" data-lid="${l.id}">לא לשמור</button>`
+        ${!inSheet
+          // One button, always the same (יצחק, 09/10): back to how the card opened — for a new visitor, not kept at all.
+          ? `<button class="btn ghost danger far" data-act="card-undo" data-lid="${l.id}">↶ ביטול השינויים</button>`
           : `<button class="btn ghost danger far" data-act="del-lead" data-lid="${l.id}">מחיקה</button>`}</div>`;
   }
   function renderLead() {
@@ -1405,6 +1448,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   const keysHaveDefault = () => sendKeys().some((k) => pkgFor('', k));
   const unqueue = (l, b) => { l.queue = (l.queue || []).filter((q) => q.btn !== b.id); };
+  const unqueueAll = (l) => { l.queue = []; };   // what waited for the card to close does not go out
   function flushSends(l) {
     if (!l || !(l.queue || []).length) return;
     const q = l.queue;
@@ -1521,10 +1565,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function sheetTasks(l, ret, title) {
     tasksRet = ret || null;
     const ts = tasks(l);
+    // At the booth a step for another day cannot be done yet: it can be changed, not marked done (יצחק, 09/10).
+    const atBooth = S.view === 'booth' || S.phase !== 'live';
+    const canDo = (t) => !atBooth || !t.due || dayNo(t.due.getTime()) <= dayNo(now());
     sheet(`<h2>${esc(title || 'מה הלאה עם ' + People.rowName(l) + '?')}</h2>
       ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
         <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
-          <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
+          ${canDo(t) ? `<button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>` : ''}
           <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
         : l.won || l.lost || l.audience ? '<p class="muted">אין צעדים פתוחים. הוא ב' + (l.won ? 'לקוחות' : l.lost ? 'לא רלוונטיים' : 'קהל') + '.</p>'
           // No step and no decision yet (a "cold" lead): the owner decides, not the system (G2).
@@ -1712,15 +1759,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return { id: l.id, business: l.b != null, town: People.town(l), warmth: effWarm(l) == null ? null : words()[effWarm(l)],
       tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, visits: l.visits, sent: l.sent, next: p.label, nextKind: p.type,
       dueInDays: p.due ? dayNo(p.due.getTime()) - dayNo(now()) : null, openSteps: tasks(l).length, noAnswer: l.noAnswer || 0,
-      notes: l.notes.map((n) => n.text || n.tr).filter(Boolean).slice(-2), won: !!l.won, lost: !!l.lost };
+      notes: l.notes.map((n) => n.text || n.tr).filter(Boolean).slice(-5), won: !!l.won, lost: !!l.lost };
   }
   async function aiInsights(scope) {
     const L = leadsNow().slice(-80).map(leadFacts);
     const btn = $('#ins-' + scope);
     if (btn) { btn.disabled = true; btn.textContent = 'עובר על הלידים…'; }
     const focus = scope === 'dash'
-      ? 'Look only at TODAY\'S TAGGING at the booth: visitors left without tags, tags that suggest a different warmth or next step, several people from the same institution, group or family, repeat visits, notes that say more than the tags. Do not talk about calls or sales follow-up.'
-      : 'Look at the SALES FOLLOW-UP: who to call first and why, overdue or neglected leads, institutions and groups worth one approach, what is held for a season, leads that should get another step. Do not talk about tagging at the booth.';
+      ? 'Look only at TODAY\'S TAGGING at the booth: visitors left without tags, tags that suggest a different warmth or next step, repeat visits, notes that say more than the tags. Groups and institutions belong to the follow-up view, not here. Do not talk about calls or sales follow-up.'
+      : 'Read every lead\'s notes first: when a note asks for something — to be called at a time, a price, a sample, a date, a visit — propose exactly that step for that lead, and say which note it comes from. Then look at the SALES FOLLOW-UP: who to call first and why, overdue or neglected leads, institutions and groups worth one approach, what is held for a season, leads that should get another step. Do not talk about tagging at the booth.';
     const prompt = `You assist an exhibitor (${S.biz.trade || 'a business'}) at a Hasidic community business fair in Israel.
 His goal at the fair: ${S.biz.goalNote || S.biz.goal || 'not given'}.
 His buttons: ${S.biz.buttons.map((b) => b.label + ' → ' + stepsOf(b).map((s) => STEPS[s.type].name).join(' + ')).join('; ')}.
@@ -2176,6 +2223,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     return { k: 'd' + d, label: H.label(p.due) + ' (' + p.due.getDate() + '/' + (p.due.getMonth() + 1) + ')', ord: d };
   }
   /** One lead: who and what is next on the first line, why underneath. With `withCall`, a 📞 beside it records the call in place. */
+  /** The newest note, written or transcribed — what he asked to be reminded of comes back with the lead (יצחק, 09/10). */
+  const lastNote = (l) => { const n = l.notes[l.notes.length - 1]; return n ? n.text || n.tr || (n.audio ? 'הקלטה' : '') : ''; };
   function crmRow(l, bare, withCall) {
     const p = plan(l);
     const w = effWarm(l);
@@ -2183,7 +2232,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const v = leadValue(l);
     const why = [w != null ? words()[w] : 'בלי חום', stageById(l.stage).name].concat(tagged(l).map((b) => b.label), l.roleOf ? [l.roleOf] : [], l.visits > 1 ? ['חזר לדוכן'] : [], [contactLine(l)], l.notes.length ? [l.notes.length + ' הערות'] : [], v ? [nis(v)] : []).join(' · ');
     const row = `<button class="row" data-crmlead="${l.id}"><span><span class="dot w${w == null ? '' : w}"></span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
-      <span class="due">${planHTML(p, bare)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span><span class="why">${esc(why)}${l.contact.phone ? ` · <bdi dir="ltr">${esc(l.contact.phone)}</bdi>` : ''}</span></button>`;
+      <span class="due">${planHTML(p, bare)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span><span class="why">${esc(why)}${l.contact.phone ? ` · <bdi dir="ltr">${esc(l.contact.phone)}</bdi>` : ''}</span>${lastNote(l) ? `<span class="note-peek">📝 ${esc(lastNote(l).slice(0, 100))}</span>` : ''}</button>`;
     if (!withCall || !isOpenLead(l)) return row;
     return `<div class="row-wrap${rowOpen === l.id ? ' open' : ''}">${row}<button class="row-call" data-rowcall="${l.id}" aria-label="להתקשר ל${esc(People.rowName(l))}" aria-expanded="${rowOpen === l.id}">📞</button>
       ${rowOpen === l.id ? `<div class="row-out"><span class="faint">${l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</span>
@@ -2353,7 +2402,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <span><b>${rows.length}</b> לידים${tbIds ? ` · <button class="chip small" data-act="ask-unfilter">${esc(tbIdsWhy || 'מתוך התשובה לשאלה')} ✕</button>` : ''}${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
         <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${v.builtin ? '⭐ ' : ''}${esc(v.name)}</button>`).join('')}
           <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button>
-          <button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">צפיפות: ${S.tb.dense ? 'דחוסה ✓' : 'רגילה'}</button><button class="btn" data-act="tb-export">⬇ אקסל</button></span>
+          <button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">צפיפות: ${S.tb.dense ? 'דחוסה ✓' : 'רגילה'}</button><button class="btn" data-act="tb-export" title="מה שרואים עכשיו בטבלה">⬇ אקסל — מה שבטבלה</button><button class="btn" data-act="export-all" title="כל הלידים, עם טלפון ומייל, בלי קשר לסינון">⬇ כל הלידים</button></span>
       </div>
       <div class="tb-wrap"><table class="tb${S.tb.dense ? ' dense' : ''}">
         <thead><tr><th class="ck"><label class="ck-hit"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></label></th>${cols.map((c) => `<th class="${c.num ? 'num' : ''}${c.id === 'name' ? ' stick' : ''}"><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
@@ -2653,7 +2702,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       if (k === 'auto') return tlAuto && tlFilter === 'all';
       return tlFilter === 'all' || k === tlFilter;
     });
-    const audio = l.notes.filter((n) => n.audio);
     box.innerHTML = `<div class="rec">
       <div class="rec-top">
         <div class="rec-bar"><button class="btn ghost" data-act="record-back">→ חזרה ל${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</button>
@@ -2680,14 +2728,18 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       </div>
       <div class="rec-grid">
         <div class="rec-main">
+          ${l.notes.length ? `<section class="card notes-card"><h2>📝 הערות <span class="faint">(${l.notes.length})</span></h2>
+            <ul class="log">${l.notes.slice().reverse().map((n) => `<li><span class="when">${esc(H.heDate(new Date(n.at)))} ${new Date(n.at).toTimeString().slice(0, 5)}</span>${n.audio ? `<button class="btn ghost" data-play="${n.id}">▶ השמעה</button> ` : ''}<b>${esc(n.text || '')}</b>${n.tr ? `<div class="faint">תמלול: ${esc(n.tr)}</div>` : ''}</li>`).join('')}</ul>
+            <div class="actions"><button class="btn" data-act="note" data-lid="${l.id}">📝 הערה חדשה</button></div></section>` : ''}
           <section class="card"><h2>הלאה</h2>
             ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
               <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
                 <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
                 <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
-              : `<p class="muted">אין צעדים פתוחים${l.won ? ' — לקוח.' : '.'}</p>`}
+              : l.won || l.lost || l.audience ? `<p class="muted">אין צעדים פתוחים — ${l.won ? 'לקוח' : l.lost ? 'לא רלוונטי' : 'בקהל'}.</p>`
+                // G2 here too: no step and no decision — the owner decides.
+                : `<p class="muted">אין לו צעד. מה עושים איתו?</p><div class="actions"><button class="btn" data-act="task-audience" data-lid="${l.id}">לשמור בקהל</button><button class="btn" data-act="lead-lost" data-lid="${l.id}">לא רלוונטי</button></div>`}
             <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד</button></div></section>
-          ${audio.length ? `<section class="card"><h2>הקלטות</h2><ul class="log">${audio.map((n) => `<li><span class="when">${esc(H.heDate(new Date(n.at)))}</span><button class="btn ghost" data-play="${n.id}">▶ השמעה</button> ${esc(n.text || '')}${n.tr ? `<div class="faint">תמלול: ${esc(n.tr)}</div>` : ''}</li>`).join('')}</ul></section>` : ''}
           <section class="card"><h2>ציר זמן</h2>
             <div class="chips tl-filter">${Object.entries(TL_KINDS).map(([k, t]) => `<button class="chip" data-tl="${k}" aria-pressed="${tlFilter === k}">${t}</button>`).join('')}</div>
             <ul class="log timeline">${entries.map((e) => `<li class="tl-${tlKind(e.t)}"><span class="when">${esc(H.heDate(new Date(e.at)))} ${new Date(e.at).toTimeString().slice(0, 5)}</span>${esc(e.t)}</li>`).join('') || '<li class="faint">אין כאן כלום.</li>'}</ul>
@@ -3170,7 +3222,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       ES.type = d.steptype;
       ES.days = STEPS[ES.type].days;
       const inp = $('#es-label');
-      if (inp && (!inp.value.trim() || inp.value.trim() === was)) inp.value = STEPS[ES.type].label;
+      // The words follow the kind: a step changed from "measuring" to "call" no longer says "measuring" — unless he typed his own words just now.
+      if (inp && (!ES.typed || !inp.value.trim() || inp.value.trim() === was)) inp.value = STEPS[ES.type].label;
       document.querySelectorAll('[data-steptype]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.steptype === ES.type));
       return renderStepExtra();
     }
@@ -3432,6 +3485,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       }
       case 'crm-settings': if (worker()) return ownerOnly('ההגדרות'); S.phase = 'settings'; S.step = 'custom'; S.sub = 'crm'; save(); return render();
       case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');
+      // A general export (יצחק, 09/10): every lead of the fair, every column — phone and email included — whatever the filter.
+      case 'export-all': if (worker()) return ownerOnly('הייצוא'); return exportLeads(leadsNow().filter((l) => !l.practice), 'כל-הלידים');
       case 'tb-cols': return sheetCols();
       case 'tb-saveview': return sheet(`<h2>לשמור את התצוגה</h2><p class="muted">הסינון, המיון והעמודות של עכשיו — בנגיעה אחת מעכשיו.</p>
         <label class="label" for="view-name">שם</label><input id="view-name" class="text-input" placeholder="למשל: מוסדות חמים" autocomplete="off">
@@ -3512,6 +3567,31 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'cold-aud': { if (L) { filledCold.add(L.id); undoable('בקהל · ' + People.rowName(L), () => { L.audience = true; log(L, 'הועבר לקהל'); }); render(); } return; }
       case 'cold-lost': { if (L) { filledCold.add(L.id); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost', 'סומן קר')); render(); } return; }
       case 'lead-lost': { if (L) { closeSheet(false); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost')); render(); } return; }
+      case 'card-undo': {
+        const l = L;
+        const snap = cardSnap;
+        if (!l || !snap || snap.id !== l.id) return;
+        unqueueAll(l);
+        if (snap.before === null) {   // added just now: not kept
+          openId = null; cardSnap = null; stopIdle();
+          undoable('לא נשמר · ' + People.rowName(l), () => { S.leads = S.leads.filter((x) => x.id !== l.id); });
+          renderResults(''); updateFoot();
+          if ($('#q') && FINE) $('#q').focus();
+          return;
+        }
+        undoable('השינויים בוטלו · ' + People.rowName(l), () => {
+          // What really went out cannot be called back: it stays on the lead, and in its log.
+          const was = snap.before;
+          const sent = l.sent.filter((x) => !was.sent.includes(x));
+          const sentLog = l.log.filter((e) => /נשלח/.test(e.t) && !was.log.some((b) => b.at === e.at && b.t === e.t));
+          Object.keys(l).forEach((k) => { delete l[k]; });
+          Object.assign(l, JSON.parse(JSON.stringify(was)));
+          l.sent = l.sent.concat(sent);
+          l.log = l.log.concat(sentLog);
+        });
+        return renderLead();
+      }
+      case 'again-all': { againAll = true; const q = $('#q'); return renderResults(q ? q.value : ''); }
       case 'new-person': return sheetNewPerson();
       case 'np-save': return saveNewPerson();
       case 'held-save': { const q = $('#q'); closeHeld(); renderResults(q ? q.value : ''); if (q && FINE) q.focus(); return; }
@@ -3611,5 +3691,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   // Test hooks: the readers and the planner, checkable from the console.
   window.Demo3 = { parse: parseWords, clean: cleanAI, useServerAI: () => aiReady(serverAI), plan: (id) => plan(leadById(id)), tasks: (id) => tasks(leadById(id)), state: () => S };
   upgrade();
+  ensureSids();
   render();
 })();
