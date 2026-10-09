@@ -742,7 +742,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         read.push({ id: same ? same.id : 'k' + (b.bseq++), axis: ax, label: x.label, steps: x.steps, weight: x.weight, unsure: x.unsure });
       });
     });
-    b.buttons = hand.concat(read);
+    // A button that real leads are tagged with is never dropped by a new reading (K1): a word changed in the
+    // description — even for a moment while typing — must not wipe what was tapped at the fair.
+    const used = new Set([].concat(...S.leads.filter((l) => !l.practice).map((l) => l.tags)));
+    const keep = old.filter((x) => !x.byHand && used.has(x.id) && !read.some((y) => y.id === x.id));
+    b.buttons = hand.concat(keep, read);
     // A suggested group appears when it has buttons, and goes when a new reading leaves it empty.
     b.groups = b.groups.filter((g) => g.byHand || groupButtons(g.id).length);
     Object.keys(STD).forEach((ax) => { if (groupButtons(ax).length && !groupById(ax)) b.groups.push(Object.assign({ id: ax }, STD[ax])); });
@@ -1133,6 +1137,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   let openId = null;
   let idleTimer = null;
   let lastClosed = null;   // { id, at } — the card that just closed, one tap away for a minute
+  let held = null;         // the card left open when he started typing the next name — saved, or gone back to
   let micState = navigator.mediaDevices && window.MediaRecorder ? null : "none";   // "none" once we know there is no microphone
   const IDLE = () => S.biz.idleSec * 1000;
   const leadByKey = (key) => leadsNow().find((l) => l.key === key);
@@ -1141,7 +1146,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     m.innerHTML = `<input id="q" class="search" type="search" placeholder="שם המשפחה, ועוד אותיות עד שהשם עולה" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
       <div id="slot"></div><p class="foot" id="foot"></p>`;
     const q = $('#q');
-    q.addEventListener('input', () => { openId = null; stopIdle(); renderResults(q.value); });
+    // Typing while a card is open does not drop it: the card is held, and a bar asks to save it or go back to it (K2).
+    q.addEventListener('input', () => { if (openId) { held = openId; openId = null; } stopIdle(); renderResults(q.value); });
     if (openId && leadById(openId)) renderLead(); else { openId = null; renderResults(''); }
     updateFoot();
     if (FINE) setTimeout(() => q.focus(), 30);
@@ -1159,8 +1165,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     // The card that just closed stays one tap away for a minute — reopening it records nothing.
     const last = lastClosed && Date.now() - lastClosed.at < 60000 ? leadById(lastClosed.id) : null;
     const lastBar = last ? `<div class="last-bar"><span>האחרון: <b>${esc(People.rowName(last))}</b> · ${esc(People.town(last))}</span><button class="btn" data-reopen="${last.id}">לפתוח</button></div>` : '';
+    const h = held && leadById(held);
+    const heldBar = h ? `<div class="last-bar held"><span><b>${esc(People.rowName(h))}</b> עוד פתוח</span><span><button class="btn primary" data-act="held-save">✓ לשמור</button> <button class="btn" data-act="held-back">← חזרה אליו</button></span></div>` : '';
     if (!People.norm(query)) {
-      slot.innerHTML = lastBar + '<div class="empty">סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם.<br>כל השאר רשות.</div>';
+      slot.innerHTML = heldBar + lastBar + '<div class="empty">סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם.<br>כל השאר רשות.</div>';
       return;
     }
     const { hits, skipped, total } = People.search(query, 6, S.biz.hideVisited ? (k) => !!leadByKey(k) : null);
@@ -1178,7 +1186,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         ${can ? `<button class="btn" data-again="${h.key}">↺ חזר שוב</button>` : ''}</div>`;
     }).join('')}</div>` : '';
     const more = total > hits.length ? `<div class="more">ועוד ${total - hits.length} — להוסיף אות משם המשפחה</div>` : '';
-    slot.innerHTML = lastBar + again + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more;
+    slot.innerHTML = heldBar + lastBar + again + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more;
   }
   const newLead = (key, r) => ({ id: S.seq++, key, i: r.i, b: r.b, at: now(), lastAt: now(), created: Date.now(), visits: 1, warmth: null, warmBy: null, tags: [],
     eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, audience: false, notes: [],
@@ -1204,7 +1212,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     openLead(l);
   }
   function openLead(l) {
-    if (openId && openId !== l.id) flushSends(leadById(openId));
+    // Another card replaces this one: the old one closes for real (sent, rules run), and a held one too — unless it is the one coming back.
+    if (held === l.id) held = null; else closeHeld();
+    if (openId && openId !== l.id) closeLead();
     openId = l.id;
     lastClosed = null;
     if ($('#q')) $('#q').value = '';
@@ -1212,6 +1222,14 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     updateFoot();
   }
   /** The card closes: what it queued goes out now, and it stays reopenable for a minute. */
+  /** The card held while typing the next name is closed for real: what it queued goes out, its rules run. */
+  function closeHeld() {
+    if (!held) return;
+    const was = openId;
+    openId = held; held = null;
+    closeLead();
+    if (was && was !== lastClosed.id) openId = was;
+  }
   function closeLead() {
     if (!openId) return;
     const l = leadById(openId);
@@ -1330,6 +1348,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const out = keys.map((k) => [k, pkgFor(id, k)]).filter(([, p]) => p);
     if (!out.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין הודעה לשליחה. מגדירים ב"הודעות וחומרים".'); return false; }
     l.pendingMat = false;
+    // The practice booth searches real names: nothing it does may reach a real person (K3).
+    if (l.practice) {
+      out.forEach(([k, p]) => { if (!l.sent.includes(p.name)) l.sent.push(p.name); log(l, `📎 "${p.name}" — בניסיון, לא נשלח (היה יוצא ב${chName(k)})`); });
+      if (!o.quiet) toast('בניסיון — לא נשלח באמת. ביום התערוכה זה ייצא ב' + out.map(([k]) => chName(k)).join(' + '));
+      return true;
+    }
     out.forEach(([k, p]) => {
       if (!l.sent.includes(p.name)) l.sent.push(p.name);
       log(l, `${byRule ? '⚙️ ' : ''}${p.mat ? '📎' : '💬'} "${p.name}" נשלח ב${chName(k)}${byRule ? ' (אוטומטי)' : o.toGroup ? ' (לקבוצה)' : ''}`);
@@ -1356,7 +1380,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     q.forEach((x) => sendPackage(l, x.pkg));
     save();
   }
-  window.addEventListener('pagehide', () => { if (openId) flushSends(leadById(openId)); });
+  window.addEventListener('pagehide', () => { if (openId) flushSends(leadById(openId)); if (held) flushSends(leadById(held)); });
   /** "What to send" — the owner's packages by name; the one tapped goes out with its message and its file. */
   function sheetMaterials(l) {
     const pkgs = S.biz.templates;
@@ -2869,10 +2893,51 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   }
   /** Run a change that a toast can take back: snapshot, change, offer undo. */
   function undoable(text, change) {
-    const before = JSON.stringify(S);
+    const before = JSON.parse(JSON.stringify(S));
     change();
     save();
-    toast(text, () => { S = JSON.parse(before); save(); closeSheet(false); render(); toast('בוטל'); });
+    const after = JSON.parse(JSON.stringify(S));
+    // Undo takes back THIS action only (K4): what changed between before and after is put back,
+    // and anything that changed since — another lead captured, another tablet — stays.
+    toast(text, () => { revert(S, before, after); save(); closeSheet(false); render(); toast('בוטל'); });
+  }
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
+  const byIds = (a) => Array.isArray(a) && a.length > 0 && a.every((x) => isObj(x) && x.id != null);
+  /** Put back in `cur` what one action changed from `before` to `after`, leaving every other change alone. */
+  function revert(cur, before, after) {
+    new Set(Object.keys(before).concat(Object.keys(after))).forEach((k) => {
+      const b = before[k];
+      const a = after[k];
+      if (same(a, b)) return;
+      const c = cur[k];
+      if (isObj(b) && isObj(a) && isObj(c)) return revert(c, b, a);
+      // Lists of things with an id (leads, buttons, messages, rules): by id, so a lead added since stays.
+      if ((byIds(b) || byIds(a)) && Array.isArray(c) && (!b || Array.isArray(b)) && (!a || Array.isArray(a))) {
+        const bs = b || [];
+        const as = a || [];
+        const ids = (xs) => new Set(xs.map((x) => x.id));
+        const aIds = ids(as);
+        const bIds = ids(bs);
+        let out = c.filter((x) => !(aIds.has(x.id) && !bIds.has(x.id)));                 // added by the action: out
+        bs.forEach((x, i) => { if (!aIds.has(x.id) && !out.some((y) => y.id === x.id)) out.splice(Math.min(i, out.length), 0, JSON.parse(JSON.stringify(x))); });   // removed: back
+        out.forEach((x) => { const xb = bs.find((y) => y.id === x.id); const xa = as.find((y) => y.id === x.id); if (xb && xa && !same(xb, xa)) revert(x, xb, xa); });
+        cur[k] = out;
+        return;
+      }
+      // Other lists (tags, done steps, the log): by content, so a tag tapped or a line logged since stays.
+      if ((!b || Array.isArray(b)) && (!a || Array.isArray(a)) && Array.isArray(c)) {
+        const bs = (b || []).map((x) => JSON.stringify(x));
+        const as = (a || []).map((x) => JSON.stringify(x));
+        const added = as.filter((x) => !bs.includes(x));
+        const removed = bs.filter((x) => !as.includes(x));
+        const cs = c.map((x) => JSON.stringify(x));
+        cur[k] = c.filter((x, i) => !added.includes(cs[i])).concat(removed.filter((x) => !cs.includes(x)).map((x) => JSON.parse(x)));
+        return;
+      }
+      // Anything else: put it back only if no one changed it since.
+      if (same(c, a)) { if (b === undefined) delete cur[k]; else cur[k] = JSON.parse(JSON.stringify(b)); }
+    });
   }
 
   // ------------------------------------------------------------------
@@ -2967,7 +3032,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (openId && b.closest('.lead')) startIdle();
     const L = d.lid ? leadById(+d.lid) : null;
 
-    if (d.view) { S.view = d.view; closeLead(); closeSheet(false); fillOpen = false; filled.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
     // Setup step 3: a channel in one tap. WhatsApp goes through its own sheet, with the warning or the existing account.
@@ -3394,6 +3459,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'held-save': { const q = $('#q'); closeHeld(); renderResults(q ? q.value : ''); if (q && FINE) q.focus(); return; }
+      case 'held-back': { const l = leadById(held); if (l) openLead(l); return; }
       case 'tune': {
         if (SETUP.some(([k]) => k === S.step)) S.backTo = S.step;
         if (d.tune === 'connect') S.step = 'connect'; else { S.step = 'custom'; S.sub = d.tune; }
