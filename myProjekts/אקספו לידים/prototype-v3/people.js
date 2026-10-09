@@ -186,8 +186,10 @@ window.People = (function () {
     return parts.join(' · ');
   }
   /** What a row is called, and the line under it. */
-  function rowName(r) { return r.b != null ? BUSINESSES[r.b].name : fullName(PEOPLE[r.i]); }
+  // A visitor added at the booth, not on the organisers' list, carries his own name and town (G1).
+  function rowName(r) { if (r.custom) return [r.custom.first, r.custom.last].filter(Boolean).join(' '); return r.b != null ? BUSINESSES[r.b].name : fullName(PEOPLE[r.i]); }
   function rowMeta(r) {
+    if (r.custom) return 'לא ברשימה · נוסף בדוכן';
     if (r.b == null) return meta(PEOPLE[r.i]);
     const b = BUSINESSES[r.b];
     return b.trade + ' · ' + fullName(PEOPLE[b.pid]) + (b.owner ? ' · על שם ' + b.owner : '');
@@ -196,6 +198,6 @@ window.People = (function () {
   return {
     list: PEOPLE, get: (i) => PEOPLE[i], name: fullName, meta, search, norm,
     biz: (b) => BUSINESSES[b], bizOf: (pid) => (BIZ_OF[pid] === undefined ? null : BIZ_OF[pid]),
-    row, rowName, rowMeta, town: (r) => (r.b != null ? BUSINESSES[r.b].town : PEOPLE[r.i][5]),
+    row, rowName, rowMeta, town: (r) => (r.custom ? r.custom.town || '' : r.b != null ? BUSINESSES[r.b].town : PEOPLE[r.i][5]),
   };
 })();

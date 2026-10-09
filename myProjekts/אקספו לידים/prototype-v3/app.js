@@ -631,6 +631,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       return;
     }
     // A screen that fails says so, with the reason — a blank page tells no one anything.
+    if (worker() && S.view === 'crm') S.view = 'booth';   // G3: a worker tablet captures and completes; "המעקב שלי" is the owner's
     try { ({ booth: viewBooth, dash: viewDash, crm: viewCRM }[S.view] || viewBooth)(m); }
     catch (er) { showFail(m, er); }
   }
@@ -645,7 +646,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   window.addEventListener('error', (e) => { try { toast('תקלה: ' + (e.message || 'לא ידועה')); } catch (x) { /* before toast exists */ } });
   function renderTop() {
     const nav = S.phase === 'live'
-      ? LIVE.map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('')
+      ? LIVE.filter(([k]) => !(worker() && k === 'crm')).map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('')
       : (S.phase === 'setup' ? SETUP : SETTINGS_NAV).map(([k, t], n) =>
         `<button class="moment" data-step="${k}" aria-current="${S.step === k}" ${S.phase === 'setup' && k !== 'account' && !accountOk() ? 'disabled title="קודם הרשמה"' : ''}>${S.phase === 'setup' ? `<span class="n">${n + 1}</span>` : ''}${t}</button>`).join('');
     $('#top').innerHTML = `<div class="top-in">
@@ -1186,7 +1187,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         ${can ? `<button class="btn" data-again="${h.key}">↺ חזר שוב</button>` : ''}</div>`;
     }).join('')}</div>` : '';
     const more = total > hits.length ? `<div class="more">ועוד ${total - hits.length} — להוסיף אות משם המשפחה</div>` : '';
-    slot.innerHTML = heldBar + lastBar + again + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more;
+    // Visitors added here by hand are not in the organisers' list, so the search finds them among the leads.
+    const nq = People.norm(query);
+    const mine = leadsNow().filter((l) => l.custom && People.norm(People.rowName(l)).includes(nq)).slice(0, 3);
+    const added = mine.length ? `<div class="again"><div class="label" style="margin:0">נוספו בדוכן</div>${mine.map((l) => `<div class="again-row"><button class="result small" data-reopen="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span> <span class="city">${esc(People.town(l))}</span></span><span class="badge">לפתוח</span></button></div>`).join('')}</div>` : '';
+    // G1: whoever is not on the list is added in a few seconds — a visitor is never lost to a missing registration.
+    const addNew = `<div class="actions" style="margin-top:8px"><button class="btn" data-act="new-person">＋ לא ברשימה — להוסיף אותו</button></div>`;
+    slot.innerHTML = heldBar + lastBar + again + added + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more + addNew;
   }
   const newLead = (key, r) => ({ id: S.seq++, key, i: r.i, b: r.b, at: now(), lastAt: now(), created: Date.now(), visits: 1, warmth: null, warmBy: null, tags: [],
     eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, audience: false, notes: [],
@@ -1200,6 +1207,31 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       toast('✓ נשמר: ' + People.rowName(l));
     }
     save();
+    openLead(l);
+  }
+  /** A visitor who is not on the organisers' list: his name, and how to reach him. Brought over from the first prototype. */
+  function sheetNewPerson() {
+    const q = $('#q') ? $('#q').value.trim() : '';
+    sheet(`<h2>מבקר שלא ברשימה</h2>
+      <label class="label" for="np-first">שם פרטי</label><input id="np-first" class="text-input" autocomplete="off">
+      <label class="label" for="np-last">שם משפחה</label><input id="np-last" class="text-input" value="${esc(q)}" autocomplete="off">
+      <label class="label" for="np-town">עיר <small>רשות</small></label><input id="np-town" class="text-input" autocomplete="off">
+      <label class="label" for="np-phone">טלפון <small>כדי שיהיה לאן לחזור — הוא לא ברשימת המארגנים</small></label><input id="np-phone" class="text-input ltr" type="tel" inputmode="tel" autocomplete="off">
+      <div class="actions"><button class="btn primary" data-act="np-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+    setTimeout(() => $('#np-first') && $('#np-first').focus(), 30);
+  }
+  function saveNewPerson() {
+    const v = (id) => ($(id) && $(id).value.trim()) || '';
+    const first = v('#np-first');
+    const last = v('#np-last');
+    if (!first && !last) { $('#np-first').focus(); return toast('מה השם שלו?'); }
+    const l = newLead('c:' + S.seq, { i: null, b: null });
+    l.custom = { first, last, town: v('#np-town') };
+    l.contact.phone = v('#np-phone');
+    log(l, 'ביקר בדוכן · לא ברשימה, נוסף ידנית');
+    S.leads.push(l);
+    save(); closeSheet(false);
+    toast('✓ נשמר: ' + People.rowName(l));
     openLead(l);
   }
   function cameBack(key) {
@@ -1494,7 +1526,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
           <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
           <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
-        : '<p class="muted">אין צעדים פתוחים. הוא ב' + (l.won ? 'לקוחות' : 'קהל') + '.</p>'}
+        : l.won || l.lost || l.audience ? '<p class="muted">אין צעדים פתוחים. הוא ב' + (l.won ? 'לקוחות' : l.lost ? 'לא רלוונטיים' : 'קהל') + '.</p>'
+          // No step and no decision yet (a "cold" lead): the owner decides, not the system (G2).
+          : `<p class="muted">אין לו צעד. מה עושים איתו?</p><div class="actions"><button class="btn" data-act="task-audience" data-lid="${l.id}">לשמור בקהל</button><button class="btn" data-act="lead-lost" data-lid="${l.id}">לא רלוונטי</button></div>`}
       <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד נוסף</button>
         ${ts.length ? `<button class="btn ghost" data-act="task-audience" data-lid="${l.id}">בלי צעדים — לקהל</button>` : ''}
         <button class="btn primary" data-act="tasks-close" data-lid="${l.id}">סיום</button></div>`, l.id);
@@ -1547,6 +1581,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const leftP = rowsP.filter(isPartial).length;
     if (rowsE.length) out.push({ fill: 'empty', q: leftE ? `חסר: ${leftE} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ חסר — הכל מולא.', leads: rowsE });
     if (rowsP.length) out.push({ fill: 'partial', q: leftP ? `להשלמה: ${leftP} סומנו רק בחלק.` : '✓ להשלמה — הכל הושלם.', leads: rowsP });
+    // G2: "cold" is the owner's call — keep him in the audience for the future, or not relevant. The system does not decide.
+    const cold = L.filter((l) => effWarm(l) === 2 && !l.audience && !l.lost && !l.won && !tasks(l).length);
+    if (cold.length || filledCold.size) out.push({ cold: true, q: cold.length ? `${cold.length} סומנו "${words()[2]}". לשמור בקהל, או לא רלוונטי?` : '✓ כולם הוחלטו.', leads: cold.concat(L.filter((l) => filledCold.has(l.id) && !cold.includes(l))) });
     const waiting = L.filter((l) => l.pendingMat);
     if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.templates.length ? '' : ', ועוד אין מה לשלוח'}.` });
     return out;
@@ -1578,15 +1615,24 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       ${insightsBox('dash', 'מה רואים בתיוג של היום')}
       <h2 style="margin-top:26px">מה מחכה</h2>
       <div class="ask-card" style="margin-top:10px"><div class="q">${nextDayLine(L)}</div>
-        <div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div></div>`;
+        ${worker() ? '' : '<div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div>'}</div>`;
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
   function dashCard(a) {
     let body = '';
     if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
+    else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="cold">להחליט</button></div>';
     else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
     return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
+  }
+  const filledCold = new Set();   // cold leads decided on this visit to the dashboard — they keep their place
+  function coldList(leads) {
+    return `<div style="margin-top:8px">${leads.map((l) => {
+      const done = l.audience ? 'בקהל' : l.lost ? 'לא רלוונטי' : '';
+      return `<div class="tag-row${done ? ' filled' : ''}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span><span class="memo">${esc([People.rowMeta(l), done].filter(Boolean).join(' · '))}</span></button>
+        <span class="chips">${done ? '' : `<button class="chip" data-act="cold-aud" data-lid="${l.id}">לשמור בקהל</button><button class="chip" data-act="cold-lost" data-lid="${l.id}">לא רלוונטי</button><button class="chip" data-act="tasks" data-lid="${l.id}">צעד…</button>`}</span></div>`;
+    }).join('')}</div>`;
   }
   /** What a lead still lacks: warmth, and each group of buttons with nothing tapped in it. */
   const missingOf = (l) => [effWarm(l) == null ? 'חום' : ''].concat(liveGroups().filter((g) => !groupButtons(g.id).some((x) => l.tags.includes(x.id))).map((g) => g.title)).filter(Boolean);
@@ -3032,7 +3078,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (openId && b.closest('.lead')) startIdle();
     const L = d.lid ? leadById(+d.lid) : null;
 
-    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
+    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); filledCold.clear(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
     // Setup step 3: a channel in one tap. WhatsApp goes through its own sheet, with the warning or the existing account.
@@ -3459,6 +3506,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'cold-aud': { if (L) { filledCold.add(L.id); undoable('בקהל · ' + People.rowName(L), () => { L.audience = true; log(L, 'הועבר לקהל'); }); render(); } return; }
+      case 'cold-lost': { if (L) { filledCold.add(L.id); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost', 'סומן קר')); render(); } return; }
+      case 'lead-lost': { if (L) { closeSheet(false); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost')); render(); } return; }
+      case 'new-person': return sheetNewPerson();
+      case 'np-save': return saveNewPerson();
       case 'held-save': { const q = $('#q'); closeHeld(); renderResults(q ? q.value : ''); if (q && FINE) q.focus(); return; }
       case 'held-back': { const l = leadById(held); if (l) openLead(l); return; }
       case 'tune': {
