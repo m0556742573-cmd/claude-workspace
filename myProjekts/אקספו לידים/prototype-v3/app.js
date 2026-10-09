@@ -1618,7 +1618,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           : '<p class="honest">כאן רק התובנות הקבועות. כשהבינה המלאכותית מחוברת — גם היא עוברת על הלידים.</p>'}
         ${!fixed.length && !got && !ai ? '<div class="faint">אין כרגע.</div>' : ''}</div>`;
   }
-  const actionText = (a) => (a.kind === 'shift' ? 'להעביר למחר' : a.kind === 'warm' ? 'לסמן ' + words()[a.value] : 'להוסיף צעד: ' + STEPS[a.type].name);
+  const actionText = (a) => (a.kind === 'shift' ? 'להעביר למחר' : a.kind === 'warm' ? 'לסמן ' + words()[a.value] : 'להוסיף צעד: ' + (STEPS[a.type] || STEPS.call).name);
   function applyInsight(scope, ref) {
     const [src, i] = ref.split(':');
     const x = src === 'fixed' ? fixedInsights(scope)[+i] : S.ai[scope] && S.ai[scope].items[+i];
@@ -1714,7 +1714,14 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
     if (!b.digestNotes) b.digestNotes = [];
     if (b.afterSale === undefined) b.afterSale = 7;   // days after a deal to ask how it went; 0 = never
-    S.leads.forEach((l) => (l.manual || []).forEach((s) => { if (!STEPS[s.type]) s.type = 'call'; }));   // the regular-customer step is gone
+    // A step kind that no longer exists (the regular-customer step, 08/10) becomes a call wherever it was saved:
+    // a lead's own steps, the buttons, the rules, and insights kept from an earlier reading.
+    const known = (s) => { if (s && s.type && !STEPS[s.type]) s.type = 'call'; };
+    S.leads.forEach((l) => (l.manual || []).forEach(known));
+    b.buttons.forEach((x) => (x.steps || []).forEach(known));
+    (b.defSteps || []).forEach(known);
+    (b.rules || []).forEach((r) => { if (r.action && r.action.kind === 'step') known(r.action); });
+    Object.values(S.ai || {}).forEach((got) => ((got && got.items) || []).forEach((x) => { if (x.action && x.action.kind === 'step') known(x.action); }));
     if (!b.views) b.views = [];
     if (!b.pkgV) {   // 08/10: a message and its material travel together, as one named package
       b.pkgV = 1;
@@ -1815,7 +1822,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const c = r.cond || {};
     const conds = [c.warm != null ? words()[c.warm] : '', c.btn && btnById(c.btn) ? 'סימן "' + btnById(c.btn).label + '"' : '', c.biz === true ? 'עסק' : c.biz === false ? 'פרטי' : '', c.minValue ? 'שווה ' + nis(c.minValue) + '+' : ''].filter(Boolean);
     const days = (n) => (n <= 0 ? 'היום' : n === 1 ? 'תוך יום' : `תוך ${n} ימים`);
-    const then = a.kind === 'step' ? `${STEPS[a.type].name} ${days(a.days || 1)}` : a.kind === 'message' ? (tplById(a.tpl) ? 'לשלוח "' + tplById(a.tpl).name + '"' : 'לשלוח את ברירת המחדל של הערוץ') : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להוסיף להודעת הבוקר';
+    const then = a.kind === 'step' ? `${(STEPS[a.type] || STEPS.call).name} ${days(a.days || 1)}` : a.kind === 'message' ? (tplById(a.tpl) ? 'לשלוח "' + tplById(a.tpl).name + '"' : 'לשלוח את ברירת המחדל של הערוץ') : a.kind === 'stage' ? 'להעביר ל"' + stageById(a.stage).name + '"' : a.kind === 'warm' ? 'לסמן ' + words()[a.value || 0] : 'להוסיף להודעת הבוקר';
     return { when: 'כש' + when + (conds.length ? ' · רק אם: ' + conds.join(', ') : ''), then };
   }
   function condOk(r, l) {
