@@ -630,8 +630,19 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       }
       return;
     }
-    ({ booth: viewBooth, dash: viewDash, crm: viewCRM }[S.view] || viewBooth)(m);
+    // A screen that fails says so, with the reason — a blank page tells no one anything.
+    try { ({ booth: viewBooth, dash: viewDash, crm: viewCRM }[S.view] || viewBooth)(m); }
+    catch (er) { showFail(m, er); }
   }
+  function showFail(m, er) {
+    const where = String((er && er.stack) || '').split('\n').slice(1, 3).map((s) => s.trim()).join(' | ');
+    m.innerHTML = `<section class="card" style="margin-top:14px"><h2>המסך הזה נתקע</h2>
+      <p class="muted">תקלה: <b dir="ltr">${esc(String((er && er.message) || er))}</b></p>
+      <p class="faint" dir="ltr">${esc(where)}</p>
+      <div class="actions"><button class="btn" data-view="booth">חזרה לדוכן</button></div></section>`;
+  }
+  // An error in a button shows at the bottom of the screen, so a tap that "does nothing" names its reason.
+  window.addEventListener('error', (e) => { try { toast('תקלה: ' + (e.message || 'לא ידועה')); } catch (x) { /* before toast exists */ } });
   function renderTop() {
     const nav = S.phase === 'live'
       ? LIVE.map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('')
