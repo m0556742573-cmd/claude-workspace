@@ -1708,7 +1708,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   function leadFacts(l) {
     const p = plan(l);
-    return { id: l.id, name: People.rowName(l), business: l.b != null, town: People.town(l), warmth: effWarm(l) == null ? null : words()[effWarm(l)],
+    // G5: the AI gets a lead by its number, never by name — the screen turns the numbers back into names.
+    return { id: l.id, business: l.b != null, town: People.town(l), warmth: effWarm(l) == null ? null : words()[effWarm(l)],
       tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, visits: l.visits, sent: l.sent, next: p.label, nextKind: p.type,
       dueInDays: p.due ? dayNo(p.due.getTime()) - dayNo(now()) : null, openSteps: tasks(l).length, noAnswer: l.noAnswer || 0,
       notes: l.notes.map((n) => n.text || n.tr).filter(Boolean).slice(-2), won: !!l.won, lost: !!l.lost };
@@ -1726,6 +1727,7 @@ His buttons: ${S.biz.buttons.map((b) => b.label + ' → ' + stepsOf(b).map((s) =
 His leads (JSON): ${JSON.stringify(L)}
 ${focus}
 Give at most 4 short, concrete observations in Hebrew, each about specific leads, judged against his goal. Skip anything obvious or already handled.
+Leads are given by number only. Never write a lead number or a name in the text — the screen lists the leads under each observation.
 Reply with ONLY JSON: {"insights":[{"text":"one Hebrew sentence","leadIds":[ids],"action":null | {"kind":"warm","value":0|1|2} | {"kind":"step","type":"call|send|quote|meet|date|register|season|none"}}]}
 warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step action ADDS that step to those leads.`;
     try {
@@ -2061,11 +2063,12 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     render();
     // The question first and the counts ready-made: a long list must never push the question out of the window.
     const L = leadsNow();
-    const facts = L.slice(-100).map((l) => ({ id: l.id, name: People.rowName(l), town: People.town(l), business: l.b != null, stage: stageById(l.stage).name, warmth: effWarm(l) == null ? null : words()[effWarm(l)],
+    const facts = L.slice(-100).map((l) => ({ id: l.id, town: People.town(l), business: l.b != null, stage: stageById(l.stage).name, warmth: effWarm(l) == null ? null : words()[effWarm(l)],
       contact: ANSWER[answerState(l)], tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, value: leadValue(l) || undefined, next: tasks(l).length ? plan(l).label : null }));
     const count = (f) => { const o = {}; L.forEach((l) => { const k = f(l); o[k] = (o[k] || 0) + 1; }); return o; };
     const prompt = `Question from a business owner about his leads (answer in Hebrew): """${q.slice(0, 300)}"""
 Answer from the data below only. Count exactly; never guess. If the data cannot answer, say so plainly.
+Leads are given by number only, without names. Never write a lead number in the answer — put them in leadIds, and the screen shows their names.
 Reply with ONLY JSON: {"answer":"one to three short Hebrew sentences","leadIds":[ids of the leads the answer is about, if any]}
 
 Context: he exhibited at a Hasidic community business fair. Today: ${H.label(new Date(now()))}. Trade: ${S.biz.trade || 'unknown'}. Goal: ${S.biz.goalNote || S.biz.goal || 'not given'}.
