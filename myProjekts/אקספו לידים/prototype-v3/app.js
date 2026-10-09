@@ -511,14 +511,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   // What follows from what is known: warmth, the steps, their dates.
   // ------------------------------------------------------------------
-  /** Warmth from what was tapped: valuable buttons, material asked for, a second visit. */
+  /* Two axes, kept apart (יצחק, 09/10):
+   *   warmth     — how interested HE is: he came back, asked for material, showed interest in products.
+   *   importance — how much such a visitor is worth to the owner: the ●●● of the buttons. It orders the lists;
+   *                it never makes a lead warm. */
   function autoWarm(l) {
-    const bs = tagged(l);
+    const interest = tagged(l).filter((b) => b.axis === 'what').length;
     const asked = l.sent.length || (l.queue || []).length;
-    if (!bs.length && !asked && l.visits < 2 && !l.roleOf) return null;
-    const score = bs.reduce((a, b) => a + (b.weight || 0), 0) + (asked ? 1 : 0) + (l.visits > 1 ? 2 : 0) + (l.roleOf ? 1 : 0);
-    return score >= 3 ? 0 : 1;
+    const score = (l.visits > 1 ? 2 : 0) + (asked ? 1 : 0) + Math.min(interest, 2);
+    return score >= 3 ? 0 : score >= 1 ? 1 : null;   // cold is never guessed: only the owner says so
   }
+  /** Importance: the highest ●●● among the buttons tapped for him. */
+  const importance = (l) => tagged(l).reduce((m, b) => Math.max(m, b.weight || 0), 0);
   function effWarm(l) {
     if (l.warmBy === 'hand') return l.warmth;
     return S.biz.derive ? autoWarm(l) : l.warmth;
@@ -953,7 +957,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="step-list">${D.steps.map((s, i) => `<div class="step-line"><button class="prod-row" data-editstep="${i}"><span class="pn">${esc(stepText(s))}</span></button>
         <button class="btn ghost danger" data-delstep="${i}" aria-label="להסיר צעד">✕</button></div>`).join('') || '<div class="faint">אין צעד — מי שיסומן כאן ייכנס לקהל.</div>'}</div>
       <button class="chip add" data-act="add-step" style="margin-top:8px">+ צעד נוסף</button>
-      ${isBtn ? `<div class="label">כמה פונה כזה שווה לך <small>מחמם את הליד לבד</small></div>
+      ${isBtn ? `<div class="label">כמה פונה כזה חשוב לך <small>קובע את הסדר ברשימות — לא את החום</small></div>
         <div class="chips">${WEIGHT.map((w, k) => `<button class="chip" data-esweight="${k}" aria-pressed="${D.weight === k}">${esc(w)}</button>`).join('')}</div>
         <label class="label" for="eb-value">שווי עסקה ממוצע ₪ <small>רשות — כך ה-CRM מעריך את שווי הצינור</small></label>
         <input id="eb-value" class="text-input" type="number" min="0" step="100" value="${esc(D.value)}" placeholder="למשל 2500">` : ''}
@@ -1020,7 +1024,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <section class="card"><h2>איך לקרוא לדרגות</h2><p class="muted">רק השמות משתנים. מה שסומן הכי חם נשאר הכי חם.</p>
           <div class="opts grid2">${Object.entries(GRADES).map(([k, g]) => `<button class="opt" data-grades="${k}" aria-pressed="${b.grades === k}">${esc(g.words.join(' · '))}<small>${esc(g.name)}</small></button>`).join('')}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>המערכת מציעה חום לבד</h2>
-          <p class="muted">לפי מה שכבר סימנת: פונה ששווה לך הרבה (●●●), ביקש חומר, חזר לדוכן פעם שנייה. נגיעה אחת משנה, ומה שבחרת ביד נשאר.</p></div>${toggle('derive', b.derive, 'חום מוצע')}</div></section>
+          <p class="muted">לפי ההתעניינות שלו: חזר לדוכן, ביקש חומר, התעניין במוצרים. כמה הוא חשוב לך (●●●) לא משנה את החום — רק את הסדר ברשימות. נגיעה אחת משנה, ומה שבחרת ביד נשאר.</p></div>${toggle('derive', b.derive, 'חום מוצע')}</div></section>
         <section class="card"><h2>כמה זמן הכרטיס נשאר פתוח</h2><p class="muted">בלי נגיעה, הכרטיס נסגר לבד וחוזר לחיפוש. מה שסומן — נשמר.</p>
           <div class="chips">${[8, 12, 15, 20, 30].map((s) => `<button class="chip" data-idle="${s}" aria-pressed="${b.idleSec === s}">${s} שניות</button>`).join('')}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>מי שכבר ביקר לא מופיע שוב בחיפוש</h2>
@@ -1901,8 +1905,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   let crmQuery = '';
   let rowOpen = null;        // the task row whose "how did it go?" is open in place
   function openTasks(L) {
-    const score = (l) => { const p = plan(l); return (p.due ? p.due.getTime() : 9e15) - (effWarm(l) === 0 ? H.DAY / 2 : 0); };
-    return L.filter((l) => tasks(l).length && plan(l).type !== 'season').sort((a, b) => score(a) - score(b));
+    // By day; within a day the more important first (●●●), then the warmer.
+    const day = (l) => { const p = plan(l); return p.due ? dayNo(p.due.getTime()) : 9e9; };
+    const w = (l) => (effWarm(l) == null ? 3 : effWarm(l));
+    return L.filter((l) => tasks(l).length && plan(l).type !== 'season')
+      .sort((a, b) => day(a) - day(b) || importance(b) - importance(a) || w(a) - w(b));
   }
   function barChart(rows, fmt) {
     const max = Math.max(1, ...rows.map((r) => r.value));
