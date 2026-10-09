@@ -609,7 +609,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['try', 'ניסיון']];
   const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים, צוות ובוקר']];
+  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים ובוקר']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
@@ -655,21 +655,22 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <p class="muted">נרשמים פעם אחת. אחר כך — כמה מילים על העסק, והמערכת מתאימה את עצמה אליך.</p>
       <label class="label" for="acc-name">שם מלא <small class="req">חובה</small></label>
       <input id="acc-name" class="text-input${accErrors.name ? ' bad' : ''}" data-acc="name" value="${esc(a.name)}" autocomplete="name"${inv('name')}>${err('name')}
-      <label class="label" for="acc-email">אימייל <small class="req">חובה</small> <small>לכאן יגיעו תשובות של לקוחות, אם לא תבחר אחרת</small></label>
+      <label class="label" for="acc-email">אימייל <small>לכאן יגיעו תשובות של לקוחות, אם לא תבחר אחרת</small></label>
       <input id="acc-email" class="text-input ltr${accErrors.email ? ' bad' : ''}" type="email" data-acc="email" value="${esc(a.email)}" autocomplete="email" placeholder="name@example.com"${inv('email')}>${err('email')}
-      <label class="label" for="acc-phone">טלפון</label><input id="acc-phone" class="text-input ltr" type="tel" data-acc="phone" value="${esc(a.phone)}" autocomplete="tel">
+      <label class="label" for="acc-phone">טלפון <small>לכאן תגיע הודעת הבוקר</small></label><input id="acc-phone" class="text-input ltr" type="tel" data-acc="phone" value="${esc(a.phone)}" autocomplete="tel">
       <label class="label" for="acc-biz">שם העסק</label><input id="acc-biz" class="text-input" data-bizname value="${esc(S.biz.name)}" placeholder="למשל: נגריית הדר" autocomplete="organization">
-      <p class="honest">בדוגמית הפרטים נשמרים רק בדפדפן הזה. אין חשבון אמיתי.</p>
+      <p class="honest">בדוגמית הפרטים נשמרים רק בדפדפן הזה, ואין חשבון אמיתי. במערכת האמיתית — טלפון ואימייל חובה.</p>
     </section>`;
   }
   /** Errors beside the fields, focus on the first: a toast that vanishes is no place for them. */
   function checkAccount() {
     accErrors = {};
     if (!S.account.name) accErrors.name = 'מה השם שלך?';
-    if (!emailOk(S.account.email)) accErrors.email = 'צריך אימייל תקין, כמו name@example.com — לשם יגיעו התשובות.';
+    // The demo asks for a name only; the real system will require the phone and the email too (יצחק, 09/10).
+    if (S.account.email && !emailOk(S.account.email)) accErrors.email = 'צריך אימייל תקין, כמו name@example.com — לשם יגיעו התשובות.';
     return !Object.keys(accErrors).length;
   }
-  const accountOk = () => !!S.account.name && emailOk(S.account.email);
+  const accountOk = () => !!S.account.name && (!S.account.email || emailOk(S.account.email));
   const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e || '');
   let exPending = null;
   function useExample(k) { const t = EXAMPLES[k]; if (!t || !$('#say')) return; $('#say').value = t; S.biz.by = null; understandWords(t); }
@@ -1166,7 +1167,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   const newLead = (key, r) => ({ id: S.seq++, key, i: r.i, b: r.b, at: now(), lastAt: now(), created: Date.now(), visits: 1, warmth: null, warmBy: null, tags: [],
     eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, audience: false, notes: [],
-    stage: 'new', value: null, owner: S.biz.team ? S.biz.team[0] : 'אני', contact: { phone: '', email: '' }, files: [], ruled: {}, by: worker() ? 'עובד' : 'בעלים' });
+    stage: 'new', value: null, contact: { phone: '', email: '' }, files: [], ruled: {}, by: worker() ? 'עובד' : 'בעלים' });
   function pick(key) {
     let l = leadByKey(key);
     if (!l) {
@@ -1496,11 +1497,17 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   function dashAsks(L) {
     const out = [];
+    // Two kinds (יצחק, 09/10): "חסר" — nothing marked at all; "להשלמה" — something marked, but not everything:
+    // no warmth, or a group of buttons with nothing tapped in it.
     const isEmpty = (l) => effWarm(l) == null && !l.tags.length;
+    const isPartial = (l) => !isEmpty(l) && missingOf(l).length > 0;
     // A row filled in stays where it is until the screen is left: the next row must not slide under the finger.
-    const rows = L.filter((l) => isEmpty(l) || filled.has(l.id));
-    const left = rows.filter(isEmpty).length;
-    if (rows.length) out.push({ fill: true, q: left ? `${left} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ הכל מסומן.', leads: rows });
+    const rowsE = L.filter((l) => isEmpty(l) || filled.has('empty:' + l.id));
+    const rowsP = L.filter((l) => (isPartial(l) || filled.has('partial:' + l.id)) && !rowsE.includes(l));
+    const leftE = rowsE.filter(isEmpty).length;
+    const leftP = rowsP.filter(isPartial).length;
+    if (rowsE.length) out.push({ fill: 'empty', q: leftE ? `חסר: ${leftE} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ חסר — הכל מולא.', leads: rowsE });
+    if (rowsP.length) out.push({ fill: 'partial', q: leftP ? `להשלמה: ${leftP} סומנו רק בחלק.` : '✓ להשלמה — הכל הושלם.', leads: rowsP });
     const waiting = L.filter((l) => l.pendingMat);
     if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.templates.length ? '' : ', ועוד אין מה לשלוח'}.` });
     return out;
@@ -1538,20 +1545,25 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
   function dashCard(a) {
     let body = '';
-    if (a.fill) body = fillOpen ? fillList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open">להשלים</button></div>';
+    if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
     else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
     return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
   }
-  function fillList(leads) {
+  /** What a lead still lacks: warmth, and each group of buttons with nothing tapped in it. */
+  const missingOf = (l) => [effWarm(l) == null ? 'חום' : ''].concat(liveGroups().filter((g) => !groupButtons(g.id).some((x) => l.tags.includes(x.id))).map((g) => g.title)).filter(Boolean);
+  function fillList(leads, kind) {
     if (!leads.length) return '<div class="faint" style="margin-top:6px">✓ הכל מסומן.</div>';
-    const g = liveGroups()[0];
+    // Nothing marked: warmth and the first group — the quickest minute. Partly marked: every group, and what is missing.
+    const gs = kind === 'partial' ? liveGroups() : liveGroups().slice(0, 1);
     return `<div style="margin-top:8px">${leads.map((l) => {
       const w = effWarm(l);
       const note = l.notes[0] && (l.notes[0].text || l.notes[0].tr);
-      const memo = [new Date(l.at).toTimeString().slice(0, 5), People.rowMeta(l), note ? '📝 ' + note.slice(0, 40) : ''].filter(Boolean).join(' · ');
-      return `<div class="tag-row${filled.has(l.id) ? ' filled' : ''}"><button class="link" data-openlead="${l.id}">${filled.has(l.id) ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}<span class="memo">${esc(memo)}</span></button>
+      const lack = kind === 'partial' ? missingOf(l) : [];
+      const memo = [new Date(l.at).toTimeString().slice(0, 5), People.rowMeta(l), lack.length ? 'חסר: ' + lack.join(', ') : '', note ? '📝 ' + note.slice(0, 40) : ''].filter(Boolean).join(' · ');
+      const done = filled.has(kind + ':' + l.id);
+      return `<div class="tag-row${done ? ' filled' : ''}" data-fill="${kind}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}<span class="memo">${esc(memo)}</span></button>
         <span class="mini-w">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</span>
-        ${g ? `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}">${esc(x.label)}</button>`).join('')}</span>` : ''}</div>`;
+        ${gs.map((g) => `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}">${esc(x.label)}</button>`).join('')}</span>`).join('')}</div>`;
     }).join('')}</div>
       <div class="faint" style="margin-top:6px">נגיעה בשם פותחת את הכרטיס המלא.</div>`;
   }
@@ -1681,7 +1693,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   function upgrade() {
     const b = S.biz;
     if (!b.stages) b.stages = clone(DEF_STAGES);
-    if (!b.team) b.team = ['אני'];
+    delete b.team;   // the team was taken out (יצחק, 09/10): a lead belongs to the business
     if (!b.templates) b.templates = clone(DEF_TEMPLATES);
     if (!b.rules) b.rules = clone(DEF_RULES);
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
@@ -1715,15 +1727,14 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       if (!b.views.some((v) => v.builtin)) b.views.unshift({ name: 'חמים בלי מענה', builtin: true, tb: { f: { warm: '0', answer: 'none' }, sort: { col: 'at', dir: 1 }, cols: ['name', 'town', 'stage', 'last', 'next', 'due', 'phone'] } });
     }
     if (!S.crmTab) S.crmTab = 'overview';
-    if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'last', 'next', 'due', 'owner'] };
+    if (!S.tb) S.tb = { f: {}, sort: { col: 'due', dir: 1 }, cols: ['name', 'town', 'stage', 'warm', 'value', 'last', 'next', 'due'] };
     if (!S.tb.v2) { S.tb.v2 = true; if (!S.tb.cols.includes('last')) S.tb.cols.splice(Math.max(0, S.tb.cols.indexOf('next')), 0, 'last'); }
-    if (S.mine === undefined) S.mine = true;
+    S.tb.cols = S.tb.cols.filter((c) => c !== 'owner'); (S.biz.views || []).forEach((v) => { if (v.tb && v.tb.cols) v.tb.cols = v.tb.cols.filter((c) => c !== 'owner'); if (v.tb && v.tb.f) delete v.tb.f.owner; }); delete S.tb.f.owner; delete S.mine;
     S.leads.forEach(upgradeLead);
   }
   function upgradeLead(l) {
     if (!l.stage) l.stage = l.won ? 'won' : l.lost ? 'lost' : 'new';
     if (l.value === undefined) l.value = null;
-    if (!l.owner) l.owner = S.biz.team[0];
     if (!l.contact) l.contact = { phone: '', email: '' };
     if (!l.files) l.files = [];
     if (!l.ruled) l.ruled = {};
@@ -1889,8 +1900,6 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   let crmFilter = null;      // the tasks tab: null = today, or everything open when nothing is due today
   let crmQuery = '';
   let rowOpen = null;        // the task row whose "how did it go?" is open in place
-  const me = () => S.biz.team[0];
-  const mineOnly = () => S.mine && S.biz.team.length > 1;
   function openTasks(L) {
     const score = (l) => { const p = plan(l); return (p.due ? p.due.getTime() : 9e15) - (effWarm(l) === 0 ? H.DAY / 2 : 0); };
     return L.filter((l) => tasks(l).length && plan(l).type !== 'season').sort((a, b) => score(a) - score(b));
@@ -1958,7 +1967,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     // The question first and the counts ready-made: a long list must never push the question out of the window.
     const L = leadsNow();
     const facts = L.slice(-100).map((l) => ({ id: l.id, name: People.rowName(l), town: People.town(l), business: l.b != null, stage: stageById(l.stage).name, warmth: effWarm(l) == null ? null : words()[effWarm(l)],
-      contact: ANSWER[answerState(l)], tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, value: leadValue(l) || undefined, owner: l.owner, next: tasks(l).length ? plan(l).label : null }));
+      contact: ANSWER[answerState(l)], tags: tagged(l).map((b) => b.label), of: l.roleOf || undefined, value: leadValue(l) || undefined, next: tasks(l).length ? plan(l).label : null }));
     const count = (f) => { const o = {}; L.forEach((l) => { const k = f(l); o[k] = (o[k] || 0) + 1; }); return o; };
     const prompt = `Question from a business owner about his leads (answer in Hebrew): """${q.slice(0, 300)}"""
 Answer from the data below only. Count exactly; never guess. If the data cannot answer, say so plainly.
@@ -2026,7 +2035,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
 
   // ---- משימות ----
   function crmTasks(box, L0) {
-    const L = mineOnly() ? L0.filter((l) => l.owner === me()) : L0;
+    const L = L0;
     const t0 = dayNo(now());
     const due = (l) => { const p = plan(l); return p.due ? dayNo(p.due.getTime()) - t0 : null; };
     const groups = {
@@ -2046,7 +2055,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (!list.length) body = `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד.'}</div>`;
     else body = crmRows(list, !q && f !== 'audience' && f !== 'won', true);
     box.innerHTML = `<div class="tasks-bar"><nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'בהמשך השבוע')}${tab('all', 'כל הצעדים')}</nav>
-        ${S.biz.team.length > 1 ? `<div class="chips"><button class="chip" data-mine="1" aria-pressed="${mineOnly()}">שלי</button><button class="chip" data-mine="0" aria-pressed="${!mineOnly()}">של כולם</button></div>` : ''}</div>
+        </div>
       <div class="more-tabs">${tab('season', 'לעונה', true)}${tab('audience', 'קהל ולא רלוונטי', true)}${tab('won', 'נסגרו', true)}</div>
       <input id="crm-q" class="text-input" placeholder="חיפוש בכל הלידים — שם, עיר, כפתור, מוסד או הערה" aria-label="חיפוש בלידים" value="${esc(crmQuery)}" autocomplete="off">
       ${q ? `<div class="faint" style="margin-top:6px">מחפש בכל הלידים · <button class="link" data-act="crm-clear">ניקוי</button></div>` : ''}
@@ -2171,7 +2180,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     { id: 'tags', t: 'כפתורים', v: (l) => tagged(l).map((b) => b.label).join(', ') },
     { id: 'next', t: 'צעד הבא', v: (l) => (tasks(l).length ? plan(l).label : '') },
     { id: 'due', t: 'מתי', v: (l) => (plan(l).due ? plan(l).due.getTime() : null), f: dateShort, num: true },
-    { id: 'owner', t: 'אחראי', v: (l) => l.owner },
     { id: 'by', t: 'נקלט ע"י', v: (l) => l.by },
     { id: 'visits', t: 'ביקורים', v: (l) => l.visits, num: true },
     { id: 'phone', t: 'טלפון', v: (l) => l.contact.phone, ltr: true },
@@ -2186,7 +2194,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
     btn: { t: 'כפתור', more: true, opts: () => [['nobtn', 'בלי כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), ok: (l, v) => (v === 'nobtn' ? !l.tags.length : l.tags.includes(v)) },
     kind: { t: 'סוג', more: true, opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
-    owner: { t: 'אחראי', more: true, opts: () => S.biz.team.map((n) => [n, n]), ok: (l, v) => l.owner === v },
     town: { t: 'עיר', more: true, opts: () => Array.from(new Set(leadsNow().map((l) => People.town(l)))).sort().map((t) => [t, t]), ok: (l, v) => People.town(l) === v },
   };
   let tbQuery = '';
@@ -2197,13 +2204,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   let tbEdit = null;   // "lid:col" — the one cell open for editing
   /** A cell becomes a control only when tapped: scrolling a tablet must never change data. */
   function inlineCell(col, l) {
-    if (!['stage', 'owner', 'warm', 'value'].includes(col)) return '';
+    if (!['stage', 'warm', 'value'].includes(col)) return '';
     const open = tbEdit === l.id + ':' + col;
-    const shown = col === 'stage' ? stageById(l.stage).name : col === 'owner' ? l.owner : col === 'warm' ? (effWarm(l) == null ? '—' : words()[effWarm(l)]) : leadValue(l) ? nis(leadValue(l)) + (typedValue(l) ? '' : ' (מוערך)') : '—';
+    const shown = col === 'stage' ? stageById(l.stage).name : col === 'warm' ? (effWarm(l) == null ? '—' : words()[effWarm(l)]) : leadValue(l) ? nis(leadValue(l)) + (typedValue(l) ? '' : ' (מוערך)') : '—';
     if (!open) return `<button class="cell-btn" data-ietap="${col}" data-lid="${l.id}" aria-label="לשנות ${esc(colById(col).t)}">${esc(shown)}</button>`;
     const opt = (pairs, cur) => pairs.map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('');
     if (col === 'stage') return `<select data-ie="stage" data-lid="${l.id}" aria-label="שלב">${opt(S.biz.stages.map((s) => [s.id, s.name]), l.stage)}</select>`;
-    if (col === 'owner') return `<select data-ie="owner" data-lid="${l.id}" aria-label="אחראי">${opt(S.biz.team.map((t) => [t, t]), l.owner)}</select>`;
     if (col === 'warm') { const w = effWarm(l); return `<select data-ie="warm" data-lid="${l.id}" aria-label="חום">${opt([['', '—']].concat(words().map((x, k) => [k, x])), w == null ? '' : w)}</select>`; }
     return `<input data-ie="value" data-lid="${l.id}" type="number" min="0" step="100" value="${typedValue(l) ? esc(l.value) : ''}" placeholder="${estValue(l) || ''}" aria-label="שווי בשקלים">`;
   }
@@ -2263,7 +2269,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       </table></div>
       ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
       ${tbSel.size ? `<div class="bulk"><b>${tbSel.size} נבחרו</b>
-        <button class="btn primary-inv" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button><button class="btn" data-bulk="owner">לשייך</button>
+        <button class="btn primary-inv" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button>
         <button class="btn" data-bulk="step">להוסיף צעד</button><button class="btn" data-bulk="export">⬇ אקסל</button>
         <button class="btn ghost" data-bulk="clear">ביטול הבחירה</button></div>` : ''}`;
     $('#tb-q').addEventListener('input', (e) => { tbQuery = e.target.value; tbPage = 0; const pos = e.target.selectionStart; render(); const n = $('#tb-q'); n.focus(); n.setSelectionRange(pos, pos); });
@@ -2276,9 +2282,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   }
   function sheetBulk(kind) {
     const n = tbSel.size;
-    const opts = kind === 'stage' ? S.biz.stages.map((s) => [s.id, s.name]) : kind === 'warm' ? words().map((w, k) => [String(k), w]) : kind === 'owner' ? S.biz.team.map((t) => [t, t])
+    const opts = kind === 'stage' ? S.biz.stages.map((s) => [s.id, s.name]) : kind === 'warm' ? words().map((w, k) => [String(k), w])
       : kind === 'step' ? Object.keys(STEPS).filter((k) => k !== 'none' && k !== 'season').map((k) => [k, STEPS[k].icon + ' ' + STEPS[k].name]) : S.biz.templates.map((t) => [t.id, '💬 ' + t.name]);
-    const title = { stage: 'להעביר שלב', warm: 'לסמן חום', owner: 'לשייך ל', step: 'להוסיף צעד', message: 'איזו הודעה לשלוח' }[kind];
+    const title = { stage: 'להעביר שלב', warm: 'לסמן חום', step: 'להוסיף צעד', message: 'איזו הודעה לשלוח' }[kind];
     sheet(`<h2>${title} — ${n} לידים</h2><div class="opts">${opts.map(([v, t]) => `<button class="opt" data-bulkdo="${kind}" data-v="${esc(v)}">${esc(t)}</button>`).join('')}</div>
       <div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
   }
@@ -2289,7 +2295,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     undoable(`✓ ${list.length} לידים עודכנו`, () => list.forEach((l) => {
       if (kind === 'stage') { holdSends = true; setStage(l, v, 'בפעולה על כמה'); holdSends = false; }
       if (kind === 'warm') { l.warmth = +v; l.warmBy = 'hand'; }
-      if (kind === 'owner') { l.owner = v; log(l, 'שויך ל' + v); }
       if (kind === 'step') { const s = normStep({ type: v }); addManual(l, s, dueFor(s)); log(l, 'הלאה: ' + s.label); }
     }));
     render();
@@ -2349,7 +2354,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       answer: { t: 'מענה', of: (l) => [ANSWER[answerState(l)]], filter: 'answer', key: (l) => [answerState(l)] },
       kind: { t: 'עסק או פרטי', of: (l) => [l.b != null ? 'עסק' : 'פרטי'], filter: 'kind', key: (l) => [l.b != null ? 'biz' : 'private'] },
       town: { t: 'עיר', of: (l) => [People.town(l)], filter: 'town', key: (l) => [People.town(l)] },
-      owner: { t: 'אחראי', of: (l) => [l.owner], filter: 'owner', key: (l) => [l.owner] },
       by: { t: 'מי קלט בדוכן', of: (l) => [l.by] },
       hour: { t: 'שעת הביקור', of: (l) => [String(new Date(l.at).getHours()).padStart(2, '0') + ':00'] },
       stage: { t: 'שלב', of: (l) => [stageById(l.stage).name], filter: 'stage', key: (l) => [l.stage], ordered: true },
@@ -2563,7 +2567,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           <span class="key"><span class="faint">שווי</span><b class="money">${leadValue(l) ? nis(leadValue(l)) : '—'}</b>${!typedValue(l) && est ? '<span class="faint">מוערך</span>' : ''}</span>
           <span class="key"><span class="faint">חום</span><b>${w == null ? 'בלי' : esc(words()[w])}</b></span>
           <span class="key"><span class="faint">מגע אחרון</span><b>${lt ? esc(lt.kind + ' · ' + agoText(lt.at)) : 'עוד לא'}</b>${tr.length ? `<span class="faint">ניסיון אחרון: לא ענה${tr.length > 1 ? ' ×' + tr.length : ''} · ${esc(agoText(tr[tr.length - 1].at))}</span>` : ''}</span>
-          <span class="key"><span class="faint">אחראי</span><b>${esc(l.owner)}</b></span>
         </div>
         <div class="actions rec-acts"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר</button>
           <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
@@ -2595,7 +2598,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <details class="card rec-fields"${narrow() ? '' : ' open'}>
           <summary><h2>פרטים</h2>${l.contact.phone ? ` <bdi dir="ltr" class="faint">${esc(l.contact.phone)}</bdi>` : ''}</summary>
           <label><span class="faint">שווי ₪</span><input class="text-input" type="number" min="0" step="100" data-lf="value" data-lid="${l.id}" value="${typedValue(l) ? esc(l.value) : ''}" placeholder="${est ? 'מוערך ' + est : 'לא ידוע'}"></label>
-          <label><span class="faint">אחראי</span><select class="text-input" data-lowner="${l.id}">${S.biz.team.map((t) => `<option ${l.owner === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
           ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : ''}
           <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
@@ -2722,7 +2724,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
 
   // ---- demo: two weeks after the fair ----
   function seedProgress() {
-    if (S.biz.team.length < 2) S.biz.team.push('יוסי');
     if (!S.biz.buttons.some((b) => b.value)) S.biz.buttons.forEach((b, i) => { b.value = [1500, 4000, 800, 12000, 2500, 6000][i % 6]; });
     const before = S.leads.length;
     seedDay();
@@ -2731,7 +2732,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     S.leads.slice(before).forEach((l) => {
       l.at -= back; l.log.forEach((e) => { e.at -= back; }); l.notes.forEach((n) => { n.at -= back; });
       upgradeLead(l);
-      l.owner = S.biz.team[rnd(S.biz.team.length)];
       l.by = Math.random() < 0.7 ? 'בעלים' : 'עובד';
       l.contact = { phone: '050-000-' + String(1000 + rnd(9000)), email: 'demo' + l.id + '@example.com' };
       if (Math.random() < 0.3) l.value = [800, 1500, 2500, 4000, 7500, 12000, 20000][rnd(7)];
@@ -2756,15 +2756,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   // ---- settings: stages, team, morning message ----
   function viewCrmSettings(m) {
     const b = S.biz;
-    m.innerHTML = `<h1>שלבים, צוות ובוקר</h1>
+    m.innerHTML = `<h1>שלבים ובוקר</h1>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>שלבי הצינור</h2><p class="muted">השמות שלך. "נסגר" ו"לא רלוונטי" קבועים בסוף.</p>
           <div class="step-list">${b.stages.map((s, i) => `<div class="stage-line"><input class="text-input" data-stname="${s.id}" value="${esc(s.name)}" aria-label="שם השלב">
             ${s.kind ? `<span class="faint">${s.kind === 'won' ? 'סגירה' : 'אבוד'}</span>` : `<button class="btn ghost" data-stmove="${i}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-stmove="${i}:1" aria-label="למטה" ${b.stages[i + 1] && !b.stages[i + 1].kind ? '' : 'disabled'}>▼</button><button class="btn ghost danger" data-stdel="${s.id}" aria-label="למחוק">✕</button>`}</div>`).join('')}</div>
           <div class="add-row"><input id="new-stage" class="text-input" placeholder="+ שלב חדש" autocomplete="off"><button class="btn" data-act="stage-add">הוספה</button></div></section>
-        <section class="card"><h2>הצוות</h2><p class="muted">למי אפשר לשייך ליד. הראשון הוא אתה.</p>
-          <div class="chips">${b.team.map((t, i) => `<span class="chip static">${esc(t)}${i ? ` <button class="link" data-teamdel="${i}" aria-label="להסיר">✕</button>` : ''}</span>`).join('')}</div>
-          <div class="add-row"><input id="new-member" class="text-input" placeholder="+ שם" autocomplete="off"><button class="btn" data-act="team-add">הוספה</button></div></section>
         <section class="card"><h2>אחרי עסקה שנסגרה</h2><p class="muted">בדיקה אחת: איך היה? לקוח מרוצה — זה הרגע להציע את ההזמנה הבאה.</p>
           <div class="chips">${[[0, "לא לבדוק"], [3, "אחרי 3 ימים"], [7, "אחרי שבוע"], [14, "אחרי שבועיים"], [30, "אחרי חודש"]].map(([d, t]) => `<button class="chip" data-aftersale="${d}" aria-pressed="${b.afterSale === d}">${t}</button>`).join("")}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור. נשלחת אליך מהמספר של מערכת הדוכן.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
@@ -2887,14 +2884,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
     if (d.chdef) { S.biz.chDefault = Object.assign({}, S.biz.chDefault, { [d.chdef]: t.value }); save(); return toast('נשמר'); }
-    if (d.lowner) { const l = leadById(+d.lowner); if (l) { l.owner = t.value; log(l, 'שויך ל' + t.value); save(); render(); } return; }
     if (d.ie) {   // a cell edited in the table — every change can be taken back
       const l = leadById(+d.lid);
       if (!l) return;
       tbEdit = null;
       if (d.ie === 'stage') { if (t.value !== l.stage) moveLead(l, t.value); else render(); return; }
       undoable('✓ ' + People.rowName(l) + ' עודכן', () => {
-        if (d.ie === 'owner') { l.owner = t.value; log(l, 'שויך ל' + t.value); }
         if (d.ie === 'warm') { if (t.value === '') { l.warmBy = null; l.warmth = null; } else { l.warmth = +t.value; l.warmBy = 'hand'; } }
         if (d.ie === 'value') l.value = t.value === '' ? null : Math.max(0, +t.value);
       });
@@ -2959,7 +2954,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.ietap) { tbEdit = d.lid + ':' + d.ietap; return render(); }
     if (d.rowcall) { rowOpen = rowOpen === +d.rowcall ? null : +d.rowcall; return render(); }
     if (d.rowout) { if (L) outcome(L, d.rowout, true); return; }
-    if (d.mine !== undefined) { S.mine = d.mine === '1'; save(); return render(); }
     if (d.msgf) { msgFilter = d.msgf; return render(); }
     if (d.rulehits) {
       const r = S.biz.rules.find((x) => x.id === d.rulehits);
@@ -3008,7 +3002,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       });
       return render();
     }
-    if (d.teamdel !== undefined) { const name = S.biz.team[+d.teamdel]; undoable(name + ' הוסר מהצוות', () => { S.biz.team.splice(+d.teamdel, 1); S.leads.forEach((l) => { if (l.owner === name) l.owner = S.biz.team[0]; }); }); return render(); }
     if (d.digestch) { S.biz.digest.ch = d.digestch; save(); return render(); }
     if (d.digesth) { S.biz.digest.hour = d.digesth; save(); return render(); }
 
@@ -3077,7 +3070,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       const l = L || leadById(openId);
       if (!l) return;
       if (b.closest('.tag-row')) {   // filling in on the dashboard: the row stays, and the tap can be taken back
-        filled.add(l.id);
+        filled.add(b.closest('.tag-row').dataset.fill + ':' + l.id);
         undoable(People.rowName(l) + ' · ' + words()[+d.warm], () => { l.warmth = +d.warm; l.warmBy = 'hand'; });
         return render();
       }
@@ -3088,7 +3081,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       const l = L || leadById(openId);
       const t = btnById(d.tag);
       if (!l || !t) return;
-      if (b.closest('.tag-row')) filled.add(l.id);
+      if (b.closest('.tag-row')) filled.add(b.closest('.tag-row').dataset.fill + ':' + l.id);
       if (l.tags.includes(t.id)) { l.tags = l.tags.filter((x) => x !== t.id); unqueue(l, t); }
       else {
         const g = groupById(t.axis);
@@ -3359,7 +3352,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         S.biz.stages.splice(at < 0 ? S.biz.stages.length : at, 0, { id: 's' + Date.now(), name: v });
         save(); return render();
       }
-      case 'team-add': { const v = $('#new-member') && $('#new-member').value.trim(); if (v && !S.biz.team.includes(v)) { S.biz.team.push(v); save(); render(); } return; }
       case 'ex-yes': closeSheet(false); return useExample(exPending);
       case 'crm-clear': crmQuery = ''; return render();
       case 'tk-save': return tkSave();
@@ -3443,7 +3435,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'rec-stop': return stopRec();
       case 'note-save': { if (L) saveNote(L); return; }
       case 'note-cancel': closeSheet(); return;
-      case 'fill-open': fillOpen = true; return render();
+      case 'fill-open': fillOpen = d.kind; return render();
       case 'call': { callOpen = true; return render(); }
       case 'edit-tags': { if (L) sheetTags(L); return; }
       case 'del-lead': { const l = L || leadById(openId); return l && sheetConfirm('למחוק את ' + People.rowName(l) + '?', 'הליד יימחק מהרשימה.', 'del-lead-yes', `data-lid="${l.id}"`); }
