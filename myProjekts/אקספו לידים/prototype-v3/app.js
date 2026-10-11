@@ -1433,6 +1433,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       if (!l.sent.includes(p.name)) l.sent.push(p.name);
       log(l, `${byRule ? '⚙️ ' : ''}${p.mat ? '📎' : '💬'} "${p.name}" נשלח ב${chName(k)}${byRule ? ' (אוטומטי · עם שורת הסרה)' : o.toGroup ? ' (לקבוצה)' : ''}`);
     });
+    // Something sent to him personally after the fair means he is in touch (M7). A group message, an automation,
+    // or the catalogue handed over at the booth itself does not — that is still the first meeting.
+    if (!o.toGroup && !byRule && S.view !== 'booth') advance(l, 'contact', 'נשלח לו ' + out[0][1].name);
     if (!o.quiet && !byRule) toast(`${out[0][1].mat ? '📎' : '💬'} "${[...new Set(out.map(([, p]) => p.name))].join('", "')}" נשלח ל${People.rowName(l)} · ${out.map(([k]) => chName(k)).join(' + ')}`);
     return true;
   }
@@ -1937,6 +1940,18 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       runRules('won', l);
     }
     runRules('stage', l, st.id);
+  }
+
+  /* M7 (יצחק, 11/10): "a system that runs the business, not a business that runs a system". What the system knows
+   * from an event moves the lead forward by itself — never back, and never to closed or not relevant, which are the
+   * owner's to say. Where it cannot know, the "what next?" sheet asks where he stands, with the likely answer chosen. */
+  const workStages = () => S.biz.stages.filter((s) => !s.kind);
+  function advance(l, id, why) {
+    if (l.won || l.lost) return;
+    const w = workStages();
+    const to = w.findIndex((s) => s.id === id);
+    if (to < 0 || to <= w.findIndex((s) => s.id === l.stage)) return;
+    setStage(l, id, 'המערכת קידמה · ' + why);   // the log says who moved him, and on what
   }
 
   // ---- automations ----
@@ -2818,11 +2833,18 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const opts = derived(l).filter((s) => s.type !== 'none' && !immediate(s))
       .concat([normStep({ type: 'call' }), normStep({ type: 'meet' }), normStep({ type: 'quote' }), normStep({ type: 'send', days: 1 })], S.biz.seasons.length ? [normStep({ type: 'season' })] : [])
       .filter((s) => { if (seen.has(s.type)) return false; seen.add(s.type); return true; }).slice(0, 6);
-    TK = { lid: l.id, opts, i: null, days: null, date: '', stay: !!stay, done: done || '' };
+    // "Where does he stand?" — the stages from here on, the likely one chosen: after a talk with a new lead, "in touch".
+    const w = workStages();
+    const at = Math.max(0, w.findIndex((s) => s.id === l.stage));
+    const ahead = l.won || l.lost ? [] : w.slice(at);
+    const likely = !done && l.stage === 'new' && w[at + 1] ? w[at + 1].id : l.stage;
+    TK = { lid: l.id, opts, i: null, days: null, date: '', stay: !!stay, done: done || '', stage: likely };
     const today = new Date(now());
     const toSunday = ((7 - today.getDay()) % 7) || 7;
     sheet(`<h2>${done ? `✓ ${esc(done)}. מה הלאה עם ${esc(People.rowName(l))}?` : `דיברנו עם ${esc(People.rowName(l))}. מה הלאה?`}</h2>
       <label class="label" for="tk-note">${done ? "מה קרה?" : "מה נאמר?"} <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="למשל: רוצה הצעה ל-300 איש, לפני פסח"></textarea>
+      ${ahead.length > 1 ? `<div class="label">איפה הוא עומד עכשיו? <small>נבחר מה שסביר — נגיעה משנה</small></div>
+      <div class="chips">${ahead.map((s) => `<button class="chip" data-tkstage="${s.id}" aria-pressed="${TK.stage === s.id}">${esc(s.name)}</button>`).join('')}</div>` : ''}
       <div class="label">הצעד הבא</div>
       <div class="chips">${opts.map((s, i) => `<button class="chip" data-tkstep="${i}" aria-pressed="false">${STEPS[s.type].icon} ${esc(s.label)}</button>`).join('')}</div>
       <div class="label">מתי</div>
@@ -2858,8 +2880,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     addManual(l, s, dueAt);
     if (note) l.notes.push({ id: 'n' + (S.nseq++), at: now(), text: note, audio: false, tr: '' });
     log(l, (TK.done ? '✓ ' + TK.done + ' — הלאה: ' : '📞 דיברנו — הלאה: ') + s.label + ' · ' + H.heDate(new Date(dueAt)) + (note ? ' · ' + note.slice(0, 60) : ''));
-    if (l.stage === 'new' && !TK.done) setStage(l, 'contact');
-    if (s.type === 'quote' && ['new', 'contact'].includes(l.stage) && S.biz.stages.some((x) => x.id === 'quote')) setStage(l, 'quote');
+    // M7: where he stands, as the owner confirmed it in this sheet (the likely answer was chosen for him).
+    // A next step of "prepare a quote" no longer marks the quote as sent — it is not sent yet.
+    if (TK.stage && TK.stage !== l.stage) setStage(l, TK.stage, TK.done ? 'אחרי: ' + TK.done : 'אחרי שיחה');
     const stay = TK.stay;
     TK = null; rowOpen = null;
     save();
@@ -3296,6 +3319,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.again) return cameBack(d.again);
     if (d.reopen) { const l = leadById(+d.reopen); if (l) openLead(l); return; }
     if (d.tkstep !== undefined) { TK.i = +d.tkstep; document.querySelectorAll('[data-tkstep]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return tkReady(); }
+    if (d.tkstage) { TK.stage = d.tkstage; document.querySelectorAll('[data-tkstage]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
     if (d.tkdays) { TK.days = +d.tkdays; TK.date = ''; if ($('#tk-date')) $('#tk-date').value = ''; document.querySelectorAll('[data-tkdays]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return tkReady(); }
     if (d.warm !== undefined) {
       const l = L || leadById(openId);
@@ -3340,10 +3364,13 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         log(L, '✓ ' + label + ' — ' + doneWord(t));
         // A quote that went out, and registration details that went out, each bring their own check a few days on.
         if (t && t.type === 'quote') {
-          if (['new', 'contact'].includes(L.stage) && S.biz.stages.some((s) => s.id === 'quote')) setStage(L, 'quote', 'הצעה נשלחה');
+          advance(L, 'quote', 'ההצעה יצאה');
           addManual(L, { type: 'call', label: 'לבדוק אם קיבל את ההצעה', days: 3 }, H.addDays(new Date(now()), 3, true).getTime());
         }
-        if (t && t.type === 'register') addManual(L, { type: 'call', label: 'לבדוק אם נרשם', days: 3 }, H.addDays(new Date(now()), 3, true).getTime());
+        if (t && t.type === 'register') { advance(L, 'contact', 'נשלחו פרטי הרשמה'); addManual(L, { type: 'call', label: 'לבדוק אם נרשם', days: 3 }, H.addDays(new Date(now()), 3, true).getTime()); }
+        // M7: a meeting arranged means he is in touch; a call made is too.
+        if (t && t.type === 'meet' && t.phase !== 'held') advance(L, 'contact', 'פגישה תואמה');
+        if (t && t.type === 'call') advance(L, 'contact', t.label);
       });
       const l2 = leadById(L.id) || L;   // after undoable the state object is the same, but stay safe
       if (t && t.type === 'meet' && t.phase !== 'held') return sheetMeetDate(l2);
@@ -3598,6 +3625,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         const at = H.addDays(new Date(v + 'T09:00'), 0).getTime();
         addManual(l, { type: 'meet', label: 'איך הלכה הפגישה?', days: 0, phase: 'held' }, at);
         log(l, '🤝 פגישה נקבעה · ' + H.heDate(new Date(at)));
+        advance(l, 'contact', 'פגישה נקבעה');
         MD = null; save(); closeSheet(false); render();
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
