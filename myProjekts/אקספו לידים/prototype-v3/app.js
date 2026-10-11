@@ -643,7 +643,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['try', 'ניסיון']];
   const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים ובוקר']];
+  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
@@ -662,6 +662,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }
     // A screen that fails says so, with the reason — a blank page tells no one anything.
     if (worker() && S.view === 'crm') S.view = 'booth';   // G3: a worker tablet captures and completes; "המעקב שלי" is the owner's
+    m.classList.toggle('wide', S.view === 'crm');   // the tracking view is mostly used on a computer (יצחק, 11/10) — it takes the width
     try { ({ booth: viewBooth, dash: viewDash, crm: viewCRM }[S.view] || viewBooth)(m); }
     catch (er) { showFail(m, er); }
   }
@@ -942,7 +943,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   function viewCustom(m) {
     m.innerHTML = `<nav class="subtabs" aria-label="התאמה אישית">${SUBS.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>`;
-    ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, materials: viewMaterials, crm: viewCrmSettings }[S.sub] || viewButtons)($('#subview'));
+    ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, materials: viewMaterials, crm: viewCrmSettings, auto: viewRules }[S.sub] || viewButtons)($('#subview'));
+  }
+  /** The rules left the tracking view (11/10): they are settings — what the system does by itself, written once. */
+  function viewRules(m) {
+    m.innerHTML = `<h1>כללים (אוטומציות)</h1><div id="rules-box"></div>`;
+    crmAuto($('#rules-box'));
   }
 
   // ---- buttons, in groups ----
@@ -2080,9 +2086,23 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       <span class="bl">${esc(r.label)}</span><span class="bt"><span class="bf${r.cls ? ' ' + r.cls : ''}" style="width:${(r.value / max * 100).toFixed(1)}%"></span></span><span class="bv">${esc((fmt || String)(r.value))}${r.sub ? ' <span class="faint">' + esc(r.sub) + '</span>' : ''}</span></div>`).join('')}</div>`;
   }
   const CRM_NAME = 'המעקב שלי';
-  const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
+  /* 11/10 (יצחק): four places, in the order of a working day — what now, with whom, what waits, what we learnt.
+   * Leads and tasks each choose their own way of showing; the rules moved to the settings. */
+  const CRM_TABS = [['overview', 'סקירה'], ['leads', 'לידים'], ['tasks', 'משימות'], ['segments', 'פילוחים']];
+  const CRM_ICONS = { overview: '◉', leads: '👥', tasks: '✓', segments: '📊' };
+  const CRM_VIEWS = { leads: [['table', 'טבלה'], ['pipeline', 'לפי שלב']], tasks: [['list', 'רשימה'], ['time', 'לפי זמן']] };
   // Each view's ⚙️ goes straight to the settings of what it shows.
-  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'ההודעות והחומרים'] };
+  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], time: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], messages: ['materials', 'ההודעות והחומרים'] };
+  /** The old tabs, still set by links across the code, land in their new place. */
+  function crmPlace() {
+    if (!S.crmView) S.crmView = { leads: 'table', tasks: 'list' };
+    const old = { table: ['leads', 'table'], pipeline: ['leads', 'pipeline'], messages: ['leads', 'messages'], auto: ['overview'] }[S.crmTab];
+    if (old) { S.crmTab = old[0]; if (old[1]) S.crmView.leads = old[1]; }
+    if (!CRM_TABS.some(([k]) => k === S.crmTab)) S.crmTab = 'overview';
+  }
+  const viewKey = () => (S.crmTab === 'leads' ? S.crmView.leads : S.crmTab === 'tasks' && S.crmView.tasks === 'time' ? 'time' : S.crmTab);
+  /** A computer has the width for the list and the lead side by side; a tablet keeps the lead as its own page. */
+  const wideCRM = () => window.matchMedia && window.matchMedia('(min-width: 1180px)').matches;
   /** M10: "days without contact" is checked once a day — when the tracking view opens or the day changes — not inside drawing the screen. */
   function idleOnce() {
     const today = dayNo(now());
@@ -2093,18 +2113,38 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
   function viewCRM(m) {
     const L = leadsNow();
+    crmPlace();
     const rec = S.crmLead && leadById(S.crmLead);
-    const vs = VIEW_SETTINGS[S.crmTab];
-    m.innerHTML = `<div class="crm-head"><h1>${CRM_NAME}</h1>
-        <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}</span></div>
-      <nav class="crm-tabs" aria-label="${CRM_NAME}">${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!rec && S.crmTab === k}">${t}</button>`).join('')}
-        ${!rec && vs && vs[0] !== 'auto' ? `<button class="ctab gear" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</nav>
-      ${!rec ? askBox() : ''}
-      ${!rec && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
-        <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
-      <div id="crm-body"></div>`;
-    if (rec) return recordPage($('#crm-body'), rec);
-    ({ overview: crmOverview, tasks: crmTasks, pipeline: crmPipeline, table: crmTable, segments: crmSegments, auto: crmAuto, messages: crmMessages }[S.crmTab] || crmOverview)($('#crm-body'), L);
+    const side = rec && wideCRM();   // on a computer the lead opens beside the list, and the list stays where it was
+    const full = rec && !side;
+    const vs = VIEW_SETTINGS[viewKey()];
+    const views = CRM_VIEWS[S.crmTab];
+    const late = todayQueue(L).length;   // the same queue the overview works through
+    const count = { overview: late, tasks: 0, leads: 0, segments: 0 };
+    m.innerHTML = `<div class="crm-shell">
+      <nav class="crm-nav" aria-label="${CRM_NAME}"><div class="crm-nav-title">${CRM_NAME}</div>
+        ${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}"><span class="ci" aria-hidden="true">${CRM_ICONS[k]}</span>${t}${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
+        <span class="crm-nav-sep"></span>
+        <button class="ctab minor" data-act="crm-rules"><span class="ci" aria-hidden="true">⚙️</span>כללים והגדרות</button></nav>
+      <div class="crm-main">
+        <div class="crm-head"><h1>${full ? CRM_NAME : esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>
+          ${!full && views ? `<div class="seg" role="group" aria-label="איך להציג">${views.map(([k, t]) => `<button data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</div>` : ''}
+          ${!full && S.crmTab === 'leads' ? `<button class="btn${S.crmView.leads === 'messages' ? ' on' : ''}" data-crmview="messages">💬 הודעה לקבוצה</button>` : ''}
+          <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
+            ${!full && vs ? `<button class="btn ghost" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</span></div>
+        ${!full && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
+          <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
+        <div class="${side ? 'crm-split' : ''}"><div id="crm-body"></div>${side ? '<aside class="crm-side" id="crm-side" aria-label="הליד"></aside>' : ''}</div>
+      </div></div>`;
+    if (full) return recordPage($('#crm-body'), rec);
+    const body = $('#crm-body');
+    if (S.crmTab === 'leads') ({ table: crmTable, pipeline: crmPipeline, messages: crmMessages }[S.crmView.leads] || crmTable)(body, L);
+    else if (S.crmTab === 'tasks') (S.crmView.tasks === 'time' ? crmTimeBoard : crmTasks)(body, L);
+    else ({ overview: crmOverview, segments: crmSegments }[S.crmTab] || crmOverview)(body, L);
+    if (side) {
+      recordPage($('#crm-side'), rec);
+      document.querySelectorAll(`[data-crmlead="${rec.id}"], [data-plid="${rec.id}"]`).forEach((n) => n.classList.add('sel'));
+    }
   }
 
   // ---- contact, as the screens say it ----
@@ -2162,8 +2202,91 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     render();
   }
 
-  // ---- סקירה ----
+  // ---- סקירה: הבא בתור ----
+  /* The system knows who is late, who matters (●●●), who is warm and what the note asked for —
+   * so the owner is not asked to choose an order. One lead, its action, and the next one comes.
+   * The queue is the head of the tasks list, in the same order, so the two never disagree.
+   * A lead waiting for a decision is a task like any other, and joins the end of it. */
+  let qSkip = [];
+  function todayQueue(L) {
+    const real = L.filter((l) => !l.practice);
+    const t0 = dayNo(now());
+    const due = openTasks(real).filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) <= t0);
+    const decide = real.filter((l) => !l.won && !l.lost && !l.audience && !tasks(l).length);
+    const q = due.concat(decide);
+    return q.filter((l) => !qSkip.includes(l.id)).concat(qSkip.map(leadById).filter((l) => l && q.includes(l)));
+  }
+  const dots = (l) => { const n = importance(l); return n ? `<span class="imp" title="חשיבות">${'●'.repeat(n)}</span>` : ''; };
+  function nextCard(l) {
+    const p = plan(l);
+    const w = effWarm(l);
+    const v = leadValue(l);
+    const note = lastNote(l);
+    const lateBy = p.due ? dayNo(now()) - dayNo(p.due.getTime()) : 0;
+    const decide = !tasks(l).length;
+    const isTalk = p.type === 'call' || p.type === 'meet';
+    const acts = decide
+      ? `<p class="muted" style="margin:0">אין לו צעד. מה עושים איתו?</p><div class="actions"><button class="btn" data-act="cold-aud" data-lid="${l.id}">לשמור בקהל</button><button class="btn" data-act="cold-lost" data-lid="${l.id}">לא רלוונטי</button><button class="btn" data-act="tasks" data-lid="${l.id}">צעד…</button></div>`
+      : isTalk ? `<div class="nc-phone">${l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi><button class="btn ghost" data-act="copy-phone" data-lid="${l.id}">להעתיק</button>` : '<span class="faint">אין טלפון — אפשר להוסיף בפרטים</span>'}</div>
+          <div class="faint">מתקשרים מהטלפון, ומסמנים כאן איך היה:</div>
+          <div class="actions"><button class="btn primary" data-rowout="talk" data-lid="${l.id}">דיברנו — מה הלאה</button><button class="btn" data-rowout="noans" data-lid="${l.id}">לא ענה</button>
+            <button class="btn" data-rowout="won" data-lid="${l.id}">🎉 נסגרה עסקה</button><button class="btn" data-rowout="lost" data-lid="${l.id}">לא רלוונטי</button></div>`
+      : `<div class="actions">${p.type === 'send' || p.type === 'register' ? `<button class="btn primary" data-tasksend="${esc(p.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
+          <button class="btn${p.type === 'send' || p.type === 'register' ? '' : ' primary'}" data-taskdone="${esc(p.key)}" data-lid="${l.id}">✓ ${doneWord(p)}</button>
+          <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button></div>`;
+    return `<section class="next-card">
+      <div class="nc-who"><span class="dot w${w == null ? '' : w}"></span><h2>${esc(People.rowName(l))}</h2>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)}
+        <span class="muted">${esc([People.town(l), w != null ? words()[w] : '', stageById(l.stage).name, v ? nis(v) : ''].filter(Boolean).join(' · '))}</span></div>
+      ${note ? `<div class="nc-note">📝 ${esc(note.slice(0, 220))}</div>` : ''}
+      <div class="nc-now"><span class="faint">עכשיו</span> ${decide ? '<b>להחליט מה איתו</b>' : planHTML(p, true)}${lateBy > 0 ? ` <span class="late-tag">באיחור ${lateBy === 1 ? 'יום' : lateBy + ' ימים'}</span>` : ''}</div>
+      <div class="faint">${esc([contactLine(l)].concat(tagged(l).map((b) => b.label), l.roleOf ? [l.roleOf] : []).join(' · '))}</div>
+      ${acts}
+      <div class="nc-foot"><button class="btn ghost" data-crmlead="${l.id}">לפתוח את הליד ←</button><button class="btn ghost" data-act="q-skip" data-lid="${l.id}">⏭ אחר כך</button></div>
+    </section>`;
+  }
   function crmOverview(box, L) {
+    const real = L.filter((l) => !l.practice);
+    const q = todayQueue(L);
+    const t0 = dayNo(now());
+    const handled = real.filter((l) => l.log.some((e) => dayNo(e.at) === t0 && !isAuto(e.t) && /^(📞|💬|📎|📝|➜|✓|🎉)/.test(e.t))).length;
+    const late = q.filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) < t0).length;
+    const decide = q.filter((l) => !tasks(l).length).length;
+    const st = { none: 0, tried: 0 };
+    real.forEach((l) => { const a = answerState(l); if (a in st) st[a]++; });
+    const total = q.length + handled;
+    const alert = (n, t, act, cls) => (n ? `<button class="alert${cls ? ' ' + cls : ''}" ${act}><b>${n}</b> ${esc(t)}</button>` : '');
+    box.innerHTML = `
+      <div class="q-progress"><span><b>${q.length ? q.length + ' להיום' : '✓ סיימת את היום'}</b>${handled ? ` · טופלו היום ${handled}` : ''}</span>
+        <span class="qbar"><span style="width:${total ? Math.round(handled / total * 100) : 100}%"></span></span></div>
+      <div class="ov-grid">
+        <div>${q.length ? nextCard(q[0]) : `<section class="next-card done"><h2>אין מה לעשות היום ✓</h2><p class="muted">כל הצעדים של היום טופלו. הבאים בתור — ב<button class="link" data-crmtab="tasks">משימות</button>.</p></section>`}</div>
+        <aside class="ov-side">
+          <div class="alerts">${alert(late, 'באיחור', 'data-act="go-today"', 'bad')}${alert(decide, 'מחכים להחלטה', 'data-act="go-decide"')}${alert(st.none + st.tried, 'עוד לא קיבלו מענה', 'data-act="view-noanswer"')}</div>
+          ${q.length > 1 ? `<h3 class="ov-h">אחריו בתור</h3><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
+            ${q.length > 9 ? `<button class="link" data-act="go-today">ועוד ${q.length - 9} — לכל הרשימה ←</button>` : `<button class="link" data-act="go-today">לכל רשימת היום ←</button>`}</div>` : ''}
+        </aside>
+      </div>`;
+  }
+  // ---- משימות לפי זמן: a board whose columns are days, not stages ----
+  function crmTimeBoard(box, L) {
+    const real = L.filter((l) => !l.practice);
+    const t0 = dayNo(now());
+    const cols = [['late', 'באיחור'], ['d0', 'היום'], ['d1', 'מחר'], ['week', 'השבוע'], ['later', 'בהמשך'], ['decide', 'מחכים להחלטה']];
+    const by = Object.fromEntries(cols.map(([k]) => [k, []]));
+    openTasks(real).forEach((l) => {
+      const p = plan(l);
+      const d = p.due ? dayNo(p.due.getTime()) - t0 : 99;
+      by[d < 0 ? 'late' : d === 0 ? 'd0' : d === 1 ? 'd1' : d <= 7 ? 'week' : 'later'].push(l);
+    });
+    by.decide = real.filter((l) => !l.won && !l.lost && !l.audience && !tasks(l).length);
+    const card = (l) => `<button class="pcard tcard" data-crmlead="${l.id}"><span class="pname"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span>${esc(People.rowName(l))}${dots(l)}</span>
+      <span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span>${lastNote(l) ? `<span class="note-peek">📝 ${esc(lastNote(l).slice(0, 60))}</span>` : ''}</button>`;
+    box.innerHTML = `<div class="pipe time-board">${cols.map(([k, t]) => `<section class="pcol${k === 'late' ? ' late' : ''}"><header><b>${t}</b><span class="faint">${by[k].length}</span></header>
+      <div class="pcards">${by[k].slice(0, 30).map(card).join('') || '<div class="faint" style="padding:8px">—</div>'}${by[k].length > 30 ? `<div class="faint">ועוד ${by[k].length - 30}</div>` : ''}</div></section>`).join('')}</div>`;
+  }
+
+  // ---- פילוחים: the numbers, the AI and asking the data — what the overview used to carry ----
+  function crmStats(box, L) {
     const real = L.filter((l) => !l.practice);
     const open = real.filter(isOpenLead);
     const won = real.filter((l) => l.won);
@@ -2568,6 +2691,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     return rows.sort((a, b) => (b.count >= MIN_N) - (a.count >= MIN_N) || b[PV.metric] - a[PV.metric]);
   }
   function crmSegments(box, L) {
+    box.innerHTML = `${askBox()}<div id="seg-stats"></div><h2 class="seg-h">פילוח</h2><div id="seg-pivot"></div>`;
+    crmStats($('#seg-stats'), L);
+    crmPivot($('#seg-pivot'), L);
+  }
+  function crmPivot(box, L) {
     const D = dims();
     if (!PV.dim || !D[PV.dim]) PV.dim = Object.keys(D)[0];
     const isStage = PV.dim === 'stage';
@@ -2744,7 +2872,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     });
     box.innerHTML = `<div class="rec">
       <div class="rec-top">
-        <div class="rec-bar"><button class="btn ghost" data-act="record-back">→ חזרה ל${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</button>
+        <div class="rec-bar"><button class="btn ghost" data-act="record-back">${box.id === 'crm-side' ? '✕ סגירה' : '→ חזרה ל' + esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</button>
           <button class="btn ghost" data-act="rec-menu" data-lid="${l.id}" aria-label="פעולות נוספות">⋯</button></div>
         <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}${l.optOut ? ' <span class="badge">ביקש הסרה</span>' : ''}</h1>
           <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · מדומה' : ''}</div></div>
@@ -2806,7 +2934,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     callOpen = false;
     S.crmLead = l.id;
     if (S.phase !== 'live' || S.view !== 'crm') { S.phase = 'live'; S.view = 'crm'; }
-    save(); render(); window.scrollTo(0, 0);
+    save(); render(); if (!wideCRM()) window.scrollTo(0, 0); else { const sd = document.getElementById("crm-side"); if (sd) sd.scrollTop = 0; }
   }
   /** Only warmth and the buttons — the whole booth card has no place on the lead's page. */
   function sheetTags(l) {
@@ -3203,6 +3331,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
 
     // ---- CRM ----
     if (d.crmtab) { S.crmTab = d.crmtab; S.crmLead = null; tbSel.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.crmview) {
+      crmPlace();
+      if (d.crmview === 'list' || d.crmview === 'time') S.crmView.tasks = d.crmview;
+      else S.crmView.leads = d.crmview === 'messages' && S.crmView.leads === 'messages' ? 'table' : d.crmview;
+      save(); return render();
+    }
     if (d.tl) { tlFilter = d.tl; return render(); }
     if (d.ietap) { tbEdit = d.lid + ':' + d.ietap; return render(); }
     if (d.rowcall) { rowOpen = rowOpen === +d.rowcall ? null : +d.rowcall; return render(); }
@@ -3534,7 +3668,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       }
       case 'toast-undo': { const f = undoFn; undoFn = null; if (f) f(); return; }
       case 'seed-progress': seedProgress(); return render();
-      case 'record-back': S.crmLead = null; callOpen = false; save(); render(); return window.scrollTo(0, 0);
+      case 'record-back': S.crmLead = null; callOpen = false; save(); render(); if (!wideCRM()) window.scrollTo(0, 0); return;
       case 'tl-auto': tlAuto = !tlAuto; return render();
       case 'tb-dense': S.tb.dense = !S.tb.dense; save(); return render();
       case 'ask': { e.preventDefault(); const q = $('#ask-q') && $('#ask-q').value.trim(); if (q) askData(q); return; }
@@ -3542,13 +3676,20 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'ask-table': tbIds = new Set(ASK.ids); tbIdsWhy = 'מתוך התשובה לשאלה'; S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
       case 'ask-unfilter': tbIds = null; tbIdsWhy = ''; return render();
       case 'view-settings': {
-        const vs = VIEW_SETTINGS[S.crmTab];
+        crmPlace();
+        const vs = VIEW_SETTINGS[viewKey()];
         if (!vs) return;
         if (vs[0] === 'cols') return sheetCols();
         if (worker()) return ownerOnly('ההגדרות');
         S.phase = 'settings'; S.step = 'custom'; S.sub = vs[0]; save(); render(); return window.scrollTo(0, 0);
       }
       case 'crm-settings': if (worker()) return ownerOnly('ההגדרות'); S.phase = 'settings'; S.step = 'custom'; S.sub = 'crm'; save(); return render();
+      case 'crm-rules': if (worker()) return ownerOnly('ההגדרות'); S.phase = 'settings'; S.step = 'custom'; S.sub = 'auto'; save(); render(); return window.scrollTo(0, 0);
+      // "⏭ later": the lead goes to the end of today's queue for this sitting — nothing is decided, nothing is written.
+      case 'q-skip': if (L) { qSkip = qSkip.filter((x) => x !== L.id).concat(L.id); } return render();
+      // On a computer "call" cannot dial: the number is copied, and the call is made from the phone in his hand.
+      case 'copy-phone': if (L && L.contact.phone) { try { navigator.clipboard.writeText(L.contact.phone).then(() => toast('✓ המספר הועתק'), () => toast(L.contact.phone)); } catch (x) { toast(L.contact.phone); } } return;
+      case 'go-decide': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'decide'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
       case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');
       // A general export (יצחק, 09/10): every lead of the fair, every column — phone and email included — whatever the filter.
       case 'export-all': if (worker()) return ownerOnly('הייצוא'); return exportLeads(leadsNow().filter((l) => !l.practice), 'כל-הלידים');
@@ -3589,7 +3730,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'tpl-del': { const id = d.id; closeSheet(false); undoable('ההודעה נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
       case 'grp-send': return sheetSendConfirm(grpList(), grp.tpl);
       case 'send-confirm': return sendConfirmed();
-      case 'go-today': S.crmTab = 'tasks'; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
+      case 'go-today': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
       case 'view-noanswer': S.tb.f = { answer: 'none' }; tbIds = null; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; save(); render(); return window.scrollTo(0, 0);
       case 'move-send': case 'move-hold': {
         if (!L) return;

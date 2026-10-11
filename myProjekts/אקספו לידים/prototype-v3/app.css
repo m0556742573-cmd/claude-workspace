@@ -969,3 +969,76 @@ button.key b { text-decoration: underline; text-decoration-color: var(--line-str
 .text-input.bad { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot); }
 .req { color: var(--hot); font-weight: 700; }
 select.text-input { appearance: auto; }
+
+/* ====================================================================== */
+/* 11/10 — the tracking view for a computer, still comfortable on a tablet */
+/* (יצחק: "most will use it on a computer"). Four places in a side rail;  */
+/* the lead opens beside the list from 1180px, as its own page below it.  */
+/* Touch sizes stay 44px: nothing here depends on hover.                  */
+/* ====================================================================== */
+main.wide { max-width: 1440px; }
+.crm-shell { display: grid; gap: var(--s5); }
+.crm-nav { display: flex; gap: var(--s1); overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.crm-nav-title, .crm-nav-sep { display: none; }
+.ctab .ci { margin-inline-end: 6px; font-size: 14px; opacity: .8; }
+.ctab .cn { margin-inline-start: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--pill); background: var(--bad, #b42318); color: #fff; font-size: 11.5px; font-weight: 700; display: inline-grid; place-items: center; }
+.ctab.minor { margin-inline-start: auto; font-weight: 500; }
+.crm-main { min-width: 0; }
+.crm-main .crm-head { align-items: center; }
+.crm-main .crm-head h1 { margin: 0; }
+.crm-main .date-now { margin-inline-start: auto; max-width: none; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: var(--pill); padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; border-radius: var(--pill); min-height: 38px; padding: 0 var(--s4); font-weight: 600; font-size: 14.5px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.btn.on { background: var(--accent); color: var(--accent-ink); }
+@media (min-width: 1000px) {
+  .crm-shell { grid-template-columns: 200px minmax(0, 1fr); align-items: start; }
+  .crm-nav { flex-direction: column; border-bottom: 0; border-inline-end: 1px solid var(--line); padding-inline-end: var(--s3); position: sticky; top: 72px; overflow: visible; }
+  .crm-nav-title { display: block; font-weight: 700; font-size: 13px; color: var(--muted); padding: 0 var(--s3) var(--s2); }
+  .crm-nav-sep { display: block; height: 1px; background: var(--line); margin: var(--s2) 0; }
+  .crm-nav .ctab { text-align: start; border-bottom: 0; margin: 0; border-radius: var(--r-sm); padding: 0 var(--s3); display: flex; align-items: center; }
+  .crm-nav .ctab[aria-current="true"] { background: var(--surface-2); }
+  .crm-nav .ctab.minor { margin-inline-start: 0; font-size: 14px; }
+  .crm-nav .ctab .cn { margin-inline-start: auto; }
+}
+/* The lead beside the list: the list keeps its place, the lead scrolls on its own. */
+.crm-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(460px, 44%); gap: var(--s4); align-items: start; }
+.crm-split #crm-body { margin-top: var(--s5); min-width: 0; }
+.crm-side { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; margin-top: var(--s5); border-radius: var(--r-lg); }
+.crm-side .rec-grid { grid-template-columns: 1fr; }
+.crm-side .rec-top { box-shadow: none; }
+.row.sel, .pcard.sel, .q-item.sel { outline: 2px solid var(--line-ink); outline-offset: -2px; }
+tr:has(.sel) td { background: var(--surface-2); }
+/* Overview: the one lead to handle now, and what comes after it. */
+.q-progress { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; font-size: 15px; }
+.qbar { flex: 1; min-width: 160px; height: 8px; background: var(--surface-2); border-radius: var(--pill); overflow: hidden; }
+.qbar span { display: block; height: 100%; background: var(--good); border-radius: var(--pill); }
+.ov-grid { display: grid; gap: var(--s4); margin-top: var(--s4); }
+@media (min-width: 900px) { .ov-grid { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } }
+.crm-split .ov-grid { grid-template-columns: 1fr; }
+.next-card { background: var(--surface); border: 1px solid var(--ink-2, var(--line-strong)); border-radius: var(--r-lg); padding: var(--s5); box-shadow: var(--shadow); display: grid; gap: var(--s3); }
+.next-card.done { text-align: center; }
+.nc-who { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.nc-who h2 { margin: 0; font-size: 24px; }
+.nc-note { background: var(--warm-soft); border: 1px solid var(--warm-line); border-radius: var(--r); padding: var(--s3) var(--s4); font-size: 15.5px; line-height: 1.55; }
+.nc-now { font-size: 17px; }
+.nc-phone { display: flex; align-items: center; gap: var(--s3); font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+.nc-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: var(--s2); }
+.late-tag { font-size: 12.5px; font-weight: 700; color: var(--bad, #b42318); background: color-mix(in srgb, var(--bad, #b42318) 10%, transparent); border-radius: var(--pill); padding: 2px 8px; }
+.imp { color: var(--warm); font-size: 11px; letter-spacing: 1px; }
+.alerts { display: grid; gap: var(--s2); }
+.alert { text-align: start; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); min-height: 44px; padding: var(--s2) var(--s3); font-size: 14.5px; }
+.alert b { font-size: 17px; margin-inline-end: 4px; }
+.alert.bad b { color: var(--bad, #b42318); }
+.alert:hover { background: var(--surface-2); }
+.ov-h { font-size: 13.5px; color: var(--muted); margin: var(--s4) 0 var(--s2); font-weight: 600; }
+.q-list { display: grid; gap: 4px; }
+.q-item { display: grid; grid-template-columns: auto auto auto 1fr; align-items: center; gap: 6px; text-align: start; border: 0; background: transparent; border-radius: var(--r-sm); min-height: 44px; padding: 4px var(--s2); font-size: 14px; }
+.q-item .faint { grid-column: 2 / -1; font-size: 13px; }
+.q-item:hover { background: var(--surface-2); }
+/* Tasks by time: the same board as the stages, its columns are days. */
+.time-board .pcol.late header b { color: var(--bad, #b42318); }
+.tcard { display: grid; gap: 3px; text-align: start; width: 100%; padding-inline-end: var(--s3); cursor: pointer; }
+.tcard .pname { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.tcard .note-peek { font-size: 12.5px; }
+.seg-h { margin-top: var(--s7); }
