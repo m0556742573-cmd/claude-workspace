@@ -2677,7 +2677,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   }
   function sheetLeadMsg(l) {
     sheet(`<h2>הודעה ל${esc(People.rowName(l))}</h2>
-      ${l.optOut ? '<p class="warn-box">ביקש להסיר את עצמו מרשימת התפוצה. אפשר לשלוח רק תשובה אישית, לא מהתבניות.</p>' : `<div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(channelFor(t) || 'אין ערוץ פעיל')}</span><small>${esc(fillFor(t, l))}</small></button>`).join('')}</div>`}
+      ${l.optOut ? '<p class="warn-box">ביקש להסיר את עצמו מרשימת התפוצה. אפשר לשלוח רק תשובה אישית, לא מהתבניות.</p>' : `<div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(sendChannels().join(' + ') || 'אין ערוץ פעיל')}</span><small>${esc(fillFor(t, l))}</small></button>`).join('')}</div>`}
       <div class="actions"><button class="btn ghost" data-act="back-crm" data-lid="${l.id}">חזרה</button></div>`, l.id);
     $('#scrim .sheet').dataset.tasks = '1';
   }
