@@ -2089,7 +2089,6 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   /* 11/10 (יצחק): four places, in the order of a working day — what now, with whom, what waits, what we learnt.
    * Leads and tasks each choose their own way of showing; the rules moved to the settings. */
   const CRM_TABS = [['overview', 'סקירה'], ['leads', 'לידים'], ['tasks', 'משימות'], ['segments', 'פילוחים']];
-  const CRM_ICONS = { overview: '◉', leads: '👥', tasks: '✓', segments: '📊' };
   const CRM_VIEWS = { leads: [['table', 'טבלה'], ['pipeline', 'לפי שלב']], tasks: [['list', 'רשימה'], ['time', 'לפי זמן']] };
   // Each view's ⚙️ goes straight to the settings of what it shows.
   const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], time: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], messages: ['materials', 'ההודעות והחומרים'] };
@@ -2123,13 +2122,13 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const count = { overview: late, tasks: 0, leads: 0, segments: 0 };
     m.innerHTML = `<div class="crm-shell">
       <nav class="crm-nav" aria-label="${CRM_NAME}"><div class="crm-nav-title">${CRM_NAME}</div>
-        ${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}"><span class="ci" aria-hidden="true">${CRM_ICONS[k]}</span>${t}${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
+        ${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}">${t}${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
         <span class="crm-nav-sep"></span>
-        <button class="ctab minor" data-act="crm-rules"><span class="ci" aria-hidden="true">⚙️</span>כללים והגדרות</button></nav>
+        <button class="ctab minor" data-act="crm-rules">⚙️ כללים והגדרות</button></nav>
       <div class="crm-main">
         <div class="crm-head"><h1>${full ? CRM_NAME : esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>
-          ${!full && views ? `<div class="seg" role="group" aria-label="איך להציג">${views.map(([k, t]) => `<button data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</div>` : ''}
-          ${!full && S.crmTab === 'leads' ? `<button class="btn${S.crmView.leads === 'messages' ? ' on' : ''}" data-crmview="messages">💬 הודעה לקבוצה</button>` : ''}
+          ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
+          ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmview="messages" aria-pressed="${S.crmView.leads === 'messages'}">💬 הודעה לקבוצה</button>` : ''}
           <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
             ${!full && vs ? `<button class="btn ghost" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</span></div>
         ${!full && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
@@ -2237,7 +2236,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     return `<section class="next-card">
       <div class="nc-who"><span class="dot w${w == null ? '' : w}"></span><h2>${esc(People.rowName(l))}</h2>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)}
         <span class="muted">${esc([People.town(l), w != null ? words()[w] : '', stageById(l.stage).name, v ? nis(v) : ''].filter(Boolean).join(' · '))}</span></div>
-      ${note ? `<div class="nc-note">📝 ${esc(note.slice(0, 220))}</div>` : ''}
+      ${note ? `<div class="note-peek nc-note">📝 ${esc(note.slice(0, 220))}</div>` : ''}
       <div class="nc-now"><span class="faint">עכשיו</span> ${decide ? '<b>להחליט מה איתו</b>' : planHTML(p, true)}${lateBy > 0 ? ` <span class="late-tag">באיחור ${lateBy === 1 ? 'יום' : lateBy + ' ימים'}</span>` : ''}</div>
       <div class="faint">${esc([contactLine(l)].concat(tagged(l).map((b) => b.label), l.roleOf ? [l.roleOf] : []).join(' · '))}</div>
       ${acts}
@@ -2262,7 +2261,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <div>${q.length ? nextCard(q[0]) : `<section class="next-card done"><h2>אין מה לעשות היום ✓</h2><p class="muted">כל הצעדים של היום טופלו. הבאים בתור — ב<button class="link" data-crmtab="tasks">משימות</button>.</p></section>`}</div>
         <aside class="ov-side">
           <div class="alerts">${alert(late, 'באיחור', 'data-act="go-today"', 'bad')}${alert(decide, 'מחכים להחלטה', 'data-act="go-decide"')}${alert(st.none + st.tried, 'עוד לא קיבלו מענה', 'data-act="view-noanswer"')}</div>
-          ${q.length > 1 ? `<h3 class="ov-h">אחריו בתור</h3><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
+          ${q.length > 1 ? `<div class="group-head"><span>אחריו בתור</span></div><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
             ${q.length > 9 ? `<button class="link" data-act="go-today">ועוד ${q.length - 9} — לכל הרשימה ←</button>` : `<button class="link" data-act="go-today">לכל רשימת היום ←</button>`}</div>` : ''}
         </aside>
       </div>`;
