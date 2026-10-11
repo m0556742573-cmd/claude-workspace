@@ -1431,7 +1431,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }
     out.forEach(([k, p]) => {
       if (!l.sent.includes(p.name)) l.sent.push(p.name);
-      log(l, `${byRule ? '⚙️ ' : ''}${p.mat ? '📎' : '💬'} "${p.name}" נשלח ב${chName(k)}${byRule ? ' (אוטומטי)' : o.toGroup ? ' (לקבוצה)' : ''}`);
+      log(l, `${byRule ? '⚙️ ' : ''}${p.mat ? '📎' : '💬'} "${p.name}" נשלח ב${chName(k)}${byRule ? ' (אוטומטי · עם שורת הסרה)' : o.toGroup ? ' (לקבוצה)' : ''}`);
     });
     if (!o.quiet && !byRule) toast(`${out[0][1].mat ? '📎' : '💬'} "${[...new Set(out.map(([, p]) => p.name))].join('", "')}" נשלח ל${People.rowName(l)} · ${out.map(([k]) => chName(k)).join(' + ')}`);
     return true;
@@ -1818,8 +1818,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   // Rules that send something to the visitor start switched off: the owner turns them on knowingly.
   const DEF_RULES = [
     { id: 'r1', on: false, trigger: 'noanswer', arg: 2, cond: {}, action: { kind: 'message', tpl: '' }, fired: 0 },
-    { id: 'r2', on: true, trigger: 'captured', arg: null, cond: { warm: 0 }, action: { kind: 'step', type: 'meet', days: 1 }, fired: 0 },
+    // Examples that are on from the start (יצחק, 11/10): each does something the system does not do by itself,
+    // so the owner sees how a rule is built for his own needs. Rules that send to a customer start off.
     { id: 'r3', on: true, trigger: 'idle', arg: 7, cond: {}, action: { kind: 'step', type: 'call', days: 1 }, fired: 0 },
+    { id: 'r5', on: true, trigger: 'stage', arg: 'quote', cond: {}, action: { kind: 'notify' }, fired: 0 },
+    { id: 'r6', on: true, trigger: 'captured', arg: null, cond: { biz: true }, action: { kind: 'notify' }, fired: 0 },
     { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't1' }, fired: 0 },
   ];
   const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -1862,6 +1865,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       if (!b.chDefault) b.chDefault = {};
       delete b.template; delete b.sendWhen;
     }
+    if (!b.rulesV3) {   // 11/10: the default "captured + hot → a meeting" doubled the buttons' own steps; examples of what the system lacks replace it
+      b.rulesV3 = true;
+      b.rules = b.rules.filter((r) => !(r.id === 'r2' && r.trigger === 'captured' && r.action.kind === 'step' && !r.fired));
+      DEF_RULES.filter((d) => ['r5', 'r6'].includes(d.id)).forEach((d) => { if (!b.rules.some((r) => r.id === d.id)) b.rules.push(clone(d)); });
+    }
     if (!b.rulesV2) {   // after the reviews: sending rules off unless the owner turns them on, and one ready view
       b.rulesV2 = true;
       b.rules.forEach((r) => { if ((r.action.kind === 'send' || r.action.kind === 'message') && !r.fired) r.on = false; });
@@ -1900,7 +1908,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   const isAuto = (t) => /^⚙️/.test(t);
   const isTalk = (t) => /^📞 דיברנו/.test(t);
   const isNoAnswer = (t) => /^📞 לא ענה/.test(t);
-  const isHumanSend = (t) => /^(💬|📎)/.test(t) && !/ממתין/.test(t);
+  // M2: a message sent to a whole group is not contact with this person — it must not make a neglected lead look handled.
+  const isHumanSend = (t) => /^(💬|📎)/.test(t) && !/ממתין|\(לקבוצה\)|בניסיון/.test(t);
   const touched = (l) => l.log.filter((e) => isTalk(e.t) || isHumanSend(e.t));
   const tries = (l) => l.log.filter((e) => isNoAnswer(e.t));
   /** none · tried (no answer yet) · sent (material or a message, not spoken) · talked */
@@ -1964,13 +1973,15 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   function applyRule(r, l) {
     const a = r.action;
     if (holdSends && sendsOut(r)) return;
+    // M3: a rule does not add a step of a kind already open for him — the buttons' steps come first.
+    if (a.kind === 'step' && tasks(l).some((t) => t.type === a.type)) return;
     r.fired = (r.fired || 0) + 1;
     l.ruleHits = l.ruleHits || {};
     l.ruleHits[r.id] = (l.ruleHits[r.id] || 0) + 1;
     byRule = true;
     if (!sendsOut(r)) log(l, '⚙️ אוטומציה: ' + ruleText(r).then);
     if (a.kind === 'step') { const s = normStep({ type: a.type, days: a.days || 1 }); addManual(l, s, dueFor(s)); }
-    else if (a.kind === 'message') sendPackage(l, a.tpl, { quiet: true });
+    else if (a.kind === 'message') sendPackage(l, a.tpl, { quiet: true, auto: true });   // M6: goes out with the opt-out line
     else if (a.kind === 'stage') setStage(l, a.stage, 'אוטומציה');
     else if (a.kind === 'warm') { l.warmth = a.value || 0; l.warmBy = 'hand'; }
     else if (a.kind === 'notify') S.biz.digestNotes.push({ at: now(), text: People.rowName(l) + ' — ' + ruleText(r).when.replace(/^כש/, '') });
@@ -2057,8 +2068,15 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   const CRM_TABS = [['overview', 'סקירה'], ['tasks', 'משימות'], ['pipeline', 'צינור'], ['table', 'טבלה'], ['segments', 'פילוח'], ['auto', 'אוטומציות'], ['messages', 'הודעות']];
   // Each view's ⚙️ goes straight to the settings of what it shows.
   const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], auto: ['auto', 'הכללים'], messages: ['materials', 'ההודעות והחומרים'] };
-  function viewCRM(m) {
+  /** M10: "days without contact" is checked once a day — when the tracking view opens or the day changes — not inside drawing the screen. */
+  function idleOnce() {
+    const today = dayNo(now());
+    if (S.idleDay === today) return;
+    S.idleDay = today;
     runIdle();
+    save();
+  }
+  function viewCRM(m) {
     const L = leadsNow();
     const rec = S.crmLead && leadById(S.crmLead);
     const vs = VIEW_SETTINGS[S.crmTab];
@@ -2188,7 +2206,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       week: openTasks(L).filter((l) => due(l) > 0 && due(l) <= 7),
       all: openTasks(L),
       season: L.filter((l) => plan(l).type === 'season'),
-      audience: L.filter((l) => !l.won && !tasks(l).length),
+      // M5: a lead with no step and no decision is not "audience" — it waits for the owner, in a tab of its own.
+      decide: L.filter((l) => !l.won && !l.lost && !l.audience && !tasks(l).length),
+      audience: L.filter((l) => !l.won && (l.audience || l.lost)),
       won: L.filter((l) => l.won),
     };
     const f = crmFilter || (groups.today.length ? 'today' : 'all');
@@ -2198,10 +2218,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const tab = (k, t, minor) => (minor && !groups[k].length ? '' : `<button class="tab${minor ? ' minor' : ''}" data-filter="${k}" aria-pressed="${!q && f === k}">${t} <span class="n">${groups[k].length}</span></button>`);
     let body;
     if (!list.length) body = `<div class="empty">${q ? 'לא נמצא אף ליד.' : 'אין כאן אף אחד.'}</div>`;
+    else if (!q && f === 'decide') body = coldList(list);   // the same three choices as on the dashboard: audience · not relevant · a step
     else body = crmRows(list, !q && f !== 'audience' && f !== 'won', true);
     box.innerHTML = `<div class="tasks-bar"><nav class="tabs" aria-label="סינון">${tab('today', 'היום')}${tab('week', 'בהמשך השבוע')}${tab('all', 'כל הצעדים')}</nav>
         </div>
-      <div class="more-tabs">${tab('season', 'לעונה', true)}${tab('audience', 'קהל ולא רלוונטי', true)}${tab('won', 'נסגרו', true)}</div>
+      <div class="more-tabs">${tab('decide', 'מחכים להחלטה', true)}${tab('season', 'לעונה', true)}${tab('audience', 'קהל ולא רלוונטי', true)}${tab('won', 'נסגרו', true)}</div>
       <input id="crm-q" class="text-input" placeholder="חיפוש בכל הלידים — שם, עיר, כפתור, מוסד או הערה" aria-label="חיפוש בלידים" value="${esc(crmQuery)}" autocomplete="off">
       ${q ? `<div class="faint" style="margin-top:6px">מחפש בכל הלידים · <button class="link" data-act="crm-clear">ניקוי</button></div>` : ''}
       <div style="margin-top:10px">${body}</div>`;
@@ -2304,7 +2325,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   function sheetMoveConfirm(l, id, sends) {
     sheet(`<h2>${esc(People.rowName(l))} ➜ ${esc(stageById(id).name)}</h2>
       <p class="muted">המעבר הזה שולח ללקוח, לפי הכללים שלך:</p>
-      ${sends.map((r) => `<div class="bubble">${esc(r.action.kind === 'message' && tplById(r.action.tpl) ? fillFor(tplById(r.action.tpl), l) : ruleText(r).then)}</div>`).join('')}
+      ${sends.map((r) => `<div class="bubble">${esc(r.action.kind === 'message' && tplById(r.action.tpl) ? fillFor(tplById(r.action.tpl), l, true) : ruleText(r).then)}</div>`).join('')}
       <p class="faint">הודעה שיצאה אי אפשר להחזיר.</p>
       <div class="actions"><button class="btn primary" data-act="move-send" data-lid="${l.id}" data-v="${id}">להעביר ולשלוח</button>
         <button class="btn" data-act="move-hold" data-lid="${l.id}" data-v="${id}">להעביר בלי לשלוח</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
@@ -2381,6 +2402,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   const narrow = () => window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
   function crmTable(box, L) {
     const rows = tableRows(L);
+    // M9: what is selected is what passes the filter now — an action never reaches a lead hidden by a search or a view.
+    const inView = new Set(rows.map((l) => l.id));
+    Array.from(tbSel).forEach((id) => { if (!inView.has(id)) tbSel.delete(id); });
     const per = 25;
     const pages = Math.max(1, Math.ceil(rows.length / per));
     tbPage = Math.min(tbPage, pages - 1);
@@ -2588,7 +2612,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     sheet(`<h2>${r.isNew ? 'כלל חדש' : 'עריכת כלל'}</h2>
       <div class="rule-sentence">כש ${sel('trigger', Object.entries(TRIGGERS), r.trigger, 'מתי')} ${arg}<br>
         אז ${sel('a.kind', Object.entries(ACTIONS), a.kind, 'מה לעשות')} ${act}</div>
-      ${tpl ? `<div class="bubble">${esc(tpl.text)}</div>` : ''}
+      ${tpl ? `<div class="bubble">${esc(tpl.text + '\n' + OPT_OUT).replace(/\n/g, '<br>')}</div><p class="faint">מה שאוטומציה שולחת יוצא עם שורת ההסרה, כמו שליחה לקבוצה.</p>` : ''}
       ${sendsOut(r) ? '<p class="out-tag">יוצא ללקוח, בשמך</p>' : ''}
       <div class="label">רק אם <small>רשות</small></div>
       <div class="rule-conds">
@@ -2842,6 +2866,13 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (stay) { closeSheet(false); render(); } else { render(); sheetCRM(l); }
     toast('✓ ' + s.label + ' · ' + dueText(new Date(dueAt)));
   }
+  function sheetNoAnswer(l) {
+    sheet(`<h2>${esc(People.rowName(l))} לא ענה ${l.noAnswer} פעמים. מה עושים?</h2>
+      <div class="opts"><button class="opt" data-act="lead-msg" data-lid="${l.id}">💬 לשלוח הודעה במקום<small>אולי הוא פשוט לא עונה למספר לא מוכר</small></button>
+        <button class="opt" data-act="na-week" data-lid="${l.id}">📞 לנסות שוב בעוד שבוע</button>
+        <button class="opt" data-act="task-audience" data-lid="${l.id}">לקהל<small>בלי משימה עכשיו, נשאר לעתיד</small></button>
+        <button class="opt" data-act="lead-lost" data-lid="${l.id}">לא רלוונטי</button></div>`, l.id);
+  }
   /** A call's outcome. With `stay`, from a row in the tasks list: the list stays, and the next row is ready. */
   function outcome(l, kind, stay) {
     const today = new Date(now());
@@ -2856,8 +2887,10 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     }
     if (kind === 'noans') {
       l.noAnswer = (l.noAnswer || 0) + 1;
-      if (l.noAnswer >= 3) { l.audience = true; log(l, '📞 לא ענה — פעם שלישית, עבר לקהל'); }
-      else { if (cur) l.moved[cur.key] = H.addDays(today, 1, true).getTime(); log(l, "📞 לא ענה — ננסה ביום העבודה הבא"); }
+      // M4: the third time the system does not move him to the audience by itself — it asks; the owner decides.
+      if (l.noAnswer >= 3) { log(l, '📞 לא ענה — ' + l.noAnswer + ' פעמים'); runRules('noanswer', l, l.noAnswer); save(); render(); return sheetNoAnswer(l); }
+      if (cur) l.moved[cur.key] = H.addDays(today, 1, true).getTime();
+      log(l, "📞 לא ענה — ננסה ביום העבודה הבא");
       runRules('noanswer', l, l.noAnswer);
       if (stay) toast('📞 ' + People.rowName(l) + ' — לא ענה, ננסה מחר');
     }
@@ -2889,7 +2922,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       const ev = (d, t) => l.log.push({ at: l.at + d * H.DAY + rnd(6) * 3600000, t });
       const r = Math.random();
       if (r < 0.75) ev(1, (Math.random() < 0.5 ? '📞 דיברנו' : '📎 מחירון — נשלח במייל'));
-      if (r < 0.15) { l.stage = 'won'; l.won = true; ev(4, '➜ הצעה נשלחה'); ev(6, '➜ נסגר · אחרי שיחה'); l.done.push(...tasks(l).map((t) => t.key)); }
+      if (r < 0.15) {
+        l.stage = 'won'; l.won = true; ev(4, '➜ הצעה נשלחה'); ev(6, '➜ נסגר · אחרי שיחה'); l.done.push(...tasks(l).map((t) => t.key));
+        // M8: closed the way a real deal closes — with its after-sale check.
+        if (S.biz.afterSale) addManual(l, { type: 'call', label: 'איך היה? בדיקה אחרי מכירה', days: S.biz.afterSale, phase: 'after' }, H.addDays(new Date(l.at + 6 * H.DAY), S.biz.afterSale, true).getTime());
+      }
       else if (r < 0.25) { l.stage = 'lost'; l.lost = true; ev(3, '➜ לא רלוונטי'); }
       else if (r < 0.45) { l.stage = 'quote'; ev(3, '➜ הצעה נשלחה'); }
       else if (r < 0.55) { l.stage = 'nego'; ev(3, '➜ הצעה נשלחה'); ev(5, '➜ במשא ומתן'); }
@@ -3135,7 +3172,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const L = d.lid ? leadById(+d.lid) : null;
 
     if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
-    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); filledCold.clear(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
     // Setup step 3: a channel in one tap. WhatsApp goes through its own sheet, with the warning or the existing account.
@@ -3565,6 +3602,14 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         return toast('🤝 נקבע · ' + dueText(new Date(at)));
       }
       case 'md-later': { const l = MD && leadById(MD.lid); MD = null; if (l) sheetTalk(l, false, 'הפגישה תואמה'); return; }
+      case 'na-week': {
+        if (!L) return;
+        const cur = tasks(L)[0];
+        const at = H.addDays(new Date(now()), 7, true).getTime();
+        if (cur) L.moved[cur.key] = at; else addManual(L, normStep({ type: 'call' }), at);
+        log(L, '📞 ננסה שוב בעוד שבוע');
+        save(); closeSheet(false); render(); return toast('📞 ננסה שוב · ' + dueText(new Date(at)));
+      }
       case 'cold-aud': { if (L) { filledCold.add(L.id); undoable('בקהל · ' + People.rowName(L), () => { L.audience = true; log(L, 'הועבר לקהל'); }); render(); } return; }
       case 'cold-lost': { if (L) { filledCold.add(L.id); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost', 'סומן קר')); render(); } return; }
       case 'lead-lost': { if (L) { closeSheet(false); undoable('לא רלוונטי · ' + People.rowName(L), () => setStage(L, (stageOf('lost') || {}).id || 'lost')); render(); } return; }
@@ -3678,8 +3723,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         if (S.phase === 'live' && S.view !== 'booth') render();
         return;
       case 'seed': seedDay(); return render();
-      case 'next-day': S.shift += 1; save(); return render();
-      case 'today': S.shift = 0; save(); return render();
+      case 'next-day': S.shift += 1; idleOnce(); save(); return render();
+      case 'today': S.shift = 0; idleOnce(); save(); return render();
       case 'devices': return sheetDevices();
       case 'join': S.biz.devices += 1; save(); return sheetDevices();
       case 'reset':
@@ -3693,5 +3738,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   window.Demo3 = { parse: parseWords, clean: cleanAI, useServerAI: () => aiReady(serverAI), plan: (id) => plan(leadById(id)), tasks: (id) => tasks(leadById(id)), state: () => S };
   upgrade();
   ensureSids();
+  if (S.phase === 'live') idleOnce();
   render();
 })();
