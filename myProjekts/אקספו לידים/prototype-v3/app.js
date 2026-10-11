@@ -2325,7 +2325,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     { id: 'answer', t: 'מענה', v: (l) => ANSWER[answerState(l)], s: (l) => ['none', 'tried', 'sent', 'talked'].indexOf(answerState(l)) },
     { id: 'last', t: 'מגע אחרון', v: (l) => contactLine(l), s: (l) => (lastTouch(l) ? lastTouch(l).at : 0) },
     { id: 'tags', t: 'כפתורים', v: (l) => tagged(l).map((b) => b.label).join(', ') },
-    { id: 'next', t: 'צעד הבא', v: (l) => (tasks(l).length ? plan(l).label : '') },
+    // No step is said in words, never as "—": a lead waiting for the owner's decision must not look like one with nothing to do.
+    { id: 'next', t: 'צעד הבא', v: (l) => (tasks(l).length ? plan(l).label : l.won ? 'לקוח' : l.lost ? 'לא רלוונטי' : l.audience ? 'קהל' : 'מחכה להחלטה') },
     { id: 'due', t: 'מתי', v: (l) => (plan(l).due ? plan(l).due.getTime() : null), f: dateShort, num: true },
     { id: 'by', t: 'נקלט ע"י', v: (l) => l.by },
     { id: 'visits', t: 'ביקורים', v: (l) => l.visits, num: true },
@@ -2372,7 +2373,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       const x = key(a); const y = key(b);
       const ex = x == null || x === '';
       const ey = y == null || y === '';
-      if (ex || ey) return ex === ey ? 0 : (ex ? -1 : 1) * S.tb.sort.dir;   // empty values sort with the direction, not always last
+      if (ex || ey) return ex === ey ? 0 : ex ? 1 : -1;   // empty values always last: "when" sorted up must start with today, not with the leads that have nothing to do
       return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'he')) * S.tb.sort.dir;
     });
     return rows;
@@ -2415,7 +2416,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
       </table></div>
       ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
-      ${tbSel.size ? `<div class="bulk"><b>${tbSel.size} נבחרו</b>
+      ${tbSel.size ? `<div class="bulk" style="z-index:10"><b>${tbSel.size} נבחרו</b>
         <button class="btn primary-inv" data-bulk="message">💬 הודעה</button><button class="btn" data-bulk="stage">להעביר שלב</button><button class="btn" data-bulk="warm">לסמן חום</button>
         <button class="btn" data-bulk="step">להוסיף צעד</button><button class="btn" data-bulk="export">⬇ אקסל</button>
         <button class="btn ghost" data-bulk="clear">ביטול הבחירה</button></div>` : ''}`;
