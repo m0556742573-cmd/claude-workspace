@@ -119,7 +119,8 @@ window.People = (function () {
         if (m.how === 'skel') { score -= 1; variant = true; } // a spelling variant ranks below a direct hit
         if (m.how === 'deep') { score -= 2; variant = true; }
         if (t === 0 && m.w === 0 && !biz) score += 2;      // first typed word hits the first name (a business name has none)
-        if (t > 0 && m.w >= ix.firstLen) score += 1;       // later word hits the surname
+        if (biz && m.w >= ix.firstLen) score -= 1;         // a business's trade ("יודאיקה") is not its name: "שוורץ י" means יצחק שוורץ first (UX review B-4)
+        else if (t > 0 && m.w >= ix.firstLen) score += 1;  // later word hits the surname
         continue;
       }
       if (t > 0 && ix.town.some((w) => w.startsWith(toks[t]))) { score += 1; continue; } // "משה כהן בני"

@@ -474,6 +474,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const groupById = (id) => S.biz.groups.find((g) => g.id === id);
   const groupButtons = (gid) => S.biz.buttons.filter((b) => b.axis === gid);
   const liveGroups = () => S.biz.groups.filter((g) => groupButtons(g.id).length);
+  // A business record is not asked who he is — the system knows he is a business (UX review D-4: "no question is asked if the answer can be known").
+  const groupsFor = (l) => liveGroups().filter((g) => !(l && l.b != null && g.id === 'who'));
   const tagged = (l) => l.tags.map(btnById).filter(Boolean);
   const leadById = (id) => S.leads.find((l) => l.id === id);
   const practice = () => S.phase !== 'live';
@@ -911,7 +913,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const cat = b.templates.find((t) => t.mat);
     const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{חומר\}/g, t.mat || 'החומר');
     m.innerHTML = `<h1>מה שולחים ואיך</h1>
-      <p class="muted">שלושה דברים, וכולם ניתנים לשינוי אחר כך.</p>
+      <p class="muted">דרך מה שולחים, ומה. הכל ניתן לשינוי אחר כך.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>1. ערוץ</h2><p class="muted">איך מה שהמבקר ביקש יגיע אליו. אחד מספיק.</p>
           <div class="chips">${CHANNELS.map((c) => `<button class="chip" data-quickch="${c.k}" aria-pressed="${!!b.channels[c.k]}">${c.ic} ${esc(c.name)}</button>`).join('')}</div>
@@ -920,7 +922,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           ${cat ? `<p>📎 <b>${esc(cat.mat)}</b> — מצורף להודעה "${esc(cat.name)}".</p>` : '<p class="muted">מה שמבקרים יבקשו בדוכן: קטלוג, מחירון, תמונות. אפשר גם לדלג ולהוסיף בדוכן.</p>'}
           <div class="add-row"><input id="cat-name" class="text-input" value="${cat ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
             <label class="btn" for="cat-file">📷 ${cat ? 'עוד קובץ' : 'קובץ'}</label></div><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></section>
-        ${cat ? `<section class="card"><h2>3. הנוסח</h2><p class="muted">מה המבקר יקבל יחד עם הקובץ. {שם} ו-{עסק} מתמלאים לבד.</p>
+        ${cat ? `<section class="card"><h2>מה כתוב בהודעה</h2><p class="muted">מה המבקר יקבל יחד עם הקובץ. {שם} ו-{עסק} מתמלאים לבד.</p>
           <textarea id="cat-text" class="say small">${esc(cat.text)}</textarea>
           <p class="faint" id="cat-prev">${esc(sample(cat))}</p></section>` : ''}
       </div>
@@ -1165,8 +1167,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Setup 5 — a practice booth
   // ------------------------------------------------------------------
   function viewTry(m) {
-    m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> מה שתקלוט כאן יימחק כשתתחיל את יום התערוכה.</span>
-      <button class="btn primary" data-act="go-live">סיימתי — ליום התערוכה ←</button></div>
+    // "Done" stands out only after one visitor was tried: before that, the loud button said "skip the practice" (UX review U-3).
+    const tried = S.leads.some((l) => l.practice);
+    m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> ${tried ? 'מה שתקלוט כאן יימחק כשתתחיל את יום התערוכה.' : 'נסה מבקר אחד: הקלד שם משפחה ונגע בשם.'}</span>
+      <button class="btn${tried ? ' primary' : ''}" data-act="go-live">סיימתי — ליום התערוכה ←</button></div>
       ${tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לכוונן?', '<b>הכל מוכן.</b> רוצה לכוונן לפני?')}<div id="boothwrap"></div>`;
     viewBooth($('#boothwrap'));
   }
@@ -1200,6 +1204,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const L = leadsNow();
     const demo = L.filter((l) => l.demo).length;
     f.textContent = (practice() ? 'ניסיון · ' : '') + (L.length - demo) + ' נקלטו' + (demo ? ' (ועוד ' + demo + ' מדומים)' : '');
+    const go = $('[data-act="go-live"]');   // the first visitor tried: now "done" is the way on (U-3)
+    if (go && L.length) go.classList.add('primary');
   }
   function renderResults(query) {
     const slot = $('#slot');
@@ -1248,7 +1254,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       l = newLead(key, People.row(key));
       log(l, 'ביקר בדוכן');
       S.leads.push(l);
-      toast('✓ נשמר: ' + People.rowName(l));
       save();
       return openLead(l, true);
     }
@@ -1338,14 +1343,14 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return `
       <div class="lead-head"><div><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>
         <div class="faint">${esc(People.rowMeta(l))}${l.visits > 1 ? ' · ביקר ' + l.visits + ' פעמים' : ''}${l.demo ? ' · מדומה' : ''}</div></div>
-        <div class="head-acts"><button class="btn primary" data-act="close-lead">✓ סיום</button></div></div>
+        <div class="head-acts">${inSheet ? "" : `<span class="saved-tag">✓ נשמר · נסגר לבד</span>`}<button class="btn primary" data-act="close-lead">✓ סיום</button></div></div>
       <div class="warmth">${words().map((t, k) => `<button class="warm-btn w${k}${auto && w === k ? ' auto' : ''}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</div>
       ${auto ? '<div class="hint">הוצע לפי מה שסימנת. נגיעה משנה.</div>' : ''}
-      ${liveGroups().map((g) => `<div class="label">${esc(g.title)} <small>רשות</small></div>
+      ${groupsFor(l).map((g) => `<div class="label">${esc(g.title)} <small>רשות</small></div>
         <div class="chips">${groupButtons(g.id).map((b) => `<button class="chip" data-tag="${b.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(b.id)}">${esc(b.label)}</button>`).join('')}</div>`).join('')}
       ${datey ? `<div class="label">מתי השמחה? <small>רשות</small></div><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}">` : ''}
       ${roley ? `<div class="label">של מי? <small>רשות — המוסד, בית הכנסת או הקבוצה</small></div><input class="text-input" data-roleof="${l.id}" value="${esc(l.roleOf)}" placeholder="למשל: קבוצת שערי חסד" autocomplete="off">` : ''}
-      <button class="next-line" data-act="tasks" data-lid="${l.id}"><span class="faint">הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${ts.length - 1}</span>` : ''}</button>
+      <button class="next-line" data-act="tasks" data-lid="${l.id}"><span class="faint">הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${ts.length - 1}</span>` : ''}<span class="next-edit">שינוי ←</span></button>
       ${last ? `<div class="note-peek">📝 ${last.audio ? '🎙️ ' : ''}${esc((last.text || last.tr || 'הקלטה').slice(0, 80))}${l.notes.length > 1 ? ` <span class="faint">(${l.notes.length} הערות)</span>` : ''}</div>` : ''}
       <div class="actions">${sendBtn}
         <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
@@ -1667,11 +1672,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const demo = L.filter((l) => l.demo).length;
     const ws = [0, 1, 2, null].map((k) => L.filter((l) => effWarm(l) === k).length);
     const asks = dashAsks(L);
-    m.innerHTML = `<h1>היום בדוכן: ${L.length - demo} אנשים${demo ? ` <span class="faint">(ועוד ${demo} מדומים)</span>` : ''}</h1>
+    m.innerHTML = `<h1>היום בדוכן: ${L.length - demo === 1 ? 'אדם אחד' : (L.length - demo) + ' אנשים'}${demo ? ` <span class="faint">(ועוד ${demo} מדומים)</span>` : ''}</h1>
       ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות איך נראה יום אמיתי, אפשר להוסיף 20 מבקרים מדומים.</div>
         <div class="actions"><button class="btn" data-act="seed">להוסיף מבקרים מדומים</button></div></div>` : ''}
-      <div class="stats">${words().map((t, k) => `<div class="stat static"><span class="n">${ws[k]}</span><span class="t">${esc(t)}</span></div>`).join('')}
-        <div class="stat static"><span class="n">${ws[3]}</span><span class="t">בלי חום</span></div></div>
+      <div class="stats">${words().map((t, k) => `<button class="stat" data-act="warm-list" data-k="${k}" ${ws[k] ? '' : 'disabled'}><span class="n">${ws[k]}</span><span class="t">${esc(t)}</span></button>`).join('')}
+        <button class="stat" data-act="warm-list" data-k="none" ${ws[3] ? '' : 'disabled'}><span class="n">${ws[3]}</span><span class="t">בלי חום</span></button></div>
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
       <div class="ask" style="margin-top:10px">${asks.map(dashCard).join('') || '<div class="empty">הכל מסומן.</div>'}</div>
       <h2 style="margin-top:26px">מה מחכה</h2>
@@ -1681,11 +1686,14 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
-  function dashCard(a) {
+  let fillShown = {};   // what each partly-marked row showed when it opened — it keeps showing it while being filled in
+  // One action stands out on the evening screen (UX review D-2): the first card in the list, the one whose memory fades first.
+  function dashCard(a, i) {
+    const pri = i ? '' : ' primary';
     let body = '';
-    if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
-    else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="cold">להחליט</button></div>';
-    else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
+    if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
+    else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="cold">להחליט</button></div>`;
+    else if (a.mat) body = `<div class="actions"><button class="btn${pri}" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
     // An open list closes with its own button, or with a tap anywhere outside it (יצחק, 12/10).
     const open = (a.fill && fillOpen === a.fill) || (a.cold && fillOpen === 'cold');
     return `<div class="ask-card${open ? ' open' : ''}"><div class="q">${esc(a.q)}</div>${body}${open ? '<div class="actions"><button class="btn ghost" data-act="fill-close">סגירת הרשימה</button></div>' : ''}</div>`;
@@ -1699,20 +1707,23 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }).join('')}</div>`;
   }
   /** What a lead still lacks: warmth, and each group of buttons with nothing tapped in it. */
-  const missingOf = (l) => [effWarm(l) == null ? 'חום' : ''].concat(liveGroups().filter((g) => !groupButtons(g.id).some((x) => l.tags.includes(x.id))).map((g) => g.title)).filter(Boolean);
+  const missingOf = (l) => [effWarm(l) == null ? 'חום' : ''].concat(groupsFor(l).filter((g) => !groupButtons(g.id).some((x) => l.tags.includes(x.id))).map((g) => g.title)).filter(Boolean);
   function fillList(leads, kind) {
     if (!leads.length) return '<div class="faint" style="margin-top:6px">✓ הכל מסומן.</div>';
-    // Nothing marked: warmth and the first group — the quickest minute. Partly marked: every group, and what is missing.
-    const gs = kind === 'partial' ? liveGroups() : liveGroups().slice(0, 1);
+    // Nothing marked: warmth and the first group — the quickest minute. Partly marked: only what is missing (UX review D-3:
+    // ten chips on a row that lacks one group). A row filled in on this visit keeps what it showed, so nothing jumps under the finger.
     return `<div style="margin-top:8px">${leads.map((l) => {
       const w = effWarm(l);
+      const miss = (g) => !groupButtons(g.id).some((x) => l.tags.includes(x.id));
+      const gs = kind === 'partial' ? (fillShown[l.id] || (fillShown[l.id] = { warm: w == null, groups: groupsFor(l).filter(miss).map((g) => g.id) })) : { warm: true, groups: groupsFor(l).slice(0, 1).map((g) => g.id) };
+      const showWarm = gs.warm;
       const note = l.notes[0] && (l.notes[0].text || l.notes[0].tr);
       const lack = kind === 'partial' ? missingOf(l) : [];
       const memo = [new Date(l.at).toTimeString().slice(0, 5), People.rowMeta(l), lack.length ? 'חסר: ' + lack.join(', ') : '', note ? '📝 ' + note.slice(0, 40) : ''].filter(Boolean).join(' · ');
       const done = filled.has(kind + ':' + l.id);
       return `<div class="tag-row${done ? ' filled' : ''}" data-fill="${kind}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}<span class="memo">${esc(memo)}</span></button>
-        <span class="mini-w">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</span>
-        ${gs.map((g) => `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}">${esc(x.label)}</button>`).join('')}</span>`).join('')}</div>`;
+        ${showWarm ? `<span class="mini-w">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</span>` : ''}
+        ${gs.groups.map((id) => S.biz.groups.find((g) => g.id === id)).filter(Boolean).map((g) => `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}">${esc(x.label)}</button>`).join('')}</span>`).join('')}</div>`;
     }).join('')}</div>
       <div class="faint" style="margin-top:6px">נגיעה בשם פותחת את הכרטיס המלא.</div>`;
   }
@@ -3362,7 +3373,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const L = d.lid ? leadById(+d.lid) : null;
 
     if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
-    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillShown = {}; filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); return render(); }
     // Setup step 3: a channel in one tap. WhatsApp goes through its own sheet, with the warning or the existing account.
@@ -3729,6 +3740,13 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       // "⏭ later": the lead goes to the end of today's queue for this sitting — nothing is decided, nothing is written.
       case 'q-skip': if (L) { qSkip = qSkip.filter((x) => x !== L.id).concat(L.id); } return render();
       // On a computer "call" cannot dial: the number is copied, and the call is made from the phone in his hand.
+      case 'warm-list': {   // a number on the evening screen opens who it counts (UX review D-5)
+        const k = d.k === 'none' ? null : +d.k;
+        const ls = leadsNow().filter((l) => effWarm(l) === k);
+        return sheet(`<h2>${esc(k == null ? 'בלי חום' : words()[k])} · ${ls.length}</h2>
+          <div class="opts">${ls.map((l) => `<button class="opt" data-openlead="${l.id}">${esc(People.rowName(l))}<small>${esc([People.town(l)].concat(tagged(l).map((b) => b.label)).join(' · '))}</small></button>`).join('')}</div>
+          <div class="actions"><button class="btn ghost" data-act="sheet-close">סגירה</button></div>`);
+      }
       case 'phone-saved': if (L && L.contact.phone) { log(L, '✎ נוסף טלפון'); save(); toast('✓ הטלפון נשמר'); } return render();
       case 'copy-phone': if (L && L.contact.phone) { try { navigator.clipboard.writeText(L.contact.phone).then(() => toast('✓ המספר הועתק'), () => toast(L.contact.phone)); } catch (x) { toast(L.contact.phone); } } return;
       case 'go-decide': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'decide'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);

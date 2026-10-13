@@ -1070,3 +1070,9 @@ tr:has(.sel) td { background: var(--surface-2); }
 .rec-now .actions { margin-top: 0; }
 .rec-keys .key .faint { font-size: 13px; letter-spacing: .02em; }
 .key-edit { font-weight: 500; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+button.stat:disabled { cursor: default; } button.stat:disabled:hover { background: transparent; }
+/* The booth card says it is kept, in its own corner, instead of a toast over the next line (UX review B-1, B-2) */
+.saved-tag { font-size: 13.5px; color: var(--muted); margin-inline-end: var(--s3); white-space: nowrap; }
+.head-acts { display: flex; align-items: center; }
+.next-line { position: relative; }
+.next-edit { margin-inline-start: auto; padding-inline-start: var(--s3); font-size: 14px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; float: left; }
