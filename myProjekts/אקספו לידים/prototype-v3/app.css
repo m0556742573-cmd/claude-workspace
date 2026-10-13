@@ -1076,3 +1076,7 @@ button.stat:disabled { cursor: default; } button.stat:disabled:hover { backgroun
 .head-acts { display: flex; align-items: center; }
 .next-line { position: relative; }
 .next-edit { margin-inline-start: auto; padding-inline-start: var(--s3); font-size: 14px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; float: left; }
+/* The table's one row of quick questions (UX review T-1) */
+.tb-quick { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.tb-quick .chip { min-height: 44px; }
+.more-filters > summary { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; color: var(--ink-2); font-size: 14.5px; }

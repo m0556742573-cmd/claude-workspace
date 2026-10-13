@@ -2538,29 +2538,18 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   const colById = (id) => COLS.find((c) => c.id === id);
   const FILTERS = {
     warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'בלי חום']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
-    answer: { t: 'מענה', opts: () => [['none', 'עוד לא'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל חומר או הודעה'], ['talked', 'דיברנו'], ['notyet', 'עוד לא דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
+    answer: { t: 'מענה', opts: () => [['none', 'עוד לא היה קשר'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל חומר או הודעה'], ['talked', 'דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
     stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
     btn: { t: 'כפתור', more: true, opts: () => [['nobtn', 'בלי כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), ok: (l, v) => (v === 'nobtn' ? !l.tags.length : l.tags.includes(v)) },
     kind: { t: 'סוג', more: true, opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
     town: { t: 'עיר', more: true, opts: () => Array.from(new Set(leadsNow().map((l) => People.town(l)))).sort().map((t) => [t, t]), ok: (l, v) => People.town(l) === v },
+    decide: { t: 'מחכים להחלטה', more: true, opts: () => [['yes', 'כן']], ok: (l) => !l.won && !l.lost && !l.audience && !tasks(l).length },
   };
   let tbQuery = '';
   let tbPage = 0;
   const tbSel = new Set();
   let tbIds = null;    // the leads an answer to a question, or a rule, pointed at — a filter of its own
   let tbIdsWhy = '';
-  let tbEdit = null;   // "lid:col" — the one cell open for editing
-  /** A cell becomes a control only when tapped: scrolling a tablet must never change data. */
-  function inlineCell(col, l) {
-    if (!['stage', 'warm', 'value'].includes(col)) return '';
-    const open = tbEdit === l.id + ':' + col;
-    const shown = col === 'stage' ? stageById(l.stage).name : col === 'warm' ? (effWarm(l) == null ? '—' : words()[effWarm(l)]) : leadValue(l) ? nis(leadValue(l)) + (typedValue(l) ? '' : ' (מוערך)') : '—';
-    if (!open) return `<button class="cell-btn" data-ietap="${col}" data-lid="${l.id}" aria-label="לשנות ${esc(colById(col).t)}">${esc(shown)}</button>`;
-    const opt = (pairs, cur) => pairs.map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('');
-    if (col === 'stage') return `<select data-ie="stage" data-lid="${l.id}" aria-label="שלב">${opt(S.biz.stages.map((s) => [s.id, s.name]), l.stage)}</select>`;
-    if (col === 'warm') { const w = effWarm(l); return `<select data-ie="warm" data-lid="${l.id}" aria-label="חום">${opt([['', '—']].concat(words().map((x, k) => [k, x])), w == null ? '' : w)}</select>`; }
-    return `<input data-ie="value" data-lid="${l.id}" type="number" min="0" step="100" value="${typedValue(l) ? esc(l.value) : ''}" placeholder="${estValue(l) || ''}" aria-label="שווי בשקלים">`;
-  }
   function tableRows(L) {
     const f = S.tb.f;
     const q = People.norm(tbQuery);
@@ -2589,33 +2578,36 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     tbPage = Math.min(tbPage, pages - 1);
     const shown = rows.slice(tbPage * per, tbPage * per + per);
     // On a tablet the default columns are the ones that decide who to call; chosen columns are kept as chosen.
-    const ids = narrow() && !S.tb.custom ? ['name', 'stage', 'last', 'next', 'due'] : S.tb.cols;
+    const ids = !wideCRM() && !S.tb.custom ? ['name', 'warm', 'next', 'due'] : S.tb.cols;   // T-5: below a computer's width, four that fit a tablet without scrolling sideways
     const cols = ids.map(colById).filter(Boolean);
     const active = Object.keys(S.tb.f).filter((k) => S.tb.f[k] && FILTERS[k]);
     const allSel = shown.length && shown.every((l) => tbSel.has(l.id));
     const sel = (k, F) => `<label class="tb-filter"><span class="faint">${F.t}</span><select data-tbf="${k}" aria-label="${F.t}"><option value="">הכל</option>${F.opts().map(([v, t]) => `<option value="${esc(v)}" ${S.tb.f[k] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
-    const main = Object.entries(FILTERS).filter(([, F]) => !F.more);
-    const more = Object.entries(FILTERS).filter(([, F]) => F.more);
+    /* One row above the table (UX review T-1): the search and the three questions a business owner asks of his list.
+     * Every other filter, the columns and the export are behind "עוד", one tap away. */
+    const quick = [['warm', '0', 'חמים'], ['answer', 'none', 'עוד לא היה קשר'], ['decide', 'yes', 'מחכים להחלטה']];
+    const quickOn = (k, v) => S.tb.f[k] === v;
+    const extra = Object.entries(FILTERS).filter(([k]) => k !== 'decide');
+    const extraOn = extra.some(([k]) => S.tb.f[k] && !quick.some(([qk, qv]) => qk === k && qv === S.tb.f[k]));
     box.innerHTML = `
       <div class="tb-bar">
         <input id="tb-q" class="text-input tb-q" placeholder="חיפוש בטבלה" aria-label="חיפוש בטבלה" value="${esc(tbQuery)}" autocomplete="off">
-        ${main.map(([k, F]) => sel(k, F)).join('')}
-        <details class="more-filters"${more.some(([k]) => S.tb.f[k]) ? ' open' : ''}><summary>עוד סינונים</summary><div class="tb-bar">${more.map(([k, F]) => sel(k, F)).join('')}</div></details>
+        <span class="chips tb-quick">${quick.map(([k, v, t]) => `<button class="chip" data-tbquick="${k}:${v}" aria-pressed="${quickOn(k, v)}">${t}</button>`).join('')}</span>
       </div>
+      <details class="more-filters"${extraOn ? ' open' : ''}><summary>עוד: סינון, עמודות, אקסל</summary>
+        <div class="tb-bar">${extra.map(([k, F]) => sel(k, F)).join('')}</div>
+        <div class="actions"><button class="btn" data-act="tb-cols">עמודות</button><button class="btn" data-act="tb-export-ask">⬇ להוריד לאקסל</button></div></details>
       <div class="tb-state">
         <span><b>${rows.length}</b> לידים${tbIds ? ` · <button class="chip small" data-act="ask-unfilter">${esc(tbIdsWhy || 'מתוך התשובה לשאלה')} ✕</button>` : ''}${active.length ? ' · מסונן לפי: ' + active.map((k) => `<button class="chip small" data-tbclear="${k}">${esc(FILTERS[k].t)}: ${esc((FILTERS[k].opts().find(([v]) => v === S.tb.f[k]) || [, S.tb.f[k]])[1])} ✕</button>`).join(' ') + ' <button class="link" data-tbclear="all">ניקוי הכל</button>' : ''}</span>
-        <span class="tb-tools">${S.biz.views.map((v, i) => `<button class="chip small" data-tbview="${i}">${v.builtin ? '⭐ ' : ''}${esc(v.name)}</button>`).join('')}
-          <button class="btn" data-act="tb-saveview">💾 לשמור תצוגה</button><button class="btn" data-act="tb-cols">עמודות</button>
-          <button class="btn" data-act="tb-dense" aria-pressed="${!!S.tb.dense}">צפיפות: ${S.tb.dense ? 'דחוסה ✓' : 'רגילה'}</button><button class="btn" data-act="tb-export" title="מה שרואים עכשיו בטבלה">⬇ אקסל — מה שבטבלה</button><button class="btn" data-act="export-all" title="כל הלידים, עם טלפון ומייל, בלי קשר לסינון">⬇ כל הלידים</button></span>
       </div>
-      <div class="tb-wrap"><table class="tb${S.tb.dense ? ' dense' : ''}">
+      <div class="tb-wrap"><table class="tb">
         <thead><tr><th class="ck"><label class="ck-hit"><input type="checkbox" data-tbselall aria-label="לבחור את כל העמוד" ${allSel ? 'checked' : ''}></label></th>${cols.map((c) => `<th class="${c.num ? 'num' : ''}${c.id === 'name' ? ' stick' : ''}"><button class="th" data-tbsort="${c.id}">${esc(c.t)}${S.tb.sort.col === c.id ? (S.tb.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
         <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><label class="ck-hit"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור את ${esc(People.rowName(l))}" ${tbSel.has(l.id) ? 'checked' : ''}></label></td>${cols.map((c) => {
           const v = c.v(l);
           const txt = c.f ? c.f(v) : v == null || v === '' ? '—' : String(v);
           if (c.id === 'name') return `<td class="stick"><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>`;
-          const ie = inlineCell(c.id, l);   // a tap opens it; nothing changes by scrolling past
-          return ie ? `<td class="ie">${ie}</td>` : `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
+          // Read only (UX review T-3): a hidden dashed underline was the only sign a cell could change — changes are made on the lead's page.
+          return `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
         }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
       </table></div>
       ${pages > 1 ? `<div class="pager"><button class="btn" data-tbpage="${tbPage - 1}" ${tbPage ? '' : 'disabled'}>הקודם</button><span>עמוד ${tbPage + 1} מתוך ${pages}</span><button class="btn" data-tbpage="${tbPage + 1}" ${tbPage < pages - 1 ? '' : 'disabled'}>הבא</button></div>` : ''}
@@ -3311,17 +3303,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.rd && d.rd !== 'c.minValue') return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
     if (d.chdef) { S.biz.chDefault = Object.assign({}, S.biz.chDefault, { [d.chdef]: t.value }); save(); return toast('נשמר'); }
-    if (d.ie) {   // a cell edited in the table — every change can be taken back
-      const l = leadById(+d.lid);
-      if (!l) return;
-      tbEdit = null;
-      if (d.ie === 'stage') { if (t.value !== l.stage) moveLead(l, t.value); else render(); return; }
-      undoable('✓ ' + People.rowName(l) + ' עודכן', () => {
-        if (d.ie === 'warm') { if (t.value === '') { l.warmBy = null; l.warmth = null; } else { l.warmth = +t.value; l.warmBy = 'hand'; } }
-        if (d.ie === 'value') l.value = t.value === '' ? null : Math.max(0, +t.value);
-      });
-      return render();
-    }
     if (d.grp) { grp[d.grp] = t.value; return render(); }
     if (d.scclosed !== undefined) { const list = SC.ids.map(leadById).filter(Boolean); return sheetSendConfirm(list, SC.tid, t.checked); }
     if (d.tbsel) { const id = +d.tbsel; if (t.checked) tbSel.add(id); else tbSel.delete(id); return render(); }
@@ -3388,7 +3369,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       save(); return render();
     }
     if (d.tl) { tlFilter = d.tl; return render(); }
-    if (d.ietap) { tbEdit = d.lid + ':' + d.ietap; return render(); }
     if (d.rowcall) { rowOpen = rowOpen === +d.rowcall ? null : +d.rowcall; return render(); }
     if (d.rowout) { if (L) outcome(L, d.rowout, true); return; }
     if (d.msgf) { msgFilter = d.msgf; return render(); }
@@ -3412,6 +3392,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.pstage) { if (L) { closeSheet(false); if (L.stage !== d.pstage) moveLead(L, d.pstage); } return; }
     if (d.tbsort) { const s = S.tb.sort; if (s.col === d.tbsort) s.dir = -s.dir; else { s.col = d.tbsort; s.dir = 1; } save(); return render(); }
     if (d.tbpage !== undefined) { tbPage = +d.tbpage; render(); return window.scrollTo(0, 0); }
+    if (d.tbquick) { const [k, v] = d.tbquick.split(':'); S.tb.f[k] = S.tb.f[k] === v ? '' : v; tbPage = 0; tbSel.clear(); save(); return render(); }   // a quick filter is a switch: on, off
     if (d.tbclear) { if (d.tbclear === 'all') { S.tb.f = {}; tbQuery = ''; } else S.tb.f[d.tbclear] = ''; tbPage = 0; save(); return render(); }
     if (d.tbview !== undefined) { const v = S.biz.views[+d.tbview]; if (v) { S.tb = clone(v.tb); tbPage = 0; save(); render(); toast('תצוגה: ' + v.name); } return; }
     if (d.tbcol) { const c = S.tb.cols; S.tb.custom = true; S.tb.cols = c.includes(d.tbcol) ? c.filter((x) => x !== d.tbcol) : COLS.map((x) => x.id).filter((x) => c.includes(x) || x === d.tbcol); save(); render(); return sheetCols(); }
@@ -3722,7 +3703,6 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'seed-progress': seedProgress(); return render();
       case 'record-back': S.crmLead = null; callOpen = false; save(); render(); if (!wideCRM()) window.scrollTo(0, 0); return;
       case 'tl-auto': tlAuto = !tlAuto; return render();
-      case 'tb-dense': S.tb.dense = !S.tb.dense; save(); return render();
       case 'ask': { e.preventDefault(); const q = $('#ask-q') && $('#ask-q').value.trim(); if (q) askData(q); return; }
       case 'ask-clear': ASK = null; return render();
       case 'ask-table': tbIds = new Set(ASK.ids); tbIdsWhy = 'מתוך התשובה לשאלה'; S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
@@ -3750,18 +3730,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'phone-saved': if (L && L.contact.phone) { log(L, '✎ נוסף טלפון'); save(); toast('✓ הטלפון נשמר'); } return render();
       case 'copy-phone': if (L && L.contact.phone) { try { navigator.clipboard.writeText(L.contact.phone).then(() => toast('✓ המספר הועתק'), () => toast(L.contact.phone)); } catch (x) { toast(L.contact.phone); } } return;
       case 'go-decide': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'decide'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
-      case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');
+      case 'tb-export-ask': if (worker()) return ownerOnly('הייצוא'); return sheet(`<h2>להוריד לאקסל</h2><div class="opts"><button class="opt" data-act="tb-export">רק מה שמוצג עכשיו<small>${tableRows(leadsNow()).length} לידים, לפי הסינון</small></button><button class="opt" data-act="export-all">את כל הלידים<small>עם טלפון ומייל, בלי קשר לסינון</small></button></div><div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+      case 'tb-export': closeSheet(false); return exportLeads(tableRows(leadsNow()), 'לידים');
       // A general export (יצחק, 09/10): every lead of the fair, every column — phone and email included — whatever the filter.
-      case 'export-all': if (worker()) return ownerOnly('הייצוא'); return exportLeads(leadsNow().filter((l) => !l.practice), 'כל-הלידים');
+      case 'export-all': if (worker()) return ownerOnly('הייצוא'); closeSheet(false); return exportLeads(leadsNow().filter((l) => !l.practice), 'כל-הלידים');
       case 'tb-cols': return sheetCols();
-      case 'tb-saveview': return sheet(`<h2>לשמור את התצוגה</h2><p class="muted">הסינון, המיון והעמודות של עכשיו — בנגיעה אחת מעכשיו.</p>
-        <label class="label" for="view-name">שם</label><input id="view-name" class="text-input" placeholder="למשל: מוסדות חמים" autocomplete="off">
-        <div class="actions"><button class="btn primary" data-act="tb-saveview-yes">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
-      case 'tb-saveview-yes': {
-        const name = ($('#view-name') && $('#view-name').value.trim()) || 'תצוגה ' + (S.biz.views.length + 1);
-        S.biz.views.push({ name, tb: clone(S.tb) });
-        save(); closeSheet(false); render(); return toast('✓ נשמרה: ' + name);
-      }
       case 'pv-export': {
         const rows = pivot(leadsNow());
         const D = dims()[PV.dim];
