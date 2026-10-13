@@ -29,7 +29,7 @@
   --ink: #061721;
   --ink-2: #30414b;
   --muted: #576772;
-  --faint: #697882;
+  --faint: #5c6b75;   /* darker than it was (#697882): the small grey text carries what is missing, the dates, the hints */
   --line: #dde3e7;
   --line-strong: #c4ced4;
   --line-ink: #061721;
@@ -1048,3 +1048,18 @@ tr:has(.sel) td { background: var(--surface-2); }
 .tcard .pname { font-weight: 700; }
 .tcard .note-peek { margin-top: var(--s1); font-size: 12.5px; padding: var(--s1) var(--s2); }
 .seg-h { margin-top: var(--s7); }
+
+/* ------------------------------------------------------------------
+ * Readability floor (UX review, 13/10). The people using this are 35–65 and not at a computer all day:
+ * nothing that carries meaning is smaller than 13.5px, the main navigation is as big as a button,
+ * and what is tapped at the booth and in the evening is a full finger high (44px).
+ * When a line gets too full at this size, take facts out of it — do not shrink them back.
+ * ------------------------------------------------------------------ */
+.faint, .q-item .faint { font-size: 14px; }
+.label { font-size: 13.5px; letter-spacing: .02em; }
+.hint, .result .mt, .kpi .s, .pnext, .season-row .nx, .stat .t, .tcard .note-peek { font-size: 13.5px; }
+.late-tag { font-size: 13.5px; }
+.foot { font-size: 13.5px; }
+.tb-filter, .rule-conds label, .tb th .th, .tb.pv th { font-size: 13px; letter-spacing: .02em; }
+.moment { font-size: 16px; min-height: 44px; }
+.lead .chip, .tag-row .chip, .ask-card .chip { min-height: 44px; }
