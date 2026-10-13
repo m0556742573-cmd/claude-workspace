@@ -1,0 +1,794 @@
+<title>הכיתוב של דוכן חכם</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap">
+<style>
+/* Layout: one reading column, a sticky section bar, and the review as rows you answer in place.
+   Tokens are the "דוכן חכם" design system's own: colour carries meaning, never decoration. */
+:root{
+  --bg:#f5f8fa;--surface:#ffffff;--surface-2:#edf2f6;--surface-3:#e1e7eb;
+  --ink:#061721;--ink-2:#30414b;--muted:#576772;--faint:#697882;
+  --line:#dde3e7;--line-strong:#c4ced4;--brand:#00586a;--focus:#2b63e0;
+  --hot:#b22d0a;--hot-soft:#f7e8e4;--hot-line:#e5b8ac;
+  --warm:#895900;--warm-soft:#f2ede3;--warm-line:#d7c7a8;
+  --good:#1f764d;--good-soft:#e6f0eb;--good-line:#b3d0c2;
+  --ai:#6a4fb1;--ai-soft:#efecf6;
+  --shadow:0 1px 2px rgba(13,17,23,.05);
+  --shadow-lg:0 1px 2px rgba(13,17,23,.08),0 12px 32px -12px rgba(13,17,23,.28);
+  --sans:"IBM Plex Sans Hebrew",Heebo,"Segoe UI","Arial Hebrew",Arial,sans-serif;
+  --r-xs:4px;--r-sm:6px;--r:12px;--pill:9999px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  --ai:#c0b0fe;--ai-soft:#303445;
+  --shadow:0 1px 2px rgba(0,0,0,.5);--shadow-lg:0 1px 2px rgba(0,0,0,.6),0 12px 32px -12px rgba(0,0,0,.8);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  --ai:#c0b0fe;--ai-soft:#303445;
+  --shadow:0 1px 2px rgba(0,0,0,.5);--shadow-lg:0 1px 2px rgba(0,0,0,.6),0 12px 32px -12px rgba(0,0,0,.8);
+  color-scheme:dark}
+html{direction:rtl}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+.wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:28px 96px}
+h1,h2,h3{text-wrap:balance;letter-spacing:-.004em;margin:0;font-weight:700}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.15}
+h2{font-size:22px;line-height:1.25}
+h3{font-size:16px;line-height:1.35}
+p{margin:0}
+b,strong{font-weight:700}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--brand);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.eyebrow .mark{display:inline-block;width:18px;height:3px;background:var(--brand)}
+.lede{font-size:18px;color:var(--ink-2);max-width:62ch}
+.muted{color:var(--muted)} .faint{color:var(--faint);font-size:14px}
+header.top{display:grid;gap:16px;padding-block:8px 24px;border-bottom:1px solid var(--line)}
+.meta{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.progress{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.bar{flex:1 1 180px;height:6px;background:var(--surface-3);border-radius:var(--pill);overflow:hidden;min-width:120px}
+.bar span{display:block;height:100%;background:var(--ink);width:0;transition:width .3s ease}
+nav.sec{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:10px;margin-inline:-16px;padding-inline:16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+nav.sec a{flex:none;font-size:14px;font-weight:500;color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:var(--pill);border:1px solid var(--line-strong);background:var(--surface)}
+nav.sec a:hover{background:var(--surface-2)}
+section.s{padding-block:40px 8px;display:grid;gap:18px;scroll-margin-top:60px}
+.sec-head{display:grid;gap:6px}
+.sec-head .n{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--faint)}
+.sec-head p{color:var(--muted);max-width:64ch}
+/* tags carry meaning: hot = I disagree with your decision, warm = a proposal, good = keep, muted = remove */
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:var(--pill);border:1px solid;white-space:nowrap;letter-spacing:.02em}
+.tag.x{color:var(--hot);background:var(--hot-soft);border-color:var(--hot-line)}
+.tag.c{color:var(--warm);background:var(--warm-soft);border-color:var(--warm-line)}
+.tag.k{color:var(--good);background:var(--good-soft);border-color:var(--good-line)}
+.tag.r{color:var(--muted);background:var(--surface-2);border-color:var(--line-strong)}
+.tag.code{color:var(--ink-2);background:var(--surface);border-color:var(--line-strong);font-variant-numeric:tabular-nums}
+/* bottom line */
+ol.bottom{list-style:none;margin:0;padding:0;display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+ol.bottom li{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:16px 18px;border-top:1px solid var(--line)}
+ol.bottom li:first-child{border-top:0}
+ol.bottom .num{font-size:22px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1.2;min-width:1.2em}
+ol.bottom h3{margin-bottom:2px}
+ol.bottom p{color:var(--ink-2)}
+/* the five statuses */
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.state{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:4px;align-content:start}
+.state b{font-size:15px}
+.state .w{font-size:13px;color:var(--muted)}
+.state.keep{border-color:var(--ink-2)}
+.state .verdict{font-size:12px;font-weight:700;margin-top:4px}
+.state.keep .verdict{color:var(--good)} .state.hide .verdict{color:var(--faint)}
+/* challenge cards */
+.cards{display:grid;gap:12px}
+.ch{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:12px}
+.ch-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ch-head h3{font-size:17px;flex:1 1 280px;min-width:0}
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ch-grid > div{background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;min-width:0}
+.ch-grid .lbl{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--faint);display:block;margin-bottom:2px}
+.ch-grid .mine{background:var(--warm-soft)}
+.ch .why{color:var(--ink-2);font-size:15px}
+@media (max-width:640px){.ch-grid{grid-template-columns:1fr}}
+/* before / after */
+.ba{display:grid;gap:18px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.pair{grid-template-columns:1fr}}
+.pair-title{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pane{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:14px;display:grid;gap:10px;align-content:start;min-width:0;position:relative}
+.pane .which{font-size:12px;font-weight:700;letter-spacing:.06em}
+.pane.before .which{color:var(--faint)} .pane.after{border-color:var(--ink-2);box-shadow:var(--shadow)} .pane.after .which{color:var(--good)}
+.m-search{border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:10px 12px;font-size:17px;font-weight:500;color:var(--faint);background:var(--surface)}
+.m-empty{color:var(--muted);font-size:14px;text-align:center;padding:8px}
+.m-name{font-size:17px;font-weight:700}
+.m-meta{font-size:13px;color:var(--muted)}
+.m-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.m-lbl{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--faint)}
+.m-lbl small{font-weight:400;letter-spacing:0}
+.m-chip{font-size:13px;padding:4px 10px;border:1px solid var(--line-strong);border-radius:var(--pill);background:var(--surface)}
+.m-chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.m-w{flex:1;text-align:center;font-size:14px;font-weight:700;padding:8px 0;border-radius:var(--r-sm);border:1px solid var(--line-strong)}
+.m-w.hot{color:var(--hot);border-color:var(--hot-line);background:var(--hot-soft)}
+.m-next{font-size:13.5px;border-top:1px solid var(--line);padding-top:8px;color:var(--ink-2)}
+.m-btn{font-size:13px;padding:5px 10px;border:1px solid var(--line-strong);border-radius:var(--r-sm)}
+.m-btn.danger{color:var(--hot);border-color:transparent}
+.m-btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.m-bubble{background:var(--good-soft);border:1px solid var(--good-line);border-radius:var(--r) var(--r) var(--r) var(--r-xs);padding:10px 12px;font-size:14.5px;white-space:pre-line}
+.strike{background:var(--hot-soft);color:var(--hot);border-radius:3px;padding:0 2px}
+.ins{background:var(--good-soft);color:var(--good);border-radius:3px;padding:0 2px}
+/* dictionary + inventory tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--faint);text-align:start;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface);white-space:nowrap}
+td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top;min-width:0}
+tr:first-child td{border-top:0}
+td.now{color:var(--muted)}
+td.new{font-weight:700}
+td .why{display:block;font-weight:400;color:var(--muted);font-size:13.5px;margin-top:2px}
+.dict td:first-child{white-space:nowrap}
+/* inventory */
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{font:inherit;font-size:14px;padding:6px 12px;border-radius:var(--pill);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip:hover{background:var(--surface-2)} .chip[aria-pressed="true"]:hover{background:var(--ink-2)}
+input.q{font:inherit;font-size:15px;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);flex:1 1 220px;min-width:0}
+details.screen{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+details.screen + details.screen{margin-top:10px}
+details.screen summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+details.screen summary::-webkit-details-marker{display:none}
+details.screen summary::before{content:"›";display:inline-block;transform:rotate(180deg);transition:transform .15s ease;color:var(--faint);font-weight:700}
+details.screen[open] summary::before{transform:rotate(90deg)}
+details.screen summary h3{flex:1 1 auto}
+details.screen summary .cnt{font-size:13px;color:var(--faint);font-variant-numeric:tabular-nums}
+.rows{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:4px 12px;padding:12px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .id{font-size:13px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums;padding-top:2px}
+.row .body{display:grid;gap:4px;min-width:0}
+.row .where{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--faint);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row .was{color:var(--muted);font-size:14.5px}
+.row .was::before{content:"היום: ";font-weight:700;font-size:12px;color:var(--faint)}
+.row .is{font-weight:700;font-size:15px}
+.row .is::before{content:"מוצע: ";font-weight:700;font-size:12px;color:var(--good)}
+.row .rw{color:var(--ink-2);font-size:14px}
+.row.keep .was::before{content:""}
+.row.keep .was{color:var(--ink-2)}
+/* answers */
+.ans{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.ans button{font:inherit;font-size:13px;font-weight:500;min-height:32px;padding:3px 12px;border-radius:var(--pill);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.ans button:hover{background:var(--surface-2)}
+.ans button[aria-pressed="true"][data-v="yes"]{background:var(--good-soft);color:var(--good);border-color:var(--good-line)}
+.ans button[aria-pressed="true"][data-v="no"]{background:var(--hot-soft);color:var(--hot);border-color:var(--hot-line)}
+.ans button[aria-pressed="true"][data-v="other"]{background:var(--warm-soft);color:var(--warm);border-color:var(--warm-line)}
+.ans input{font:inherit;font-size:14px;flex:1 1 220px;min-width:0;padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--warm-line);background:var(--surface);color:var(--ink)}
+.ans .saved{font-size:12px;color:var(--faint)}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.footbar{position:fixed;inset-inline:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);box-shadow:var(--shadow-lg);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:6;font-size:14px}
+.footbar .btn{font:inherit;font-size:14px;font-weight:700;padding:8px 14px;border-radius:var(--r-sm);border:1px solid var(--ink);background:var(--ink);color:var(--surface);cursor:pointer;min-height:40px}
+.footbar .btn.ghost{background:var(--surface);color:var(--ink)}
+textarea.out{width:100%;min-height:160px;font:inherit;font-size:14px;border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:10px;background:var(--surface);color:var(--ink)}
+.note{background:var(--warm-soft);border:1px solid var(--warm-line);border-radius:var(--r);padding:12px 14px;color:var(--ink-2);font-size:15px}
+.dim{opacity:.55}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow"><span class="mark"></span>חוות דעת חיצונית · 13/10/2026 · דוכן חכם, דוגמית 3</div>
+  <h1>המערכת מדברת כמו המתכנת שלה. בעל הדוכן צריך שהיא תדבר כמוהו.</h1>
+  <p class="lede">עברתי שוב על כל מילה שמופיעה במסך — הפעם כיועץ חיצוני, לא כמי שבנה את זה. איפה שאני חושב שהחלטה שלך טעות, כתבתי את זה. הבעיה הגדולה כאן אינה הניסוח של כפתור כזה או אחר. <b>מאחורי חלק מהמילים הקשות עומדות החלטות מוצר</b>, ושם הכי כדאי להתחיל.</p>
+  <div class="meta"><span>הוחלף: המסמך מהבוקר (review-wording.md)</span><span>שום דבר במערכת לא שונה</span><span>הכל הצעה עד שתאמר</span></div>
+  <div class="progress"><span id="prog-t" class="faint">עוד לא ענית על אף סעיף</span><div class="bar" aria-hidden="true"><span id="prog-b"></span></div></div>
+</header>
+
+<nav class="sec" aria-label="חלקי הדף">
+  <a href="#bottom">השורה התחתונה</a>
+  <a href="#states">מתחת למילים</a>
+  <a href="#disagree">איפה אני חולק עליך</a>
+  <a href="#ba">לפני ואחרי</a>
+  <a href="#dict">המילון</a>
+  <a href="#all">כל הכיתוב</a>
+</nav>
+
+<section class="s" id="bottom">
+  <div class="sec-head"><span class="n">1</span><h2>השורה התחתונה</h2><p>חמישה דברים, לפי סדר החשיבות. אם תעשה רק את הראשון, חצי מהרשימה המלאה מסתדר מעצמו.</p></div>
+  <ol class="bottom">
+    <li><span class="num">1</span><div><h3>פחות מצבים על המסך, ואז פחות מילים</h3><p>לכל מבקר יש היום חמישה מצבים שמוצגים במסך: חום, חשיבות, שלב, קשר ומשימה. כל אחד צריך שם, תוויות וסינון — ומשם מגיעות רוב המילים הקשות. <b>אני מציע שבמסך יופיעו שלושה בלבד.</b> ובנוסף, "לא רלוונטי" ו"קהל" הם אותו דבר בשני שמות, ולכן הם מתאחדים.</p></div></li>
+    <li><span class="num">2</span><div><h3>מילה אחת לכל דבר</h3><p>האדם שביקר בדוכן נקרא היום בחמישה שמות: ליד, מבקר, פונה, אנשים ולקוח. אני מציע <b>מבקר</b> בכל מקום. "צעד" הופך ל<b>משימה</b>, ו"קהל" יחד עם "לא רלוונטי" הופכים ל<b>לעתיד</b>.</p></div></li>
+    <li><span class="num">3</span><div><h3>להוציא את המילים של התוכנה</h3><p>CRM, צינור, דשבורד, פילוח, אוטומציה, ברירת מחדל, תצוגה, צפיפות ונקלט. נגר מבני ברק לא אומר אף אחת מהן. לכל אחת יש תחליף שהוא כבר משתמש בו.</p></div></li>
+    <li><span class="num">4</span><div><h3>לנקות את הדוגמית לפני שמציג רואה אותה</h3><p>"קלוד" מופיע במסך שלוש פעמים. יש גם "רשימת מילים שמזהה רבע מהעסקים", ועשרים הערות של "בדוגמית — מדומה". מציג שקורא את זה בראיון רואה סקיצה. <b>כל אלה צריכים להפוך לפס אחד: "הדגמה — שום דבר לא נשלח באמת".</b></p></div></li>
+    <li><span class="num">5</span><div><h3>לדבר בשפה של הקהילה</h3><p>להוסיף "ר'" בפנייה למבקר. להציג תאריך עברי קצר ("יום ג', ז' כסלו"). להוסיף בס"ד בראש המסך, לכתוב "בשעה טובה" כשנסגרת עסקה, ולא לשלוח את הודעת הבוקר בשמונה, באמצע התפילה.</p></div></li>
+  </ol>
+</section>
+
+<section class="s" id="states">
+  <div class="sec-head"><span class="n">2</span><h2>מה שמתחת למילים: חמישה מצבים לכל מבקר</h2><p>זה השורש. כל שורה ברשימה, כל סינון וכל כפתור צריכים לתת שם לחמשת אלה. בעל עסק קטן מחזיק בראש שניים: <b>כמה הוא מעוניין</b>, ו<b>מה אני עושה איתו עכשיו</b>.</p></div>
+  <div class="states">
+    <div class="state keep"><b>חום</b><span class="w">חם · פושר · קר</span><span class="verdict">נשאר במסך</span></div>
+    <div class="state keep"><b>מה הלאה</b><span class="w">המשימה הבאה ומתי</span><span class="verdict">נשאר במסך</span></div>
+    <div class="state keep"><b>תוצאה</b><span class="w">פתוח · לעתיד · נסגרה עסקה</span><span class="verdict">נשאר — במקום "שלב"</span></div>
+    <div class="state hide"><b>חשיבות</b><span class="w">●●● בארבע רמות</span><span class="verdict">רק קובע את הסדר, ⭐ אחד</span></div>
+    <div class="state hide"><b>שלב</b><span class="w">חדש · בקשר · הצעה · משא ומתן</span><span class="verdict">לדף המבקר ולמספרים</span></div>
+    <div class="state hide"><b>קשר</b><span class="w">דיברנו · לא ענה · קיבל חומר</span><span class="verdict">לדף המבקר</span></div>
+  </div>
+  <p class="note">ההפרדה בין חום לחשיבות (09/10) נכונה בהיגיון של המערכת. לא צריך לבטל אותה, רק להפסיק להציג אותה כמצב נפרד: <b>חשיבות היא הסדר שבו הרשימה מופיעה</b>, לא עוד עמודה. גם השלבים יכולים להישאר, אבל לא בכל שורה.</p>
+</section>
+
+<section class="s" id="disagree">
+  <div class="sec-head"><span class="n">3</span><h2>איפה אני חולק עליך</h2><p>אחת-עשרה נקודות. בכל אחת יש מה החלטת או מה קיים היום, מה אני אומר, ולמה. <span class="tag x">חולק על החלטה שלך</span> פירושו שהחלטת במפורש ואני חושב אחרת. <span class="tag c">הצעה</span> פירושו שלא הוחלט כלום.</p></div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<section class="s" id="ba">
+  <div class="sec-head"><span class="n">4</span><h2>לפני ואחרי</h2><p>ארבעה רגעים מהמערכת, כמו שהם היום וכמו שהם יהיו אחרי השינוי. <span class="strike">מחוק</span> = יורד. <span class="ins">מסומן</span> = חדש.</p></div>
+  <div class="ba">
+    <div><div class="pair-title"><h3>הדוכן, לפני שנוגעים בשם</h3><span class="faint">החשוב מכל: שיידע שנגיעה = נשמר</span></div>
+      <div class="pair">
+        <div class="pane before"><span class="which">היום</span><div class="m-search">שם המשפחה, ועוד אותיות עד שהשם עולה</div><div class="m-empty">סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם.<br>כל השאר רשות.</div><div class="faint">ניסיון · 12 נקלטו (ועוד 20 מדומים)</div></div>
+        <div class="pane after"><span class="which">מוצע</span><div class="m-search">שם משפחה…</div><div class="m-empty"><b>כמה אותיות משם המשפחה, ונגיעה בשם — הוא נשמר.</b><br>כל השאר רשות.</div><div class="faint">ניסיון · 12 מבקרים (ועוד 20 לדוגמה)</div></div>
+      </div></div>
+    <div><div class="pair-title"><h3>כרטיס המבקר בדוכן</h3><span class="faint">המבקר רואה את המסך — כל מילה מיותרת נקראת מול שניים</span></div>
+      <div class="pair">
+        <div class="pane before"><span class="which">היום</span>
+          <div><div class="m-name">משה כהן</div><div class="m-meta">בן ר' יעקב · חתן ר' שמואל גרוס</div></div>
+          <div class="m-row"><span class="m-w hot">חם</span><span class="m-w">פושר</span><span class="m-w">קר</span></div>
+          <div class="faint">הוצע לפי מה שסימנת. נגיעה משנה.</div>
+          <div class="m-lbl">במה התעניין <small><span class="strike">רשות</span></small></div><div class="m-row"><span class="m-chip on">מטבחים</span><span class="m-chip">ארונות</span><span class="m-chip">דלתות</span></div>
+          <div class="m-lbl">סוג פונה <small><span class="strike">רשות</span></small></div><div class="m-row"><span class="m-chip">פרטי</span><span class="m-chip on">מוסד</span></div>
+          <div class="m-lbl">של מי? <small>רשות — המוסד, בית הכנסת או הקבוצה</small></div>
+          <div class="m-next"><span class="faint">הלאה:</span> לתאם מדידה · מחר · יום רביעי, ח' בכסלו (18/11) · ועוד 1</div>
+          <div class="m-row"><span class="m-btn">שלח חומר</span><span class="m-btn">הערה</span><span class="m-btn danger">↶ ביטול השינויים</span></div></div>
+        <div class="pane after"><span class="which">מוצע</span>
+          <div><div class="m-name">משה כהן</div><div class="m-meta">בן ר' יעקב · חתן ר' שמואל גרוס</div></div>
+          <div class="m-row"><span class="m-w hot">חם</span><span class="m-w">פושר</span><span class="m-w">קר</span></div>
+          <div class="faint">המערכת הציעה — אפשר לשנות.</div>
+          <div class="m-lbl">במה התעניין</div><div class="m-row"><span class="m-chip on">מטבחים</span><span class="m-chip">ארונות</span><span class="m-chip">דלתות</span></div>
+          <div class="m-lbl"><span class="ins">מי הוא</span></div><div class="m-row"><span class="m-chip">פרטי</span><span class="m-chip on">מוסד</span></div>
+          <div class="m-lbl"><span class="ins">מאיזה מוסד או קבוצה?</span></div>
+          <div class="m-next"><span class="faint"><span class="ins">מה הלאה:</span></span> לתאם מדידה · <span class="ins">מחר, יום ד'</span> · <span class="ins">ועוד משימה</span></div>
+          <div class="m-row"><span class="m-btn">שלח חומר</span><span class="m-btn">הערה</span><span class="m-btn danger"><span class="ins">↶ טעות</span></span></div></div>
+      </div></div>
+    <div><div class="pair-title"><h3>שורה ברשימת המשימות</h3><span class="faint">תשע עובדות בשורה זה קיר. שלוש זה מידע</span></div>
+      <div class="pair">
+        <div class="pane before"><span class="which">היום</span><div><b>אהרן הופמן</b> <span class="muted">בני ברק</span></div><div class="m-meta">לחזור אליו · ועוד 1</div><div class="m-meta">פושר · ליד חדש · מטבחים · פרטי · חזר לדוכן · דיברנו · לפני 3 ימים · 2 הערות · 4,000 ₪</div></div>
+        <div class="pane after"><span class="which">מוצע</span><div><b>אהרן הופמן</b> <span class="muted">בני ברק</span></div><div class="m-meta">לחזור אליו · ועוד משימה</div><div class="m-meta"><span class="ins">פושר · מטבחים · דיברנו לפני 3 ימים</span></div></div>
+      </div></div>
+    <div><div class="pair-title"><h3>ההודעה שמגיעה למבקר הביתה</h3><span class="faint">כאן כל מילה נכתבת בשם בעל הדוכן</span></div>
+      <div class="pair">
+        <div class="pane before"><span class="which">היום</span><div class="m-bubble">שלום משה כהן, תודה שעברת בדוכן של נגריית הדר. מצורף קטלוג. נשמח לעמוד לשירותך.</div><span class="faint">שם מלא בלי ר' — נשמע כמו דיוור</span></div>
+        <div class="pane after"><span class="which">מוצע</span><div class="m-bubble">שלום וברכה ר' משה,
+תודה שעברת בדוכן של נגריית הדר בתערוכה.
+מצורף הקטלוג. לכל שאלה — אנחנו כאן.</div><span class="faint">דורש משתנה חדש: {שם פרטי}</span></div>
+      </div></div>
+  </div>
+</section>
+
+<section class="s" id="dict">
+  <div class="sec-head"><span class="n">5</span><h2>המילון: מילה אחת לכל דבר</h2><p>כל שורה כאן מחליפה את המילה בכל המסכים. לכן ברשימה המלאה לא חזרתי עליה בכל שורה.</p></div>
+  <div class="tbl-wrap"><table class="dict"><thead><tr><th>#</th><th>היום</th><th>מוצע</th><th>תשובה</th></tr></thead><tbody id="dict-body"></tbody></table></div>
+</section>
+
+<section class="s" id="all">
+  <div class="sec-head"><span class="n">6</span><h2>כל הכיתוב, מסך אחרי מסך</h2><p>כל מחרוזת שמופיעה למשתמש, מכל המסכים. סעיפים שמסומנים "להשאיר" מקופלים בברירת המחדל.</p></div>
+  <div class="tools">
+    <button class="chip" data-f="change" aria-pressed="true">רק מה שמשתנה</button>
+    <button class="chip" data-f="all" aria-pressed="false">הכל, כולל מה שנשאר</button>
+    <button class="chip" data-f="open" aria-pressed="false">עוד לא עניתי</button>
+    <input class="q" id="q" type="search" placeholder="חיפוש מילה, למשל: קהל" aria-label="חיפוש ברשימה">
+  </div>
+  <div id="screens"></div>
+</section>
+
+<section class="s" id="export" hidden>
+  <div class="sec-head"><h2>התשובות שלך, כטקסט</h2><p>אפשר להדביק לי את זה בשיחה, אם השמירה כאן לא עובדת אצלך.</p></div>
+  <textarea class="out" id="out" readonly aria-label="התשובות כטקסט"></textarea>
+</section>
+</div>
+
+<div class="footbar">
+  <span id="store-state" class="faint">התשובות נשמרות במכשיר הזה</span>
+  <button class="btn ghost" id="show-export">התשובות שלי כטקסט</button>
+  <button class="btn" id="copy-export">להעתיק את התשובות</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+// ---------------------------------------------------------------- content
+// type: x = I disagree with a decision of yours · c = change · k = keep · r = remove (demo note)
+const CH = [
+ {id:'X1',t:'x',h:'לאחד את "לא רלוונטי" ו"קהל" ל"לעתיד"',d:'08/10: הקהל כולל גם את הלא רלוונטיים, כי הם לידים עתידיים. במסך יש שני כפתורים נפרדים, "לשמור בקהל" ו"לא רלוונטי".',m:'כפתור אחד: לעתיד. מי שבאמת לא רוצה לשמוע — "ביקש הסרה", שכבר קיים.',w:'שני הכפתורים מובילים כמעט לאותו מקום: שני המבקרים נשארים, ושניהם מקבלים הודעות לקבוצה. כלומר מבקשים ממנו להחליט החלטה שאין לה תוצאה, על כל מבקר קר. ו"לא רלוונטי" אומר את ההפך ממה שקורה — אם הוא ליד עתידי, הוא רלוונטי.'},
+ {id:'X2',t:'x',h:'"מחכה להחלטה" נעלם: קר עובר לעתיד לבד',d:'G2, 09/10: קר הוא החלטה של המציג, והמערכת לא מחליטה. יש בשבילו כרטיס בסוף היום, לשונית במשימות, פריט בתור ומונה.',m:'אחרי X1 נשארת רק אפשרות אחת, ולכן המערכת עושה אותה: "4 סומנו קר — עברו לעתיד. להחזיר?" בסוף היום, עם ביטול.',w:'זה הכלל שלך עצמך: "מערכת שמנהלת את העסק, לא עסק שמנהל מערכת". ההחלטה נשארת שלו — הוא רואה אותה ויכול לבטל — אבל היא לא עוצרת אותו. כך יורדים כרטיס, לשונית, סינון והמשפט "אין לו צעד. מה עושים איתו?" מארבעה מקומות.'},
+ {id:'X3',t:'x',h:'הניווט: "הדוכן · סוף היום · מעקב"',d:'07/10: "המעקב שלי", לא CRM. ו"דשבורד" עדיין מחכה לשם.',m:'שלוש מילים באותה צורה. "שלי" יורד, כי הכל במערכת שלו. "סוף היום" אומר מתי פותחים את המסך.',w:'"המעקב שלי" ליד "הדוכן" נשמע כמו שני דברים מסוגים שונים. בבוקר הצעתי "סיכום היום", אבל זה מתנגש עם הכותרת "סיכום היום" של הבינה המלאכותית באותו מסך.'},
+ {id:'X4',t:'x',h:'"הבא בתור" ו"משימות" הם מסך אחד',d:'11/10: ארבעה מקומות במעקב — סקירה, לידים, משימות ופילוחים. הקוד עצמו כותב שהתור הוא ראש רשימת המשימות.',m:'מסך אחד, "היום": הכרטיס של הבא בתור למעלה, והרשימה מתחתיו. במעקב שלוש לשוניות: היום · כל המבקרים · מספרים.',w:'שני מסכים שמראים את אותה רשימה בשני סדרים מכריחים לבחור בלי סיבה. אותה רשימה, ומספר אחד ל"היום" — בדיוק מה שתוקן ב-N13.'},
+ {id:'X5',t:'x',h:'חשיבות: ⭐ אחד, לא ארבע רמות',d:'09/10: ●●● ברמות רגיל · טוב · חשוב · חשוב מאוד. אתה עצמך דיברת על שלוש (U5).',m:'"⭐ חשוב — מופיע קודם", ליד כל כפתור, כן או לא.',w:'כשהוא מגדיר כפתורים בבית, אין לו דרך לדעת אם מוסד הוא "חשוב" או "חשוב מאוד". והמידע הזה רק קובע מי מופיע קודם באותו יום — לזה מספיק כן או לא.'},
+ {id:'X6',t:'x',h:'"↶ ביטול השינויים" ← "↶ טעות"',d:'09/10: כפתור אחד שתמיד אומר אותו דבר.',m:'נשאר כפתור אחד שעושה אותו דבר. רק השם: ↶ טעות.',w:'הסיבה הנפוצה ללחוץ עליו היא שנגע בשם הלא נכון. ברגע הזה הוא לא חושב "לבטל שינויים" — הוא חושב "טעות". הכפתור צריך לקרוא לזה כמו שהוא קורא לזה.'},
+ {id:'X7',t:'x',h:'שווי: מספר אחד, ו"כ-" כשהוא משוער',d:'07/10: הבינה המלאכותית אף פעם לא מנחשת שווי, ובמסך מבדילים בין "מוקלד" ל"מוערך".',m:'העיקרון נשאר. במקום שתי מילים בשישה מקומות — מספר אחד, ו"כ-" לפניו כשחלקו לפי ממוצע: "כ-12,000 ₪".',w:'"מוקלד" ו"מוערך" ליד כל סכום הם רעש. "כ-" זו הדרך שבה אנשים אומרים שסכום הוא הערכה. ובאמת, רוב בעלי הדוכן לא יקלידו סכומים, ולכן "סכום" מופיע במסך רק כשיש בו משהו.'},
+ {id:'X8',t:'c',h:'שם אחד למוצר, בכל מקום',d:'אין היום שם. "דוכן חכם · דוגמית 3" בלשונית הדפדפן, "הדוכן שלי" בראש המסך, ו"מערכת הדוכן" בהודעת הבוקר.',m:'דוכן חכם — כבר השם של שפת העיצוב שלך. בלשונית, בראש המסך ובחתימת הודעת הבוקר.',w:'הכלי הזה הוא כרטיס הביקור שלך בקהילה, והודעת הבוקר יוצאת כל יום. הודעה מ"מערכת הדוכן" לא בונה שם לאף אחד. איך אתה עצמך מופיע בכלי — זה כבר שלך.'},
+ {id:'X9',t:'c',h:'ההקמה מתחילה מהעסק, לא מטופס',d:'שלב 1 הוא הרשמה: שם, מייל וטלפון, לפני שראה משהו.',m:'שלב 1: "ספר לי על העסק". ההרשמה זזה לפני הניסיון, כשהוא כבר ראה את הכפתורים שלו.',w:'קודם ערך, אחר כך טופס. אדם בקהילה שמתבקש לתת טלפון ומייל לכלי שעוד לא הכיר — נעצר. ההנחה שלי כאן לא נבדקה: שווה לראות בראיון איפה מציג נעצר.'},
+ {id:'X10',t:'c',h:'הכלים המתקדמים מאחורי דלת אחת',d:'עורך כללים עם תנאים, השוואה לפי כל ממד, עמודות, צפיפות ותצוגות שמורות, ו"לשאול את הנתונים" — כולם במסלול הרגיל.',m:'דלת אחת: "כלים מתקדמים — מה עוד מערכת יכולה לעשות לעסק שלך". המסלול הרגיל: דוכן, סוף היום, מעקב היום.',w:'בשביל בעל דוכן ממוצע אלה מילים של אנשי מחשבים. בשביל המטרה שלך — להראות מה מערכת יכולה לעשות — הם הדבר הכי חזק. לכן לא מורידים אותם: מניחים אותם מאחורי דלת אחת, והדלת עצמה היא הפרסומת.'},
+ {id:'X11',t:'c',h:'הודעת הבוקר: 9:30, ולשאול לאן',d:'ברירת המחדל היא 08:00 בוואטסאפ.',m:'09:30. ובהקמה: "לאן לשלוח לך כל בוקר?" — וואטסאפ או מייל.',w:'בשמונה בבוקר רבים בתפילה, בכולל או בדרך עם הילדים. ומי שמחזיק רק טלפון כשר לא יקבל וואטסאפ בכלל — הוא צריך לבחור בעצמו.'},
+];
+
+const DICT = [
+ ['W1','ליד · מבקר · פונה · אנשים · לקוח','מבקר','כולם ביקרו בדוכן. "ליד" — של אנשי שיווק. "לקוח" — רק מי שקנה'],
+ ['W2','צעד · משימה · הלאה · הצעד הבא','משימה, והשאלה: מה הלאה?','"צעד" מופשט'],
+ ['W3','קהל · לא רלוונטי · אבוד','לעתיד','X1'],
+ ['W4','מחכה להחלטה · להחליט מה איתו','— (נעלם)','X2'],
+ ['W5','דשבורד','סוף היום','X3'],
+ ['W6','המעקב שלי · CRM','מעקב','X3'],
+ ['W7','חום · דרגות · בלי חום','חום, ו"בלי חום" ← לא סומן','"בלי חום" נשמע כמו תכונה של אדם'],
+ ['W8','●●● · חשיבות · כמה פונה כזה חשוב לך','⭐ חשוב','X5'],
+ ['W9','כפתורים · קבוצות כפתורים · תיוג','בהגדרות: כפתור. על מבקר: מה סימנו','"הכפתורים שהביאו לידים" לא אומר כלום'],
+ ['W10','נסגר · נסגרה עסקה · לקוח','נסגרה עסקה (גם שם השלב)',''],
+ ['W11','מענה · מגע · קשר','קשר · "עוד לא היה קשר"','"מענה" — של מוקד שירות'],
+ ['W12','שווי · שווי בצינור · מוקלד · מוערך','סכום, ו"כ-" כשמשוער','X7'],
+ ['W13','צינור · שלבי הצינור','שלבים — "צינור" יוצא לגמרי',''],
+ ['W14','כללים · אוטומציות · ⚙️ אוטומציה','מה המערכת עושה לבד · ביומן: ⚙️ לבד',''],
+ ['W15','פילוח · פילוחים · לפלח','מספרים · השוואה',''],
+ ['W16','חיבורים · ערוץ שליחה','מייל ווואטסאפ (ה"ערוץ" נשאר)','"חיבורים" לא אומר מה מחברים'],
+ ['W17','תבנית · נוסח · ברירת המחדל של הערוץ','הודעה · ההודעה הרגילה',''],
+ ['W18','חומר · קובץ · קטלוג','בדוכן: חומר. בהגדרות: קובץ','"תשלח לי חומר" — כך המבקר מבקש'],
+ ['W19','ברירת המחדל','מבקר שלא סימנת לו כלום · הרגיל',''],
+ ['W20','נקלט · קולט · מתייג','נרשם · רשם · מסמן',''],
+ ['W21','מדומה · דמה · דוגמית','לדוגמה (ו"ניסיון" נשאר לדוכן הניסיון)',''],
+ ['W22','בינה מלאכותית · קלוד','✨ ופועל: "✨ לסכם לי את היום"','בלי לקרוא לה בשם'],
+ ['W23','אקספו · תערוכה','תערוכה, או השם האמיתי כשיהיה',''],
+ ['W24','רשימת המארגנים','רשימת הנרשמים','כך הוא מבין מאיפה השם'],
+ ['W25','בעלים · טאבלט עובד · נקלט ע"י','בעל הדוכן · עובד · מי רשם',''],
+ ['W26','הרשמה (גם בהגדרות)','בהגדרות: הפרטים שלי',''],
+ ['W27','יום שלישי, ז׳ בכסלו (17/11)','יום ג׳, ז׳ כסלו','כך כותבים בקהילה. התאריך הלועזי רק בדף המבקר'],
+ ['W28','תוך 3 ימים · 14 ימים · ×2','בעוד 3 ימים · שבועיים · פעמיים','המשימה נקבעת ביום השלישי עצמו, לא "עד"'],
+ ['W29','סיימתם · חייגו · שלכם · דיברתם','יחיד: אתה','הטאבלט ביד של אדם אחד. "דיברנו" נשאר — זה ה"אנחנו" של העסק'],
+];
+
+// [id, where, today, proposed, why, type]
+const SCREENS = [
+ ['מסגרת קבועה', [
+  ['K1','לשונית הדפדפן','דוכן חכם · דוגמית 3','דוכן חכם','X8','c'],
+  ['K2','ראש המסך, כשאין שם עסק','הדוכן שלי','דוכן חכם','X8','c'],
+  ['K3','ראש כל מסך','—','בס"ד, בפינה','לא עולה כלום, ואצל חלק מהמציגים היעדר שלו ייראה','c'],
+  ['K4','הניווט ביום התערוכה','הדוכן · דשבורד · המעקב שלי','הדוכן · סוף היום · מעקב','X3','x'],
+  ['K5','שלבי ההקמה','הרשמה · העסק והמטרה · מה שולחים ואיך · ניסיון','העסק · מה שולחים · הפרטים שלך · ניסיון','X9: קודם העסק, ההרשמה לפני הניסיון','x'],
+  ['K6','שלב נעול בהקמה','קודם הרשמה','קודם לספר על העסק','אחרי X9','c'],
+  ['K7','הניווט בהגדרות','הרשמה · העסק והמטרה · חיבורים · התאמה אישית','הפרטים שלי · העסק · מייל ווואטסאפ · התאמה אישית','W16, W26','c'],
+  ['K8','תג בטאבלט של עובד','🔒 טאבלט עובד','🔒 טאבלט של עובד','','c'],
+  ['K9','התפריט ⋯','הגדרות מתקדמות והתאמה אישית · חיבור עוד טאבלט · איפוס מערכת','הגדרות · להוסיף טאבלט · למחוק הכל ולהתחיל מחדש','"איפוס" — מתכנתים. מה שקורה: הכל נמחק','c'],
+  ['K10','מסך שנתקע','המסך הזה נתקע · תקלה: (באנגלית) · (שורת קוד)','משהו השתבש במסך הזה. מה שסימנת — שמור.','האנגלית והקוד רק בהדגמה. "שמור" נכון: כל נגיעה נשמרת מיד','c'],
+  ['K11','הודעה קופצת על תקלה','תקלה: (הודעה טכנית)','משהו לא עבד. אפשר לנסות שוב.','','c'],
+  ['K12','נעול בטאבלט עובד','🔒 X — רק בטאבלט של הבעלים','🔒 X — רק בטאבלט של בעל הדוכן','W25','c'],
+  ['K13','סגירת חלון בנגיעה בחוץ','לשמור או לבטל — בכפתורים שבחלון','','','k'],
+  ['K14','ביטול בהודעה קופצת','בוטל · ביטול','','','k'],
+  ['K15','פס הדגמה','— (הערות מפוזרות בעשרים מקומות)','פס אחד קבוע: הדגמה — שום דבר לא נשלח באמת','כל "בדוגמית…" שמופיע למטה יורד לטובתו','c'],
+ ]],
+ ['הקמה — העסק (יהיה שלב 1)', [
+  ['H11','כותרת','ספר לי על העסק שלך','','מצוין: פונה אליו, לא אל "משתמש"','k'],
+  ['H12','פתיח','כמה שיותר פרטים — מכל מילה נגזר משהו:','כתוב כמו שהיית מספר ללקוח. ככל שתכתוב יותר — הכפתורים בדוכן יתאימו יותר:','"נגזר" — של מהנדסים, והוא לא יודע מה נגזר','c'],
+  ['H13','שאלות מנחות','מה אתה מוכר, ולמי · איך עובדים איתך… · מה ההזמנה הטיפוסית… · מתי העונה החזקה','אותן שאלות, ו"הטיפוסית" ← הרגילה','השאלות הן החלק הכי טוב בהקמה','c'],
+  ['H14','דוגמה בתיבה','למשל: משווק לחמים ומזונות של מאפיות בוטיק…','','','k'],
+  ['H15','דוגמאות מוכנות','דוגמה: נגר · מאפים · הפעלות · דפוס','','','k'],
+  ['H16','אישור החלפה','להחליף את מה שכתבת? · … · כן · ביטול','… · להחליף · ביטול','כפתור אומר מה קורה','c'],
+  ['H17','כותרת','מה המטרה שלך באקספו?','מה אתה רוצה מהתערוכה?','"מטרה" — של יועץ עסקי. W23','c'],
+  ['H18','הסבר כשיש בינה מלאכותית','לפי זה נקבע מי הכי חשוב לך, ומה עושים אחרי.','','','k'],
+  ['H19','הסבר כשאין','נשמר. כאן, בלי בינה מלאכותית, המטרה לא משנה את הכפתורים — בתוך קלוד…','להוריד','"קלוד" במסך של מציג','r'],
+  ['H21','מטרות מוכנות','להכיר לקוחות חדשים · לסגור אספקה קבועה למוסדות · למכור במקום · לבנות רשימת תפוצה · לקבוע פגישות','ולהוסיף: שיכירו את העסק','לחלק מהמציגים זו המטרה העיקרית. הנחה, לא בדקתי','c'],
+  ['H22','כפתור הבינה המלאכותית','✨ תבין אותי','✨ לסדר לי את הכפתורים','אומר מה הוא יקבל','c'],
+  ['H23','ליד הכפתור','שינית משהו — לחץ שוב כדי שאקרא מחדש · הובן ע"י בינה מלאכותית · עד שתלחץ — טיוטה מהירה לפי מילים','שינית — לחץ שוב לעדכון · ✓ מסודר · בינתיים — הצעה ראשונה','','c'],
+  ['H25','בלי בינה מלאכותית','כאן הטקסט נקרא לפי רשימת מילים, שמזהה בערך רבע מהעסקים…','להוריד. בלי חיבור — הכפתור פשוט לא מופיע','זה מה שהכי משדר "סקיצה"','r'],
+  ['H26','כותרת בצד','מה הבנתי','','','k'],
+  ['H27','שורות "מה הבנתי"','התחום · המטרה · הקבוצות · מי שלא סומן לו כלום · העונה החזקה · לא זיהיתי בוודאות: X — השארתי במילים שלך','"מי שלא סומן לו כלום" ← מבקר שלא סימנת לו כלום','W19','c'],
+  ['H28','סימן ליד כפתור','?','? — ולהסביר פעם אחת: "? = לא בטוח, כדאי לבדוק"','היום הסימן לא מוסבר בשום מקום','c'],
+  ['H29','תחתית','נקרא ע"י בינה מלאכותית / לפי רשימת מילים. הכל ניתן לשינוי ב"התאמה אישית".','אפשר לשנות הכל ב"התאמה אישית".','איך זה נקרא — לא מעניין אותו','c'],
+  ['H30','ריק','תתחיל לכתוב, ומה שהבנתי יופיע כאן.','','','k'],
+  ['H31','קישור','רוצה לכוונן? להתאים אישית את הכפתורים והצעדים ←','רוצה לשנות? לכפתורים בדוכן ←','W2','c'],
+  ['H32','הודעה קופצת','ספר קודם על העסק','','','k'],
+ ]],
+ ['הקמה — מה שולחים', [
+  ['H33','כותרת','מה שולחים ואיך','מה שולחים למבקר','','c'],
+  ['H34','פתיח','שלושה דברים, וכולם ניתנים לשינוי אחר כך.','שלושה דברים קצרים. אפשר לשנות אחר כך.','','c'],
+  ['H35','סעיף 1','1. ערוץ · איך מה שהמבקר ביקש יגיע אליו. אחד מספיק.','1. איך זה יגיע אליו · אחד מספיק.','','c'],
+  ['H36','אפשרויות','מייל · SMS · וואטסאפ (לא רשמי) · וואטסאפ עסקי רשמי','מייל · SMS · וואטסאפ מהמספר שלך · וואטסאפ עסקי','"לא רשמי" נשמע כמו משהו אסור. האזהרה נשארת בחלון החיבור','c'],
+  ['H37','שורת מייל','מייל: נגריית הדר (ואחריו הכתובת הטכנית) · תשובות אל: …','יוצא בשם: נגריית הדר · תשובות יגיעו אל: …','הכתובת הטכנית לא אומרת לו כלום','c'],
+  ['H38','סעיף 2','2. הקטלוג · מה שמבקרים יבקשו בדוכן: קטלוג, מחירון, תמונות. אפשר גם לדלג ולהוסיף בדוכן.','','','k'],
+  ['H39','כפתור קובץ','📷 קובץ / 📷 עוד קובץ','📷 לצרף קובץ','','c'],
+  ['H40','סעיף 3','3. הנוסח · מה המבקר יקבל יחד עם הקובץ. {שם} ו-{עסק} מתמלאים לבד.','3. מה ייכתב לו · השם שלו ושם העסק מתמלאים לבד.','סוגריים מסולסלים — של מתכנתים','c'],
+  ['H41','קישורים','כל ההודעות, והודעה לכל ערוץ ← · הגדרות מתקדמות של הערוצים ←','עוד הודעות ← · הגדרות מייל ווואטסאפ ←','','c'],
+  ['H42','הודעות קופצות','כבר יש קובץ בשם הזה · X נשמר','','','k'],
+ ]],
+ ['הקמה — הפרטים שלך (היום שלב 1)', [
+  ['H1','כותרת','ברוך הבא','הכפתורים שלך מוכנים. רק פרטים לחשבון:','אחרי X9 הוא כבר לא בפתיחה','x'],
+  ['H2','פתיח','נרשמים פעם אחת. אחר כך — כמה מילים על העסק…','להוריד','אחרי X9 הוא כבר כתב על העסק','x'],
+  ['H3','שדה','שם מלא · חובה','','','k'],
+  ['H4','שדה','אימייל · לכאן יגיעו תשובות של לקוחות, אם לא תבחר אחרת','מייל · לכאן יגיעו תשובות מלקוחות','"מייל" בכל השאר','c'],
+  ['H5','שדה','טלפון · לכאן תגיע הודעת הבוקר','טלפון · לכאן תגיע כל בוקר רשימת מה לעשות היום','בשלב הזה הוא עוד לא יודע מה זו "הודעת הבוקר"','c'],
+  ['H5b','שדה חדש','—','לאן לשלוח לך כל בוקר? וואטסאפ · מייל','X11','c'],
+  ['H6','שדה','שם העסק · למשל: נגריית הדר','','','k'],
+  ['H7','הערה','בדוגמית הפרטים נשמרים רק בדפדפן הזה…','לפס ההדגמה','K15','r'],
+  ['H8','שגיאה','מה השם שלך?','','','k'],
+  ['H9','שגיאה','צריך אימייל תקין, כמו (כתובת לדוגמה) — לשם יגיעו התשובות.','כתובת המייל לא שלמה. למשל: (כתובת ג׳ימייל לדוגמה)','קצר, ודוגמה שהוא מכיר','c'],
+ ]],
+ ['הקמה — ניסיון', [
+  ['H43','פס עליון','דוכן לניסיון. מה שתקלוט כאן יימחק כשתתחיל את יום התערוכה.','דוכן לניסיון. נסה כמה שמות. כשתתחיל את יום התערוכה — הניסיון יימחק.','מזמין לנסות. W20','c'],
+  ['H44','כפתור','סיימתי — ליום התערוכה ←','','','k'],
+  ['H45','שורת "מוכן"','הכל מוכן. רוצה לכוונן לפני? + שישה קישורים','כשאין ערוץ: חסר: איך לשלוח למבקר ←. כשמוכן — כמו היום','U1: היום כתוב "הכל מוכן" גם כשלא','c'],
+  ['H46','אישור','להתחיל את יום התערוכה? · N לידים של ניסיון יימחקו, וההגדרות נשארות. · כן','… · N מבקרי הניסיון יימחקו. ההגדרות נשארות. · להתחיל','','c'],
+  ['H47','הודעה קופצת','יום התערוכה. בהצלחה!','בהצלחה רבה, ובשעה טובה!','','c'],
+ ]],
+ ['הדוכן — חיפוש', [
+  ['D1','תיבת החיפוש','שם המשפחה, ועוד אותיות עד שהשם עולה','שם משפחה…','ההסבר בא מתחת','c'],
+  ['D2','מסך ריק','סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם. כל השאר רשות.','כמה אותיות משם המשפחה, ונגיעה בשם — הוא נשמר. כל השאר רשות.','העובדה היחידה שחייב לדעת: נגיעה = נשמר','c'],
+  ['D3','שורה בתחתית','N נקלטו (ועוד N מדומים)','N מבקרים (ועוד N לדוגמה)','נשאר: אישור שקט שהנגיעה נקלטה. בלי השוואה, אז לא מעודד כמות','c'],
+  ['D4','המבקר האחרון','האחרון: X · עיר · לפתוח','','','k'],
+  ['D5','כרטיס פתוח בזמן הקלדה','X עוד פתוח · ✓ לשמור · ← חזרה אליו','X עוד פתוח · ✓ סיום · ← חזרה אליו','הוא כבר שמור. "סיום" — כמו בכרטיס','c'],
+  ['D6','ביקרו כבר','ביקרו כבר · לפתוח · ↺ חזר שוב · ועוד N שביקרו ←','','','k'],
+  ['D7','תגים','עסק · ביקר כבר','','','k'],
+  ['D8','יותר מדי תוצאות','ועוד N — להוסיף אות משם המשפחה','','מצוין: אומר מה לעשות','k'],
+  ['D9','נוספו ביד','נוספו בדוכן','','','k'],
+  ['D10','לא נמצא','לא נמצא ברשימה.','','','k'],
+  ['D11','כפתור','＋ לא ברשימה — להוסיף אותו','','','k'],
+  ['D12','הודעות קופצות','✓ נשמר: X · ↺ X חזר — סומן','✓ נשמר: X · ↺ X חזר לדוכן','','c'],
+ ]],
+ ['הדוכן — כרטיס המבקר', [
+  ['D13','שורה מתחת לשם','בן ר׳ … · חתן ר׳ … · ביקר N פעמים · מדומה','… · לדוגמה','"בן ר׳ · חתן ר׳" — כך הקהילה מזהה','c'],
+  ['D14','כפתור','✓ סיום','','','k'],
+  ['D15','מתחת לחום','הוצע לפי מה שסימנת. נגיעה משנה.','המערכת הציעה — אפשר לשנות.','','c'],
+  ['D16','ליד כל קבוצה, השמחה והמוסד','רשות','להוריד','המסך הריק כבר אמר "כל השאר רשות". פחות לקרוא באמצע שיחה','c'],
+  ['D18','שדה מוסד','של מי? · רשות — המוסד, בית הכנסת או הקבוצה','מאיזה מוסד או קבוצה?','"של מי?" לא מובן בלי ההסבר','c'],
+  ['D19','שורת המשך','הלאה: לחזור אליו · מחר · יום רביעי, ח׳ בכסלו (18/11) · ועוד 1','מה הלאה: לחזור אליו · מחר, יום ד׳ · ועוד משימה','"ועוד 1" — אחד מה?','c'],
+  ['D20','הערה אחרונה','📝 … (N הערות)','','','k'],
+  ['D21','כפתור חומר','שלח חומר · נשלח: X · ממתין לחומר · יישלח בסגירה: X','… · יישלח כשתסיים: X','"סגירה" — של מתכנתים','c'],
+  ['D22','הערה והקלטה','הערה · הקלטה · אין מיקרופון','','','k'],
+  ['D23','ביטול','↶ ביטול השינויים','↶ טעות','X6','x'],
+  ['D24','הודעות קופצות','לא נשמר · X · השינויים בוטלו · X','','','k'],
+ ]],
+ ['הדוכן — חלונות', [
+  ['D25','מבקר שלא ברשימה','מבקר שלא ברשימה · שם פרטי · שם משפחה · עיר','','','k'],
+  ['D26','שדה טלפון','טלפון · כדי שיהיה לאן לחזור — הוא לא ברשימת המארגנים','טלפון · כדי שיהיה לאן לחזור','הוא כבר יודע שהאיש לא ברשימה','c'],
+  ['D27','שגיאה','מה השם שלו?','','','k'],
+  ['D28','מה לשלוח','מה לשלוח ל-X?','','','k'],
+  ['D29','אפשרויות','(שם) · עם X / (שם) · הודעה בלבד','(שם) · מצורף: X / ✓','','c'],
+  ['D30','קובץ חדש','הודעה חדשה עם קובץ / להוסיף קטלוג עכשיו · לצלם או לבחור קובץ · תמונה או PDF','','','k'],
+  ['D31','אחר כך','לא עכשיו · יסומן "ממתין לחומר", ויופיע בדשבורד','… ויופיע בסוף היום','W5','c'],
+  ['D33','חלון הערה','הערה על X · מה חשוב לזכור עליו · להקליט · לעצור · מקליט… · הוקלט ותומלל. שומרים? · הערות קודמות · השמעה','','כתוב טוב','k'],
+  ['D34','אין מיקרופון','אין גישה למיקרופון כאן — אפשר רק לכתוב. בטאבלט, בדפדפן רגיל, זה עובד.','אין גישה למיקרופון — אפשר לכתוב.','המשפט השני — הדגמה','c'],
+  ['D35','הודעות קופצות','אין מה לשמור · נשמר · ההקלטה לא נשמרה במכשיר הזה · לא הצלחתי להשמיע','','','k'],
+  ['D36','חלון המשימות','מה הלאה עם X? · לשלוח · בוצע / הוכנה ונשלחה / תואם / התקיימה · שינוי','','"הוכנה ונשלחה", "תואם" — מצוין: המילה לפי סוג המשימה','k'],
+  ['D37','אין משימות','אין צעדים פתוחים. הוא בלקוחות / בלא רלוונטיים / בקהל.','אין משימות. נסגרה עסקה / לעתיד.','X1, W2','x'],
+  ['D38','אין משימה ואין החלטה','אין לו צעד. מה עושים איתו? · לשמור בקהל · לא רלוונטי','אין לו משימה. · + משימה · לעתיד','X1, X2','x'],
+  ['D39','כפתורים','+ צעד נוסף · בלי צעדים — לקהל · סיום','+ משימה · לעתיד · סיום','','x'],
+  ['D40','שליחה בניסיון','בניסיון — לא נשלח באמת. ביום התערוכה זה ייצא בוואטסאפ','','','k'],
+  ['D41','נשלח','"קטלוג" נשלח ל-X · מייל','','','k'],
+  ['D42','אין ערוץ','אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".','… מפעילים ב"מייל ווואטסאפ".','W16','c'],
+  ['D43','אין הודעה','אין הודעה לשליחה. מגדירים ב"הודעות וחומרים".','… ב"הודעות וקבצים".','','c'],
+ ]],
+ ['סוף היום (היום "דשבורד")', [
+  ['S1','כותרת','היום בדוכן: N אנשים (ועוד N מדומים)','בדוכן: N מבקרים (ועוד N לדוגמה)','למחרת עדיין כתוב "היום" (U3)','c'],
+  ['S2','הצעה לדוגמה','כדי לראות איך נראה יום אמיתי, אפשר להוסיף 20 מבקרים מדומים. · להוסיף מבקרים מדומים','רוצה לראות יום מלא? · להוסיף 20 מבקרים לדוגמה','','c'],
+  ['S3','מונים','חם · פושר · קר · בלי חום','… · לא סומן','W7','c'],
+  ['S4','כותרת','מה כדאי להשלים','','','k'],
+  ['S5','כרטיס "חסר"','חסר: N בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.','N לא סומנו בכלל. כדאי עכשיו, כשעוד זוכרים — בערך דקה.','','c'],
+  ['S6','כרטיס "להשלמה"','להשלמה: N סומנו רק בחלק.','N סומנו רק חלקית.','','c'],
+  ['S7','כשנגמר','✓ חסר — הכל מולא. / ✓ להשלמה — הכל הושלם.','✓ הכל מולא.','','c'],
+  ['S8','כרטיס "קר"','N סומנו "קר". לשמור בקהל, או לא רלוונטי? · להחליט','N סומנו "קר" — עברו לעתיד. · להחזיר','X2: מודיע, לא שואל','x'],
+  ['S9','כרטיס חומר','N מחכים לחומר, ועוד אין מה לשלוח.','N ביקשו חומר ועוד לא קיבלו.','ברור מי מחכה למה','c'],
+  ['S10','כפתורים','להשלים · להחליט · לשלוח להם · להוסיף חומר · סגירת הרשימה','להשלים · לשלוח להם · להוסיף חומר · סגירה','','c'],
+  ['S11','שורות ברשימה','חסר: חום, סוג פונה · נגיעה בשם פותחת את הכרטיס המלא. · לשמור בקהל · לא רלוונטי · צעד…','חסר: חום, מי הוא · ✓ · לעתיד · משימה…','','c'],
+  ['S12','הכל מסומן','הכל מסומן.','','','k'],
+  ['S14','מה מחכה','מחר: 5 שיחות · 1 הצעות מחיר להכין · שליחות חומר · פרטי הרשמה','מחר: 5 שיחות · הצעת מחיר אחת להכין · חומר לשלוח · פרטי הרשמה לשלוח','"1 הצעות" — טעות דקדוק. דורש צורת יחיד בקוד','c'],
+  ['S15','כפתור','למעקב ←','','','k'],
+  ['S16','תובנות','✨ סיכום היום · לבקש מהבינה המלאכותית לסכם את היום · עובר על הלידים…','✨ איך היה היום · ✨ לסכם לי את היום · קורא…','W22','c'],
+  ['S17','בלי בינה מלאכותית','כאן רק התובנות הקבועות. כשהבינה המלאכותית מחוברת…','להוריד','','r'],
+  ['S18','חלון שליחה','לשלוח ל-N שמחכים לחומר · מה לשלוח · יוצא במייל. מקבלים: …','','','k'],
+ ]],
+ ['מעקב — מסגרת', [
+  ['M1','תפריט הצד','סקירה · לידים · משימות · פילוחים · ⚙️ כללים והגדרות','היום · כל המבקרים · מספרים · כלים מתקדמים · ⚙️ הגדרות','X4, X10','x'],
+  ['M2','איך להציג','טבלה · לפי שלב / רשימה · לפי זמן','טבלה · לפי שלב (ב"כל המבקרים")','"לפי זמן" יורד עם X4','x'],
+  ['M3','כפתור','💬 הודעה לקבוצה','','','k'],
+  ['M4','התאריך','היום: יום שלישי, ז׳ בכסלו · ⏩ יום הבא (הדגמה) · לחזור להיום','היום: יום ג׳, ז׳ כסלו · …','W27','c'],
+  ['M5','⚙️ כשמרחפים','הגדרות: הכפתורים והצעדים · שלבי הצינור · …','הגדרות: הכפתורים והמשימות · השלבים · …','','c'],
+  ['M6','הצעה לדוגמה','כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים… · להוסיף נתוני דמה','רוצה לראות איך זה נראה? 20 מבקרים לדוגמה, כאילו עברו שבועיים. · להוסיף דוגמה','','c'],
+ ]],
+ ['מעקב — היום (היום "סקירה" ו"משימות")', [
+  ['M7','פס התקדמות','N להיום · טופלו היום N / ✓ סיימת את היום','נשארו N להיום · טיפלת היום ב-N','','c'],
+  ['M8','אין כלום','אין מה לעשות היום ✓ · כל הצעדים של היום טופלו. הבאים בתור — במשימות.','אין מה לעשות היום ✓ · כל המשימות של היום נעשו.','','c'],
+  ['M9','הכרטיס','עכשיו · להחליט מה איתו · באיחור יום / N ימים','עכשיו · באיחור יום / N ימים','X2','x'],
+  ['M10','טלפון','להעתיק · אין טלפון — אפשר להוסיף בפרטים','','','k'],
+  ['M11','הנחיה','מתקשרים מהטלפון, ומסמנים כאן איך היה:','','מצוין','k'],
+  ['M12','כפתורי שיחה','דיברנו — מה הלאה · לא ענה · 🎉 נסגרה עסקה · לא רלוונטי','דיברנו — מה הלאה · לא ענה · 🎉 נסגרה עסקה · לעתיד','X1','x'],
+  ['M15','קישור','לפתוח את הליד ←','כל הפרטים ←','','c'],
+  ['M16','דילוג','⏭ אחר כך','','','k'],
+  ['M17','התראות','N באיחור · N מחכים להחלטה · N עוד לא קיבלו מענה','N באיחור · N עוד לא היה איתם קשר','X2, W11','x'],
+  ['M18','אחריו','אחריו בתור · ועוד N — לכל הרשימה ←','אחריו בתור — והרשימה כולה מתחת, באותו מסך','X4','x'],
+  ['M20','הצעות','✨ מה כדאי לעשות','','','k'],
+  ['M21','הצעה','N באיחור. להעביר את כולם למחר? · להעביר למחר','','','k'],
+  ['M22','הצעה','N שמורים ללפני פסח. יחזרו אליך ב…','N שמורים לעונה "לפני פסח". יחזרו אליך ב…','"ללפני" — שתי ל׳','c'],
+  ['M23','הצעה','N לא ענו פעמיים. לשלוח להם חומר במקום עוד שיחה? · להוסיף צעד: לשלוח חומר','… · לשלוח להם חומר','הכפתור עונה לשאלה','c'],
+  ['M24','הצעה','N אנשים מ(מוסד). כדאי לדבר איתם כאחד.','… כדאי לדבר איתם ביחד.','','c'],
+  ['M25','בקשה','לבקש מהבינה המלאכותית לעבור על הכל · לבדוק שוב','✨ מה עוד כדאי?','','c'],
+  ['M27','סינון','היום · בהמשך השבוע · כל הצעדים','היום · השבוע · הכל','','c'],
+  ['M28','עוד','מחכים להחלטה · לעונה · קהל ולא רלוונטי · נסגרו','לפני העונה · לעתיד · עסקאות','X1, X2','x'],
+  ['M29','חיפוש','חיפוש בכל הלידים — שם, עיר, כפתור, מוסד או הערה','חיפוש: שם, עיר, מוסד, הערה…','','c'],
+  ['M31','ריק','לא נמצא אף ליד.','לא נמצא.','','c'],
+  ['M32','כותרות קבוצה','באיחור · היום · מחר · יום חמישי, ט׳ בכסלו (19/11) · מחכים להחלטה · בלי תאריך','באיחור · היום · מחר · יום ה׳, ט׳ כסלו · בלי תאריך','W27, X2','c'],
+  ['M33','השורה','פושר · ליד חדש · מטבחים · פרטי · חזר לדוכן · דיברנו · לפני 3 ימים · 2 הערות · 4,000 ₪','פושר · מטבחים · דיברנו לפני 3 ימים','שלוש עובדות. השאר בדף המבקר','c'],
+  ['M35','הודעות קופצות','X — לא ענה, ננסה מחר · X — נסגרה עסקה','… · 🎉 בשעה טובה! נסגרה עסקה עם X','','c'],
+ ]],
+ ['מעקב — כל המבקרים (טבלה, לפי שלב, הודעה לקבוצה)', [
+  ['M38','סינונים','חום · מענה · שלב · עוד סינונים: כפתור · סוג · עיר','חום · קשר · שלב · עוד: מה סימנו · עסק או פרטי · עיר','','c'],
+  ['M39','ערכי "קשר"','עוד לא · ניסינו ולא ענה · קיבל חומר או הודעה · דיברנו · עוד לא דיברנו','עוד לא היה קשר · ✓ · ✓ · ✓ · ✓','"עוד לא" — עוד לא מה?','c'],
+  ['M40','מצב','N לידים · מסונן לפי: … · ניקוי הכל','N מבקרים · …','','c'],
+  ['M41','כלים','⭐ חמים בלי מענה · 💾 לשמור תצוגה · עמודות · צפיפות: רגילה/דחוסה · ⬇ אקסל — מה שבטבלה · ⬇ כל הלידים','⭐ חמים בלי קשר · ⬇ לאקסל · ⬇ כולם לאקסל — ושאר הכלים בכלים מתקדמים','X10','x'],
+  ['M43','שמות העמודות','סוג · מענה · מגע אחרון · כפתורים · צעד הבא · נקלט ע"י · ביקר · שווי','עסק או פרטי · קשר · קשר אחרון · מה סימנו · מה הלאה · מי רשם · תאריך ביקור · סכום','','c'],
+  ['M44','ערכים בטבלה','(מוערך) · מחכה להחלטה · לקוח · קהל','כ- · — · נסגרה עסקה · לעתיד','X7, X1','x'],
+  ['M45','ריק','אין לידים שעונים על הסינון.','אין מבקרים שמתאימים לסינון.','','c'],
+  ['M47','כמה נבחרו','N נבחרו · הודעה · להעביר שלב · לסמן חום · להוסיף צעד · אקסל · ביטול הבחירה','… · להוסיף משימה · …','','c'],
+  ['M49','הודעה קופצת','✓ N לידים עודכנו','✓ עודכנו N','','c'],
+  ['M51','שמירה','לשמור את התצוגה · הסינון, המיון והעמודות של עכשיו — בנגיעה אחת מעכשיו.','לשמור את הסינון · כדי לחזור אליו בנגיעה','','c'],
+  ['M52','קבצי אקסל','לידים-13-10 · כל-הלידים · לידים-נבחרים','מבקרים-13-10 · כל-המבקרים · מבקרים-נבחרים','','c'],
+  ['M53','לפי שלב','גוררים כרטיס לשלב אחר, או נוגעים ב-⇄ כדי להעביר. נגיעה בשם פותחת את הליד.','… נגיעה בשם פותחת את כל הפרטים.','','c'],
+  ['M54','כרטיס','בלי חום · מוערך · חלקו מוערך','לא סומן · כ-','X7','c'],
+  ['M56','אזור אחרון','לא רלוונטי · לגרור לכאן, או ⇄','לעתיד · לגרור לכאן, או ⇄','X1','x'],
+  ['M57','חלון העברה','⚠️ יישלח ללקוח: …','⚠️ יישלח אליו: …','W1','c'],
+  ['M58','אישור לפני שליחה','המעבר הזה שולח ללקוח, לפי הכללים שלך · הודעה שיצאה אי אפשר להחזיר · להעביר ולשלוח · להעביר בלי לשלוח','… שולח אליו …','חלון מצוין','c'],
+  ['M61','הודעה לקבוצה','שלב · חום · מענה · כפתור · כל כפתור','שלב · חום · קשר · מה סימנו · כולם','','c'],
+  ['M63','מי יקבל','יישלח ל-N (M הוצאו — עסקה נסגרה, ביקשו הסרה, או קיבלו אותה החודש)','','','k'],
+  ['M65','היסטוריה','נשלחו לאחרונה · הכל · ידני · ⚙️ אוטומטי','… · שלחתי · ⚙️ נשלח לבד','','c'],
+  ['M66','אישור שליחה','לשלוח "X" ל-N במייל? · כך זה ייראה אצל X. כל אחד מקבל את השם שלו. · יקבלו · הוצאו · לשלוח ל-N','','החלון הכי טוב במערכת','k'],
+  ['M68','אחרי שליחה','נשלח ל-N. הודעה שיצאה אי אפשר להחזיר.','נשלח ל-N.','האזהרה נאמרה לפני. אחרי — היא רק מלחיצה','c'],
+ ]],
+ ['מעקב — מספרים (היום "פילוחים")', [
+  ['M69','שאלה חופשית','✨ לשאול את הנתונים: כמה מוסדות חמים עוד לא קיבלו מענה?','✨ שאלה, למשל: כמה מוסדות חמים עוד לא היה איתם קשר? — בכלים מתקדמים','X10','x'],
+  ['M70','בלי בינה מלאכותית','✨ אפשר לשאול את הנתונים בשפה חופשית — בתוך קלוד…','להוריד','"קלוד"','r'],
+  ['M71','מספר 1','לטיפול היום · N באיחור · לפתוח את הרשימה ←','','','k'],
+  ['M72','מספר 2','חמים שקיבלו מענה תוך 48 שעות · המדד שהכי משפיע על סגירה','חמים שחזרו אליהם תוך יומיים · זה מה שהכי משפיע על סגירת עסקה','"מדד", "48 שעות"','c'],
+  ['M73','מספר 3','שווי בצינור · X מוקלד · Y מוערך / עוד לא הוזן שווי — אפשר לכל ליד, או ממוצע לכל כפתור','עסקאות פתוחות · כ-X ₪ / יורד כשאין סכומים','X7','x'],
+  ['M74','מספר 4','עסקאות שנסגרו','','','k'],
+  ['M76','14 הימים','מ-N לידים מהתערוכה: X דיברתם, Y קיבלו חומר או הודעה, Z לא ענו, ו-W עוד לא קיבלו שום מענה.','מתוך N מבקרים: עם X דיברנו, Y קיבלו חומר או הודעה, Z לא ענו, ועם W עוד לא היה קשר.','W29, W11','c'],
+  ['M78','גרף','הצינור לפי שלבים','איפה כולם עומדים','W13','c'],
+  ['M79','גרף','הכפתורים שהביאו לידים','מה סימנו הכי הרבה','W9','c'],
+  ['M80','הודעת הבוקר','בוקר טוב משה! · … · 💰 בצינור: X ₪','בוקר טוב ר׳ משה! · … · 💰 עסקאות פתוחות: כ-X ₪','','c'],
+  ['M81','מתחת','נשלח אליך כל בוקר ב-08:00 בוואטסאפ, מהמספר של מערכת הדוכן. בדוגמית — תצוגה בלבד.','נשלח אליך כל בוקר ב-09:30 בוואטסאפ, מדוכן חכם.','X8, X11','c'],
+  ['M82','השוואה','פילוח · לפלח לפי · למדוד','השוואה · לפי · לספור — בכלים מתקדמים','X10','x'],
+  ['M83','הערה','אחוז סגירה מוצג רק מ-10 לידים ומעלה, ותמיד עם המספרים עצמם.','אחוז מוצג רק כשיש 10 מבקרים ומעלה — פחות מזה זה מקרה.','אומר למה','c'],
+  ['M84','מה סופרים','מספר לידים · שווי · עסקאות שנסגרו · אחוז סגירה · קיבלו מענה','כמה מבקרים · סכום · עסקאות · אחוז סגירה · היה קשר','','c'],
+  ['M85','לפי מה','כפתורים: (קבוצה) · מענה · מי קלט בדוכן · בלי חום','(קבוצה) · קשר · מי רשם בדוכן · לא סומן','','c'],
+ ]],
+ ['דף המבקר', [
+  ['L1','חזרה','✕ סגירה / → חזרה ל(לשונית)','','','k'],
+  ['L4','שורה מתחת לשם','עיר · בן ר׳ … · מדומה','… · לדוגמה','','c'],
+  ['L5','ארבעת המפתחות','שלב ⇄ · שווי · מוערך · חום · בלי · מגע אחרון · ניסיון אחרון: לא ענה ×2','שלב ⇄ · סכום כ- · חום · לא סומן · קשר אחרון · אחר כך לא ענה פעמיים','W28, X7','c'],
+  ['L6','פעולות','להתקשר · הודעה · חומר · הערה · ✎ כפתורים וחום','… · ✎ לשנות סימון','','c'],
+  ['L7','אחרי "להתקשר"','חייגו: (טלפון) · איך היה? · … · מתקשרים מהטלפון שלכם, ומסמנים כאן איך היה.','הטלפון: … · איך היה? · מתקשרים מהטלפון, ומסמנים כאן איך היה.','W29','c'],
+  ['L8','הערות','📝 הערות (N) · הערה חדשה · השמעה · תמלול:','','','k'],
+  ['L9','המשימות','הלאה · אין צעדים פתוחים — לקוח / לא רלוונטי / בקהל. · + צעד','מה הלאה · אין משימות — נסגרה עסקה / לעתיד. · + משימה','','x'],
+  ['L10','ההיסטוריה','ציר זמן · … · להציג N פעולות אוטומציה ⚙️','מה היה עד עכשיו · … · להציג N דברים שהמערכת עשתה לבד','"ציר זמן" — של מתכנתים','c'],
+  ['L11','פרטים','טלפון, מייל ריקים: מרשימת המארגנים · כפתורים · של מי · נקלט ע"י בעלים','ריק: לא ידוע · מה סימנו · מוסד או קבוצה · רשם: בעל הדוכן','שדה ריק שכתוב בו "מרשימת המארגנים" מטעה','c'],
+  ['L13','תפריט ⋯','ביקש להסיר — לא לשלוח לו הודעות · לא ייכלל בשליחה לקבוצה ובאוטומציות · מחיקת הליד · נמחק מכל הרשימות','… ובמה שנשלח לבד · למחוק · יימחק לגמרי','','c'],
+  ['L14','הודעה קופצת','לא יקבל יותר הודעות מהתבניות','לא יקבל יותר הודעות לקבוצה','W17','c'],
+  ['L15','מחיקה','הליד יימחק מהרשימה. · כן · הליד נמחק','יימחק לגמרי, ואי אפשר להחזיר. · למחוק · נמחק','"מהרשימה" מקטין את מה שקורה','c'],
+  ['L16','חלון הודעה','ביקש להסיר את עצמו מרשימת התפוצה. אפשר לשלוח רק תשובה אישית, לא מהתבניות.','… אפשר רק לענות לו אישית.','','c'],
+  ['L17','חלון הסימונים','X — כפתורים וחום','X — מה סימנו','','c'],
+ ]],
+ ['חלונות "מה הלאה"', [
+  ['C1','אחרי שיחה','דיברנו עם X. מה הלאה?','','','k'],
+  ['C2','הערה','מה נאמר? · למשל: רוצה הצעה ל-300 איש, לפני פסח','','','k'],
+  ['C3','שלב','איפה הוא עומד עכשיו? · נבחר מה שסביר — נגיעה משנה','איפה הוא עומד עכשיו? · סימנו את הסביר — אפשר לשנות','','c'],
+  ['C4','משימה','הצעד הבא','המשימה הבאה','','c'],
+  ['C5','מתי','מחר · יום ראשון · בעוד שבוע · תאריך…','','','k'],
+  ['C7','סיום','🎉 נסגרה עסקה · לא רלוונטי (נשאר בקהל, לעתיד) · בלי צעד עכשיו — לקהל','🎉 נסגרה עסקה · לעתיד','X1: שני כפתורים עם אותה תוצאה הופכים לאחד','x'],
+  ['C8','הודעות קופצות','סומן "לא רלוונטי" · X · הועבר לקהל · X','לעתיד · X','','x'],
+  ['C10','פגישה שתואמה','הפגישה עם X תואמה. מתי היא? · ביום הפגישה תופיע משימה: "איך הלכה הפגישה?"','','','k'],
+  ['C12','לא ענה 3 פעמים','X לא ענה N פעמים. מה עושים? · לשלוח הודעה במקום · אולי הוא פשוט לא עונה למספר לא מוכר · לנסות שוב בעוד שבוע · לקהל · לא רלוונטי','… · לעתיד','"אולי הוא פשוט לא עונה למספר לא מוכר" — בדיוק הנוסח הנכון','x'],
+  ['C14','משימה אוטומטית','איך היה? בדיקה אחרי מכירה','לשאול איך היה (אחרי הקנייה)','"בדיקה" נשמע כמו פיקוח','c'],
+  ['C15','משימות אוטומטיות','לבדוק אם קיבל את ההצעה · לבדוק אם נרשם · איך הלכה הפגישה?','','','k'],
+  ['C16','עריכת משימה — כותרות','צעד 1 · שינוי: X · צעד חדש ל-X','משימה 1 · לשנות: X · משימה חדשה ל-X','W2','c'],
+  ['C17','סוג','סוג הצעד · לפי זה המערכת פועלת','סוג המשימה · לפי זה המערכת יודעת מה לעשות','','c'],
+  ['C18','שמונת הסוגים','להתקשר · לשלוח חומר · הצעת מחיר · פגישה או ביקור · תלוי תאריך · הרשמה · לעונה · בלי משימה — קהל','להתקשר · לשלוח חומר · להכין הצעת מחיר · פגישה, ביקור או מדידה · לפני שמחה · לשלוח פרטי הרשמה · לפני העונה · לעתיד','כולם פעלים. "תלוי תאריך" לא אומר באיזה','c'],
+  ['C20','מתי','מיד · תוך יום · 2 ימים · 7 ימים · 14 ימים · 30 ימים','מיד · מחר · בעוד יומיים · בעוד שבוע · בעוד שבועיים · בעוד חודש','W28','c'],
+  ['C22','בלי משימה','לא נכנס לרשימת המשימות. נשמר בקהל.','בלי משימה. נשמר לעתיד.','','x'],
+  ['C24','איזו הודעה','ברירת המחדל של הערוץ','ההודעה הרגילה','W17','c'],
+  ['C26','שמחה','כמה לפני השמחה · בדוכן נשאל "מתי השמחה?"…','','','k'],
+  ['C28','ביומן','הלאה: X · הועבר לקהל · ⚙️ אוטומציה: X · לפי תובנה: X','משימה: X · לעתיד · ⚙️ לבד: X · לפי הצעה: X','⚠️ הקוד מזהה שורות ביומן לפי המילים — שינוי רק יחד עם הקוד','c'],
+ ]],
+ ['הגדרות — כפתורים והדוכן', [
+  ['G1','לשוניות','הכפתורים · החום והדוכן · עונות · הודעות וחומרים · שלבים ובוקר · כללים (אוטומציות)','כפתורים בדוכן · הדוכן · עונות · הודעות וקבצים · שלבים והודעת בוקר — והכללים לכלים מתקדמים','X10. "שלבים ובוקר" — בוקר של מה?','x'],
+  ['G3','הסבר','מה שמבדיל אצלך בין פונה לפונה. מאחורי כל כפתור יש צעד אחד או יותר, והמערכת פועלת לפיהם…','מה שאתה מסמן בדוכן על כל מבקר. לכל כפתור יש משימה — והמערכת כבר עושה אותה: שולחת, מזכירה, וחוזרת לפני העונה.','','c'],
+  ['G6','ברירת המחדל','מי שלא סומן לו כלום · ברירת המחדל','מבקר שלא סימנת לו כלום','W19','c'],
+  ['G7','ארבע הקבוצות','במה התעניין · סוג פונה (מי ניגש אליך) · סדר גודל (כמה הוא יכול לקנות) · מתי','במה התעניין · מי הוא (פרטי, מוסד, בעל שמחה) · כמה הוא קונה · מתי','"סוג פונה" — של טפסים','c'],
+  ['G8','כרטיס קבוצה','עריכה · אפשר כמה','עריכה · אפשר לסמן כמה','','c'],
+  ['G10','הוספה','+ כפתור חדש · כבר יש','+ כפתור חדש · כבר יש כפתור כזה','','c'],
+  ['G12','מחיקת קבוצה','הכפתורים שבה יימחקו, והסימונים שלהם יירדו מהלידים. · כן','… יירדו מכל המבקרים. · למחוק','','c'],
+  ['G14','כפתור בלי משימה','אין צעד משלו — יקבל את ברירת המחדל: X. כדי שייכנס לקהל: צעד "בלי משימה — קהל".','אין לו משימה משלו, ולכן יקבל את של מבקר שלא סומן: X.','המשפט השני — מקרה נדיר במילים קשות','c'],
+  ['G16','חשיבות','כמה פונה כזה חשוב לך · קובע את הסדר ברשימות — לא את החום · רגיל · טוב · חשוב · חשוב מאוד','⭐ חשוב — מופיע קודם','X5','x'],
+  ['G18','שווי','שווי עסקה ממוצע ₪ · רשות — כך ה-CRM מעריך את שווי הצינור','בערך כמה שווה עסקה כזו (₪) · רשות. כך תראה כמה כסף פתוח','"CRM" ו"צינור" במשפט אחד — הכי דחוף ברשימה','c'],
+  ['G20','כותרת','החום והדוכן','הדוכן','','c'],
+  ['G21','שמות החום','איך לקרוא לדרגות · רק השמות משתנים. מה שסומן הכי חם נשאר הכי חם.','איך לקרוא לחם, פושר וקר · רק השם משתנה.','"דרגות" — של צבא','c'],
+  ['G22','ארבע האפשרויות','הקלאסי · לפי רצינות: רציני · אולי · סתם · לפי זמן · במילים פשוטות','רגיל · … רציני · אולי · לא עכשיו · …','"סתם" — מבקר שמציץ ייפגע','c'],
+  ['G23','חום אוטומטי','המערכת מציעה חום לבד · … כמה הוא חשוב לך (●●●) לא משנה את החום — רק את הסדר ברשימות. נגיעה אחת משנה, ומה שבחרת ביד נשאר.','המערכת מציעה "חם" או "פושר" לבד · לפי מה שהוא עשה: חזר לדוכן, ביקש חומר, התעניין. "קר" — רק אתה מסמן.','ההסבר על ●●● יורד עם X5','c'],
+  ['G24','זמן הכרטיס','כמה זמן הכרטיס נשאר פתוח · בלי נגיעה, הכרטיס נסגר לבד וחוזר לחיפוש. מה שסומן — נשמר.','','','k'],
+  ['G25','מי שביקר','מי שכבר ביקר לא מופיע שוב בחיפוש · העסק שלו, או העסק של אשתו, מופיע כשורה נפרדת…','מי שכבר ביקר — מופיע בנפרד, למעלה · כדי שלא תרשום אותו פעמיים. חזר? נגיעה ב"חזר שוב".','U2: "העסק של אשתו" שייך לנושא אחר','c'],
+ ]],
+ ['הגדרות — עונות, הודעות, שלבים', [
+  ['G26','עונות','העונות שלך · לפי הלוח העברי. ליד שנשמר "לעונה" חוזר אליך לפני שהיא מתחילה. אין משימות ותזכורות בשבת ובחג.','… מבקר שנשמר לעונה …','W1','c'],
+  ['G27','הערה','את גבולות העונות קבעתי לפי הערכה. תקן לפי מה שנכון אצלך — נגיעה בשם.','','כן ופשוט','k'],
+  ['G31','שמות העונות','אלול — לפני ראש השנה · לפני סוכות · אחרי החגים · עונת החתונות · חנוכה · פורים · לפני פסח · לפני הקיץ · בין הזמנים · סוף שנת המס','… לפני חנוכה · לפני פורים …','נכונים לקהילה. רק אחידות','c'],
+  ['G31b','חגים','אין תזכורות בשבת ובחג','גם בחול המועד: שיחות זזות לאחרי החג','רוב העסקים בקהילה לא עובדים בחול המועד. הצעה לבדיקה','c'],
+  ['G32','הודעות','הודעות וחומרים · כל מה שיוצא למבקר הוא הודעה… בדוכן, בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם.','הודעות וקבצים · … בכל מקום בוחרים הודעה לפי השם שלה.','','c'],
+  ['G35','ברירת מחדל לערוץ','מה יוצא בכל ערוץ, כשלא בחרו הודעה','ההודעה הרגילה בכל ערוץ','W17','c'],
+  ['G36','קבצים','קובץ לבדו לא נשלח — הוא יוצא רק עם הודעה. · 📷 קובץ','… · 📷 לצרף','','c'],
+  ['G38','עריכת הודעה','+ שם · + העסק שלך · + חומר','+ שם פרטי · + שם העסק · + שם הקובץ','"+ שם פרטי" — חדש, ר׳ ההודעות למבקר','c'],
+  ['G39','הערות','{חומר} = שם הקובץ המצורף. בלי קובץ מצורף — עדיף לא לכתוב "מצורף".','בלי קובץ — לא לכתוב "מצורף".','','c'],
+  ['G42','שלבים','שלבי הצינור · השמות שלך. "נסגר" ו"לא רלוונטי" קבועים בסוף. · סגירה · אבוד','השלבים · אפשר לשנות שמות. "נסגרה עסקה" ו"לעתיד" תמיד בסוף. · קבוע','W13, X1. "אבוד" — שלילי','x'],
+  ['G45','שמות השלבים','ליד חדש · בקשר · הצעה נשלחה · במשא ומתן · נסגר · לא רלוונטי','חדש · בקשר · הצעה נשלחה · במשא ומתן · נסגרה עסקה · לעתיד','','x'],
+  ['G46','אחרי עסקה','בדיקה אחת: איך היה? · לא לבדוק','שאלה אחת: איך היה? · לא לשאול','','c'],
+  ['G47','הודעת בוקר','כל בוקר: מה לטיפול היום, ומה בצינור. · באיזו שעה: 07:00 · 08:00 · 09:00 · 10:00','… ומה פתוח. · 08:00 · 09:30 · 10:00 · 12:00 (ברירת מחדל 09:30)','X11','x'],
+ ]],
+ ['הגדרות — מה המערכת עושה לבד (לכלים מתקדמים)', [
+  ['G48','כותרת','כללים (אוטומציות)','מה המערכת עושה לבד','W14','c'],
+  ['G49','הסבר','כללים שאתה כותב: כשקורה משהו — המערכת עושה משהו, לבד. כל מה שהיא עשתה נרשם בהיסטוריה של הליד עם ⚙️.','"כש… — אז…". אתה קובע, והמערכת עושה לבד. כל מה שהיא עשתה רשום אצל המבקר עם ⚙️.','','c'],
+  ['G50','קבוצות','שולח ללקוח · … אין להם "ביטול". / רק אצלי · …','שולח למבקר · … / ✓','','c'],
+  ['G54','חלון כלל','רק אם · כפתור · כל כפתור · שווי מינימלי ₪','רק אם · סימון · כל סימון · שווה לפחות (₪)','','c'],
+  ['G55','"כש…"','ליד נקלט בדוכן · לא ענה · עוברים ימים בלי מגע · ליד עובר לשלב · נסגרה עסקה','מבקר נרשם בדוכן · לא ענה · עוברים ימים בלי קשר · מבקר עובר לשלב · נסגרה עסקה','','c'],
+  ['G56','"אז…"','להוסיף צעד · לשלוח הודעה · להעביר לשלב · לסמן חום · להוסיף להודעת הבוקר','להוסיף משימה · …','','c'],
+  ['G57','מתי','היום · תוך יום · תוך יומיים · תוך 3 ימים · תוך שבוע','היום · מחר · בעוד יומיים · בעוד 3 ימים · בעוד שבוע','W28','c'],
+  ['G59','מתחת להודעה','מה שאוטומציה שולחת יוצא עם שורת ההסרה','מה שנשלח לבד יוצא עם שורת ההסרה','','c'],
+ ]],
+ ['הגדרות — מייל ווואטסאפ, טאבלטים', [
+  ['G62','כותרת','חיבורים','מייל ווואטסאפ','W16','c'],
+  ['G63','הסבר','איך החומר והתשובות יוצאים למבקר.','איך מה שאתה שולח מגיע למבקר. אפשר כמה, ולבחור מה קודם.','"התשובות" לא יוצאות — הן נכנסות','c'],
+  ['G64','מייל','לאן יגיעו תשובות · ברירת המחדל: המייל שנרשמת איתו','… · אם לא תכתוב — למייל שנרשמת איתו','','c'],
+  ['G65','SMS','למי שיש לו מכשיר נוסף. לא צריך את המספר שלך.','מגיע לכל מכשיר שמקבל הודעות — לא לטלפון כשר. נשלח בשם העסק.','היום: "לא צריך את המספר של מי?"','c'],
+  ['G66','שם השולח','עד 11 אותיות באנגלית או ספרות','כך יופיע אצלו. עד 11 אותיות באנגלית — זו דרישה של חברות הסלולר.','U4','c'],
+  ['G67','וואטסאפ','וואטסאפ (לא רשמי) · מהמספר שלך, בקצב שלא נחסם. בלי אחריות.','וואטסאפ מהמספר שלך · נשלח לאט, כדי לא להיחסם. באחריותך.','','c'],
+  ['G68','וואטסאפ עסקי','וואטסאפ עסקי רשמי · רק אם כבר יש לך חשבון רשמי.','וואטסאפ עסקי · רק אם כבר יש לך וואטסאפ עסקי. מתחברים לקיים.','','c'],
+  ['G69','סדר','באיזה ערוץ קודם · חומר יוצא בערוץ הראשון ברשימה שמחובר.','מה קודם · נשלח בראשון שמחובר.','','c'],
+  ['G71','אזהרה','⚠️ אין אף ערוץ פעיל. בלי ערוץ, חומר לא יישלח מהדוכן — רק יסומן "ממתין".','','מצוין','k'],
+  ['G73','חלון וואטסאפ','וואטסאפ לא רשמי · ⚠️ אין אחריות… וזה באחריותך בלבד.','וואטסאפ מהמספר שלך · האזהרה נשארת מילה במילה','האזהרה היא החתימה של 0008. כדאי לוודא ששמות התפריטים תואמים לוואטסאפ בעברית היום','c'],
+  ['G72','הערות','בדוגמית שום דבר לא נשלח באמת · בדוגמית — מדומה · מחובר (בדוגמית — מדומה)','לפס ההדגמה','K15','r'],
+  ['G76','טאבלטים','חיבור עוד טאבלט · … רואים את אותם לידים.','להוסיף טאבלט · … רואים את אותם מבקרים.','','c'],
+  ['G77','תפקידים','בעלים · רואה הכל, משנה הגדרות / עובד · קולט, מתייג ושולח — בלי הגדרות ובלי איפוס','בעל הדוכן · … / עובד · רושם, מסמן ושולח. בלי הגדרות ובלי מחיקה','W20','c'],
+  ['G78','הערות','בדוגמית זה מדומה, ואין סנכרון · בגרסה האמיתית — רק עם קוד של הבעלים','להוריד','','r'],
+  ['G80','איפוס','איפוס מערכת? · כל הלידים, הכפתורים וההגדרות יימחקו, וחוזרים להקמה. · כן','למחוק הכל? · כל המבקרים, הכפתורים וההגדרות יימחקו, ומתחילים מההתחלה. · למחוק הכל','','c'],
+ ]],
+ ['מה שיוצא למבקר הביתה', [
+  ['E1','נוסח עם קטלוג','שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}. נשמח לעמוד לשירותך.','שלום וברכה ר׳ {שם פרטי}, תודה שעברת בדוכן של {עסק} בתערוכה. מצורף {חומר}. לכל שאלה — אנחנו כאן.','"שלום משה כהן" נשמע כמו דיוור. דורש משתנה חדש','c'],
+  ['E2','תודה על הביקור','שלום {שם}, תודה שעברת בדוכן של {עסק} בתערוכה. נשמח לעמוד לשירותך.','שלום וברכה ר׳ {שם פרטי}, … לכל שאלה — אנחנו כאן.','','c'],
+  ['E3','כמו שדיברנו','שלום {שם}, כמו שדיברנו — לכל שאלה אני כאן.','שלום ר׳ {שם פרטי}, כמו שדיברנו — לכל שאלה אני כאן.','','c'],
+  ['E4','תזכורת לפגישה','שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!','… מזכיר את הפגישה שקבענו ל{מתי}.','בלי תאריך, התזכורת לא מזכירה כלום. דורש משתנה','c'],
+  ['E5','לפני העונה','שלום {שם}, העונה מתקרבת — זה הזמן להזמין.','… {עונה} מתקרב — זה הזמן להזמין.','"העונה" סתמי. דורש משתנה','c'],
+  ['E6','שורת הסרה','להסרה מרשימת התפוצה השיבו "הסר".','','דרישת החוק. הרבים נכונים כאן','k'],
+  ['E8','עסק במקום אדם','בשורת עסק {שם} = שם העסק: "שלום נגריית כהן"','בשורת עסק: שם האדם שמייצג את העסק','','c'],
+ ]],
+];
+
+// ---------------------------------------------------------------- state: answers
+const KEY = 'duchan-wording-answers-v2';
+let A = {};
+try { A = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { A = {}; }
+let db = null;
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(A)); } catch (e) {} };
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const ALL_IDS = [].concat(CH.map((c) => c.id), DICT.map((d) => d[0]), ...SCREENS.map(([, rows]) => rows.filter((r) => r[5] !== 'k').map((r) => r[0])));
+
+function ansHTML(id) {
+  const a = A[id] || {};
+  return `<div class="ans" data-id="${id}">
+    <button type="button" data-v="yes" aria-pressed="${a.v === 'yes'}">מסכים</button>
+    <button type="button" data-v="no" aria-pressed="${a.v === 'no'}">לא</button>
+    <button type="button" data-v="other" aria-pressed="${a.v === 'other'}">אחרת…</button>
+    ${a.v === 'other' || a.note ? `<input id="note-${id}" type="text" value="${esc(a.note || '')}" placeholder="מה במקום?" aria-label="מה במקום, סעיף ${id}">` : ''}
+  </div>`;
+}
+const TAGS = { x: '<span class="tag x">חולק על החלטה שלך</span>', c: '<span class="tag c">הצעה</span>', k: '<span class="tag k">להשאיר</span>', r: '<span class="tag r">להוריד</span>' };
+
+function renderCards() {
+  $('#cards').innerHTML = CH.map((c) => `<article class="ch" id="${c.id}">
+    <div class="ch-head"><span class="tag code">${c.id}</span><h3>${esc(c.h)}</h3>${TAGS[c.t]}</div>
+    <div class="ch-grid"><div><span class="lbl">${c.t === 'x' ? 'מה החלטת' : 'מה יש היום'}</span>${esc(c.d)}</div><div class="mine"><span class="lbl">מה אני אומר</span>${esc(c.m)}</div></div>
+    <p class="why">${esc(c.w)}</p>${ansHTML(c.id)}</article>`).join('');
+}
+function renderDict() {
+  $('#dict-body').innerHTML = DICT.map(([id, now, nw, why]) => `<tr><td><span class="tag code">${id}</span></td><td class="now">${esc(now)}</td><td class="new">${esc(nw)}${why ? `<span class="why">${esc(why)}</span>` : ''}</td><td>${ansHTML(id)}</td></tr>`).join('');
+}
+let F = 'change';
+let Q = '';
+function renderScreens() {
+  const q = Q.trim();
+  $('#screens').innerHTML = SCREENS.map(([title, rows], si) => {
+    const shown = rows.filter((r) => {
+      if (F === 'change' && r[5] === 'k') return false;
+      if (F === 'open' && (r[5] === 'k' || A[r[0]])) return false;
+      if (q && !(r.join(' ').includes(q))) return false;
+      return true;
+    });
+    if (!shown.length) return '';
+    const changes = rows.filter((r) => r[5] !== 'k').length;
+    const open = q || F !== 'change' || si < 2;
+    return `<details class="screen"${open ? ' open' : ''}><summary><h3>${esc(title)}</h3><span class="cnt">${changes} שינויים · ${rows.length - changes} נשארים</span></summary><div class="rows">${shown.map(rowHTML).join('')}</div></details>`;
+  }).join('') || '<p class="muted">לא נמצא.</p>';
+}
+function rowHTML([id, where, now, nw, why, t]) {
+  const keep = t === 'k';
+  return `<div class="row${keep ? ' keep' : ''}"><span class="id">${id}</span><div class="body">
+    <div class="where">${esc(where)} ${TAGS[t]}</div>
+    <div class="was">${esc(now)}</div>
+    ${!keep && nw ? `<div class="is">${esc(nw)}</div>` : ''}
+    ${why ? `<div class="rw">${esc(why)}</div>` : ''}
+    ${keep ? '' : ansHTML(id)}</div></div>`;
+}
+function progress() {
+  const n = ALL_IDS.filter((id) => A[id] && A[id].v).length;
+  $('#prog-t').textContent = n ? `ענית על ${n} מתוך ${ALL_IDS.length} סעיפים` : `עוד לא ענית על אף סעיף · ${ALL_IDS.length} סעיפים`;
+  $('#prog-b').style.width = (n / ALL_IDS.length * 100).toFixed(1) + '%';
+}
+function exportText() {
+  const W = { yes: 'מסכים', no: 'לא', other: 'אחרת' };
+  return ALL_IDS.filter((id) => A[id] && (A[id].v || A[id].note)).map((id) => `${id} ${W[A[id].v] || ''}${A[id].note ? ': ' + A[id].note : ''}`).join('\n') || 'עוד אין תשובות.';
+}
+function renderAll() { renderCards(); renderDict(); renderScreens(); progress(); }
+
+async function store(id) {
+  saveLocal(); progress();
+  if (!db) return;
+  try { await db.collection('answers').doc(id).set(Object.assign({ at: new Date().toISOString() }, A[id])); $('#store-state').textContent = 'נשמר — Claude יכול לקרוא את התשובות'; }
+  catch (e) { $('#store-state').textContent = 'נשמר רק במכשיר הזה'; }
+}
+function setAnswer(box, v) {
+  const id = box.dataset.id;
+  const cur = A[id] || {};
+  A[id] = Object.assign({}, cur, { v: cur.v === v ? '' : v });
+  box.outerHTML = ansHTML(id);
+  store(id);
+  const inp = document.getElementById('note-' + id);
+  if (inp && A[id].v === 'other') inp.focus();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.ans button');
+  if (b) return setAnswer(b.closest('.ans'), b.dataset.v);
+  const f = e.target.closest('[data-f]');
+  if (f) { F = f.dataset.f; document.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-pressed', x === f)); return renderScreens(); }
+});
+let noteT = {};
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'q') { Q = e.target.value; return renderScreens(); }
+  const box = e.target.closest('.ans');
+  if (!box) return;
+  const id = box.dataset.id;
+  A[id] = Object.assign({}, A[id] || {}, { note: e.target.value, v: (A[id] && A[id].v) || 'other' });
+  saveLocal();
+  clearTimeout(noteT[id]); noteT[id] = setTimeout(() => store(id), 600);
+});
+$('#show-export').addEventListener('click', () => { const s = $('#export'); s.hidden = false; $('#out').value = exportText(); s.scrollIntoView({ behavior: 'smooth' }); });
+$('#copy-export').addEventListener('click', () => {
+  const t = exportText();
+  const ok = () => { $('#store-state').textContent = '✓ הועתק — אפשר להדביק בשיחה'; };
+  const fallback = () => { const s = $('#export'); s.hidden = false; const o = $('#out'); o.value = t; o.focus(); o.select(); $('#store-state').textContent = 'סמן והעתק מהתיבה למטה'; };
+  try { navigator.clipboard.writeText(t).then(ok, fallback); } catch (er) { fallback(); }
+});
+
+renderAll();
+
+// The shared store: answers live where Claude can read them. Without it, this device keeps them.
+(async () => {
+  if (!(window.claude && window.claude.use)) return;
+  try {
+    db = await window.claude.use('db');
+    if (!db) return;
+    $('#store-state').textContent = 'התשובות נשמרות — Claude יכול לקרוא אותן';
+    db.collection('answers').onSnapshot((snap) => {
+      let changed = false;
+      snap.docs.forEach((d) => { const v = d.data() || {}; const cur = A[d.id] || {}; if (cur.v !== v.v || cur.note !== v.note) { A[d.id] = { v: v.v || '', note: v.note || '' }; changed = true; } });
+      if (changed && !document.activeElement.closest('.ans')) { saveLocal(); renderAll(); }
+    }, () => {});
+  } catch (e) { db = null; }
+})();
+})();
+</script>
