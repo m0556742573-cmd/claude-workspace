@@ -214,7 +214,7 @@ main { max-width: var(--w-app); margin: 0 auto; padding: var(--s7) var(--s4) 120
 
 /* The working screens want a column, not a field. Setting it here keeps
  * app.js untouched: each block finds its own measure. */
-.search, .lead, .results, .rows, .ask, .stats, .crm-head, .date-now,
+.search, .lead, .results, .rows, .ask, .stats, .date-now,
 main > h1, main > h2, main > .faint, main > .actions, main > div[style] {
   max-width: var(--w-work); margin-inline: auto;
 }
@@ -786,7 +786,6 @@ details.held summary { cursor: pointer; font-weight: 600; color: var(--muted); p
 /* ====================================================================== */
 
 /* The tracking view is a workspace, not a column: its head spans the frame like its tabs. */
-.crm-head { max-width: none; }
 .crm-tabs { display: flex; gap: var(--s1); overflow-x: auto; margin-top: var(--s4); border-bottom: 1px solid var(--line); scrollbar-width: none; }
 .ctab { flex: none; border: 0; background: transparent; min-height: 44px; padding: 0 var(--s4); font-weight: 600; font-size: 15px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s; }
 .ctab:hover { color: var(--ink); }

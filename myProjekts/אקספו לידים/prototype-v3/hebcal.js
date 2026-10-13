@@ -21,7 +21,8 @@ window.HebCal = (function () {
 
   const cache = new Map();
   function parts(date) {
-    const k = Math.floor(date.getTime() / DAY);
+    // The local calendar day, not Greenwich's: an action at 01:30 belongs to today's Hebrew date (N6).
+    const k = date.getFullYear() * 10000 + date.getMonth() * 100 + date.getDate();
     if (cache.has(k)) return cache.get(k);
     let m = '';
     let d = 0;

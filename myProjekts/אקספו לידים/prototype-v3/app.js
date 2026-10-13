@@ -617,7 +617,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       .sort((a, b) => a.due - b.due || PRI.indexOf(a.type) - PRI.indexOf(b.type));
   }
   function plan(l) {
-    return tasks(l)[0] || { type: 'none', label: l.won ? 'לקוח' : l.lost ? 'לא רלוונטי' : 'קהל', due: null };
+    // An open lead with no step is not audience: he waits for the owner's decision, and says so wherever he appears.
+    return tasks(l)[0] || { type: 'none', label: l.won ? 'לקוח' : l.lost ? 'לא רלוונטי' : l.audience ? 'קהל' : 'מחכה להחלטה', due: null };
   }
   const dayNo = (t) => Math.floor((t - new Date(t).getTimezoneOffset() * 60000) / H.DAY);
   function dueText(d) {
@@ -648,6 +649,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function render() {
     renderTop();
     const m = $('#main');
+    // The tracking view and the settings are mostly used on a computer (יצחק, 11–12/10): they take the width. A tablet is narrower anyway.
+    m.classList.toggle('wide', S.phase === 'settings' || (S.phase === 'live' && S.view === 'crm'));
     if (S.phase !== 'live') {
       ({ account: viewAccount, biz: viewBiz, send: viewSend, connect: viewConnect, custom: viewCustom, try: viewTry }[S.step] || viewAccount)(m);
       if (S.phase === 'setup') {
@@ -662,7 +665,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     }
     // A screen that fails says so, with the reason — a blank page tells no one anything.
     if (worker() && S.view === 'crm') S.view = 'booth';   // G3: a worker tablet captures and completes; "המעקב שלי" is the owner's
-    m.classList.toggle('wide', S.view === 'crm');   // the tracking view is mostly used on a computer (יצחק, 11/10) — it takes the width
     try { ({ booth: viewBooth, dash: viewDash, crm: viewCRM }[S.view] || viewBooth)(m); }
     catch (er) { showFail(m, er); }
   }
@@ -1441,7 +1443,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     });
     // Something sent to him personally after the fair means he is in touch (M7). A group message, an automation,
     // or the catalogue handed over at the booth itself does not — that is still the first meeting.
-    if (!o.toGroup && !byRule && S.view !== 'booth') advance(l, 'contact', 'נשלח לו ' + out[0][1].name);
+    // The dashboard is the fair's own evening (N3): what is sent from it is still part of the first meeting.
+    if (!o.toGroup && !byRule && S.view !== 'booth' && S.view !== 'dash') advance(l, 'contact', 'נשלח לו ' + out[0][1].name);
     if (!o.quiet && !byRule) toast(`${out[0][1].mat ? '📎' : '💬'} "${[...new Set(out.map(([, p]) => p.name))].join('", "')}" נשלח ל${People.rowName(l)} · ${out.map(([k]) => chName(k)).join(' + ')}`);
     return true;
   }
@@ -1649,8 +1652,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function nextDayLine(L) {
     const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
     if (!all.length) return 'אין משימות.';
-    const first = Math.min(...all.map((t) => dayNo(t.due.getTime())));
-    const day = all.filter((t) => dayNo(t.due.getTime()) === first);
+    // Everything due today or late counts as today (N4) — not only the earliest day that has a step.
+    const first = Math.max(dayNo(now()), Math.min(...all.map((t) => dayNo(t.due.getTime()))));
+    const day = all.filter((t) => (first === dayNo(now()) ? dayNo(t.due.getTime()) <= first : dayNo(t.due.getTime()) === first));
     const n = {};
     day.forEach((t) => { n[t.type] = (n[t.type] || 0) + 1; });
     const when = first - dayNo(now()) === 1 ? 'מחר' : first <= dayNo(now()) ? 'היום' : 'ב' + H.label(day[0].due);
@@ -1668,10 +1672,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <div class="stat static"><span class="n">${ws[3]}</span><span class="t">בלי חום</span></div></div>
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
       <div class="ask" style="margin-top:10px">${asks.map(dashCard).join('') || '<div class="empty">הכל מסומן.</div>'}</div>
-      ${insightsBox('dash', 'מה רואים בתיוג של היום')}
       <h2 style="margin-top:26px">מה מחכה</h2>
       <div class="ask-card" style="margin-top:10px"><div class="q">${nextDayLine(L)}</div>
-        ${worker() ? '' : '<div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div>'}</div>`;
+        ${worker() ? '' : '<div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div>'}</div>
+      ${insightsBox('dash', 'סיכום היום')}`;   // last, and only a look back at the day (יצחק, 12/10) — the actions are above it
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
@@ -1680,13 +1684,15 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
     else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : '<div class="actions"><button class="btn primary" data-act="fill-open" data-kind="cold">להחליט</button></div>';
     else if (a.mat) body = `<div class="actions"><button class="btn primary" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
-    return `<div class="ask-card"><div class="q">${esc(a.q)}</div>${body}</div>`;
+    // An open list closes with its own button, or with a tap anywhere outside it (יצחק, 12/10).
+    const open = (a.fill && fillOpen === a.fill) || (a.cold && fillOpen === 'cold');
+    return `<div class="ask-card${open ? ' open' : ''}"><div class="q">${esc(a.q)}</div>${body}${open ? '<div class="actions"><button class="btn ghost" data-act="fill-close">סגירת הרשימה</button></div>' : ''}</div>`;
   }
   const filledCold = new Set();   // cold leads decided on this visit to the dashboard — they keep their place
   function coldList(leads) {
     return `<div style="margin-top:8px">${leads.map((l) => {
       const done = l.audience ? 'בקהל' : l.lost ? 'לא רלוונטי' : '';
-      return `<div class="tag-row${done ? ' filled' : ''}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span><span class="memo">${esc([People.rowMeta(l), done].filter(Boolean).join(' · '))}</span></button>
+      return `<div class="tag-row${done ? ' filled' : ''}"><button class="link" data-${S.view === 'crm' ? 'crmlead' : 'openlead'}="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span><span class="memo">${esc([People.rowMeta(l), done].filter(Boolean).join(' · '))}</span></button>
         <span class="chips">${done ? '' : `<button class="chip" data-act="cold-aud" data-lid="${l.id}">לשמור בקהל</button><button class="chip" data-act="cold-lost" data-lid="${l.id}">לא רלוונטי</button><button class="chip" data-act="tasks" data-lid="${l.id}">צעד…</button>`}</span></div>`;
     }).join('')}</div>`;
   }
@@ -1735,12 +1741,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const got = S.ai[scope];
     if (!fixed.length && !got && !ai) return '';   // nothing to show and no one to ask: no empty box
     const card = (x, i, src) => `<div class="insight ${src}"><div class="q">${esc(x.text)}</div>
-      ${x.leadIds && x.leadIds.length ? `<div class="faint">${x.leadIds.map(leadById).filter(Boolean).slice(0, 6).map((l) => `<button class="link" data-openlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}${x.leadIds.length > 6 ? ' ועוד ' + (x.leadIds.length - 6) : ''}</div>` : ''}
+      ${x.leadIds && x.leadIds.length ? `<div class="faint">${x.leadIds.map(leadById).filter(Boolean).slice(0, 6).map((l) => `<button class="link" ${scope === 'crm' ? 'data-crmlead' : 'data-openlead'}="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}${x.leadIds.length > 6 ? ' ועוד ' + (x.leadIds.length - 6) : ''}</div>` : ''}
       ${x.action ? (x.done ? '<div class="faint">✓ בוצע</div>' : `<div class="actions"><button class="btn primary" data-insight="${src}:${i}" data-scope="${scope}">${esc(actionText(x.action))}</button></div>`) : ''}</div>`;
     return `<h2 style="margin-top:26px">✨ ${esc(title)}</h2>
       <div class="ask" style="margin-top:10px">${fixed.map((x, i) => card(x, i, 'fixed')).join('')}
         ${got ? got.items.map((x, i) => card(x, i, 'ai')).join('') || '<div class="faint">לא נמצא משהו מיוחד.</div>' : ''}
-        ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? 'לבדוק שוב' : 'לבקש מהבינה המלאכותית לעבור על הכל'}</button></div>`
+        ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? (scope === 'dash' ? 'לסכם שוב' : 'לבדוק שוב') : scope === 'dash' ? 'לבקש מהבינה המלאכותית לסכם את היום' : 'לבקש מהבינה המלאכותית לעבור על הכל'}</button></div>`
           : '<p class="honest">כאן רק התובנות הקבועות. כשהבינה המלאכותית מחוברת — גם היא עוברת על הלידים.</p>'}
         ${!fixed.length && !got && !ai ? '<div class="faint">אין כרגע.</div>' : ''}</div>`;
   }
@@ -1749,11 +1755,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const [src, i] = ref.split(':');
     const x = src === 'fixed' ? fixedInsights(scope)[+i] : S.ai[scope] && S.ai[scope].items[+i];
     if (!x || !x.action) return;
-    const tomorrow = H.addDays(new Date(now()), 1).getTime();
     x.leadIds.map(leadById).filter(Boolean).forEach((l) => {
       const a = x.action;
       if (a.kind === 'warm') { l.warmth = a.value; l.warmBy = 'hand'; }
-      else if (a.kind === 'shift') tasks(l).filter((t) => dayNo(t.due.getTime()) < dayNo(now())).forEach((t) => { l.moved[t.key] = tomorrow; });
+      // N7: "tomorrow" for a call or a meeting skips Friday, as everywhere else.
+      else if (a.kind === 'shift') tasks(l).filter((t) => dayNo(t.due.getTime()) < dayNo(now())).forEach((t) => { l.moved[t.key] = H.addDays(new Date(now()), 1, talk(t.type)).getTime(); });
       else if (a.type === 'none') l.audience = true;
       else { const s = normStep({ type: a.type }); addManual(l, s, dueFor(s)); }
       log(l, 'לפי תובנה: ' + actionText(a));
@@ -1775,7 +1781,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const btn = $('#ins-' + scope);
     if (btn) { btn.disabled = true; btn.textContent = 'עובר על הלידים…'; }
     const focus = scope === 'dash'
-      ? 'Look only at TODAY\'S TAGGING at the booth: visitors left without tags, tags that suggest a different warmth or next step, repeat visits, notes that say more than the tags. Groups and institutions belong to the follow-up view, not here. Do not talk about calls or sales follow-up.'
+      ? 'Give a short OVERVIEW OF THE DAY AT THE BOOTH, looking back only: how many came and of what kind, what they were interested in, how warm, who came back, what the notes say. No advice, no tasks, no actions — only what happened. Set every action to null. Groups and institutions belong to the follow-up view, not here.'
       : 'Read every lead\'s notes first: when a note asks for something — to be called at a time, a price, a sample, a date, a visit — propose exactly that step for that lead, and say which note it comes from. Then look at the SALES FOLLOW-UP: who to call first and why, overdue or neglected leads, institutions and groups worth one approach, what is held for a season, leads that should get another step. Do not talk about tagging at the booth.';
     const prompt = `You assist an exhibitor (${S.biz.trade || 'a business'}) at a Hasidic community business fair in Israel.
 His goal at the fair: ${S.biz.goalNote || S.biz.goal || 'not given'}.
@@ -1794,6 +1800,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         const a = x && x.action;
         if (a && a.kind === 'warm' && [0, 1, 2].includes(a.value)) action = { kind: 'warm', value: a.value };
         if (a && a.kind === 'step' && STEPS[a.type]) action = { kind: 'step', type: a.type };
+        if (scope === 'dash') action = null;   // the day's overview tells what happened; it does not act
         return { text: str(x && x.text, 220), leadIds: (Array.isArray(x && x.leadIds) ? x.leadIds : []).filter((id) => ids.has(id)), action };
       }).filter((x) => x.text);
       S.ai[scope] = { at: now(), items };
@@ -1806,13 +1813,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ------------------------------------------------------------------
   // CRM — the part a business owner opens every day after the fair.
-  //   סקירה    numbers, the 14 days, the morning message
-  //   משימות   who to talk to today
-  //   צינור    stages, dragged across
-  //   טבלה     every column, filters, saved views, bulk actions, Excel
-  //   פילוח    any dimension against any measure
-  //   אוטומציות rules the owner writes: when X, do Y
-  //   הודעות   templates, and sending to a group
+  //   סקירה    next in line: one lead and its action, the queue, what to do (11/10)
+  //   לידים    a table (filters, saved views, bulk actions, Excel) or by stage; a message to a group
+  //   משימות   a list by day, or a board by time
+  //   פילוחים  the numbers, the 14 days, the morning message, the AI, any dimension against any measure
+  //   The rules (when X, do Y) are in the settings.
   // ------------------------------------------------------------------
   const DEF_STAGES = [
     { id: 'new', name: 'ליד חדש' }, { id: 'contact', name: 'בקשר' }, { id: 'quote', name: 'הצעה נשלחה' },
@@ -2207,7 +2212,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
    * The queue is the head of the tasks list, in the same order, so the two never disagree.
    * A lead waiting for a decision is a task like any other, and joins the end of it. */
   let qSkip = [];
+  let qSkipDay = null;
   function todayQueue(L) {
+    if (qSkipDay !== dayNo(now())) { qSkip = []; qSkipDay = dayNo(now()); }   // N17: "later" lasts the day, not past it
     const real = L.filter((l) => !l.practice);
     const t0 = dayNo(now());
     const due = openTasks(real).filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) <= t0);
@@ -2247,7 +2254,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const real = L.filter((l) => !l.practice);
     const q = todayQueue(L);
     const t0 = dayNo(now());
-    const handled = real.filter((l) => l.log.some((e) => dayNo(e.at) === t0 && !isAuto(e.t) && /^(📞|💬|📎|📝|➜|✓|🎉)/.test(e.t))).length;
+    // N16: what the owner did today — what a rule or the system did by itself is not "handled".
+    const handled = real.filter((l) => l.log.some((e) => dayNo(e.at) === t0 && !isAuto(e.t) && !/אוטומציה|המערכת קידמה/.test(e.t) && /^(📞|💬|📎|📝|➜|✓|🎉)/.test(e.t))).length;
     const late = q.filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) < t0).length;
     const decide = q.filter((l) => !tasks(l).length).length;
     const st = { none: 0, tried: 0 };
@@ -2264,7 +2272,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           ${q.length > 1 ? `<div class="group-head"><span>אחריו בתור</span></div><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
             ${q.length > 9 ? `<button class="link" data-act="go-today">ועוד ${q.length - 9} — לכל הרשימה ←</button>` : `<button class="link" data-act="go-today">לכל רשימת היום ←</button>`}</div>` : ''}
         </aside>
-      </div>`;
+      </div>
+      ${insightsBox('crm', 'מה כדאי לעשות')}`;   // N12: proposals to act on belong where the day's work is, not with the numbers
   }
   // ---- משימות לפי זמן: a board whose columns are days, not stages ----
   function crmTimeBoard(box, L) {
@@ -2290,8 +2299,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const open = real.filter(isOpenLead);
     const won = real.filter((l) => l.won);
     const t0 = dayNo(now());
-    const dueToday = openTasks(real).filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) <= t0);
-    const late = dueToday.filter((l) => dayNo(plan(l).due.getTime()) < t0).length;
+    // N13: "for today" is one number everywhere — the overview's queue: steps due or late, and the leads waiting for a decision.
+    const dueToday = todayQueue(L);
+    const late = dueToday.filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) < t0).length;
     const hot = real.filter((l) => effWarm(l) === 0);
     const fast = hot.filter((l) => touched(l).some((e) => e.at - l.at <= 2 * H.DAY));
     const first = real.length ? Math.min(...real.map((l) => l.at)) : now();
@@ -2330,7 +2340,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           ${notes.length ? notes.map((n) => '🔔 ' + esc(n.text)).join('<br>') + '<br>' : ''}${typed + est ? '💰 בצינור: ' + nis(typed + est) : ''}</div>
           <p class="faint">נשלח אליך כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch] || 'וואטסאפ')}, מהמספר של מערכת הדוכן. בדוגמית — תצוגה בלבד. <button class="link" data-act="crm-settings">שינוי</button></p>`
           : '<p class="muted">כבוי. <button class="link" data-act="crm-settings">להפעיל</button></p>'}</section>
-      ${insightsBox('crm', 'מה כדאי לעשות')}`;
+      `;
   }
 
   // ---- משימות ----
@@ -2339,7 +2349,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const t0 = dayNo(now());
     const due = (l) => { const p = plan(l); return p.due ? dayNo(p.due.getTime()) - t0 : null; };
     const groups = {
-      today: openTasks(L).filter((l) => due(l) <= 0),
+      today: todayQueue(L),   // N13: the same list as the overview's queue, in the same order
       week: openTasks(L).filter((l) => due(l) > 0 && due(l) <= 7),
       all: openTasks(L),
       season: L.filter((l) => plan(l).type === 'season'),
@@ -2350,7 +2360,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     };
     const f = crmFilter || (groups.today.length ? 'today' : 'all');
     const q = People.norm(crmQuery);
-    const hay = (l) => People.norm(People.rowName(l) + ' ' + People.town(l) + ' ' + tagged(l).map((b) => b.label).join(' ') + ' ' + l.roleOf + ' ' + l.notes.map((n) => n.text).join(' '));
+    const hay = (l) => People.norm(People.rowName(l) + ' ' + People.town(l) + ' ' + tagged(l).map((b) => b.label).join(' ') + ' ' + l.roleOf + ' ' + l.notes.map((n) => (n.text || '') + ' ' + (n.tr || '')).join(' '));   // N15: a transcribed recording is searched too
     const list = q ? L0.filter((l) => hay(l).includes(q)) : groups[f];
     const tab = (k, t, minor) => (minor && !groups[k].length ? '' : `<button class="tab${minor ? ' minor' : ''}" data-filter="${k}" aria-pressed="${!q && f === k}">${t} <span class="n">${groups[k].length}</span></button>`);
     let body;
@@ -2373,6 +2383,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
    * between one person and the next. */
   function dueGroup(l) {
     const p = plan(l);
+    if (!p.due && !l.won && !l.lost && !l.audience) return { k: 'decide', label: 'מחכים להחלטה', ord: 9e8 };
     if (!p.due) return { k: 'none', label: 'בלי תאריך', ord: 9e9 };
     const d = dayNo(p.due.getTime()) - dayNo(now());
     if (d < 0) return { k: 'late', label: 'באיחור', ord: -1 };
@@ -3084,14 +3095,16 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       else if (Math.random() < 0.5) { l.noAnswer = 1 + rnd(2); for (let k = 0; k < l.noAnswer; k++) ev(2 + k, '📞 לא ענה — ננסה מחר'); }
       if (!l.won && !l.lost && r < 0.75) {
         tasks(l).forEach((t) => l.done.push(t.key));   // someone who was spoken to has one step ahead, not the old ones
-        addManual(l, normStep({ type: ['call', 'meet', 'quote'][rnd(3)] }), H.addDays(new Date(now()), rnd(7) - 2).getTime());
+        // N8: a lead whose quote went out follows it up — he is not asked to prepare it again.
+        const step = l.stage === 'quote' || l.stage === 'nego' ? { type: 'call', label: 'לבדוק אם קיבל את ההצעה', days: 3 } : normStep({ type: ['call', 'meet', 'quote'][rnd(3)] });
+        addManual(l, step, H.addDays(new Date(now()), rnd(7) - 2).getTime());
       }
       l.log.sort((a, b) => a.at - b.at);
     });
     save();
   }
 
-  // ---- settings: stages, team, morning message ----
+  // ---- settings: stages, after a sale, the morning message ----
   function viewCrmSettings(m) {
     const b = S.biz;
     m.innerHTML = `<h1>שלבים ובוקר</h1>
@@ -3315,6 +3328,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   document.addEventListener('submit', (e) => e.preventDefault());   // the ask box is a form only so Enter works
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button');
+    // A dashboard list that is open closes on a tap outside it — before the tap does whatever else it does.
+    const outside = fillOpen && S.phase === 'live' && S.view === 'dash' && !e.target.closest('.ask-card.open') && !e.target.closest('#scrim') && !e.target.closest('#toast');
+    if (outside && (!b || b.dataset.act !== 'fill-open')) { fillOpen = false; render(); if (!b) return; }
     if (!b) { const mn = $('#menu'); if (mn && !e.target.closest('#menu')) { mn.remove(); if (openId && $('#slot')) startIdle(); } return; }
     const d = b.dataset;
     if (!b.closest('#menu') && d.act !== 'menu') { const mn = $('#menu'); if (mn) mn.remove(); }
@@ -3343,9 +3359,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.msgf) { msgFilter = d.msgf; return render(); }
     if (d.rulehits) {
       const r = S.biz.rules.find((x) => x.id === d.rulehits);
-      tbIds = new Set(leadsNow().filter((l) => l.ruleHits && l.ruleHits[d.rulehits]).map((l) => l.id));
+      // From the settings the "leads now" are the practice ones; a rule acts on the fair's leads.
+      tbIds = new Set(S.leads.filter((l) => !l.practice && l.ruleHits && l.ruleHits[d.rulehits]).map((l) => l.id));
       tbIdsWhy = 'הכלל: ' + (r ? ruleText(r).then : '');
-      S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; save(); render(); return window.scrollTo(0, 0);
+      // N9: the rules live in the settings now — the list of whom a rule touched opens in the tracking view.
+      S.tb.f = {}; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; S.phase = 'live'; S.view = 'crm'; save(); render(); return window.scrollTo(0, 0);
     }
     if (d.tplvar) {
       const ta = $('#tp-text');
@@ -3755,8 +3773,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'ex-yes': closeSheet(false); return useExample(exPending);
       case 'crm-clear': crmQuery = ''; return render();
       case 'tk-save': return tkSave();
-      case 'tk-back': { const l = TK && leadById(TK.lid); TK = null; return l ? sheetCRM(l) : closeSheet(false); }
-      case 'tk-won': { const l = TK && leadById(TK.lid); TK = null; if (l) outcome(l, 'won'); return; }
+      // N10: "back" and "closed" return to where he was — the overview, the list, or the lead's page — not always to the lead.
+      case 'tk-back': { TK = null; closeSheet(false); return render(); }
+      case 'tk-won': { const l = TK && leadById(TK.lid); TK = null; if (l) outcome(l, 'won', true); return; }
       case 'md-save': {
         const l = MD && leadById(MD.lid);
         const v = $('#md-date') && $('#md-date').value;
@@ -3877,6 +3896,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'note-save': { if (L) saveNote(L); return; }
       case 'note-cancel': closeSheet(); return;
       case 'fill-open': fillOpen = d.kind; return render();
+      case 'fill-close': fillOpen = false; return render();
       case 'call': { callOpen = true; return render(); }
       case 'edit-tags': { if (L) sheetTags(L); return; }
       case 'del-lead': { const l = L || leadById(openId); return l && sheetConfirm('למחוק את ' + People.rowName(l) + '?', 'הליד יימחק מהרשימה.', 'del-lead-yes', `data-lid="${l.id}"`); }
