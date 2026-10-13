@@ -1063,3 +1063,10 @@ tr:has(.sel) td { background: var(--surface-2); }
 .tb-filter, .rule-conds label, .tb th .th, .tb.pv th { font-size: 13px; letter-spacing: .02em; }
 .moment { font-size: 16px; min-height: 44px; }
 .lead .chip, .tag-row .chip, .ask-card .chip { min-height: 44px; }
+
+/* The lead's page (UX review L-2…L-6): the phone beside the name, then what to do now, with that step's buttons */
+.rec-phone { display: flex; align-items: baseline; gap: var(--s3); font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 4px; }
+.rec-now { margin-top: var(--s4); padding: var(--s4); border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); display: grid; gap: var(--s3); }
+.rec-now .actions { margin-top: 0; }
+.rec-keys .key .faint { font-size: 13px; letter-spacing: .02em; }
+.key-edit { font-weight: 500; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }

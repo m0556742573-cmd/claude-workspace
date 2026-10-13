@@ -2228,24 +2228,21 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   }
   // Importance in a word, and only when it is high: dots beside a coloured dot were a code to learn (UX review R-4).
   const dots = (l) => (importance(l) >= 2 ? '<span class="imp-tag">חשוב</span>' : '');
-  function nextCard(l) {
+  /* What to do with the first step, in one place for the next-in-line card and the lead's page (UX review R-1, L-2):
+   * the buttons follow the step — a meeting to arrange asks "arranged — when?", a quote asks "sent", a call asks how it went.
+   * The final decisions sit under "עוד…", away from the everyday tap (R-3). `noPhone`: the page shows the phone itself. */
+  function stepActs(l, noPhone) {
     const p = plan(l);
-    const w = effWarm(l);
-    const v = leadValue(l);
-    const note = lastNote(l);
-    const lateBy = p.due ? dayNo(now()) - dayNo(p.due.getTime()) : 0;
     const decide = !tasks(l).length;
-    /* The buttons follow the step (UX review R-1): a meeting to arrange asks "arranged — when?", a quote asks "sent",
-     * a call asks how it went. The final decisions sit under "עוד…", away from the everyday tap (R-3). */
     const phoneish = ['call', 'meet', 'date', 'season'].includes(p.type);
     const b = (cls, attrs, text) => `<button class="btn${cls ? ' ' + cls : ''}" ${attrs} data-lid="${l.id}">${text}</button>`;
     const more = `<details class="nc-more"><summary>עוד…</summary><div class="actions">${b('', 'data-rowout="won"', '🎉 נסגרה עסקה')}${b('', 'data-rowout="lost"', 'לא רלוונטי')}${b('', 'data-act="tasks"', 'לשנות את הצעד')}</div></details>`;
     // No phone, nothing to call: adding it is the action (R-2).
-    const phone = !phoneish ? '' : l.contact.phone
+    const phone = !phoneish || noPhone ? '' : l.contact.phone
       ? `<div class="nc-phone"><bdi dir="ltr">${esc(l.contact.phone)}</bdi>${b('ghost', 'data-act="copy-phone"', 'להעתיק')}</div>`
       : `<div class="nc-nophone"><label class="label" for="ncp-${l.id}">אין לו טלפון. יש לך?</label>
           <div class="add-row"><input id="ncp-${l.id}" class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" placeholder="050-0000000" autocomplete="off">${b('primary', 'data-act="phone-saved"', 'לשמור')}</div></div>`;
-    const pri = phoneish && !l.contact.phone ? '' : 'primary';   // without a phone the field is what stands out
+    const pri = phoneish && !noPhone && !l.contact.phone ? '' : 'primary';   // without a phone the field is what stands out
     let acts;
     if (decide) acts = `<p class="muted" style="margin:0">אין לו צעד. מה עושים איתו?</p><div class="actions">${b('primary', 'data-act="tasks"', 'לקבוע צעד')}${b('', 'data-act="cold-aud"', 'לשמור בקהל')}${b('', 'data-act="cold-lost"', 'לא רלוונטי')}</div>`;
     else if (p.type === 'meet' && p.phase !== 'held') acts = `${phone}<div class="actions">${b(pri, `data-taskdone="${esc(p.key)}"`, '✓ תואם — מתי?')}${b('', 'data-rowout="noans"', 'לא ענה')}${b('', 'data-rowout="talk"', 'דיברנו, עוד לא תואם')}</div>${more}`;
@@ -2253,6 +2250,16 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     else if (p.type === 'quote') acts = `<div class="actions">${b('primary', `data-taskdone="${esc(p.key)}"`, '✓ ההצעה נשלחה')}${b('', 'data-act="lead-msg"', 'לשלוח לו הודעה')}</div>${more}`;
     else if (p.type === 'send' || p.type === 'register') acts = `<div class="actions">${b('primary', `data-tasksend="${esc(p.key)}"`, 'לשלוח עכשיו')}${b('', `data-taskdone="${esc(p.key)}"`, '✓ כבר נשלח')}</div>${more}`;
     else acts = `${phone}<div class="actions">${b(pri, 'data-rowout="talk"', 'דיברנו — מה הלאה')}${b('', 'data-rowout="noans"', 'לא ענה')}</div>${more}`;
+    return acts;
+  }
+  function nextCard(l) {
+    const p = plan(l);
+    const w = effWarm(l);
+    const v = leadValue(l);
+    const note = lastNote(l);
+    const lateBy = p.due ? dayNo(now()) - dayNo(p.due.getTime()) : 0;
+    const decide = !tasks(l).length;
+    const acts = stepActs(l);
     return `<section class="next-card">
       <div class="nc-who"><h2>${esc(People.rowName(l))}</h2>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)}
         <span class="muted">${esc([People.town(l), w != null ? words()[w] : '', stageById(l.stage).name, v ? nis(v) : ''].filter(Boolean).join(' · '))}</span></div>
@@ -2868,6 +2875,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   function sheetLeadMsg(l) {
     sheet(`<h2>הודעה ל${esc(People.rowName(l))}</h2>
       ${l.optOut ? '<p class="warn-box">ביקש להסיר את עצמו מרשימת התפוצה. אפשר לשלוח רק תשובה אישית, לא מהתבניות.</p>' : `<div class="opts">${S.biz.templates.map((t) => `<button class="opt" data-sendtpl="${t.id}" data-lid="${l.id}">💬 ${esc(t.name)} <span class="faint">· ${esc(sendChannels().join(' + ') || 'אין ערוץ פעיל')}</span><small>${esc(fillFor(t, l))}</small></button>`).join('')}</div>`}
+      ${l.optOut || worker() ? "" : `<div class="opts"><button class="opt" data-act="send" data-lid="${l.id}">📎 הודעה חדשה עם קובץ<small>קטלוג, מחירון, תמונה</small></button></div>`}
       <div class="actions"><button class="btn ghost" data-act="back-crm" data-lid="${l.id}">חזרה</button></div>`, l.id);
     $('#scrim .sheet').dataset.tasks = '1';
   }
@@ -2883,6 +2891,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   const tlKind = (t) => (isAuto(t) ? 'auto' : /^📞/.test(t) ? 'calls' : /^(💬|📎)/.test(t) ? 'msgs' : /^📝/.test(t) ? 'notes' : /^➜/.test(t) ? 'stages' : 'other');
   function recordPage(box, l) {
     const ts = tasks(l);
+    // On top: what to do now, with the buttons of that step (UX review L-2, L-6). "Call" stands apart only when the step is not itself a call.
+    const open = ts.length || !(l.won || l.lost || l.audience);
+    const talkFirst = ts.length && ['call', 'meet', 'date', 'season'].includes(ts[0].type);
     const w = effWarm(l);
     const est = estValue(l);
     const lt = lastTouch(l);
@@ -2896,40 +2907,40 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     box.innerHTML = `<div class="rec">
       <div class="rec-top">
         <div class="rec-bar"><button class="btn ghost" data-act="record-back">${box.id === 'crm-side' ? '✕ סגירה' : '→ חזרה ל' + esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</button>
-          <button class="btn ghost" data-act="rec-menu" data-lid="${l.id}" aria-label="פעולות נוספות">⋯</button></div>
-        <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}${l.optOut ? ' <span class="badge">ביקש הסרה</span>' : ''}</h1>
+          <button class="btn ghost" data-act="rec-menu" data-lid="${l.id}">עוד פעולות</button></div>
+        <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}${dots(l)}${l.optOut ? ' <span class="badge">ביקש הסרה</span>' : ''}</h1>
+          ${l.contact.phone ? `<div class="rec-phone"><bdi dir="ltr">${esc(l.contact.phone)}</bdi><button class="btn ghost" data-act="copy-phone" data-lid="${l.id}">להעתיק</button></div>` : ''}
           <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · מדומה' : ''}</div></div>
         <div class="rec-keys">
-          <button class="key" data-pmove="${l.id}" aria-label="לשנות שלב"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)} ⇄</b></button>
+          <button class="key" data-pmove="${l.id}" aria-label="לשנות שלב"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)} <span class="key-edit">· שינוי</span></b></button>
           <span class="key"><span class="faint">שווי</span><b class="money">${leadValue(l) ? nis(leadValue(l)) : '—'}</b>${!typedValue(l) && est ? '<span class="faint">מוערך</span>' : ''}</span>
           <span class="key"><span class="faint">חום</span><b>${w == null ? 'בלי' : esc(words()[w])}</b></span>
           <span class="key"><span class="faint">מגע אחרון</span><b>${lt ? esc(lt.kind + ' · ' + agoText(lt.at)) : 'עוד לא'}</b>${tr.length ? `<span class="faint">ניסיון אחרון: לא ענה${tr.length > 1 ? ' ×' + tr.length : ''} · ${esc(agoText(tr[tr.length - 1].at))}</span>` : ''}</span>
         </div>
-        <div class="actions rec-acts"><button class="btn primary" data-act="call" data-lid="${l.id}">📞 להתקשר</button>
-          <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button>
-          <button class="btn" data-act="send" data-lid="${l.id}">📎 חומר</button>
+        ${open ? `<section class="rec-now"><div class="nc-now"><span class="faint">עכשיו</span> ${ts.length ? planHTML(ts[0], true) : '<b>להחליט מה איתו</b>'}</div>${stepActs(l, !!l.contact.phone)}</section>` : ''}
+        <div class="actions rec-acts">${talkFirst ? '' : `<button class="btn" data-act="call" data-lid="${l.id}">📞 להתקשר</button>`}
+          <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 לשלוח</button>
           <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
           <button class="btn" data-act="edit-tags" data-lid="${l.id}">✎ לשנות מה סימנתי</button></div>
-        ${callOpen ? `<div class="mini"><div class="label" style="margin-top:0">${l.contact.phone ? `לחייג: <bdi dir="ltr" class="phone">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</div><div class="chips">
+        ${callOpen && !talkFirst ? `<div class="mini"><div class="label" style="margin-top:0">${l.contact.phone ? `לחייג: <bdi dir="ltr" class="phone">${esc(l.contact.phone)}</bdi> · ` : ''}איך היה?</div><div class="chips">
           <button class="chip" data-outcome="talk" data-lid="${l.id}">דיברנו — מה הלאה</button>
           <button class="chip" data-outcome="noans" data-lid="${l.id}">לא ענה</button>
-          <button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
-          <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></div>
+          <details class="nc-more"><summary>עוד…</summary><button class="chip" data-outcome="won" data-lid="${l.id}">🎉 נסגרה עסקה</button>
+          <button class="chip" data-outcome="lost" data-lid="${l.id}">לא רלוונטי</button></details></div>
           <div class="faint" style="margin-top:6px">מתקשר מהטלפון שלך, ומסמן כאן איך היה.</div></div>` : ''}
       </div>
       <div class="rec-grid">
         <div class="rec-main">
           ${l.notes.length ? `<section class="card notes-card"><h2>📝 הערות <span class="faint">(${l.notes.length})</span></h2>
-            <ul class="log">${l.notes.slice().reverse().map((n) => `<li><span class="when">${esc(H.heDate(new Date(n.at)))} ${new Date(n.at).toTimeString().slice(0, 5)}</span>${n.audio ? `<button class="btn ghost" data-play="${n.id}">▶ השמעה</button> ` : ''}<b>${esc(n.text || '')}</b>${n.tr ? `<div class="faint">תמלול: ${esc(n.tr)}</div>` : ''}</li>`).join('')}</ul>
-            <div class="actions"><button class="btn" data-act="note" data-lid="${l.id}">📝 הערה חדשה</button></div></section>` : ''}
-          <section class="card"><h2>הלאה</h2>
+            <ul class="log">${l.notes.slice().reverse().map((n) => `<li><span class="when">${esc(H.heDate(new Date(n.at)))} ${new Date(n.at).toTimeString().slice(0, 5)}</span>${n.audio ? `<button class="btn ghost" data-play="${n.id}">▶ השמעה</button> ` : ''}<b>${esc(n.text || '')}</b>${n.tr ? `<div class="faint">תמלול: ${esc(n.tr)}</div>` : ''}</li>`).join('')}</ul></section>` : ''}
+          <section class="card"><h2>${ts.length > 1 ? 'כל הצעדים' : 'הצעדים'}</h2>
             ${ts.length ? `<div class="step-list">${ts.map((t, i) => `<div class="task-line${i === 0 ? ' first' : ''}"><span>${planHTML(t)}</span>
               <span class="task-acts">${t.type === 'send' || t.type === 'register' ? `<button class="btn" data-tasksend="${esc(t.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
                 <button class="btn" data-taskdone="${esc(t.key)}" data-lid="${l.id}">✓ ${doneWord(t)}</button>
                 <button class="btn ghost" data-taskedit="${esc(t.key)}" data-lid="${l.id}">שינוי</button></span></div>`).join('')}</div>`
               : l.won || l.lost || l.audience ? `<p class="muted">אין צעדים פתוחים — ${l.won ? 'לקוח' : l.lost ? 'לא רלוונטי' : 'בקהל'}.</p>`
-                // G2 here too: no step and no decision — the owner decides.
-                : `<p class="muted">אין לו צעד. מה עושים איתו?</p><div class="actions"><button class="btn" data-act="task-audience" data-lid="${l.id}">לשמור בקהל</button><button class="btn" data-act="lead-lost" data-lid="${l.id}">לא רלוונטי</button></div>`}
+                // G2: no step and no decision — the question is asked once, at the top of the page.
+                : '<p class="muted">אין צעדים פתוחים.</p>'}
             <div class="actions"><button class="btn" data-act="task-add" data-lid="${l.id}">+ צעד</button></div></section>
           <section class="card"><h2>ציר זמן</h2>
             <div class="chips tl-filter">${Object.entries(TL_KINDS).map(([k, t]) => `<button class="chip" data-tl="${k}" aria-pressed="${tlFilter === k}">${t}</button>`).join('')}</div>
@@ -2942,12 +2953,12 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
           ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : ''}
           <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
-          <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'}</span></div>
+          <div class="field-row"><span class="faint">מה סימנו לו</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'}</span></div>
           ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
           ${l.eventDate || tasks(l).some((t) => t.type === 'date') ? `<label><span class="faint">תאריך השמחה</span><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}"></label>` : ''}
-          <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · נקלט ע"י ${esc(l.by)}</span></div>
+          <div class="field-row"><span class="faint">ביקר בדוכן</span><span>${esc(H.heDate(new Date(l.at)))}${l.visits > 1 ? ' · ' + l.visits + ' פעמים' : ''} · רשם: ${esc(l.by)}</span></div>
           <div class="field-row"><span class="faint">קבצים</span><span>${l.files.map((f) => '📄 ' + esc(f.name)).join(' · ') || '—'}</span></div>
-          <button class="btn" data-act="pick-file" data-lid="${l.id}">📄 לצרף קובץ</button><input id="lead-file" type="file" hidden data-lfile="${l.id}">
+          <button class="btn" data-act="pick-file" data-lid="${l.id}">📄 לשמור קובץ אצלו</button><input id="lead-file" type="file" hidden data-lfile="${l.id}">
         </details>
       </div></div>`;
   }
