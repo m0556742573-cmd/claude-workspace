@@ -1025,12 +1025,6 @@ tr:has(.sel) td { background: var(--surface-2); }
 .imp-tag { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); border: 1px solid var(--line-strong); border-radius: 999px; padding: 0 8px; margin-inline-start: 6px; line-height: 20px; vertical-align: 2px; }
 .nc-meta { font-size: 14px; color: var(--ink-2); }
 .nc-nophone .add-row { max-width: 420px; }
-/* The final decisions, one tap further (R-3) */
-.nc-more summary { cursor: pointer; display: inline-flex; align-items: center; min-height: 44px; font-size: 14.5px; color: var(--ink-2); list-style: none; }
-.nc-more summary::-webkit-details-marker { display: none; }
-.nc-more summary:hover { color: var(--ink); text-decoration: underline; }
-.nc-more[open] summary { color: var(--ink); }
-.nc-more .actions { margin-top: 0; }
 .ov-side { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) 0; }
 .ov-side .group-head { padding: var(--s3) var(--s4) var(--s1); }
 .alerts, .q-list { display: grid; }
@@ -1069,13 +1063,12 @@ tr:has(.sel) td { background: var(--surface-2); }
 .rec-now { margin-top: var(--s4); padding: var(--s4); border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); display: grid; gap: var(--s3); }
 .rec-now .actions { margin-top: 0; }
 .rec-keys .key .faint { font-size: 13px; letter-spacing: .02em; }
-.key-edit { font-weight: 500; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 button.stat:disabled { cursor: default; } button.stat:disabled:hover { background: transparent; }
 /* The booth card says it is kept, in its own corner, instead of a toast over the next line (UX review B-1, B-2) */
 .saved-tag { font-size: 13.5px; color: var(--muted); margin-inline-end: var(--s3); white-space: nowrap; }
 .head-acts { display: flex; align-items: center; }
 .next-line { position: relative; }
-.next-edit { margin-inline-start: auto; padding-inline-start: var(--s3); font-size: 14px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; float: left; }
+.next-edit { float: left; margin-inline-start: var(--s3); display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); font-size: 14px; font-weight: 600; color: var(--ink-2); }   /* יצחק, 13/10: a button that says "שינוי" */
 /* The table's one row of quick questions (UX review T-1) */
 .tb-quick { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .tb-quick .chip { min-height: 44px; }
