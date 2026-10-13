@@ -2126,12 +2126,12 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const late = todayQueue(L).length;   // the same queue the overview works through
     const count = { overview: late, tasks: 0, leads: 0, segments: 0 };
     m.innerHTML = `<div class="crm-shell">
-      <nav class="crm-nav" aria-label="${CRM_NAME}"><div class="crm-nav-title">${CRM_NAME}</div>
+      <nav class="crm-nav" aria-label="${CRM_NAME}">
         ${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}">${t}${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
         <span class="crm-nav-sep"></span>
         <button class="ctab minor" data-act="crm-rules">⚙️ כללים והגדרות</button></nav>
       <div class="crm-main">
-        <div class="crm-head"><h1>${full ? CRM_NAME : esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>
+        <div class="crm-head">${full ? '' : `<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>`}
           ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
           ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmview="messages" aria-pressed="${S.crmView.leads === 'messages'}">💬 הודעה לקבוצה</button>` : ''}
           <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
@@ -2222,7 +2222,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const q = due.concat(decide);
     return q.filter((l) => !qSkip.includes(l.id)).concat(qSkip.map(leadById).filter((l) => l && q.includes(l)));
   }
-  const dots = (l) => { const n = importance(l); return n ? `<span class="imp" title="חשיבות">${'●'.repeat(n)}</span>` : ''; };
+  // Importance in a word, and only when it is high: dots beside a coloured dot were a code to learn (UX review R-4).
+  const dots = (l) => (importance(l) >= 2 ? '<span class="imp-tag">חשוב</span>' : '');
   function nextCard(l) {
     const p = plan(l);
     const w = effWarm(l);
@@ -2230,24 +2231,32 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const note = lastNote(l);
     const lateBy = p.due ? dayNo(now()) - dayNo(p.due.getTime()) : 0;
     const decide = !tasks(l).length;
-    const isTalk = p.type === 'call' || p.type === 'meet';
-    const acts = decide
-      ? `<p class="muted" style="margin:0">אין לו צעד. מה עושים איתו?</p><div class="actions"><button class="btn" data-act="cold-aud" data-lid="${l.id}">לשמור בקהל</button><button class="btn" data-act="cold-lost" data-lid="${l.id}">לא רלוונטי</button><button class="btn" data-act="tasks" data-lid="${l.id}">צעד…</button></div>`
-      : isTalk ? `<div class="nc-phone">${l.contact.phone ? `<bdi dir="ltr">${esc(l.contact.phone)}</bdi><button class="btn ghost" data-act="copy-phone" data-lid="${l.id}">להעתיק</button>` : '<span class="faint">אין טלפון — אפשר להוסיף בפרטים</span>'}</div>
-          <div class="faint">מתקשרים מהטלפון, ומסמנים כאן איך היה:</div>
-          <div class="actions"><button class="btn primary" data-rowout="talk" data-lid="${l.id}">דיברנו — מה הלאה</button><button class="btn" data-rowout="noans" data-lid="${l.id}">לא ענה</button>
-            <button class="btn" data-rowout="won" data-lid="${l.id}">🎉 נסגרה עסקה</button><button class="btn" data-rowout="lost" data-lid="${l.id}">לא רלוונטי</button></div>`
-      : `<div class="actions">${p.type === 'send' || p.type === 'register' ? `<button class="btn primary" data-tasksend="${esc(p.key)}" data-lid="${l.id}">📎 לשלוח</button>` : ''}
-          <button class="btn${p.type === 'send' || p.type === 'register' ? '' : ' primary'}" data-taskdone="${esc(p.key)}" data-lid="${l.id}">✓ ${doneWord(p)}</button>
-          <button class="btn" data-act="lead-msg" data-lid="${l.id}">💬 הודעה</button></div>`;
+    /* The buttons follow the step (UX review R-1): a meeting to arrange asks "arranged — when?", a quote asks "sent",
+     * a call asks how it went. The final decisions sit under "עוד…", away from the everyday tap (R-3). */
+    const phoneish = ['call', 'meet', 'date', 'season'].includes(p.type);
+    const b = (cls, attrs, text) => `<button class="btn${cls ? ' ' + cls : ''}" ${attrs} data-lid="${l.id}">${text}</button>`;
+    const more = `<details class="nc-more"><summary>עוד…</summary><div class="actions">${b('', 'data-rowout="won"', '🎉 נסגרה עסקה')}${b('', 'data-rowout="lost"', 'לא רלוונטי')}${b('', 'data-act="tasks"', 'לשנות את הצעד')}</div></details>`;
+    // No phone, nothing to call: adding it is the action (R-2).
+    const phone = !phoneish ? '' : l.contact.phone
+      ? `<div class="nc-phone"><bdi dir="ltr">${esc(l.contact.phone)}</bdi>${b('ghost', 'data-act="copy-phone"', 'להעתיק')}</div>`
+      : `<div class="nc-nophone"><label class="label" for="ncp-${l.id}">אין לו טלפון. יש לך?</label>
+          <div class="add-row"><input id="ncp-${l.id}" class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" placeholder="050-0000000" autocomplete="off">${b('primary', 'data-act="phone-saved"', 'לשמור')}</div></div>`;
+    const pri = phoneish && !l.contact.phone ? '' : 'primary';   // without a phone the field is what stands out
+    let acts;
+    if (decide) acts = `<p class="muted" style="margin:0">אין לו צעד. מה עושים איתו?</p><div class="actions">${b('primary', 'data-act="tasks"', 'לקבוע צעד')}${b('', 'data-act="cold-aud"', 'לשמור בקהל')}${b('', 'data-act="cold-lost"', 'לא רלוונטי')}</div>`;
+    else if (p.type === 'meet' && p.phase !== 'held') acts = `${phone}<div class="actions">${b(pri, `data-taskdone="${esc(p.key)}"`, '✓ תואם — מתי?')}${b('', 'data-rowout="noans"', 'לא ענה')}${b('', 'data-rowout="talk"', 'דיברנו, עוד לא תואם')}</div>${more}`;
+    else if (p.type === 'meet') acts = `${phone}<div class="actions">${b('primary', `data-taskdone="${esc(p.key)}"`, '✓ הפגישה התקיימה')}${b('', 'data-act="tasks"', 'נדחתה — לקבוע מחדש')}</div>${more}`;
+    else if (p.type === 'quote') acts = `<div class="actions">${b('primary', `data-taskdone="${esc(p.key)}"`, '✓ ההצעה נשלחה')}${b('', 'data-act="lead-msg"', 'לשלוח לו הודעה')}</div>${more}`;
+    else if (p.type === 'send' || p.type === 'register') acts = `<div class="actions">${b('primary', `data-tasksend="${esc(p.key)}"`, 'לשלוח עכשיו')}${b('', `data-taskdone="${esc(p.key)}"`, '✓ כבר נשלח')}</div>${more}`;
+    else acts = `${phone}<div class="actions">${b(pri, 'data-rowout="talk"', 'דיברנו — מה הלאה')}${b('', 'data-rowout="noans"', 'לא ענה')}</div>${more}`;
     return `<section class="next-card">
-      <div class="nc-who"><span class="dot w${w == null ? '' : w}"></span><h2>${esc(People.rowName(l))}</h2>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)}
+      <div class="nc-who"><h2>${esc(People.rowName(l))}</h2>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)}
         <span class="muted">${esc([People.town(l), w != null ? words()[w] : '', stageById(l.stage).name, v ? nis(v) : ''].filter(Boolean).join(' · '))}</span></div>
-      ${note ? `<div class="note-peek nc-note">📝 ${esc(note.slice(0, 220))}</div>` : ''}
       <div class="nc-now"><span class="faint">עכשיו</span> ${decide ? '<b>להחליט מה איתו</b>' : planHTML(p, true)}${lateBy > 0 ? ` <span class="late-tag">באיחור ${lateBy === 1 ? 'יום' : lateBy + ' ימים'}</span>` : ''}</div>
-      <div class="faint">${esc([contactLine(l)].concat(tagged(l).map((b) => b.label), l.roleOf ? [l.roleOf] : []).join(' · '))}</div>
+      ${note ? `<div class="note-peek nc-note">📝 ${esc(note.slice(0, 220))}</div>` : ''}
+      <div class="nc-meta">${esc([contactLine(l)].concat(tagged(l).map((x) => x.label), l.roleOf ? [l.roleOf] : []).join(' · '))}</div>
       ${acts}
-      <div class="nc-foot"><button class="btn ghost" data-crmlead="${l.id}">לפתוח את הליד ←</button><button class="btn ghost" data-act="q-skip" data-lid="${l.id}">⏭ אחר כך</button></div>
+      <div class="nc-foot"><button class="btn ghost" data-crmlead="${l.id}">לפתוח את הליד ←</button><button class="btn ghost" data-act="q-skip" data-lid="${l.id}">אחר כך</button></div>
     </section>`;
   }
   function crmOverview(box, L) {
@@ -2258,8 +2267,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const handled = real.filter((l) => l.log.some((e) => dayNo(e.at) === t0 && !isAuto(e.t) && !/אוטומציה|המערכת קידמה/.test(e.t) && /^(📞|💬|📎|📝|➜|✓|🎉)/.test(e.t))).length;
     const late = q.filter((l) => plan(l).due && dayNo(plan(l).due.getTime()) < t0).length;
     const decide = q.filter((l) => !tasks(l).length).length;
-    const st = { none: 0, tried: 0 };
-    real.forEach((l) => { const a = answerState(l); if (a in st) st[a]++; });
+    // "not yet answered" is a number about the whole fair, not about today: it lives with the numbers (R-5).
     const total = q.length + handled;
     const alert = (n, t, act, cls) => (n ? `<button class="alert${cls ? ' ' + cls : ''}" ${act}><b>${n}</b> ${esc(t)}</button>` : '');
     box.innerHTML = `
@@ -2268,8 +2276,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <div class="ov-grid">
         <div>${q.length ? nextCard(q[0]) : `<section class="next-card done"><h2>אין מה לעשות היום ✓</h2><p class="muted">כל הצעדים של היום טופלו. הבאים בתור — ב<button class="link" data-crmtab="tasks">משימות</button>.</p></section>`}</div>
         <aside class="ov-side">
-          <div class="alerts">${alert(late, 'באיחור', 'data-act="go-today"', 'bad')}${alert(decide, 'מחכים להחלטה', 'data-act="go-decide"')}${alert(st.none + st.tried, 'עוד לא קיבלו מענה', 'data-act="view-noanswer"')}</div>
-          ${q.length > 1 ? `<div class="group-head"><span>אחריו בתור</span></div><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><span class="dot w${effWarm(l) == null ? '' : effWarm(l)}"></span><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
+          ${late || decide ? `<div class="alerts">${alert(late, 'באיחור', 'data-act="go-today"', 'bad')}${alert(decide, 'מחכים להחלטה', 'data-act="go-decide"')}</div>` : ''}
+          ${q.length > 1 ? `<div class="group-head"><span>אחריו בתור</span></div><div class="q-list">${q.slice(1, 9).map((l) => `<button class="q-item" data-crmlead="${l.id}"><b>${esc(People.rowName(l))}</b>${dots(l)}<span class="faint">${tasks(l).length ? planHTML(plan(l), true) : 'להחליט מה איתו'}</span></button>`).join('')}
             ${q.length > 9 ? `<button class="link" data-act="go-today">ועוד ${q.length - 9} — לכל הרשימה ←</button>` : `<button class="link" data-act="go-today">לכל רשימת היום ←</button>`}</div>` : ''}
         </aside>
       </div>
@@ -3705,6 +3713,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       // "⏭ later": the lead goes to the end of today's queue for this sitting — nothing is decided, nothing is written.
       case 'q-skip': if (L) { qSkip = qSkip.filter((x) => x !== L.id).concat(L.id); } return render();
       // On a computer "call" cannot dial: the number is copied, and the call is made from the phone in his hand.
+      case 'phone-saved': if (L && L.contact.phone) { log(L, '✎ נוסף טלפון'); save(); toast('✓ הטלפון נשמר'); } return render();
       case 'copy-phone': if (L && L.contact.phone) { try { navigator.clipboard.writeText(L.contact.phone).then(() => toast('✓ המספר הועתק'), () => toast(L.contact.phone)); } catch (x) { toast(L.contact.phone); } } return;
       case 'go-decide': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'decide'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
       case 'tb-export': return exportLeads(tableRows(leadsNow()), 'לידים');

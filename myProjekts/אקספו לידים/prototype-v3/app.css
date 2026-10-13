@@ -1021,6 +1021,16 @@ tr:has(.sel) td { background: var(--surface-2); }
 .nc-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: var(--s2); }
 .late-tag { font-size: 12.5px; font-weight: 700; color: var(--hot); margin-inline-start: var(--s2); }
 .imp { color: var(--faint); font-size: 10px; letter-spacing: 1px; margin-inline-start: 4px; }
+/* Importance as a word (UX review R-4) */
+.imp-tag { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); border: 1px solid var(--line-strong); border-radius: 999px; padding: 0 8px; margin-inline-start: 6px; line-height: 20px; vertical-align: 2px; }
+.nc-meta { font-size: 14px; color: var(--ink-2); }
+.nc-nophone .add-row { max-width: 420px; }
+/* The final decisions, one tap further (R-3) */
+.nc-more summary { cursor: pointer; display: inline-flex; align-items: center; min-height: 44px; font-size: 14.5px; color: var(--ink-2); list-style: none; }
+.nc-more summary::-webkit-details-marker { display: none; }
+.nc-more summary:hover { color: var(--ink); text-decoration: underline; }
+.nc-more[open] summary { color: var(--ink); }
+.nc-more .actions { margin-top: 0; }
 .ov-side { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) 0; }
 .ov-side .group-head { padding: var(--s3) var(--s4) var(--s1); }
 .alerts, .q-list { display: grid; }
