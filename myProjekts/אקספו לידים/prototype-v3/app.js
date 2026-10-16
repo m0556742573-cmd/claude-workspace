@@ -2280,9 +2280,14 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ---- ask the data, in plain words ----
   let ASK = null;   // { q, busy, answer, ids }
+  /* Principle 9 (יצחק, 16/10): the grey example inside a field speaks his trade, not someone else's —
+   * taken from his own buttons, so a carpenter reads about kitchens and a caterer about events. */
+  const sampleWhat = () => (S.biz.buttons.find((b) => b.axis === 'what') || {}).label || '';
+  const exampleAsk = () => (sampleWhat() ? `✨ שאלה, למשל: כמה התעניינו ב${sampleWhat()} ועוד לא היה איתם קשר?` : '✨ שאלה, למשל: כמה עוד לא היה איתם קשר?');
+  const exampleNote = () => (sampleWhat() ? `למשל: רוצה הצעה ל${sampleWhat()}, לחזור אחרי החגים` : 'למשל: רוצה הצעת מחיר, לחזור אחרי החגים');
   function askBox() {
     if (!ai) return '';   // M70: no note about where the AI works — without it, the box is simply not there
-    return `<form class="askbox" data-askform><input id="ask-q" class="text-input" placeholder="✨ לשאול את הנתונים: כמה מוסדות חמים עוד לא קיבלו מענה?" aria-label="שאלה על הנתונים" value="${esc(ASK ? ASK.q : '')}" autocomplete="off">
+    return `<form class="askbox" data-askform><input id="ask-q" class="text-input" placeholder="${esc(exampleAsk())}" aria-label="שאלה על הנתונים" value="${esc(ASK ? ASK.q : '')}" autocomplete="off">
       <button class="btn primary" data-act="ask" ${ASK && ASK.busy ? 'disabled' : ''}>${ASK && ASK.busy ? 'חושב…' : 'לשאול'}</button></form>
       ${ASK && ASK.answer ? `<div class="ask-answer"><div>${esc(ASK.answer)}</div>
         ${ASK.ids.length ? `<div class="faint" style="margin-top:6px">${ASK.ids.map(leadById).filter(Boolean).slice(0, 8).map((l) => `<button class="link" data-crmlead="${l.id}">${esc(People.rowName(l))}</button>`).join(' · ')}${ASK.ids.length > 8 ? ' ועוד ' + (ASK.ids.length - 8) : ''}</div>
@@ -3099,7 +3104,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const today = new Date(now());
     const toSunday = ((7 - today.getDay()) % 7) || 7;
     sheet(`<h2>${done ? `✓ ${esc(done)}. מה הלאה עם ${esc(People.rowName(l))}?` : `דיברנו עם ${esc(People.rowName(l))}. מה הלאה?`}</h2>
-      <label class="label" for="tk-note">${done ? "מה קרה?" : "מה נאמר?"} <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="למשל: רוצה הצעה ל-300 איש, לפני פסח"></textarea>
+      <label class="label" for="tk-note">${done ? "מה קרה?" : "מה נאמר?"} <small>רשות</small></label><textarea id="tk-note" class="say small" placeholder="${esc(exampleNote())}"></textarea>
       ${ahead.length > 1 ? `<div class="label">איפה הוא עומד עכשיו? <small>נבחר מה שסביר — נגיעה משנה</small></div>
       <div class="chips">${ahead.map((s) => `<button class="chip" data-tkstage="${s.id}" aria-pressed="${TK.stage === s.id}">${esc(s.name)}</button>`).join('')}</div>` : ''}
       <div class="label">המשימה הבאה</div>
