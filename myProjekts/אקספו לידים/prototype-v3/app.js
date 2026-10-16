@@ -276,8 +276,8 @@
    * its own. */
   const STD = {
     what: { title: 'במה התעניין', hint: 'מוצרים או שירותים', multi: true },
-    who:  { title: 'סוג פונה', hint: 'מי ניגש אליך' },
-    size: { title: 'סדר גודל', hint: 'כמה הוא יכול לקנות' },
+    who:  { title: 'מי הוא', hint: 'פרטי, מוסד, בעל שמחה' },
+    size: { title: 'כמה הוא קונה', hint: '' },
     when: { title: 'מתי', hint: 'עכשיו, לשמחה, לעונה' },
   };
   // Importance is one star, on or off (יצחק, 16/10): it decides only who comes first. Kept as a weight of 2 so old data reads the same.
@@ -402,9 +402,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   const KEY = 'expo-demo3d';
   const DEVKEY = 'expo-demo3-tablet';        // owner or worker belongs to THIS tablet, not to the business
+  // A7 (יצחק, 16/10): "קר" and "פושר" describe the person; the default describes his situation. "סתם" is gone — a visitor who saw it would be hurt.
   const GRADES = {
+    serious: { name: 'ברירת המחדל', words: ['רציני', 'שוקל', 'לא עכשיו'] },
     classic: { name: 'הקלאסי', words: ['חם', 'פושר', 'קר'] },
-    serious: { name: 'לפי רצינות', words: ['רציני', 'אולי', 'סתם'] },
     time:    { name: 'לפי זמן', words: ['עכשיו', 'בהמשך', 'לא כרגע'] },
     plain:   { name: 'במילים פשוטות', words: ['מעניין מאוד', 'מעניין', 'רק עבר'] },
   };
@@ -424,7 +425,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         removed: [], removedGroups: [], groups: [], buttons: [], bseq: 1,
         defSteps: [{ type: 'call', label: 'לחזור אליו', days: 3 }], defByHand: false,
         seasons: [], seasonsByHand: false, seasonDefs: JSON.parse(JSON.stringify(H.SEASONS)), remindWeeks: 3,
-        grades: 'classic', derive: true, idleSec: 12, hideVisited: true, coldDo: 'ask',
+        grades: 'serious', derive: true, idleSec: 12, hideVisited: true, coldDo: 'ask',
         materials: [], channels: { email: true, sms: false, wa: false, waApi: false },
         mail: { replyTo: '', prefix: '' }, smsName: '',
         chOrder: ['wa', 'waApi', 'email', 'sms'], sendAll: false, template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {קובץ}. נשמח לעמוד לשירותך.',
@@ -637,11 +638,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return tasks(l)[0] || { type: 'none', label: restWord(l), due: null };
   }
   const dayNo = (t) => Math.floor((t - new Date(t).getTimezoneOffset() * 60000) / H.DAY);
+  /** W27: the way the community writes a day — "יום ג׳, ז׳ כסלו". The civil date stays on the lead's page only. */
+  const shortDay = (d) => { const p = H.parts(d); return 'יום ' + 'אבגדהוש'[d.getDay()] + '׳, ' + H.gem(p.d) + ' ' + H.HE[p.m]; };
   function dueText(d) {
     if (!d) return '';
     const diff = dayNo(d.getTime()) - dayNo(now());
     const rel = diff < 0 ? 'באיחור · ' : diff === 0 ? 'היום · ' : diff === 1 ? 'מחר · ' : '';
-    return rel + H.label(d) + ' (' + d.getDate() + '/' + (d.getMonth() + 1) + ')';
+    return rel + shortDay(d);
   }
   const daysWord = (s) => (s.type === 'none' ? 'בלי משימה' : s.type === 'season' ? 'לפני העונה' : s.days === 0 ? 'מיד' : s.days === 1 ? 'תוך יום' : 'תוך ' + s.days + ' ימים');
   const stepText = (s) => STEPS[s.type].icon + ' ' + s.label + (s.pkg && pkgById(s.pkg) ? ' (' + pkgById(s.pkg).name + ')' : '') + ' · ' + daysWord(s);
@@ -1112,9 +1115,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ---- warmth and the booth ----
   function viewBoothSettings(m) {
     const b = S.biz;
-    m.innerHTML = `<h1>החום והדוכן</h1>
+    m.innerHTML = `<h1>הדוכן</h1>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>איך לקרוא לדרגות</h2><p class="muted">רק השמות משתנים. מה שסומן הכי חם נשאר הכי חם.</p>
+        <section class="card"><h2>איך לקרוא לשלוש הדרגות</h2><p class="muted">רק השם משתנה.</p>
           <div class="opts grid2">${Object.entries(GRADES).map(([k, g]) => `<button class="opt" data-grades="${k}" aria-pressed="${b.grades === k}">${esc(g.words.join(' · '))}<small>${esc(g.name)}</small></button>`).join('')}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>המערכת מציעה "${esc(words()[0])}" או "${esc(words()[1])}" לבד</h2>
           <p class="muted">לפי מה שהוא עשה: חזר לדוכן, ביקש שישלחו לו, התעניין. "${esc(words()[2])}" — רק אתה מסמן, ומה שקורה אחריו קובעים ב"מה המערכת עושה לבד". נגיעה אחת משנה, ומה שבחרת ביד נשאר.</p></div>${toggle('derive', b.derive, 'חום מוצע')}</div></section>
@@ -1228,7 +1231,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const leadByKey = (key) => leadsNow().find((l) => l.key === key);
 
   function viewBooth(m) {
-    m.innerHTML = `<input id="q" class="search" type="search" placeholder="שם המשפחה, ועוד אותיות עד שהשם עולה" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
+    m.innerHTML = `<input id="q" class="search" type="search" placeholder="שם או עסק…" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
       <div id="slot"></div><p class="foot" id="foot"></p>`;
     const q = $('#q');
     // Typing while a card is open does not drop it: the card is held, and a bar asks to save it or go back to it (K2).
@@ -1253,9 +1256,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const last = lastClosed && Date.now() - lastClosed.at < 60000 ? leadById(lastClosed.id) : null;
     const lastBar = last ? `<div class="last-bar"><span>האחרון: <b>${esc(People.rowName(last))}</b> · ${esc(People.town(last))}</span><button class="btn" data-reopen="${last.id}">לפתוח</button></div>` : '';
     const h = held && leadById(held);
-    const heldBar = h ? `<div class="last-bar held"><span><b>${esc(People.rowName(h))}</b> עוד פתוח</span><span><button class="btn primary" data-act="held-save">✓ לשמור</button> <button class="btn" data-act="held-back">← חזרה אליו</button></span></div>` : '';
+    const heldBar = h ? `<div class="last-bar held"><span><b>${esc(People.rowName(h))}</b> עוד פתוח</span><span><button class="btn primary" data-act="held-save">✓ סיום</button> <button class="btn" data-act="held-back">← חזרה אליו</button></span></div>` : '';
     if (!People.norm(query)) {
-      slot.innerHTML = heldBar + lastBar + '<div class="empty">סיימתם לדבר? שם המשפחה, ועוד אותיות עד שהשם עולה — ונגיעה בשם.<br>כל השאר רשות.</div>';
+      slot.innerHTML = heldBar + lastBar + '<div class="empty">כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br>כל השאר רשות.</div>';
       return;
     }
     const { hits, skipped, total } = People.search(query, 6, S.biz.hideVisited ? (k) => !!leadByKey(k) : null);
@@ -1275,7 +1278,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       return `<div class="again-row"><button class="result small" data-reopen="${l.id}"><span><span class="nm">${esc(People.rowName(h))}</span> <span class="city">${esc(People.town(h))}</span><span class="mt">${esc(People.rowMeta(h))}</span></span><span class="badge">לפתוח</span></button>
         ${can ? `<button class="btn" data-again="${h.key}">↺ חזר שוב</button>` : ''}</div>`;
     }).join('')}${againMore}</div>` : '';
-    const more = total > hits.length ? `<div class="more">ועוד ${total - hits.length} — להוסיף אות משם המשפחה</div>` : '';
+    const more = total > hits.length ? `<div class="more">ועוד ${total - hits.length} — להקליד עוד אות, או את העיר</div>` : '';
     // Visitors added here by hand are not in the organisers' list, so the search finds them among the leads.
     const nq = People.norm(query);
     const mine = leadsNow().filter((l) => l.custom && People.norm(People.rowName(l)).includes(nq)).slice(0, 3);
@@ -1332,7 +1335,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     l.visits++; l.lastAt = now();
     log(l, 'חזר לדוכן');
     save();
-    toast('↺ ' + People.rowName(l) + ' חזר — סומן');
+    toast('↺ ' + People.rowName(l) + ' חזר לדוכן');
     openLead(l);
   }
   function openLead(l, isNew) {
@@ -1390,12 +1393,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <div class="faint">${esc(People.rowMeta(l))}${l.visits > 1 ? ' · ביקר ' + l.visits + ' פעמים' : ''}${l.demo ? ' · לדוגמה' : ''}</div></div>
         <div class="head-acts">${inSheet ? "" : `<span class="saved-tag">✓ נשמר · נסגר לבד</span>`}<button class="btn primary" data-act="close-lead">✓ סיום</button></div></div>
       <div class="warmth">${words().map((t, k) => `<button class="warm-btn w${k}${auto && w === k ? ' auto' : ''}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</div>
-      ${auto ? '<div class="hint">הוצע לפי מה שסימנת. נגיעה משנה.</div>' : ''}
-      ${groupsFor(l).map((g) => `<div class="label">${esc(g.title)} <small>רשות</small></div>
+      ${auto ? '<div class="hint">המערכת הציעה — אפשר לשנות.</div>' : ''}
+      ${groupsFor(l).map((g) => `<div class="label">${esc(g.title)}</div>
         <div class="chips">${groupButtons(g.id).map((b) => `<button class="chip" data-tag="${b.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(b.id)}">${esc(b.label)}</button>`).join('')}</div>`).join('')}
-      ${datey ? `<div class="label">מתי השמחה? <small>רשות</small></div><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}">` : ''}
-      ${roley ? `<div class="label">של מי? <small>רשות — המוסד, בית הכנסת או הקבוצה</small></div><input class="text-input" data-roleof="${l.id}" value="${esc(l.roleOf)}" placeholder="למשל: קבוצת שערי חסד" autocomplete="off">` : ''}
-      <button class="next-line" data-act="tasks" data-lid="${l.id}"><span class="faint">הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${ts.length - 1}</span>` : ''}<span class="next-edit">שינוי</span></button>
+      ${datey ? `<div class="label">מתי השמחה?</div><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}">` : ''}
+      ${roley ? `<div class="label">מאיזה מוסד או קבוצה?</div><input class="text-input" data-roleof="${l.id}" value="${esc(l.roleOf)}" placeholder="למשל: קבוצת שערי חסד" autocomplete="off">` : ''}
+      <button class="next-line" data-act="tasks" data-lid="${l.id}"><span class="faint">מה הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${many(ts.length - 1, 'משימה', 'משימות')}</span>` : ''}<span class="next-edit">שינוי</span></button>
       ${last ? `<div class="note-peek">📝 ${last.audio ? '🎙️ ' : ''}${esc((last.text || last.tr || 'הקלטה').slice(0, 80))}${l.notes.length > 1 ? ` <span class="faint">(${l.notes.length} הערות)</span>` : ''}</div>` : ''}
       <div class="actions">${sendBtn}
         <button class="btn" data-act="note" data-lid="${l.id}">📝 הערה</button>
@@ -1562,7 +1565,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const noMic = () => {
       micState = 'none';
       const btn = $('#rec-btn');
-      if (btn) btn.outerHTML = '<span class="faint">אין גישה למיקרופון כאן — אפשר רק לכתוב. בטאבלט, בדפדפן רגיל, זה עובד.</span>';
+      if (btn) btn.outerHTML = '<span class="faint">אין גישה למיקרופון — אפשר לכתוב.</span>';
       if ($('#rec-state')) $('#rec-state').textContent = '';
       if ($('#note-text')) $('#note-text').focus();
     };
@@ -1696,17 +1699,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const rowsP = L.filter((l) => (isPartial(l) || filled.has('partial:' + l.id)) && !rowsE.includes(l));
     const leftE = rowsE.filter(isEmpty).length;
     const leftP = rowsP.filter(isPartial).length;
-    if (rowsE.length) out.push({ fill: 'empty', q: leftE ? `חסר: ${leftE} בלי שום סימון. להשלים עכשיו, כל עוד זוכרים? בערך דקה.` : '✓ חסר — הכל מולא.', leads: rowsE });
-    if (rowsP.length) out.push({ fill: 'partial', q: leftP ? `להשלמה: ${leftP} סומנו רק בחלק.` : '✓ להשלמה — הכל הושלם.', leads: rowsP });
+    if (rowsE.length) out.push({ fill: 'empty', q: leftE ? `${leftE === 1 ? 'אחד לא סומן' : leftE + ' לא סומנו'} בכלל. כדאי עכשיו, כשעוד זוכרים — בערך דקה.` : '✓ הכל מולא.', leads: rowsE });
+    if (rowsP.length) out.push({ fill: 'partial', q: leftP ? `${leftP === 1 ? 'אחד סומן' : leftP + ' סומנו'} רק חלקית.` : '✓ הכל מולא.', leads: rowsP });
     // G2: "cold" is the owner's call — the system cannot know what he meant by it, so it asks: a task, or the mailing list.
     const cold = L.filter((l) => effWarm(l) === 2 && undecided(l));
-    if (cold.length || filledCold.size) out.push({ cold: true, q: cold.length ? `${cold.length} סומנו "${words()[2]}" — מה איתם?` : '✓ כולם הוחלטו.', leads: cold.concat(L.filter((l) => filledCold.has(l.id) && !cold.includes(l))) });
+    if (cold.length || filledCold.size) out.push({ cold: true, q: cold.length ? `${cold.length === 1 ? 'אחד סומן' : cold.length + ' סומנו'} "${words()[2]}" — מה איתם?` : '✓ כולם הוחלטו.', leads: cold.concat(L.filter((l) => filledCold.has(l.id) && !cold.includes(l))) });
     // Not set up to send: one line about the business, not a list of visitors waiting (יצחק, 16/10).
     if (!sendReady() && !worker()) out.push({ setup: true, q: `עוד לא הגדרת ${sendMissing()} למבקר — מהדוכן לא יוצאת שום הודעה.` });
     return out;
   }
   /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
-  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'הודעות לשלוח', date: 'בדיקות תאריך', register: 'פרטי הרשמה' };
+  // S14: one of a kind is said as one ("הצעת מחיר אחת להכין"), never "1 הצעות".
+  const PLURAL = { call: ['שיחה אחת', 'שיחות'], meet: ['תיאום פגישה אחד', 'תיאומי פגישה'], quote: ['הצעת מחיר אחת להכין', 'הצעות מחיר להכין'], send: ['הודעה אחת לשלוח', 'הודעות לשלוח'], date: ['בדיקת תאריך אחת', 'בדיקות תאריך'], register: ['פרטי הרשמה לשלוח', 'פרטי הרשמה לשלוח'] };
   function nextDayLine(L) {
     const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
     if (!all.length) return 'אין משימות.';
@@ -1715,8 +1719,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const day = all.filter((t) => (first === dayNo(now()) ? dayNo(t.due.getTime()) <= first : dayNo(t.due.getTime()) === first));
     const n = {};
     day.forEach((t) => { n[t.type] = (n[t.type] || 0) + 1; });
-    const when = first - dayNo(now()) === 1 ? 'מחר' : first <= dayNo(now()) ? 'היום' : 'ב' + H.label(day[0].due);
-    return `<b>${esc(when)}:</b> ${PRI.filter((k) => n[k]).map((k) => n[k] + ' ' + (PLURAL[k] || STEPS[k].name)).join(' · ')}`;
+    const when = first - dayNo(now()) === 1 ? 'מחר' : first <= dayNo(now()) ? 'היום' : 'ב' + shortDay(day[0].due);
+    return `<b>${esc(when)}:</b> ${PRI.filter((k) => n[k]).map((k) => (PLURAL[k] ? many(n[k], PLURAL[k][0], PLURAL[k][1]) : n[k] + ' ' + STEPS[k].name)).join(' · ')}`;
   }
   function viewDash(m) {
     const L = leadsNow();
@@ -1727,13 +1731,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות יום מלא?</div>
         <div class="actions"><button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button></div></div>` : ''}
       <div class="stats">${words().map((t, k) => `<button class="stat" data-act="warm-list" data-k="${k}" ${ws[k] ? '' : 'disabled'}><span class="n">${ws[k]}</span><span class="t">${esc(t)}</span></button>`).join('')}
-        <button class="stat" data-act="warm-list" data-k="none" ${ws[3] ? '' : 'disabled'}><span class="n">${ws[3]}</span><span class="t">בלי חום</span></button></div>
+        <button class="stat" data-act="warm-list" data-k="none" ${ws[3] ? '' : 'disabled'}><span class="n">${ws[3]}</span><span class="t">לא סומן</span></button></div>
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
       <div class="ask" style="margin-top:10px">${asks.map(dashCard).join('') || '<div class="empty">הכל מסומן.</div>'}</div>
       <h2 style="margin-top:26px">מה מחכה</h2>
       <div class="ask-card" style="margin-top:10px"><div class="q">${nextDayLine(L)}</div>
         ${worker() ? '' : '<div class="actions"><button class="btn" data-view="crm">למעקב ←</button></div>'}</div>
-      ${insightsBox('dash', 'סיכום היום')}`;   // last, and only a look back at the day (יצחק, 12/10) — the actions are above it
+      ${insightsBox('dash', 'איך היה היום')}`;   // last, and only a look back at the day (יצחק, 12/10) — the actions are above it
   }
   let fillOpen = false;
   const filled = new Set();   // rows filled in on this visit to the dashboard — they keep their place
@@ -1745,11 +1749,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const pri = i ? '' : ' primary';
     let body = '';
     if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
-    else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="cold">להחליט</button></div>`;
+    else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="cold">מה איתם</button></div>`;
     else if (a.setup) body = `<div class="actions"><button class="btn${pri}" data-act="setup-send">להגדיר ←</button></div>`;
     // An open list closes with its own button, or with a tap anywhere outside it (יצחק, 12/10).
     const open = (a.fill && fillOpen === a.fill) || (a.cold && fillOpen === 'cold');
-    return `<div class="ask-card${open ? ' open' : ''}"><div class="q">${esc(a.q)}</div>${body}${open ? '<div class="actions"><button class="btn ghost" data-act="fill-close">סגירת הרשימה</button></div>' : ''}</div>`;
+    return `<div class="ask-card${open ? ' open' : ''}"><div class="q">${esc(a.q)}</div>${body}${open ? '<div class="actions"><button class="btn ghost" data-act="fill-close">סגירה</button></div>' : ''}</div>`;
   }
   const filledCold = new Set();   // cold leads decided on this visit to the dashboard — they keep their place
   function coldList(leads) {
@@ -1781,7 +1785,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <span class="mini-w">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}"${askWarm(k) ? ' data-ask="1"' : ''}>${esc(t)}</button>`).join('')}</span>
         ${gs.map((g) => `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}"${askTag(x, g) ? ' data-ask="1"' : ''}>${esc(x.label)}</button>`).join('')}</span>`).join('')}</div>`;
     }).join('')}</div>
-      <div class="faint" style="margin-top:6px">נגיעה בשם פותחת את הכרטיס המלא.</div>`;
+      `;
   }
 
   // ------------------------------------------------------------------
@@ -1796,7 +1800,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       const late = L.filter((l) => { const p = plan(l); return p.due && dayNo(p.due.getTime()) < t0; });
       if (late.length) out.push({ text: `${late.length} באיחור. להעביר את כולם למחר?`, leadIds: late.map((l) => l.id), action: { kind: 'shift' } });
       const held = L.filter((l) => plan(l).type === 'season');
-      if (held.length) { const p = plan(held[0]); out.push({ text: `${held.length} שמורים ל${p.season || 'עונה'}. יחזרו אליך ב${H.label(p.due)}.`, leadIds: held.map((l) => l.id), action: null }); }
+      if (held.length) { const p = plan(held[0]); out.push({ text: `${held.length} שמורים ל${p.season || 'עונה'}. יחזרו אליך ב${shortDay(p.due)}.`, leadIds: held.map((l) => l.id), action: null }); }
       const twice = L.filter((l) => l.noAnswer >= 2 && !l.sent.length && tasks(l).length);
       if (twice.length) out.push({ text: `${twice.length} לא ענו פעמיים. לשלוח להם הודעה במקום עוד שיחה?`, leadIds: twice.map((l) => l.id), action: { kind: 'step', type: 'send' } });
       const groups = {};   // one institution, several people: one approach for all of them
@@ -1815,7 +1819,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     return `<h2 style="margin-top:26px">✨ ${esc(title)}</h2>
       <div class="ask" style="margin-top:10px">${fixed.map((x, i) => card(x, i, 'fixed')).join('')}
         ${got ? got.items.map((x, i) => card(x, i, 'ai')).join('') || '<div class="faint">לא נמצא משהו מיוחד.</div>' : ''}
-        ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? (scope === 'dash' ? 'לסכם שוב' : 'לבדוק שוב') : scope === 'dash' ? 'לבקש מהבינה המלאכותית לסכם את היום' : 'לבקש מהבינה המלאכותית לעבור על הכל'}</button></div>`
+        ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? (scope === 'dash' ? '✨ לסכם שוב' : '✨ מה עוד כדאי?') : scope === 'dash' ? '✨ לסכם לי את היום' : '✨ מה עוד כדאי?'}</button></div>`
           : ''}
         ${!fixed.length && !got && !ai ? '<div class="faint">אין כרגע.</div>' : ''}</div>`;
   }
@@ -1848,7 +1852,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   async function aiInsights(scope) {
     const L = leadsNow().slice(-80).map(leadFacts);
     const btn = $('#ins-' + scope);
-    if (btn) { btn.disabled = true; btn.textContent = 'עובר על הלידים…'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'קורא…'; }
     const focus = scope === 'dash'
       ? 'Give a short OVERVIEW OF THE DAY AT THE BOOTH, looking back only: how many came and of what kind, what they were interested in, how warm, who came back, what the notes say. No advice, no tasks, no actions — only what happened. Set every action to null. Groups and institutions belong to the follow-up view, not here.'
       : 'Read every lead\'s notes first: when a note asks for something — to be called at a time, a price, a sample, a date, a visit — propose exactly that step for that lead, and say which note it comes from. Then look at the SALES FOLLOW-UP: who to call first and why, overdue or neglected leads, institutions and groups worth one approach, what is held for a season, leads that should get another step. Do not talk about tagging at the booth.';
@@ -1914,6 +1918,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const b = S.biz;
     if (!b.stages) b.stages = clone(DEF_STAGES);
     if (!b.coldDo) b.coldDo = 'ask';
+    (b.groups || []).forEach((g) => {   // the group names in plain words (S11, G7)
+      if (g.id === 'who' && g.title === 'סוג פונה') { g.title = STD.who.title; g.hint = STD.who.hint; }
+      if (g.id === 'size' && g.title === 'סדר גודל') { g.title = STD.size.title; g.hint = STD.size.hint; }
+    });
+    if (!b.gradesV) { b.gradesV = true; if (b.grades === 'classic' || !GRADES[b.grades]) b.grades = 'serious'; }   // the new default names
     (b.templates || []).forEach((t) => { if (t.text) t.text = t.text.replace(/\{חומר\}/g, '{קובץ}'); });   // only messages, with a file or without (W18)
     if (!b.listV) {   // 16/10: "audience" and "not relevant" are one — the mailing list, the last stage
       b.listV = true;
@@ -2220,7 +2229,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         <div class="crm-head">${full ? '' : `<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>`}
           ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
           ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmview="messages" aria-pressed="${S.crmView.leads === 'messages'}">💬 הודעה לקבוצה</button>` : ''}
-          <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
+          <span class="date-now">היום: ${esc(shortDay(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
             ${!full && vs ? `<button class="btn ghost" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</span></div>
         ${!full && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות איך זה נראה? 20 לידים לדוגמה, כאילו עברו שבועיים.</div>
           <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף דוגמה</button></div></div>` : ''}
@@ -2435,7 +2444,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <section class="card"><h2>הכפתורים שהביאו לידים</h2>${btnRows.length ? barChart(btnRows) : '<div class="empty">עוד אין סימונים.</div>'}</section>
       </div>
       <section class="card digest-card" style="margin-top:14px"><h2>הודעת הבוקר שלך</h2>
-        ${S.biz.digest.on ? `<div class="bubble"><b>בוקר טוב${firstName ? ' ' + esc(firstName) : ''}!</b><br>היום, ${esc(H.label(new Date(now())))}:<br>
+        ${S.biz.digest.on ? `<div class="bubble"><b>בוקר טוב${firstName ? ' ר׳ ' + esc(firstName) : ''}!</b><br>היום, ${esc(shortDay(new Date(now())))}:<br>
           ${dueToday.length ? `📞 ${dueToday.length} לטיפול${late ? `, מהם ${late} באיחור` : ''}<br>${todayNames.map((t) => '• ' + esc(t)).join('<br>')}${dueToday.length > 3 ? '<br>• ועוד ' + (dueToday.length - 3) : ''}` : '✓ אין משימות להיום.'}<br>
           ${notes.length ? notes.map((n) => '🔔 ' + esc(n.text)).join('<br>') + '<br>' : ''}${won.length ? '🎉 מהאקספו: ' + many(won.length, 'עסקה אחת', 'עסקאות') : ''}</div>
           <p class="faint">נשלח אליך כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch] || 'וואטסאפ')}. <button class="link" data-act="crm-settings">שינוי</button></p>`
@@ -2489,7 +2498,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d < 0) return { k: 'late', label: 'באיחור', ord: -1 };
     if (d === 0) return { k: 'd0', label: 'היום', ord: 0 };
     if (d === 1) return { k: 'd1', label: 'מחר', ord: 1 };
-    return { k: 'd' + d, label: H.label(p.due) + ' (' + p.due.getDate() + '/' + (p.due.getMonth() + 1) + ')', ord: d };
+    return { k: 'd' + d, label: shortDay(p.due), ord: d };
   }
   /** One lead: who and what is next on the first line, why underneath. With `withCall`, a 📞 beside it records the call in place. */
   /** The newest note, written or transcribed — what he asked to be reminded of comes back with the lead (יצחק, 09/10). */
@@ -2531,7 +2540,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const lost = stageOf('lost');
     const card = (l) => { const w = effWarm(l); const p = plan(l); const late = p.due && dayNo(p.due.getTime()) < dayNo(now()); return `<div class="pcard" draggable="true" data-plid="${l.id}">
       <button class="pname" data-crmlead="${l.id}">${esc(People.rowName(l))}</button>
-      <div class="faint">${w == null ? 'בלי חום' : `<b class="warm-word w${w}">${esc(words()[w])}</b>`} · ${esc(People.town(l))}</div>
+      <div class="faint">${w == null ? 'לא סומן' : `<b class="warm-word w${w}">${esc(words()[w])}</b>`} · ${esc(People.town(l))}</div>
       ${p.due ? `<div class="pnext${late ? ' late' : ''}">${late ? 'באיחור · ' : ''}${STEPS[p.type].icon} ${esc(p.label)} · ${esc(dateShort(p.due.getTime()))}</div>` : ''}
       <button class="pmove" data-pmove="${l.id}" aria-label="להעביר את ${esc(People.rowName(l))} לשלב אחר">⇄</button></div>`; };
     const byDue = (a, b) => ((plan(a).due || { getTime: () => 9e15 }).getTime() - (plan(b).due || { getTime: () => 9e15 }).getTime());
@@ -2606,7 +2615,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   ];
   const colById = (id) => COLS.find((c) => c.id === id);
   const FILTERS = {
-    warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'בלי חום']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
+    warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'לא סומן']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
     answer: { t: 'מענה', opts: () => [['none', 'עוד לא היה קשר'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל הודעה'], ['talked', 'דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
     stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
     btn: { t: 'כפתור', more: true, opts: () => [['nobtn', 'בלי כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), ok: (l, v) => (v === 'nobtn' ? !l.tags.length : l.tags.includes(v)) },
@@ -2762,7 +2771,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         filter: 'btn', key: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.id) : ['nobtn']; } };
     });
     Object.assign(d, {
-      warm: { t: 'חום', of: (l) => [effWarm(l) == null ? 'בלי חום' : words()[effWarm(l)]], filter: 'warm', key: (l) => [effWarm(l) == null ? 'none' : String(effWarm(l))] },
+      warm: { t: 'חום', of: (l) => [effWarm(l) == null ? 'לא סומן' : words()[effWarm(l)]], filter: 'warm', key: (l) => [effWarm(l) == null ? 'none' : String(effWarm(l))] },
       answer: { t: 'מענה', of: (l) => [ANSWER[answerState(l)]], filter: 'answer', key: (l) => [answerState(l)] },
       kind: { t: 'עסק או פרטי', of: (l) => [l.b != null ? 'עסק' : 'פרטי'], filter: 'kind', key: (l) => [l.b != null ? 'biz' : 'private'] },
       town: { t: 'עיר', of: (l) => [People.town(l)], filter: 'town', key: (l) => [People.town(l)] },
@@ -3812,7 +3821,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'warm-list': {   // a number on the evening screen opens who it counts (UX review D-5)
         const k = d.k === 'none' ? null : +d.k;
         const ls = leadsNow().filter((l) => effWarm(l) === k);
-        return sheet(`<h2>${esc(k == null ? 'בלי חום' : words()[k])} · ${ls.length}</h2>
+        return sheet(`<h2>${esc(k == null ? 'לא סומן' : words()[k])} · ${ls.length}</h2>
           <div class="opts">${ls.map((l) => `<button class="opt" data-openlead="${l.id}">${esc(People.rowName(l))}<small>${esc([People.town(l)].concat(tagged(l).map((b) => b.label)).join(' · '))}</small></button>`).join('')}</div>
           <div class="actions"><button class="btn ghost" data-act="sheet-close">סגירה</button></div>`);
       }
