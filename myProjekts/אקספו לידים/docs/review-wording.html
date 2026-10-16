@@ -209,27 +209,34 @@ section.s > h3{margin-top:8px}
 .re-link b{color:var(--warm)}
 ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px}
 #open-list{font-size:14px;color:var(--ink-2);line-height:1.9}
+details.rest{margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
+details.rest > summary{cursor:pointer;list-style:none;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:8px 0}
+details.rest > summary::-webkit-details-marker{display:none}
+details.rest > summary h2{font-size:18px;color:var(--ink-2)}
+details.rest > summary::before{content:"›";display:inline-block;transform:rotate(180deg);transition:transform .15s ease;color:var(--faint);font-weight:700}
+details.rest[open] > summary::before{transform:rotate(90deg)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div class="wrap">
 <header class="top">
   <div class="eyebrow"><span class="mark"></span>חוות דעת חיצונית · 13/10/2026 · עודכן 16/10 אחרי התשובות שלך</div>
-  <h1>המערכת מדברת כמו המתכנת שלה. בעל הדוכן צריך שהיא תדבר כמוהו.</h1>
-  <p class="lede">עברתי שוב על כל מילה שמופיעה במסך — הפעם כיועץ חיצוני, לא כמי שבנה את זה. איפה שאני חושב שהחלטה שלך טעות, כתבתי את זה. הבעיה הגדולה כאן אינה הניסוח של כפתור כזה או אחר. <b>מאחורי חלק מהמילים הקשות עומדות החלטות מוצר</b>, ושם הכי כדאי להתחיל.</p>
+  <h1>שתים-עשרה שאלות פתוחות. כל השאר מקופל למטה.</h1>
+  <p class="lede">צמצמתי לשאלות בלבד. ההמלצה שלי מסומנת בירוק, ו"מסכים" אומר שאתה הולך איתה. על שאלה 1 עדיף משפט שלך.</p>
   <div class="meta"><span>הוחלף: המסמך מהבוקר (review-wording.md)</span><span>שום דבר במערכת לא שונה</span><span>הכל הצעה עד שתאמר</span></div>
   <div class="progress"><span id="prog-t" class="faint">עוד לא ענית על אף סעיף</span><div class="bar" aria-hidden="true"><span id="prog-b"></span></div></div>
 </header>
-
 <nav class="sec" aria-label="חלקי הדף">
-  <a href="#r2">סבב 2 · אחרי התשובות שלך</a>
-  <a href="#how">איך לקרוא</a>
-  <a href="#bottom">השורה התחתונה</a>
-  <a href="#states">מתחת למילים</a>
-  <a href="#disagree">איפה אני חולק עליך</a>
-  <a href="#ba">לפני ואחרי</a>
-  <a href="#dict">המילון</a>
-  <a href="#all">כל הכיתוב</a>
+  <a href="#ask">השאלות הפתוחות</a>
+  <a href="#rest">כל השאר — לעיון</a>
+</nav>
+
+<section class="s" id="ask">
+  <div class="sec-head"><span class="n">?</span><h2>רק השאלות הפתוחות</h2><p>שתים-עשרה שאלות, ובכל אחת הסבר של שורה. ליד כל שאלה: "מסכים" = עם ההמלצה שלי (בירוק). "אחרת…" = לכתוב מה במקום. כל השאר בדף הוא חומר לעיון, ולא צריך לעבור עליו.</p></div>
+  <div class="cards" id="qq"></div>
+</section>
+
+<details class="rest" id="rest"><summary><h2>כל השאר — לעיון בלבד</h2><span class="faint">הסבב הראשון, הסבב השני והרשימה המלאה</span></summary>
 </nav>
 
 <section class="s" id="r2">
@@ -239,7 +246,7 @@ ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px}
   <h3>א · מה למדתי ממך — עשרה עקרונות</h3>
   <p class="muted">אלה הדברים שחוזרים בתשובות שלך. החלתי אותם על כל הרשימה, גם על סעיפים שעוד לא ענית עליהם. שורה שהשתנתה בגללם מסומנת ברשימה המלאה ב-<b>↻</b>.</p>
   <div class="princ">
-    <div><b>1 · החום שייך למציג. המערכת לא מסיקה ממנו כלום.</b><span class="eff">מי שמסמן "קר" יכול להתכוון לעשרה דברים, והחום משתנה. לכן המערכת לא מחליטה כלום לפי "קר" — לא מעבירה, לא שואלת עליו בנפרד ולא מורידה לו משימות. <b>מצאתי שהיום היא כן עושה את זה:</b> מבקר שסומן "קר" לא מקבל את משימות ברירת המחדל (app.js, שורה 615). זה שינוי במערכת, לא בניסוח — ר׳ R8.</span><span class="src">מתוך: X2</span></div>
+    <div><b>1 · (נמחק) מה התכוונת ב"קר"</b><span class="eff">כתבתי כאן שהמערכת לא מסיקה כלום מהחום. אמרת שזה לא מה שהתכוונת, ולכן זה נמחק. זו עכשיו שאלה 1 למעלה.</span><span class="src">מתוך: X2</span></div>
     <div><b>2 · אין "לא רלוונטי". מי שלא רלוונטי — פשוט לא נרשם.</b><span class="eff">מי שנשמר בלי מעקב אישי נמצא ב"רשימת תפוצה", כי זו המילה שאנשים מכירים. "קהל", "לא רלוונטי", "אבוד" ו"לעתיד" — כולם יורדים.</span><span class="src">מתוך: X1, X2, W3</span></div>
     <div><b>3 · יש רק הודעות.</b><span class="eff">הודעה היא טקסט, עם קובץ אחד או יותר או בלי. אין "חומר" ואין "ממתין לחומר". כל מקום שכתוב בו "חומר" מתעדכן, ו"ממתין לחומר" יורד — ר׳ R17.</span><span class="src">מתוך: W18, D21, S9, S10, M23</span></div>
     <div><b>4 · שמות מקוריים ושיווקיים למוצר ולמסכים הראשיים.</b><span class="eff">את המקוריות נותנים לשם המוצר ולשמות בראש המסך. בתוך המסכים נשארות מילים פשוטות.</span><span class="src">מתוך: X3, X8, W5, W15</span></div>
@@ -410,6 +417,7 @@ ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px}
   <div id="screens"></div>
 </section>
 
+</details>
 <section class="s" id="export" hidden>
   <div class="sec-head"><h2>התשובות שלך, כטקסט</h2><p>אפשר להדביק לי את זה בשיחה, אם השמירה כאן לא עובדת אצלך.</p></div>
   <textarea class="out" id="out" readonly aria-label="התשובות כטקסט"></textarea>
@@ -959,6 +967,33 @@ const QS = [
  {id:'Q3',h:'"מבקר" או "ליד"',src:'W1, X4',
   m:'ב-W1 הסכמת ל"מבקר" בכל מקום. ב-X4 כתבת "לידים" כשם של לשונית. אם הלשונית נקראת "לידים" והשורות בתוכה "מבקר", חוזרת הבעיה של שתי מילים לאותו דבר. ההמלצה שלי: "מבקרים" גם בלשונית. ה-CRM כבר נותן את הצליל השיווקי בשורה העליונה. אבל אם בעתיד ייכנסו לידים שלא ביקרו בדוכן (עסקים מהמדריך, למשל), "לידים" נכון יותר. אז כדאי להחליט עכשיו.'},
 ];
+// The short list (16/10, after "no strength to go over it all"): only the open questions. {id, q, ctx, opts:[[label, rec]]}
+const QQ = [
+ {id:'A1',q:'מה התכוונת ב"קר"?',ctx:'הבנתי לא נכון. מה שאני כן יודע מהקוד: היום מבקר שסומן "קר" לא מקבל את המשימות של ברירת המחדל, ולכן הוא מגיע ל"מחכה להחלטה". הבנה שנייה שלי: "קר" הוא לא מצב סופי ולא "לא רלוונטי", כי מי שלא רלוונטי לא נרשם בכלל. הוא יכול להתחמם, ולכן לא קובעים לו מסלול קבוע. אם זה נכון — מה צריך לקרות למבקר קר?',
+  opts:[['מקבל משימות כמו כל מבקר, לפי מה שסימנו לו. החום קובע רק את הסדר.',0],['מקבל משימה אחת רחוקה, למשל "לבדוק שוב בעוד חודש".',0],['כמו היום: בלי משימות, ונשאר "מחכה להחלטה".',0]],
+  note:'כאן אין לי המלצה. עדיף משפט אחד שלך ב"אחרת…".'},
+ {id:'A2',q:'שם למוצר',ctx:'שם מקורי, שיווקי, קצר ובעברית.',
+  opts:[['בעתו — "דבר בעתו מה טוב": חוזרים לכל מבקר בזמן שלו',1],['פנקס — הפנקס של החנווני',0],['קשר חם',0],['מזל וברכה',0]],
+  note:'לפני שמחליטים: לבדוק שאין עסק בקהילה בשם הזה, ושהדומיין פנוי.'},
+ {id:'A3',q:'שם למסך של יום התערוכה (היום "הדוכן")',ctx:'',opts:[['מצב דוכן — כמו "מצב טיסה": הטאבלט עובר למצב של יום התערוכה',1],['דוכן פתוח',0],['הדוכן — כמו היום',0]]},
+ {id:'A4',q:'שם למסך של הערב (היום "דשבורד")',ctx:'במסך הזה משלימים את מה שחסר על המבקרים של היום, ורואים מה מחכה מחר.',opts:[['סגירת יום — כמו "סגירת קופה"',1],['סיכום יום',0]]},
+ {id:'A5',q:'שם ללשונית של הדשבורד, בתוך ה-CRM',ctx:'המבנה הוא שלך: דף הבית · לידים · משימות · ___ . תנאי אחד: דף הבית לא מציג שוב את רשימת המשימות.',opts:[['דוחות',1],['תמונת מצב',0],['דשבורד',0]]},
+ {id:'A6',q:'"מבקרים" או "לידים" בשם הלשונית?',ctx:'הסכמת ל"מבקר" בכל מקום (W1), אבל כתבת "לידים" כשם הלשונית. אם הלשונית תיקרא "לידים" והשורות בתוכה "מבקר", יהיו שתי מילים לאותו דבר.',opts:[['מבקרים — בכל מקום',1],['לידים — בכל מקום (מתאים אם בעתיד ייכנסו גם מי שלא ביקרו בדוכן)',0]]},
+ {id:'A7',q:'שמות ברירת המחדל לחום',ctx:'"קר" ו"פושר" מתארים את האדם עצמו. הצבעים נשארים, ומשתנות רק המילים.',opts:[['רציני · שוקל · לא עכשיו',1],['מעוניין מאוד · מעוניין · אולי',0],['דחוף · בהמשך · לא עכשיו',0]]},
+ {id:'A8',q:'שווי עסקה — האם צריך?',ctx:'לא אתה בחרת בפיצ\'ר הזה. בעל דוכן שואל אחרי התערוכה שאלה אחת: "האקספו השתלם לי?"',opts:[['להוריד את ההערכה. כשנסגרת עסקה — שאלה אחת, לא חובה: "על כמה?". בדוחות: "מהאקספו: 4 עסקאות · 18,000 ₪"',1],['להוריד הכל, רק מספר עסקאות',0],['להשאיר כמו היום',0]]},
+ {id:'A9',q:'מבקר ביקש קטלוג, ואין עדיין דרך לשלוח — מה קורה?',ctx:'"ממתין לחומר" יורד, כמו שאמרת.',opts:[['נוצרת לו משימה "לשלוח לו הודעה", ומופיע כפתור "להפעיל ←"',1],['רק הכפתור "להפעיל ←", בלי משימה',0]]},
+ {id:'A10',q:'הודעת הבוקר: לשאול בהקמה לאן לשלוח?',ctx:'השעה סגורה: 08:00. ב-X11 אמרת "לא", אבל ב-H5b הסכמת לשאלה הזו.',opts:[['כן: וואטסאפ או מייל. מי שיש לו רק טלפון כשר לא יקבל וואטסאפ',1],['לא, רק וואטסאפ',0]]},
+ {id:'A11',q:'חשיבות: כמה רמות?',ctx:'ב-X5 הסכמת לכוכב אחד. אבל במערכת כבר נבנו "חשוב" ו"חשוב מאוד", לפי תשובה שלך בסקירה הקודמת.',opts:[['כוכב אחד, כן או לא',1],['"חשוב" ו"חשוב מאוד", כמו שנבנה',0]]},
+ {id:'A12',q:'שאלת המטרה בהקמה — להשאיר?',ctx:'בדקתי: רק הבינה המלאכותית משתמשת בה. היא בונה לפיה את הכפתורים ומכוונת לפיה את ההצעות במעקב. בלי בינה מלאכותית היא לא משנה כלום.',opts:[['להשאיר, עם בחירה בנגיעה ועוד מטרות מוכנות. הכתיבה החופשית — רשות',1],['להוריד',0]]},
+];
+function renderQQ() {
+  $('#qq').innerHTML = QQ.map((x, i) => `<article class="ch" id="${x.id}">
+    <div class="ch-head"><span class="tag code">${i + 1}</span><h3>${esc(x.q)}</h3></div>
+    ${x.ctx ? `<p>${esc(x.ctx)}</p>` : ''}
+    <ul class="opts">${x.opts.map(([n, rec]) => `<li${rec ? ' class="rec"' : ''}>${esc(n)}${rec ? '<span class="rk">ההמלצה שלי</span>' : ''}</li>`).join('')}</ul>
+    ${x.note ? `<p class="cost"><b>לשים לב: </b>${esc(x.note)}</p>` : ''}
+    ${ansHTML(x.id)}</article>`).join('');
+}
 // Inventory rows changed by the principles: id -> [new proposal, why]
 const UPD = {
  K1:['[שם המוצר — R1]','R1'], K2:['[שם המוצר — R1]','R1'],
@@ -1039,7 +1074,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 
 const typeOf = (r) => (UPD[r[0]] && UPD[r[0]][2]) || r[5];
 const ROUND1 = [].concat(CH.map((c) => c.id), DICT.map((d) => d[0]), ...SCREENS.map(([, rows]) => rows.filter((r) => typeOf(r) !== 'k').map((r) => r[0])));
-const ALL_IDS = [].concat(R2.map((r) => r.id), QS.map((q) => q.id), ROUND1);
+const ALL_IDS = [].concat(QQ.map((x) => x.id), R2.map((r) => r.id), QS.map((q) => q.id), ROUND1);
 
 function ansHTML(id) {
   const a = A[id] || {};
@@ -1129,15 +1164,15 @@ function rowHTML(r) {
     ${keep ? '' : ansHTML(id)}</div></div>`;
 }
 function progress() {
-  const n = ALL_IDS.filter((id) => A[id] && A[id].v).length;
-  $('#prog-t').textContent = n ? `ענית על ${n} מתוך ${ALL_IDS.length} סעיפים` : `עוד לא ענית על אף סעיף · ${ALL_IDS.length} סעיפים`;
-  $('#prog-b').style.width = (n / ALL_IDS.length * 100).toFixed(1) + '%';
+  const n = QQ.filter((x) => A[x.id] && (A[x.id].v || A[x.id].note)).length;
+  $('#prog-t').textContent = `ענית על ${n} מתוך ${QQ.length} השאלות`;
+  $('#prog-b').style.width = (n / QQ.length * 100).toFixed(1) + '%';
 }
 function exportText() {
   const W = { yes: 'מסכים', no: 'לא', other: 'אחרת' };
   return ALL_IDS.filter((id) => A[id] && (A[id].v || A[id].note)).map((id) => `${id} ${W[A[id].v] || ''}${A[id].note ? ': ' + A[id].note : ''}`).join('\n') || 'עוד אין תשובות.';
 }
-function renderAll() { renderR2(); renderOpen(); renderCards(); renderDict(); renderScreens(); progress(); }
+function renderAll() { renderQQ(); renderR2(); renderOpen(); renderCards(); renderDict(); renderScreens(); progress(); }
 
 async function store(id) {
   saveLocal(); progress(); renderOpen();
