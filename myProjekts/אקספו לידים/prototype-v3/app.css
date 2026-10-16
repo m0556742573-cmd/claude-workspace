@@ -1080,3 +1080,14 @@ button.stat:disabled { cursor: default; } button.stat:disabled:hover { backgroun
 
 /* The goal, asked inside the business description (B8): set apart, so it is not missed. */
 .prompts li.goal-q { margin-top: 6px; color: var(--ink); }
+
+/* K15: one bar for the demo, instead of notes on every screen. K3: בס"ד in the corner. */
+.demo-bar { font-size: 12px; text-align: center; padding: 3px 8px; background: var(--warm-soft, #fff4e0); color: var(--ink-2); letter-spacing: .02em; }
+.bsd { font-size: 11px; color: var(--faint); align-self: flex-start; padding-top: 2px; }
+/* X10: the advanced tools behind one door. */
+details.adv { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.adv > summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+details.adv > summary::-webkit-details-marker { display: none; }
+details.adv > summary::before { content: "‹"; color: var(--faint); font-weight: 700; transition: transform .15s ease; display: inline-block; }
+details.adv[open] > summary::before { transform: rotate(-90deg); }
+details.adv > summary h2 { font-size: 17px; }

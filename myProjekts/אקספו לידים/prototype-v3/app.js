@@ -467,7 +467,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const save = () => { ensureSids(); try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem(DEVKEY, JSON.stringify(DEV)); } catch (e) { /* private window, or full */ } };
   const words = () => GRADES[S.biz.grades].words;
   const worker = () => DEV.role === 'worker';
-  const ownerOnly = (what) => toast('🔒 ' + what + ' — רק בטאבלט של הבעלים');
+  const ownerOnly = (what) => toast('🔒 ' + what + ' — רק בטאבלט של בעל הדוכן');
   // The demo can step forward in time, so the CRM can be seen on the days after the fair.
   const now = () => Date.now() + S.shift * H.DAY;
 
@@ -660,8 +660,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק'], ['send', 'מה שולחים'], ['auto', 'מה המערכת עושה לבד'], ['try', 'ניסיון']];
   const SETTINGS_NAV = [['account', 'הפרטים שלי'], ['biz', 'העסק'], ['connect', 'מייל ווואטסאפ'], ['custom', 'התאמה אישית']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
-  const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
+  const SUBS = [['buttons', 'כפתורים בדוכן'], ['booth', 'הדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות'], ['crm', 'שלבים והודעת בוקר'], ['auto', 'מה המערכת עושה לבד']];
+  // 16/10: the booth screen and the evening screen keep working names until the product has its own; "דשבורד" is the CRM's tab now.
+  const LIVE = [['booth', 'הדוכן'], ['dash', 'סוף היום'], ['crm', 'CRM']];
   function render() {
     renderTop();
     const m = $('#main');
@@ -686,19 +687,22 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   function showFail(m, er) {
     const where = String((er && er.stack) || '').split('\n').slice(1, 3).map((s) => s.trim()).join(' | ');
-    m.innerHTML = `<section class="card" style="margin-top:14px"><h2>המסך הזה נתקע</h2>
-      <p class="muted">תקלה: <b dir="ltr">${esc(String((er && er.message) || er))}</b></p>
-      <p class="faint" dir="ltr">${esc(where)}</p>
+    // K10: what he needs to know first — what he marked is saved. The technical part is folded, for whoever fixes it.
+    m.innerHTML = `<section class="card" style="margin-top:14px"><h2>משהו השתבש במסך הזה</h2>
+      <p class="muted">מה שסימנת — שמור.</p>
+      <details class="faint"><summary>פרטים טכניים</summary><p dir="ltr">${esc(String((er && er.message) || er))}</p><p dir="ltr">${esc(where)}</p></details>
       <div class="actions"><button class="btn" data-view="booth">חזרה לדוכן</button></div></section>`;
   }
   // An error in a button shows at the bottom of the screen, so a tap that "does nothing" names its reason.
-  window.addEventListener('error', (e) => { try { toast('תקלה: ' + (e.message || 'לא ידועה')); } catch (x) { /* before toast exists */ } });
+  window.addEventListener('error', () => { try { toast('משהו לא עבד. אפשר לנסות שוב.'); } catch (x) { /* before toast exists */ } });
   function renderTop() {
     const nav = S.phase === 'live'
       ? LIVE.filter(([k]) => !(worker() && k === 'crm')).map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('')
       : (S.phase === 'setup' ? SETUP : SETTINGS_NAV).map(([k, t], n) =>
         `<button class="moment" data-step="${k}" aria-current="${S.step === k}" ${S.phase === 'setup' && k !== 'account' && !accountOk() ? 'disabled title="קודם הרשמה"' : ''}>${S.phase === 'setup' ? `<span class="n">${n + 1}</span>` : ''}${t}</button>`).join('');
-    $('#top').innerHTML = `<div class="top-in">
+    // K15: one bar says it is a demo, instead of twenty notes scattered over the screens.
+    $('#top').innerHTML = `<div class="demo-bar">הדגמה — שום דבר לא נשלח באמת</div><div class="top-in">
+      <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
       <div class="brand">${esc(S.biz.name || 'הדוכן שלי')}${S.phase === 'settings' ? ' <span class="faint">· הגדרות</span>' : S.phase === 'setup' ? ' <span class="faint">· הקמה</span>' : ''}</div>
       <nav class="moments" aria-label="ניווט">${nav}</nav>
       ${S.phase === 'settings' ? '<button class="btn" data-act="settings-done">חזרה לדוכן</button>' : ''}
@@ -880,7 +884,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     m.innerHTML = `<h1>חיבורים</h1>
       <p class="muted">איך מה שאתה שולח מגיע למבקר. אפשר כמה, ולבחור מה קודם.</p>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><div class="toggle-row"><div><h2>📧 מייל</h2><p class="muted">לכל מבקר יש מייל ברשימת המארגנים. יוצא מהמערכת, בשם העסק שלך.</p></div>${toggle('ch:email', b.channels.email, 'מייל')}</div>
+        <section class="card"><div class="toggle-row"><div><h2>📧 מייל</h2><p class="muted">יוצא מהמערכת, בשם העסק שלך.</p></div>${toggle('ch:email', b.channels.email, 'מייל')}</div>
           ${b.channels.email ? `<div class="label">הכתובת שממנה זה יוצא</div>
           <div class="mail-from ltr"><input class="text-input" data-mail="prefix" value="${esc(b.mail.prefix)}" placeholder="info" autocomplete="off" spellcheck="false"><span>@${MAIL_DOMAIN}</span></div>
           <div class="label">לאן יגיעו תשובות <small>ברירת המחדל: המייל שנרשמת איתו</small></div>
@@ -899,7 +903,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           <div class="toggle-row" style="margin-top:12px"><div><b>לשלוח בכל הערוצים</b><p class="muted">המבקר יקבל את אותה הודעה בכל ערוץ מחובר. וואטסאפ — פעם אחת בלבד.</p></div>${toggle('sendAll', b.sendAll, 'לשלוח בכל הערוצים')}</div></section>` : ''}
       </div>
       ${Object.values(b.channels).some(Boolean) ? "" : `<p class="warn-box" style="margin-top:14px">⚠️ אין דרך שליחה פעילה. בלי זה, הודעות לא ייצאו מהדוכן.</p>`}
-      <p class="honest">בדוגמית שום דבר לא נשלח באמת, והחיבורים מדומים.</p>`;
+      `;
   }
   // H37: the technical address says nothing to him — the name it goes out under, and where the answers come.
   const mailPreview = () => `יוצא בשם: ${S.biz.name || 'העסק'}  ·  תשובות יגיעו אל: ${replyTo() || '—'}`;
@@ -908,11 +912,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       sheet(`<h2>וואטסאפ לא רשמי</h2>
         <p class="warn-box">⚠️ <b>אין אחריות.</b> החיבור עובד דרך המספר שלך, בקצב איטי שמיועד לא להיחסם — אבל וואטסאפ יכולה לחסום כל מספר, בכל זמן, וזה באחריותך בלבד.</p>
         <div class="join-mock"><div class="qr" aria-hidden="true"></div><div class="faint">בוואטסאפ בטלפון שלך: מכשירים מקושרים ← קישור מכשיר ← לסרוק</div></div>
-        <div class="opts"><button class="opt" data-act="connect-yes" data-ch="wa">הבנתי, וסרקתי<small>בדוגמית — מדומה</small></button><button class="opt" data-act="sheet-close">ביטול</button></div>`);
+        <div class="opts"><button class="opt" data-act="connect-yes" data-ch="wa">הבנתי, וסרקתי</button><button class="opt" data-act="sheet-close">ביטול</button></div>`);
     } else {
       sheet(`<h2>וואטסאפ עסקי רשמי</h2>
         <p class="muted">רק למי שכבר יש לו חשבון. נכנסים עם החשבון הקיים ומאשרים למערכת לשלוח בשמו. אפשר להמשיך להשתמש בוואטסאפ בטלפון במקביל.</p>
-        <div class="opts"><button class="opt" data-act="connect-yes" data-ch="waApi">יש לי חשבון — להתחבר<small>בדוגמית — מדומה</small></button><button class="opt" data-act="sheet-close">אין לי — לא עכשיו</button></div>`);
+        <div class="opts"><button class="opt" data-act="connect-yes" data-ch="waApi">יש לי חשבון — להתחבר</button><button class="opt" data-act="sheet-close">אין לי — לא עכשיו</button></div>`);
     }
   }
 
@@ -1238,7 +1242,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (!f) return;
     const L = leadsNow();
     const demo = L.filter((l) => l.demo).length;
-    f.textContent = (practice() ? 'ניסיון · ' : '') + (L.length - demo) + ' נקלטו' + (demo ? ' (ועוד ' + demo + ' מדומים)' : '');
+    f.textContent = (practice() ? 'ניסיון · ' : '') + many(L.length - demo, 'מבקר אחד', 'מבקרים') + (demo ? ' (ועוד ' + demo + ' לדוגמה)' : '');
     const go = $('[data-act="go-live"]');   // the first visitor tried: now "done" is the way on (U-3)
     if (go && L.length) go.classList.add('primary');
   }
@@ -1302,7 +1306,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <label class="label" for="np-first">שם פרטי</label><input id="np-first" class="text-input" autocomplete="off">
       <label class="label" for="np-last">שם משפחה</label><input id="np-last" class="text-input" value="${esc(q)}" autocomplete="off">
       <label class="label" for="np-town">עיר <small>רשות</small></label><input id="np-town" class="text-input" autocomplete="off">
-      <label class="label" for="np-phone">טלפון <small>כדי שיהיה לאן לחזור — הוא לא ברשימת המארגנים</small></label><input id="np-phone" class="text-input ltr" type="tel" inputmode="tel" autocomplete="off">
+      <label class="label" for="np-phone">טלפון <small class="req">חובה</small></label><input id="np-phone" class="text-input ltr" type="tel" inputmode="tel" autocomplete="off">
       <div class="actions"><button class="btn primary" data-act="np-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
     setTimeout(() => $('#np-first') && $('#np-first').focus(), 30);
   }
@@ -1311,6 +1315,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const first = v('#np-first');
     const last = v('#np-last');
     if (!first && !last) { $('#np-first').focus(); return toast('מה השם שלו?'); }
+    // D26: every visitor has a phone — it is a condition of the system.
+    if (!v('#np-phone')) { $('#np-phone').focus(); return toast('מה הטלפון שלו?'); }
     const l = newLead('c:' + S.seq, { i: null, b: null });
     l.custom = { first, last, town: v('#np-town') };
     l.contact.phone = v('#np-phone');
@@ -1381,7 +1387,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const last = l.notes[l.notes.length - 1];
     return `
       <div class="lead-head"><div><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>
-        <div class="faint">${esc(People.rowMeta(l))}${l.visits > 1 ? ' · ביקר ' + l.visits + ' פעמים' : ''}${l.demo ? ' · מדומה' : ''}</div></div>
+        <div class="faint">${esc(People.rowMeta(l))}${l.visits > 1 ? ' · ביקר ' + l.visits + ' פעמים' : ''}${l.demo ? ' · לדוגמה' : ''}</div></div>
         <div class="head-acts">${inSheet ? "" : `<span class="saved-tag">✓ נשמר · נסגר לבד</span>`}<button class="btn primary" data-act="close-lead">✓ סיום</button></div></div>
       <div class="warmth">${words().map((t, k) => `<button class="warm-btn w${k}${auto && w === k ? ' auto' : ''}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}">${esc(t)}</button>`).join('')}</div>
       ${auto ? '<div class="hint">הוצע לפי מה שסימנת. נגיעה משנה.</div>' : ''}
@@ -1717,9 +1723,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const demo = L.filter((l) => l.demo).length;
     const ws = [0, 1, 2, null].map((k) => L.filter((l) => effWarm(l) === k).length);
     const asks = dashAsks(L);
-    m.innerHTML = `<h1>היום בדוכן: ${L.length - demo} אנשים${demo ? ` <span class="faint">(ועוד ${demo} מדומים)</span>` : ''}</h1>
-      ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות איך נראה יום אמיתי, אפשר להוסיף 20 מבקרים מדומים.</div>
-        <div class="actions"><button class="btn" data-act="seed">להוסיף מבקרים מדומים</button></div></div>` : ''}
+    m.innerHTML = `<h1>בדוכן: ${many(L.length - demo, 'מבקר אחד', 'מבקרים')}${demo ? ` <span class="faint">(ועוד ${demo} לדוגמה)</span>` : ''}</h1>
+      ${L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות יום מלא?</div>
+        <div class="actions"><button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button></div></div>` : ''}
       <div class="stats">${words().map((t, k) => `<button class="stat" data-act="warm-list" data-k="${k}" ${ws[k] ? '' : 'disabled'}><span class="n">${ws[k]}</span><span class="t">${esc(t)}</span></button>`).join('')}
         <button class="stat" data-act="warm-list" data-k="none" ${ws[3] ? '' : 'disabled'}><span class="n">${ws[3]}</span><span class="t">בלי חום</span></button></div>
       <h2 style="margin-top:22px">מה כדאי להשלים</h2>
@@ -1771,7 +1777,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       const lack = kind === 'partial' ? missingOf(l) : [];
       const memo = [new Date(l.at).toTimeString().slice(0, 5), People.rowMeta(l), lack.length ? 'חסר: ' + lack.join(', ') : '', note ? '📝 ' + note.slice(0, 40) : ''].filter(Boolean).join(' · ');
       const done = filled.has(kind + ':' + l.id);
-      return `<div class="tag-row${done ? ' filled' : ''}" data-fill="${kind}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}<span class="memo">${esc(memo)}</span></button>
+      return `<div class="tag-row${done ? ' filled' : ''}" data-fill="${kind}"><button class="link" data-openlead="${l.id}">${done ? '✓ ' : ''}<b>${esc(People.rowName(l))}</b> <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· לדוגמה</span>' : ''}<span class="memo">${esc(memo)}</span></button>
         <span class="mini-w">${words().map((t, k) => `<button class="warm-btn w${k}" data-warm="${k}" data-lid="${l.id}" aria-pressed="${w === k}"${askWarm(k) ? ' data-ask="1"' : ''}>${esc(t)}</button>`).join('')}</span>
         ${gs.map((g) => `<span class="chips mini-tags">${groupButtons(g.id).map((x) => `<button class="chip" data-tag="${x.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(x.id)}"${askTag(x, g) ? ' data-ask="1"' : ''}>${esc(x.label)}</button>`).join('')}</span>`).join('')}</div>`;
     }).join('')}</div>
@@ -1810,7 +1816,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="ask" style="margin-top:10px">${fixed.map((x, i) => card(x, i, 'fixed')).join('')}
         ${got ? got.items.map((x, i) => card(x, i, 'ai')).join('') || '<div class="faint">לא נמצא משהו מיוחד.</div>' : ''}
         ${ai ? `<div class="actions"><button class="btn" data-act="ai-insights" data-scope="${scope}" id="ins-${scope}">${got ? (scope === 'dash' ? 'לסכם שוב' : 'לבדוק שוב') : scope === 'dash' ? 'לבקש מהבינה המלאכותית לסכם את היום' : 'לבקש מהבינה המלאכותית לעבור על הכל'}</button></div>`
-          : '<p class="honest">כאן רק התובנות הקבועות. כשהבינה המלאכותית מחוברת — גם היא עוברת על הלידים.</p>'}
+          : ''}
         ${!fixed.length && !got && !ai ? '<div class="faint">אין כרגע.</div>' : ''}</div>`;
   }
   const actionText = (a) => (a.kind === 'shift' ? 'להעביר למחר' : a.kind === 'warm' ? 'לסמן ' + words()[a.value] : 'להוסיף צעד: ' + (STEPS[a.type] || STEPS.call).name);
@@ -2169,13 +2175,14 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     return `<div class="bars">${rows.map((r) => `<div class="bar-row${r.thin ? ' thin' : ''}" title="${esc(r.label)}: ${esc((fmt || String)(r.value))}">
       <span class="bl">${esc(r.label)}</span><span class="bt"><span class="bf${r.cls ? ' ' + r.cls : ''}" style="width:${(r.value / max * 100).toFixed(1)}%"></span></span><span class="bv">${esc((fmt || String)(r.value))}${r.sub ? ' <span class="faint">' + esc(r.sub) + '</span>' : ''}</span></div>`).join('')}</div>`;
   }
-  const CRM_NAME = 'המעקב שלי';
+  const CRM_NAME = 'CRM';
   /* 11/10 (יצחק): four places, in the order of a working day — what now, with whom, what waits, what we learnt.
    * Leads and tasks each choose their own way of showing; the rules moved to the settings. */
-  const CRM_TABS = [['overview', 'סקירה'], ['leads', 'לידים'], ['tasks', 'משימות'], ['segments', 'פילוחים']];
+  // יצחק, 14–16/10: the structure every system has — a home page, then leads and tasks in depth, and a dashboard.
+  const CRM_TABS = [['overview', 'דף הבית'], ['leads', 'לידים'], ['tasks', 'משימות'], ['segments', 'דשבורד']];
   const CRM_VIEWS = { leads: [['table', 'טבלה'], ['pipeline', 'לפי שלב']], tasks: [['list', 'רשימה'], ['time', 'לפי זמן']] };
   // Each view's ⚙️ goes straight to the settings of what it shows.
-  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והצעדים'], time: ['buttons', 'הכפתורים והצעדים'], pipeline: ['crm', 'שלבי הצינור'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], messages: ['materials', 'ההודעות והחומרים'] };
+  const VIEW_SETTINGS = { overview: ['crm', 'הודעת הבוקר והשלבים'], tasks: ['buttons', 'הכפתורים והמשימות'], time: ['buttons', 'הכפתורים והמשימות'], pipeline: ['crm', 'השלבים'], table: ['cols', 'העמודות'], segments: ['buttons', 'הכפתורים'], messages: ['materials', 'ההודעות'] };
   /** The old tabs, still set by links across the code, land in their new place. */
   function crmPlace() {
     if (!S.crmView) S.crmView = { leads: 'table', tasks: 'list' };
@@ -2208,15 +2215,15 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       <nav class="crm-nav" aria-label="${CRM_NAME}">
         ${CRM_TABS.map(([k, t]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}">${t}${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
         <span class="crm-nav-sep"></span>
-        <button class="ctab minor" data-act="crm-rules">⚙️ כללים והגדרות</button></nav>
+        <button class="ctab minor" data-act="crm-rules">⚙️ הגדרות</button></nav>
       <div class="crm-main">
         <div class="crm-head">${full ? '' : `<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>`}
           ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
           ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmview="messages" aria-pressed="${S.crmView.leads === 'messages'}">💬 הודעה לקבוצה</button>` : ''}
           <span class="date-now">היום: ${esc(H.label(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
             ${!full && vs ? `<button class="btn ghost" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</span></div>
-        ${!full && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">כדי לראות את המעקב בפעולה — אפשר להוסיף 20 לידים מדומים, עם שבועיים של מעקב אחרי התערוכה.</div>
-          <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף נתוני דמה</button></div></div>` : ''}
+        ${!full && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות איך זה נראה? 20 לידים לדוגמה, כאילו עברו שבועיים.</div>
+          <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף דוגמה</button></div></div>` : ''}
         <div class="${side ? 'crm-split' : ''}"><div id="crm-body"></div>${side ? '<aside class="crm-side" id="crm-side" aria-label="הליד"></aside>' : ''}</div>
       </div></div>`;
     if (full) return recordPage($('#crm-body'), rec);
@@ -2253,7 +2260,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   // ---- ask the data, in plain words ----
   let ASK = null;   // { q, busy, answer, ids }
   function askBox() {
-    if (!ai) return `<div class="askbox off"><span>✨ אפשר לשאול את הנתונים בשפה חופשית — בתוך קלוד, או כשהבינה המלאכותית מחוברת.</span></div>`;
+    if (!ai) return '';   // M70: no note about where the AI works — without it, the box is simply not there
     return `<form class="askbox" data-askform><input id="ask-q" class="text-input" placeholder="✨ לשאול את הנתונים: כמה מוסדות חמים עוד לא קיבלו מענה?" aria-label="שאלה על הנתונים" value="${esc(ASK ? ASK.q : '')}" autocomplete="off">
       <button class="btn primary" data-act="ask" ${ASK && ASK.busy ? 'disabled' : ''}>${ASK && ASK.busy ? 'חושב…' : 'לשאול'}</button></form>
       ${ASK && ASK.answer ? `<div class="ask-answer"><div>${esc(ASK.answer)}</div>
@@ -2431,7 +2438,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         ${S.biz.digest.on ? `<div class="bubble"><b>בוקר טוב${firstName ? ' ' + esc(firstName) : ''}!</b><br>היום, ${esc(H.label(new Date(now())))}:<br>
           ${dueToday.length ? `📞 ${dueToday.length} לטיפול${late ? `, מהם ${late} באיחור` : ''}<br>${todayNames.map((t) => '• ' + esc(t)).join('<br>')}${dueToday.length > 3 ? '<br>• ועוד ' + (dueToday.length - 3) : ''}` : '✓ אין משימות להיום.'}<br>
           ${notes.length ? notes.map((n) => '🔔 ' + esc(n.text)).join('<br>') + '<br>' : ''}${won.length ? '🎉 מהאקספו: ' + many(won.length, 'עסקה אחת', 'עסקאות') : ''}</div>
-          <p class="faint">נשלח אליך כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch] || 'וואטסאפ')}, מהמספר של מערכת הדוכן. בדוגמית — תצוגה בלבד. <button class="link" data-act="crm-settings">שינוי</button></p>`
+          <p class="faint">נשלח אליך כל בוקר ב-${esc(S.biz.digest.hour)} ב${esc(CH_NAMES[S.biz.digest.ch] || 'וואטסאפ')}. <button class="link" data-act="crm-settings">שינוי</button></p>`
           : '<p class="muted">כבוי. <button class="link" data-act="crm-settings">להפעיל</button></p>'}</section>
       `;
   }
@@ -2494,7 +2501,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     // Two facts under the name — what he wanted and when we last spoke — and "hot" when he is (UX review: seven were noise).
     // The rest is one tap away, on the lead's page.
     const why = (w === 0 ? [words()[0]] : []).concat(tagged(l).filter((b) => b.axis !== 'who').map((b) => b.label).slice(0, 2), [contactLine(l)]).join(' · ');
-    const row = `<button class="row" data-crmlead="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)} <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· מדומה</span>' : ''}</span>
+    const row = `<button class="row" data-crmlead="${l.id}"><span><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''}${dots(l)} <span class="muted">${esc(People.town(l))}</span>${l.demo ? ' <span class="faint">· לדוגמה</span>' : ''}</span>
       <span class="due">${planHTML(p, bare)}${more > 0 ? ` <span class="faint">· ועוד ${more}</span>` : ''}</span><span class="why">${esc(why)}</span>${lastNote(l) ? `<span class="note-peek">📝 ${esc(lastNote(l).slice(0, 100))}</span>` : ''}</button>`;
     if (!withCall || !isOpenLead(l)) return row;
     return `<div class="row-wrap${rowOpen === l.id ? ' open' : ''}">${row}<button class="row-call" data-rowcall="${l.id}" aria-label="להתקשר ל${esc(People.rowName(l))}" aria-expanded="${rowOpen === l.id}">📞</button>
@@ -2667,7 +2674,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <tbody>${shown.map((l) => `<tr${tbSel.has(l.id) ? ' class="sel"' : ''}><td class="ck"><label class="ck-hit"><input type="checkbox" data-tbsel="${l.id}" aria-label="לבחור את ${esc(People.rowName(l))}" ${tbSel.has(l.id) ? 'checked' : ''}></label></td>${cols.map((c) => {
           const v = c.v(l);
           const txt = c.f ? c.f(v) : v == null || v === '' ? '—' : String(v);
-          if (c.id === 'name') return `<td class="stick"><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">מדומה</span>' : ''}</td>`;
+          if (c.id === 'name') return `<td class="stick"><button class="link" data-crmlead="${l.id}"><b>${esc(txt)}</b></button>${l.demo ? ' <span class="faint">לדוגמה</span>' : ''}</td>`;
           // Read only (UX review T-3): a hidden dashed underline was the only sign a cell could change — changes are made on the lead's page.
           return `<td class="${c.num ? 'num' : ''}"${c.ltr ? ' dir="ltr"' : ''}>${esc(txt)}</td>`;
         }).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}"><div class="empty">אין לידים שעונים על הסינון. <button class="link" data-tbclear="all">ניקוי סינון</button></div></td></tr>`}</tbody>
@@ -2751,7 +2758,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   function dims() {
     const d = {};
     liveGroups().forEach((g) => {
-      d['g:' + g.id] = { t: 'כפתורים: ' + g.title, of: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.label) : ['לא סומן']; },
+      d['g:' + g.id] = { t: g.title, of: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.label) : ['לא סומן']; },
         filter: 'btn', key: (l) => { const bs = tagged(l).filter((b) => b.axis === g.id); return bs.length ? bs.map((b) => b.id) : ['nobtn']; } };
     });
     Object.assign(d, {
@@ -2759,7 +2766,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       answer: { t: 'מענה', of: (l) => [ANSWER[answerState(l)]], filter: 'answer', key: (l) => [answerState(l)] },
       kind: { t: 'עסק או פרטי', of: (l) => [l.b != null ? 'עסק' : 'פרטי'], filter: 'kind', key: (l) => [l.b != null ? 'biz' : 'private'] },
       town: { t: 'עיר', of: (l) => [People.town(l)], filter: 'town', key: (l) => [People.town(l)] },
-      by: { t: 'מי קלט בדוכן', of: (l) => [l.by] },
+      by: { t: 'נקלט ע"י', of: (l) => [l.by === 'בעלים' ? 'בעל הדוכן' : l.by] },
       hour: { t: 'שעת הביקור', of: (l) => [String(new Date(l.at).getHours()).padStart(2, '0') + ':00'] },
       stage: { t: 'שלב', of: (l) => [stageById(l.stage).name], filter: 'stage', key: (l) => [l.stage], ordered: true },
     });
@@ -2786,7 +2793,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     return rows.sort((a, b) => (b.count >= MIN_N) - (a.count >= MIN_N) || b[PV.metric] - a[PV.metric]);
   }
   function crmSegments(box, L) {
-    box.innerHTML = `${askBox()}<div id="seg-stats"></div><h2 class="seg-h">פילוח</h2><div id="seg-pivot"></div>`;
+    // X10: the comparison and the free question are behind one door — the dashboard itself stays plain.
+    box.innerHTML = `<div id="seg-stats"></div>
+      <details class="adv"${PV.open ? ' open' : ''}><summary><h2>כלים מתקדמים</h2><span class="faint">השוואה בין קבוצות, ושאלה חופשית על הנתונים</span></summary>
+        ${askBox()}<h2 class="seg-h">השוואה</h2><div id="seg-pivot"></div></details>`;
+    $('.adv').addEventListener('toggle', (e) => { PV.open = e.target.open; });
     crmStats($('#seg-stats'), L);
     crmPivot($('#seg-pivot'), L);
   }
@@ -2801,8 +2812,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const chartRows = rows.map((r) => ({ label: r.label, value: PV.metric === 'conv' ? (r.count >= MIN_N ? r.conv : 0) : r[PV.metric], sub: PV.metric === 'conv' ? (r.count >= MIN_N ? `(${r.won} מתוך ${r.count})` : `מעט מדי לידים (${r.count})`) : '', thin: r.count < MIN_N }));
     const canShow = !!D[PV.dim].filter;
     box.innerHTML = `<div class="tb-bar">
-        <label class="tb-filter"><span class="faint">לפלח לפי</span><select data-pv="dim">${Object.entries(D).map(([k, d]) => `<option value="${k}" ${PV.dim === k ? 'selected' : ''}>${esc(d.t)}</option>`).join('')}</select></label>
-        <label class="tb-filter"><span class="faint">למדוד</span><select data-pv="metric">${Object.entries(METRICS).map(([k, t]) => `<option value="${k}" ${PV.metric === k ? 'selected' : ''} ${isStage && (k === 'conv' || k === 'won') ? 'disabled' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="tb-filter"><span class="faint">לפי</span><select data-pv="dim">${Object.entries(D).map(([k, d]) => `<option value="${k}" ${PV.dim === k ? 'selected' : ''}>${esc(d.t)}</option>`).join('')}</select></label>
+        <label class="tb-filter"><span class="faint">לספור</span><select data-pv="metric">${Object.entries(METRICS).map(([k, t]) => `<option value="${k}" ${PV.metric === k ? 'selected' : ''} ${isStage && (k === 'conv' || k === 'won') ? 'disabled' : ''}>${t}</option>`).join('')}</select></label>
         <button class="btn" data-act="pv-export">⬇ אקסל</button></div>
       <p class="faint">אחוז סגירה מוצג רק מ-${MIN_N} לידים ומעלה, ותמיד עם המספרים עצמם.</p>
       <div class="two-col">
@@ -2975,7 +2986,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
           <button class="btn ghost" data-act="rec-menu" data-lid="${l.id}">עוד פעולות</button></div>
         <div class="rec-title"><h1>${esc(People.rowName(l))}${l.b != null ? ' <span class="badge biz">עסק</span>' : ''}${dots(l)}${l.optOut ? ' <span class="badge">ביקש הסרה</span>' : ''}</h1>
           ${l.contact.phone ? `<div class="rec-phone"><bdi dir="ltr">${esc(l.contact.phone)}</bdi><button class="btn ghost" data-act="copy-phone" data-lid="${l.id}">להעתיק</button></div>` : ''}
-          <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · מדומה' : ''}</div></div>
+          <div class="muted">${esc(People.town(l))} · ${esc(People.rowMeta(l))}${l.demo ? ' · לדוגמה' : ''}</div></div>
         <div class="rec-keys">
           <button class="key" data-pmove="${l.id}" aria-label="לשנות שלב"><span class="faint">שלב</span><b>${esc(stageById(l.stage).name)} ⇄</b></button>
           <span class="key"><span class="faint">חום</span><b>${w == null ? 'בלי' : esc(words()[w])}</b></span>
@@ -3013,9 +3024,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         </div>
         <details class="card rec-fields"${narrow() ? '' : ' open'}>
           <summary><h2>פרטים</h2>${l.contact.phone ? ` <bdi dir="ltr" class="faint">${esc(l.contact.phone)}</bdi>` : ''}</summary>
-          <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" placeholder="מרשימת המארגנים"></label>
+          <label><span class="faint">טלפון</span><input class="text-input ltr" type="tel" data-lf="phone" data-lid="${l.id}" value="${esc(l.contact.phone)}" ></label>
           ${l.contact.phone && !l.demo ? `<a class="phone" href="tel:${esc(l.contact.phone)}" dir="ltr">📞 ${esc(l.contact.phone)}</a>` : ''}
-          <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}" placeholder="מרשימת המארגנים"></label>
+          <label><span class="faint">מייל</span><input class="text-input ltr" type="email" data-lf="email" data-lid="${l.id}" value="${esc(l.contact.email)}"></label>
           <div class="field-row"><span class="faint">כפתורים</span><span>${tagged(l).map((b) => esc(b.label)).join(' · ') || '—'}</span></div>
           ${l.roleOf ? `<div class="field-row"><span class="faint">של מי</span><span>${esc(l.roleOf)}</span></div>` : ''}
           ${l.eventDate || tasks(l).some((t) => t.type === 'date') ? `<label><span class="faint">תאריך השמחה</span><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}"></label>` : ''}
@@ -3254,7 +3265,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <div class="label">הטאבלט הזה</div>
       <div class="opts"><button class="opt" data-devrole="owner" aria-pressed="${!worker()}">בעלים<small>רואה הכל, משנה הגדרות</small></button>
         <button class="opt" data-devrole="worker" aria-pressed="${worker()}">עובד<small>קולט, מתייג ושולח — בלי הגדרות ובלי איפוס</small></button></div>
-      <p class="faint" style="margin-top:10px">מחוברים: ${S.biz.devices} ${S.biz.devices === 1 ? 'טאבלט' : 'טאבלטים'}. בדוגמית זה מדומה, ואין סנכרון.</p>`);
+      <p class="faint" style="margin-top:10px">מחוברים: ${S.biz.devices} ${S.biz.devices === 1 ? 'טאבלט' : 'טאבלטים'}.</p>`);
   }
   function toggleMenu() {
     const old = $('#menu');
@@ -3263,8 +3274,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const m = document.createElement('div');
     m.className = 'menu'; m.id = 'menu';
     m.innerHTML = [
-      S.phase === 'live' ? '<button data-act="settings">הגדרות מתקדמות והתאמה אישית</button>' : '',
-      '<button data-act="devices">חיבור עוד טאבלט</button>',
+      S.phase === 'live' ? '<button data-act="settings">הגדרות</button>' : '',
+      '<button data-act="devices">להוסיף טאבלט</button>',
       '<button data-act="reset">איפוס מערכת</button>',
     ].join('');
     $('.top-in').appendChild(m);
@@ -3637,7 +3648,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (d.filter) { crmFilter = d.filter; crmQuery = ''; return render(); }
     if (d.insight) return applyInsight(d.scope, d.insight);
     if (d.devrole) {
-      if (d.devrole === 'owner' && worker()) toast('בגרסה האמיתית — רק עם קוד של הבעלים');
+
       DEV.role = d.devrole; if (worker() && S.phase === 'settings') S.phase = 'live';
       save(); closeSheet(false); render(); return;
     }
@@ -3757,7 +3768,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         S.biz.seasons = S.biz.seasons.filter((x) => x !== d.id);
         save(); closeSheet(false); return render();
       case 'connect': return sheetConnect(d.ch);
-      case 'connect-yes': S.biz.channels[d.ch] = true; save(); closeSheet(false); render(); return toast('מחובר (בדוגמית — מדומה)');
+      case 'connect-yes': S.biz.channels[d.ch] = true; save(); closeSheet(false); render(); return toast('מחובר');
       case 'disconnect': S.biz.channels[d.ch] = false; save(); return render();
       case 'del-mat': {
         const x = S.biz.materials[+d.i];
@@ -4001,7 +4012,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'join': S.biz.devices += 1; save(); return sheetDevices();
       case 'reset':
         if (worker()) return ownerOnly('איפוס');
-        return sheetConfirm('איפוס מערכת?', 'כל הלידים, הכפתורים וההגדרות יימחקו, וחוזרים להקמה.', 'reset-yes');
+        return sheetConfirm('איפוס מערכת?', 'כל המבקרים, הכפתורים וההגדרות יימחקו, ומתחילים מההתחלה.', 'reset-yes', '', 'למחוק הכל');
       case 'reset-yes': S = fresh(); upgrade(); openId = null; D = null; stopIdle(); closeSheet(false); save(); return render();
     }
   });
