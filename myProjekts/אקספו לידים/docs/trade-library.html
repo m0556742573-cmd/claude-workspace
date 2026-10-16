@@ -1,0 +1,492 @@
+<title>ספריית התחומים</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column; a sticky filter bar; one card per trade, each answered in place.
+   Tokens are the "דוכן חכם" design system's own: colour carries meaning, never decoration. */
+:root{
+  --bg:#f5f8fa;--surface:#ffffff;--surface-2:#edf2f6;--surface-3:#e1e7eb;
+  --ink:#061721;--ink-2:#30414b;--muted:#576772;--faint:#697882;
+  --line:#dde3e7;--line-strong:#c4ced4;--brand:#00586a;--focus:#2b63e0;
+  --hot:#b22d0a;--hot-soft:#f7e8e4;--hot-line:#e5b8ac;
+  --warm:#895900;--warm-soft:#f2ede3;--warm-line:#d7c7a8;
+  --good:#1f764d;--good-soft:#e6f0eb;--good-line:#b3d0c2;
+  --ai:#6a4fb1;--ai-soft:#efecf6;
+  --shadow:0 1px 2px rgba(13,17,23,.05);
+  --sans:"IBM Plex Sans Hebrew",Heebo,"Segoe UI","Arial Hebrew",Arial,sans-serif;
+  --r-xs:4px;--r-sm:6px;--r:12px;--pill:9999px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  --ai:#c0b0fe;--ai-soft:#303445;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  --ai:#c0b0fe;--ai-soft:#303445;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+  color-scheme:dark}
+html{direction:rtl}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+*{box-sizing:border-box}
+.wrap{max-width:900px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 96px}
+h1,h2,h3{text-wrap:balance;letter-spacing:-.004em;margin:0;font-weight:700}
+h1{font-size:clamp(28px,5vw,38px);line-height:1.15}
+h2{font-size:20px;line-height:1.25}
+h3{font-size:15px;line-height:1.35}
+p{margin:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--brand);display:flex;gap:10px;align-items:center}
+.eyebrow .mark{display:inline-block;width:18px;height:3px;background:var(--brand)}
+.lede{font-size:17px;color:var(--ink-2);max-width:64ch}
+.muted{color:var(--muted)}.faint{color:var(--faint);font-size:14px}
+header.top{display:grid;gap:14px;padding-block:8px 22px;border-bottom:1px solid var(--line)}
+.rules{display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin:0;padding:0;list-style:none}
+.rules li{padding:12px 16px;border-top:1px solid var(--line);font-size:15px;color:var(--ink-2)}
+.rules li:first-child{border-top:0}
+.rules b{color:var(--ink)}
+.progress{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.bar{flex:1 1 160px;height:6px;background:var(--surface-3);border-radius:var(--pill);overflow:hidden;min-width:120px}
+.bar span{display:block;height:100%;background:var(--ink);width:0;transition:width .3s ease}
+nav.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:18px}
+.chip{flex:none;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);padding:5px 12px;border-radius:var(--pill);border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;min-height:36px}
+.chip:hover{background:var(--surface-2)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.search{width:100%;margin-top:10px;font:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);color:var(--ink);min-height:46px}
+.search:focus,textarea:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(37,99,235,.22)}
+#cards{display:grid;gap:18px;margin-top:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:14px;scroll-margin-top:70px}
+.card.done{border-color:var(--line-strong)}
+.c-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.cat{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--faint)}
+.covers{display:flex;gap:4px;flex-wrap:wrap}
+.covers span{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:var(--pill);padding:1px 9px}
+.how{color:var(--ink-2);max-width:66ch}
+.how b{color:var(--ink)}
+.label{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--faint);margin-bottom:6px}
+.group{display:grid;gap:0;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+.btn-row{display:grid;grid-template-columns:minmax(110px,30%) 1fr;gap:4px 14px;padding:9px 12px;border-top:1px solid var(--line);align-items:baseline}
+.btn-row:first-child{border-top:0}
+.btn-row .b{font-weight:700;font-size:15px}
+.btn-row .b .w{color:var(--warm);font-size:12px;margin-inline-start:4px;letter-spacing:1px}
+.steps{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:14px;color:var(--ink-2)}
+.steps .k{font-size:11px;font-weight:700;color:var(--muted);background:var(--surface-2);border-radius:var(--r-xs);padding:0 6px;margin-inline-end:4px}
+@media (max-width:560px){.btn-row{grid-template-columns:1fr}}
+.groups{display:grid;gap:12px}
+.meta-row{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:14px;color:var(--ink-2)}
+.meta-row b{font-weight:600;color:var(--muted)}
+.season{display:inline-block;font-size:13px;color:var(--ink-2);border:1px solid var(--line-strong);border-radius:var(--pill);padding:0 9px;margin-inline-end:4px}
+.q{background:var(--warm-soft);border:1px solid var(--warm-line);border-radius:var(--r-sm);padding:10px 12px;font-size:15px}
+.q b{color:var(--warm)}
+.ans{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:14px}
+.ans .opts{display:flex;gap:6px;flex-wrap:wrap}
+.ans .opts button{font:inherit;font-size:14px;font-weight:600;min-height:40px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.ans .opts button:hover{background:var(--surface-2)}
+.ans .opts button[aria-pressed="true"][data-v="ok"]{background:var(--good-soft);border-color:var(--good-line);color:var(--good)}
+.ans .opts button[aria-pressed="true"][data-v="fix"]{background:var(--warm-soft);border-color:var(--warm-line);color:var(--warm)}
+.ans .opts button[aria-pressed="true"][data-v="skip"]{background:var(--surface-3);border-color:var(--line-strong);color:var(--muted)}
+textarea{width:100%;font:inherit;font-size:15px;line-height:1.55;min-height:76px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);resize:vertical}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+section.end{margin-top:36px;display:grid;gap:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-size:15px;font-weight:700;min-height:44px;padding:0 18px;border-radius:var(--r-sm);border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line-strong);font-weight:600}
+#store-state{font-size:14px;color:var(--muted)}
+#out{min-height:160px;font-size:14px}
+.empty{color:var(--faint);text-align:center;padding:28px;border:1px dashed var(--line-strong);border-radius:var(--r)}
+@media (prefers-reduced-motion:reduce){.bar span{transition:none}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow"><span class="mark"></span>דוכן חכם · טיוטה לעיון</div>
+  <h1>ספריית התחומים</h1>
+  <p class="lede">לכל תחום של עסק בקהילה: אילו כפתורים יהיו בדוכן, מה הצעד הבא אחרי כל כפתור, ומתי העונה. בעל עסק שבוחר את התחום שלו מקבל הקמה מוכנה ומשנה ממנה מה שהוא רוצה. הבינה המלאכותית משתמשת בספרייה כדוגמה כשהיא קוראת את התיאור שכתב.</p>
+  <ul class="rules">
+    <li><b>תובנה, לא תורה מסיני.</b> כל כרטיס הוא ניחוש שלי שצריך את הידיעה שלך. אף כרטיס לא מחייב את בעל העסק או את הבינה המלאכותית.</li>
+    <li><b>מה לעשות בכל כרטיס:</b> לסמן "נשמע נכון", "צריך תיקון" או "לא מכיר את התחום", ולכתוב מה שאתה יודע. גם משפט אחד עוזר.</li>
+    <li><b>מאיפה הרשימה:</b> 80 התחומים של האיגוד "התפרנסו". תחומים קרובים מאוחדים בכרטיס אחד, ושמות התחומים שהכרטיס מכסה כתובים בראשו.</li>
+  </ul>
+  <div class="progress"><span id="prog-t">עברת על 0 מתוך 38</span><div class="bar"><span id="prog-b"></span></div><span id="store-state">ההערות נשמרות במכשיר הזה</span></div>
+</header>
+
+<nav class="filters" id="filters" aria-label="קטגוריות"></nav>
+<input id="q" class="search" type="search" placeholder="חיפוש תחום, למשל: מטבחים, פאה, מיזוג" aria-label="חיפוש תחום" autocomplete="off">
+
+<div id="cards"></div>
+
+<section class="end">
+  <h2>תחום שחסר כאן</h2>
+  <p class="muted">עסק שאתה מכיר מהקהילה ולא מופיע, או תחום שכדאי לפצל לשניים.</p>
+  <textarea id="missing" aria-label="תחומים שחסרים" placeholder="למשל: שטריימלים — לא מופיע באיגוד, אבל היה בתערוכה הקודמת"></textarea>
+  <div class="actions">
+    <button class="btn" id="copy">להעתיק את כל ההערות</button>
+    <button class="btn ghost" id="show">להציג אותן כאן</button>
+  </div>
+  <textarea id="out" aria-label="כל ההערות" hidden readonly></textarea>
+</section>
+</div>
+
+<script>
+(function () {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* The step kinds are the system's own (prototype-v3/app.js STEPS); a step is "kind|what he does|after how many days". */
+const KIND = { call: 'שיחה', send: 'הודעה', quote: 'הצעת מחיר', meet: 'פגישה', date: 'תאריך', register: 'הרשמה', season: 'לעונה', none: 'רשימת תפוצה' };
+const SEASON = { elul: 'אלול', sukkot: 'לפני סוכות', afterchag: 'אחרי החגים', weddings: 'עונת החתונות', chanukah: 'חנוכה', purim: 'פורים', pesach: 'לפני פסח', summer: 'לפני הקיץ', bein: 'בין הזמנים', tax: 'סוף שנת המס' };
+const WHEN = (d) => (d === 0 ? 'מיד, מהדוכן' : d === 1 ? 'למחרת' : 'אחרי ' + d + ' ימים');
+const B = (label, w, ...steps) => ({ label, w, steps });
+const G = { what: 'במה התעניין', who: 'סוג פונה', size: 'סדר גודל', when: 'מתי' };
+
+const TRADES = [
+  // ---- פרסום, דפוס וגרפיקה
+  { id: 'graphic', name: 'גרפיקה, מיתוג ופרסום', cat: 'פרסום, דפוס וגרפיקה', covers: ['גרפיקאי', 'מיתוג', 'מעצב', 'משרד פרסום', 'אסטרטגיה', 'ייעוץ אסטרטגי', 'דיגיטל עסקי'],
+    how: 'מוכרים בעיקר לבעלי עסקים ולמוסדות. <b>העסקה נסגרת בפגישה, אחרי שהלקוח ראה תיק עבודות.</b> פרטי מגיע בעיקר בשביל משהו לשמחה.',
+    groups: { what: [B('לוגו ומיתוג', 2, 'send|לשלוח תיק עבודות|0', 'meet|פגישת היכרות|3'), B('פרסום ומודעות', 1, 'quote|להכין הצעה|2'), B('קמפיין לעסק', 3, 'meet|פגישת היכרות|3')],
+      who: [B('בעל עסק', 2, 'meet|פגישת היכרות|3'), B('מוסד', 3, 'meet|פגישה עם המנהל|3'), B('פרטי, לשמחה', 0, 'send|לשלוח דוגמאות|0')] },
+    def: ['send|לשלוח תיק עבודות|0', 'call|לחזור אליו|3'], seasons: ['elul', 'pesach'],
+    q: 'עסקים בקהילה מפרסמים בעיקר לפני החגים? ומוסדות לפני קמפיין גיוס?' },
+  { id: 'print', name: 'דפוס, הזמנות ואלבומים', cat: 'פרסום, דפוס וגרפיקה', covers: ['דפוס', 'הזמנות', 'אלבומים'],
+    how: 'שני לקוחות שונים לגמרי: <b>בעל שמחה</b>, שהכול אצלו תלוי בתאריך, ו<b>עסק או מוסד</b>, שמזמין בכמויות וחוזר שוב.',
+    groups: { what: [B('הזמנות לשמחה', 2, 'send|לשלוח דוגמאות|0', 'date|לחזור לפני השמחה|0'), B('דפוס לעסק', 2, 'quote|להכין הצעת מחיר|2'), B('אלבום', 1, 'date|לחזור אחרי השמחה|0')],
+      who: [B('בעל שמחה', 2, 'date|לבדוק תאריך|1'), B('עסק או מוסד', 3, 'quote|להכין הצעת מחיר|2')] },
+    def: ['call|לחזור אליו|2'], seasons: ['weddings', 'elul'],
+    q: 'הזמנות לחתונה נסגרות בדוכן עם האבא, או שזה תמיד נקבע בבית עם המחותנים?' },
+  { id: 'video', name: 'עריכת וידאו ואנימציה', cat: 'פרסום, דפוס וגרפיקה', covers: ['עריכת וידאו', 'אנימציה'],
+    how: 'הלקוח הגדול הוא <b>מוסד שצריך סרטון לקמפיין גיוס</b>. עסקים מזמינים סרטון תדמית, ופרטיים מזמינים סרטון לשמחה.',
+    groups: { what: [B('סרטון לקמפיין גיוס', 3, 'meet|פגישה עם המוסד|3'), B('סרטון לעסק', 2, 'send|לשלוח דוגמאות|0', 'call|לחזור אליו|3'), B('סרטון לשמחה', 1, 'date|לבדוק תאריך|1')],
+      who: [B('מוסד', 3, 'meet|פגישה|3'), B('עסק', 2, 'call|לחזור אליו|2'), B('פרטי', 0, 'send|לשלוח דוגמאות|0')] },
+    def: ['send|לשלוח דוגמאות|0', 'call|לחזור אליו|3'], seasons: ['purim', 'elul'],
+    q: 'מוסדות מתחילים להכין קמפיין חודשיים לפני פורים? מתי בפועל צריך לחזור אליהם?' },
+
+  // ---- תוכנה ודיגיטל
+  { id: 'web', name: 'אתרים, אפליקציות ותוכנה', cat: 'תוכנה ודיגיטל', covers: ['בניית אתרים', 'בניית אפליקציות', 'פיתוח תוכנה', 'מערכות מידע', 'בדיקות תוכנה'],
+    how: 'כמעט תמיד עסק או מוסד. <b>הצעד הראשון הוא פגישת אפיון</b>, והמחיר נקבע רק אחריה.',
+    groups: { what: [B('אתר לעסק', 2, 'meet|פגישת אפיון|3'), B('חנות אונליין', 2, 'meet|פגישת אפיון|3'), B('מערכת לעסק או מוסד', 3, 'meet|פגישת אפיון|3'), B('תחזוקה לאתר קיים', 1, 'call|לחזור אליו|2')],
+      who: [B('עסק קטן', 2), B('מוסד', 3), B('חברה', 3)] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: 'בקהילה מבקשים יותר אתר, או מערכות פנימיות כמו גבייה וניהול תלמידים?' },
+  { id: 'automation', name: 'אוטומציה וליווי דיגיטלי', cat: 'תוכנה ודיגיטל', covers: ['אוטומציה', 'ליווי סטארטאפים'],
+    how: 'בעל העסק לא יודע מה הוא צריך, רק <b>מה כואב לו</b>. לכן הכפתורים הם הכאב, לא המוצר.',
+    groups: { what: [B('הרבה עבודה ידנית', 2, 'meet|פגישת אבחון|3'), B('לידים הולכים לאיבוד', 3, 'meet|פגישת אבחון|3'), B('גבייה ותשלומים', 2, 'meet|פגישת אבחון|3')],
+      who: [B('עסק קטן', 2), B('מוסד', 3), B('יזם בתחילת הדרך', 1, 'call|לחזור אליו|3')] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: 'זה התחום שלך. מה באמת עובד אצלך בשיחה הראשונה עם בעל עסק?' },
+  { id: 'computers', name: 'מחשבים, רשתות ואבטחת מידע', cat: 'מחשבים וסלולר', covers: ['מחשבים', 'חדר מחשבים', 'אבטחת מידע'],
+    how: 'הלקוח הגדול הוא <b>משרד או מוסד</b>: ציוד, רשת, גיבוי. תיקון ורכישה לבית הם עסקה קטנה ומהירה.',
+    groups: { what: [B('ציוד למשרד או מוסד', 3, 'quote|להכין הצעת מחיר|2'), B('רשת וחדר מחשבים', 3, 'meet|ביקור במקום|3'), B('אבטחת מידע', 2, 'meet|ביקור במקום|3'), B('תיקון', 1, 'call|לחזור אליו|1')],
+      who: [B('פרטי', 0), B('עסק', 2), B('מוסד או תלמוד תורה', 3)] },
+    def: ['call|לחזור אליו|2'], seasons: ['elul'],
+    q: 'מחשב בבית הוא עניין רגיש בקהילה. בתערוכה מציגים את זה בכלל, או רק לעסקים ולמוסדות?' },
+  { id: 'cell', name: 'סלולר', cat: 'מחשבים וסלולר', covers: ['סלולר'],
+    how: 'רוב הקהל עם מכשיר כשר. <b>עסק עם כמה קווים שווה הרבה יותר</b> ממכשיר בודד.',
+    groups: { what: [B('מכשיר כשר', 1, 'call|לחזור עם הצעה|1'), B('קו ומסלול', 1, 'call|לחזור עם הצעה|1'), B('קווים לעסק', 3, 'quote|להכין הצעה|2'), B('תיקון', 0, 'call|לחזור אליו|1')] },
+    def: ['call|לחזור עם הצעה|1'], seasons: [],
+    q: 'מוכרים בתערוכה מכשירים, או בעיקר מסלולים? ומי מחליט על קו לעסק?' },
+
+  // ---- פיננסים וייעוץ
+  { id: 'finance', name: 'ניהול כספים וייעוץ פיננסי', cat: 'פיננסים וייעוץ', covers: ['ניהול כספים', 'ייעוץ פיננסי'],
+    how: 'משפחות ואברכים מגיעים בגלל לחץ כלכלי, ובעלי עסקים בגלל תזרים. <b>הכול מתחיל בפגישה, ובדיסקרטיות.</b>',
+    groups: { what: [B('ייעוץ למשפחה', 2, 'meet|פגישת היכרות|3'), B('חיסכון ופנסיה', 2, 'meet|פגישה|3'), B('ייעוץ לעסק', 3, 'meet|פגישה|3')],
+      who: [B('משפחה', 2), B('בעל עסק', 3)] },
+    def: ['call|לחזור אליו|2'], seasons: ['tax'],
+    q: 'משפחה תשאיר פרטים לייעוץ כלכלי בתערוכה פתוחה, או שזה עובד רק דרך המלצה?' },
+  { id: 'bookkeeping', name: 'הנהלת חשבונות', cat: 'פיננסים וייעוץ', covers: ['הנהלת חשבונות'],
+    how: 'עצמאי מחליף מנהל חשבונות כשמשהו לא עובד, ובדרך כלל בתחילת שנת מס. <b>עמותה היא לקוח גדול וקבוע.</b>',
+    groups: { what: [B('עוסק פטור או מורשה', 1, 'call|לחזור אליו|2'), B('חברה', 2, 'meet|פגישה|3'), B('עמותה או מוסד', 3, 'meet|פגישה|3'), B('החזר מס', 1, 'send|לשלוח רשימת מסמכים|0')] },
+    def: ['call|לחזור אליו|2'], seasons: ['tax'],
+    q: 'החזרי מס לאברכים הם שער כניסה טוב ללקוחות קבועים?' },
+  { id: 'insurance', name: 'ביטוח', cat: 'פיננסים וייעוץ', covers: ['ביטוח'],
+    how: 'כמעט כל מבקר הוא לקוח אפשרי, אז <b>החום חשוב כאן יותר מהכפתור</b>. הצעד הוא הצעה או פגישה.',
+    groups: { what: [B('בריאות', 1, 'quote|להכין הצעה|2'), B('חיים', 2, 'meet|פגישה|3'), B('דירה', 1, 'quote|להכין הצעה|2'), B('רכב', 1, 'quote|להכין הצעה|2'), B('ביטוח לעסק', 3, 'meet|פגישה|3')],
+      who: [B('משפחה', 1), B('בעל עסק', 3)] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: 'איזה ביטוח הכי מבקשים בקהילה? ויש עונה, למשל לפני חתונה של ילד?' },
+  { id: 'bizconsult', name: 'ייעוץ עסקי', cat: 'פיננסים וייעוץ', covers: ['ייעוץ עסקי'],
+    how: 'בעל עסק שנתקע, או מישהו שרוצה לפתוח עסק. <b>הצעד הוא תמיד פגישה.</b>',
+    groups: { what: [B('לפתוח עסק', 1, 'meet|פגישת היכרות|3'), B('להגדיל עסק קיים', 3, 'meet|פגישת היכרות|3'), B('לסדר את המספרים', 2, 'meet|פגישה|3')] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: '' },
+  { id: 'realestate', name: 'נדל"ן', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['ייעוץ נדל"ן'],
+    how: 'שני קהלים: <b>הורים שמחפשים דירה לילד שמתחתן</b>, ומשקיעים.',
+    groups: { what: [B('דירה לזוג צעיר', 2, 'meet|פגישה|3'), B('השקעה', 3, 'meet|פגישה|3'), B('למכור דירה', 2, 'call|לחזור אליו|2')],
+      when: [B('לחתונה בתאריך', 2, 'date|לבדוק מועד|1'), B('בלי לחץ זמן', 1, 'call|לחזור אליו|7')] },
+    def: ['call|לחזור אליו|3'], seasons: ['weddings'],
+    q: 'דירה לילד שמתחתן היא הסיבה הנפוצה ביותר?' },
+
+  // ---- נדל"ן ובעלי מקצוע בבנייה
+  { id: 'arch', name: 'אדריכלות ועיצוב פנים', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['אדריכלות', 'אדריכלות פנים', 'עיצוב פנים', 'הום סטיילינג'],
+    how: 'הלקוח הגדול הוא <b>מוסד או בית כנסת שבונה או משפץ</b>. פרטיים: תכנון דירה ושיפוץ.',
+    groups: { what: [B('תכנון דירה', 2, 'meet|פגישת היכרות|3'), B('שיפוץ', 2, 'meet|ביקור בדירה|3'), B('בית כנסת או מוסד', 3, 'meet|פגישה עם הגבאי|3')],
+      who: [B('פרטי', 1), B('מוסד או בית כנסת', 3), B('יזם או קבלן', 2)] },
+    def: ['send|לשלוח תיק עבודות|0', 'call|לחזור אליו|3'], seasons: ['afterchag', 'summer'],
+    q: 'שיפוצים בקהילה מתחילים אחרי החגים, או בבין הזמנים כשהמשפחה בנופש?' },
+  { id: 'engineer', name: 'הנדסה ונגישות', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['מהנדס בניין', 'מהנדס אזרחי', 'ייעוץ נגישות'],
+    how: '<b>נגישות היא חובה בחוק</b> לעסקים ולמוסדות, ולכן הלקוח בא כשמישהו דרש ממנו. מהנדס בא בגלל היתר או פיקוח.',
+    groups: { what: [B('היתר בנייה', 2, 'meet|פגישה|3'), B('פיקוח', 2, 'quote|להכין הצעה|2'), B('אישור נגישות', 3, 'quote|להכין הצעה|2')],
+      who: [B('מוסד', 3), B('עסק', 2), B('פרטי', 1)] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: '' },
+  { id: 'electric', name: 'חשמל ותאורה', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['חשמל', 'לדים'],
+    how: 'עבודה בבית נקבעת בביקור, ותאורה נמכרת בהצעת מחיר. <b>בתי כנסת ומוסדות מזמינים בגדול.</b>',
+    groups: { what: [B('עבודת חשמל', 1, 'meet|ביקור במקום|2'), B('תאורה ולדים', 2, 'quote|להכין הצעה|2'), B('תאורה לסוכה', 1, 'send|לשלוח מחירון|0'), B('בית כנסת או מוסד', 3, 'meet|ביקור במקום|3')] },
+    def: ['call|לחזור אליו|2'], seasons: ['sukkot', 'afterchag'],
+    q: 'תאורה לסוכה היא מוצר שמוכרים בתערוכה כזו?' },
+  { id: 'plumbing', name: 'אינסטלציה והנדימן', cat: 'בעלי מקצוע', covers: ['אינסטלציה', 'הנדימן'],
+    how: 'עבודה קטנה ודחופה, ולכן <b>מי שחוזר מהר זוכה</b>. לפני פסח יש עומס של עבודות בבית.',
+    groups: { what: [B('תיקון', 1, 'call|לחזור אליו|1'), B('שיפוץ חדר רחצה', 2, 'meet|ביקור במקום|2'), B('עבודות לפני פסח', 2, 'season|לחזור לפני פסח|0')] },
+    def: ['call|לחזור אליו|1'], seasons: ['pesach', 'afterchag'],
+    q: '' },
+  { id: 'ac', name: 'מיזוג אוויר', cat: 'בעלי מקצוע', covers: ['מיזוג אוויר'],
+    how: 'רוב המכירות לפני הקיץ. <b>בית כנסת, מוסד או אולם הם עסקה גדולה</b>, עם ביקור במקום.',
+    groups: { what: [B('מזגן לבית', 1, 'quote|להכין הצעה|2'), B('בית כנסת או מוסד', 3, 'meet|ביקור במקום|3'), B('ניקוי ותחזוקה', 1, 'season|לחזור לפני הקיץ|0')] },
+    def: ['season|לחזור לפני הקיץ|0'], seasons: ['summer', 'pesach'],
+    q: '' },
+  { id: 'security', name: 'מצלמות, אזעקה ואינטרקום', cat: 'בעלי מקצוע', covers: ['מצלמות', 'מערכות אזעקה', 'אינטרקום'],
+    how: '<b>ועד בית שמחליף אינטרקום לבניין שלם</b> שווה הרבה יותר מדירה בודדת. העסקה נקבעת בביקור.',
+    groups: { what: [B('לדירה', 1, 'meet|ביקור במקום|2'), B('לבניין, ועד בית', 3, 'meet|ביקור במקום|3'), B('לעסק או מוסד', 3, 'meet|ביקור במקום|3')] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: 'מי בא לתערוכה בשם ועד הבית? האם יש לו סמכות להחליט?' },
+  { id: 'alum', name: 'אלומיניום ומרפסות', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['אלומיניום', 'בנייה קלה', 'עיצוב מרפסות'],
+    how: '<b>מרפסת סוכה</b> היא כנראה המוצר הכי קהילתי כאן: מזמינים אותה חודשים לפני סוכות. חלונות וסגירות נמכרים כל השנה.',
+    groups: { what: [B('מרפסת סוכה', 3, 'meet|מדידה|3', 'season|לחזור לפני סוכות|0'), B('חלונות', 1, 'quote|להכין הצעה|2'), B('סגירת מרפסת', 2, 'meet|מדידה|3'), B('פרגולה', 1, 'quote|להכין הצעה|2')] },
+    def: ['call|לחזור אליו|2'], seasons: ['sukkot', 'summer'],
+    q: 'מרפסת סוכה היא באמת הכפתור הכי חשוב כאן? ומתי בפועל צריך להזמין אותה?' },
+  { id: 'doors', name: 'דלתות', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['דלתות חוץ', 'דלתות ביטחון'],
+    how: 'החלפת דלת היא החלטה של רגע, ולכן <b>מדידה מהר</b>. קבלן שבונה בניין הוא לקוח גדול.',
+    groups: { what: [B('דלת כניסה', 1, 'meet|מדידה|2'), B('דלת ביטחון', 2, 'meet|מדידה|2'), B('דלתות פנים', 1, 'quote|להכין הצעה|2')],
+      who: [B('פרטי', 1), B('קבלן או בניין חדש', 3, 'meet|פגישה|3')] },
+    def: ['call|לחזור אליו|2'], seasons: ['afterchag', 'pesach'],
+    q: '' },
+  { id: 'kitchens', name: 'מטבחים', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['מטבחים'],
+    how: 'הכול מתחיל ב<b>מדידה בבית</b>. בקהילה יש גם צורך מיוחד: <b>פינת פסח, כיור או מטבח שני.</b>',
+    groups: { what: [B('מטבח חדש', 3, 'meet|לתאם מדידה|3'), B('שיפוץ מטבח', 2, 'meet|לתאם מדידה|3'), B('פינת פסח', 2, 'meet|לתאם מדידה|3', 'season|לחזור לפני פסח|0')],
+      who: [B('זוג צעיר', 2), B('משפחה', 2), B('קבלן', 3)] },
+    def: ['send|לשלוח קטלוג|0', 'call|לחזור אליו|3'], seasons: ['pesach', 'afterchag'],
+    q: 'פינת פסח היא מוצר נפרד שמבקשים, או חלק רגיל מכל מטבח?' },
+  { id: 'finishes', name: 'חיפויים, כיורים וברזים', cat: 'נדל"ן ובעלי מקצוע בבנייה', covers: ['חיפויים', 'כיורים וברזים'],
+    how: 'נמכר בהצעת מחיר, בדרך כלל כחלק משיפוץ. <b>כיור לנטילת ידיים</b> הוא מוצר קהילתי.',
+    groups: { what: [B('חיפוי קירות', 2, 'quote|להכין הצעה|2'), B('כיורים וברזים', 1, 'send|לשלוח קטלוג|0'), B('חדר רחצה', 2, 'meet|ביקור במקום|3')],
+      who: [B('פרטי', 1), B('קבלן או מעצב', 3)] },
+    def: ['send|לשלוח קטלוג|0', 'call|לחזור אליו|3'], seasons: ['pesach', 'afterchag'],
+    q: '' },
+
+  // ---- פאות, קוסמטיקה וטיפוח
+  { id: 'wigs', name: 'פאות ואיפור', cat: 'פאות, קוסמטיקה וטיפוח', covers: ['פאנית', 'מאפרת', 'ספרית כלות'],
+    how: 'התערוכה היא לגברים, ולכן <b>מי שניגש הוא אבי הכלה או הבעל</b>, לא הלקוחה עצמה. מה שקורה בדוכן הוא בעיקר "תתקשרו לאשתי".',
+    groups: { what: [B('פאה לכלה', 3, 'date|לבדוק תאריך החתונה|1'), B('טיפול בפאה', 1, 'call|לחזור אליו|2'), B('איפור לשמחה', 2, 'date|לבדוק תאריך|1')],
+      who: [B('אבי הכלה', 3), B('בעל, מתנה לאשתו', 1)] },
+    def: ['call|לחזור אליו|2'], seasons: ['weddings'],
+    q: 'מי בפועל ניגש לדוכן של פאנית בתערוכה לגברים? והוא משאיר פרטים, או רק לוקח כרטיס לבית?' },
+
+  // ---- רפואה ובריאות
+  { id: 'massage', name: 'עיסוי ונטורופתיה', cat: 'רפואה ובריאות', covers: ['עיסוי', 'נטורופתיה'],
+    how: 'טיפול לעצמו, או <b>שובר מתנה לאשתו</b>, למשל אחרי לידה. סדרת טיפולים שווה יותר מטיפול בודד.',
+    groups: { what: [B('טיפול אחד', 1, 'call|לקבוע טיפול|1'), B('סדרת טיפולים', 2, 'call|לקבוע טיפול|1'), B('שובר מתנה', 2, 'send|לשלוח פרטים|0')] },
+    def: ['call|לחזור אליו|2'], seasons: [],
+    q: '' },
+  { id: 'therapy', name: 'טיפול רגשי וייעוץ', cat: 'חינוך, ייעוץ, הדרכה וטיפול', covers: ['טיפול רגשי', 'ייעוץ זוגי', 'ייעוץ והדרכת הורים'],
+    how: 'נושא רגיש. <b>אנשים לא ירצו שיראו אותם משאירים פרטים</b>, ולכן אולי עדיף שהלקוח ייקח את המספר, ולא להפך.',
+    groups: { what: [B('הדרכת הורים', 2, 'call|לחזור בדיסקרטיות|2'), B('ייעוץ זוגי', 2, 'call|לחזור בדיסקרטיות|2'), B('טיפול לילד', 2, 'call|לחזור בדיסקרטיות|2'), B('הרצאה למוסד', 3, 'meet|פגישה עם המוסד|3')] },
+    def: ['call|לחזור בדיסקרטיות|2'], seasons: [],
+    q: 'אנשים בכלל ישאירו פרטים לייעוץ זוגי בתערוכה פתוחה? או שהדוכן הזה בעיקר מחלק כרטיסים?' },
+  { id: 'nannies', name: 'מטפלות', cat: 'חינוך, ייעוץ, הדרכה וטיפול', covers: ['מטפלות'],
+    how: 'צורך שמגיע ברגע מסוים: <b>לידה, חזרה לעבודה, שעות מסוימות.</b> הצעד הוא שיחה מהירה.',
+    groups: { what: [B('מטפלת קבועה', 2, 'call|לחזור אליו|1'), B('לשעות', 1, 'call|לחזור אליו|1'), B('אחרי לידה', 2, 'call|לחזור אליו|1')] },
+    def: ['call|לחזור אליו|1'], seasons: [],
+    q: '' },
+  { id: 'workshops', name: 'סדנאות והרצאות', cat: 'חינוך, ייעוץ, הדרכה וטיפול', covers: ['סדנאות', 'מרצה'],
+    how: '<b>מוסד או ארגון שמזמין הרצאה לקהל שלם</b> שווה הרבה יותר מנרשם בודד.',
+    groups: { what: [B('הרצאה למוסד', 3, 'meet|פגישה עם המוסד|3'), B('סדנה לקבוצה', 2, 'date|לבדוק תאריך|1'), B('הרשמה לקורס', 1, 'register|לשלוח פרטי הרשמה|0')] },
+    def: ['register|לשלוח פרטי הרשמה|0'], seasons: ['bein', 'elul'],
+    q: '' },
+
+  // ---- אירועים ושמחות
+  { id: 'events', name: 'הפקת אירועים', cat: 'אירועים ושמחות', covers: ['הפקת אירועים'],
+    how: 'הכול תלוי בתאריך. <b>דינר של מוסד הוא עסקה גדולה</b> שנסגרת חודשים מראש.',
+    groups: { what: [B('חתונה', 2, 'date|לבדוק תאריך|1'), B('בר מצווה', 1, 'date|לבדוק תאריך|1'), B('דינר או אירוע מוסד', 3, 'meet|פגישה עם המוסד|3')] },
+    def: ['date|לבדוק תאריך|1'], seasons: ['weddings'],
+    q: '' },
+  { id: 'music', name: 'מוזיקה לשמחות', cat: 'אירועים ושמחות', covers: ['מוזיקה'],
+    how: '<b>מי שמחזיק את התאריך ראשון זוכה.</b> לכן הצעד הוא לבדוק מיד אם התאריך פנוי.',
+    groups: { what: [B('חתונה', 2, 'date|לבדוק אם התאריך פנוי|0'), B('בר מצווה', 1, 'date|לבדוק אם התאריך פנוי|0'), B('אירוע מוסד', 3, 'date|לבדוק אם התאריך פנוי|0')] },
+    def: ['date|לבדוק תאריך|1'], seasons: ['weddings'],
+    q: '' },
+  { id: 'attractions', name: 'אטרקציות ומשחקי חשיבה', cat: 'נופש, תוכניות והפעלות', covers: ['אטרקציות', 'משחקי חשיבה'],
+    how: 'שלושה לקוחות: <b>תלמוד תורה שמזמין לכיתות</b>, שמחה, ומשחקים לבית. הכול מתרכז בבין הזמנים ובחנוכה.',
+    groups: { what: [B('הפעלה לשמחה', 1, 'date|לבדוק תאריך|1'), B('לתלמוד תורה או מוסד', 3, 'meet|פגישה עם המנהל|3'), B('משחקים לבית', 1, 'send|לשלוח קטלוג|0')] },
+    def: ['call|לחזור אליו|2'], seasons: ['bein', 'chanukah', 'purim'],
+    q: '' },
+
+  // ---- מזון וקולינריה
+  { id: 'cakes', name: 'עוגות מעוצבות ועיצובי פירות', cat: 'מזון וקולינריה', covers: ['עוגות מעוצבות', 'עיצובי פירות'],
+    how: 'תלוי בתאריך השמחה. <b>פורים הוא עונה בפני עצמה</b>: משלוחי מנות, ולפעמים בכמויות.',
+    groups: { what: [B('עוגה לשמחה', 2, 'date|לבדוק תאריך|1'), B('מגש פירות לאירוע', 2, 'date|לבדוק תאריך|1'), B('משלוח מנות', 2, 'season|לחזור לפני פורים|0')] },
+    def: ['send|לשלוח תמונות|0'], seasons: ['purim', 'weddings'],
+    q: '' },
+  { id: 'foodbiz', name: 'מוצרי מזון לעסקים ויבוא', cat: 'מזון וקולינריה', covers: ['מוצרי מזון לעסקים', 'יבוא'],
+    how: 'כמו "לחמים ומזונות": <b>ההבדל הוא מי הקונה, לא מה המוצר</b>. מכולת, קייטרינג ומטבח של ישיבה, וכל אחד מהם יכול להפוך ללקוח קבוע.',
+    groups: { who: [B('מכולת או חנות', 2, 'send|לשלוח מחירון|0', 'call|לחזור אליו|3'), B('בעל קייטרינג', 3, 'send|לשלוח מחירון|0', 'meet|לתאם טעימה|3'), B('מטבח של מוסד', 3, 'send|לשלוח מחירון|0', 'call|לחזור אליו|3')],
+      size: [B('ניסיון', 1), B('הזמנה קבועה', 3)] },
+    def: ['send|לשלוח מחירון|0', 'call|לחזור אליו|3'], seasons: ['pesach', 'elul'],
+    q: 'אצל ספקים לעסקים, ההבדל בין "ניסיון" ל"הזמנה קבועה" נקבע כבר בדוכן?' },
+  { id: 'produce', name: 'ירקות ופירות', cat: 'מזון וקולינריה', covers: ['ירקות ופירות'],
+    how: '<b>משלוח קבוע לבית</b> הוא הלקוח הנאמן. מוסדות וקייטרינג מזמינים בכמויות.',
+    groups: { who: [B('משפחה, משלוח קבוע', 2, 'call|לחזור אליו|2'), B('מוסד', 3, 'send|לשלוח מחירון|0', 'call|לחזור אליו|3'), B('קייטרינג', 3, 'send|לשלוח מחירון|0', 'call|לחזור אליו|3')] },
+    def: ['send|לשלוח מחירון|0'], seasons: ['pesach', 'sukkot'],
+    q: '' },
+
+  // ---- חנויות ועסקים כלליים
+  { id: 'gifts', name: 'מתנות ויודאיקה', cat: 'תשמישי קדושה', covers: ['מתנות מעוצבות', 'מזכרות יודאיקה'],
+    how: 'פרטי קונה מתנה לשמחה. <b>עסק או מוסד שקונה מתנות לעובדים או לתלמידים לפני החג</b> הוא העסקה הגדולה.',
+    groups: { what: [B('מתנה לשמחה', 1, 'send|לשלוח קטלוג|0'), B('מתנות לחג בכמות', 3, 'quote|להכין הצעה|2'), B('יודאיקה', 1, 'send|לשלוח קטלוג|0')],
+      who: [B('פרטי', 1), B('עסק', 3), B('מוסד', 3)] },
+    def: ['send|לשלוח קטלוג|0', 'call|לחזור אליו|3'], seasons: ['elul', 'pesach', 'chanukah', 'purim'],
+    q: 'מוסדות קונים מתנות לצוות לפני החגים? ומתי צריך לחזור אליהם?' },
+  { id: 'clothing', name: 'ביגוד גברים ותפירה אישית', cat: 'ביגוד והנעלה', covers: ['בגדי גברים', 'הלבשה בהזמנה אישית'],
+    how: 'הקנייה מרוכזת לפני החגים. <b>הלבשה לחתן ולמשפחה לקראת חתונה</b> היא הזמנה גדולה שתלויה בתאריך.',
+    groups: { what: [B('חליפה', 1, 'call|להזמין למדידה|2'), B('בגדי שבת', 1, 'season|לחזור לפני החג|0'), B('הלבשה לחתונה', 3, 'date|לבדוק תאריך החתונה|1'), B('תפירה אישית', 2, 'meet|מדידה|3')] },
+    def: ['season|לחזור לפני החג|0'], seasons: ['pesach', 'sukkot', 'weddings'],
+    q: '' },
+  { id: 'baby', name: 'תינוקות', cat: 'חנויות ועסקים כלליים', covers: ['בגדי תינוקות', 'מוצרי תינוקות'],
+    how: 'גם כאן ניגש גבר, ולכן <b>הקונה הוא אבא לעתיד או סבא שקונה מתנה</b>.',
+    groups: { what: [B('ציוד ללידה', 2, 'send|לשלוח קטלוג|0'), B('מתנה ללידה', 1, 'send|לשלוח קטלוג|0'), B('בגדים', 1, 'send|לשלוח קטלוג|0')] },
+    def: ['send|לשלוח קטלוג|0'], seasons: [],
+    q: '' },
+
+  // ---- תחבורה, רכב ומשלוחים
+  { id: 'shipping', name: 'משלוחים בינעירוניים', cat: 'תחבורה, רכב ומשלוחים', covers: ['משלוחים בינעירוניים'],
+    how: '<b>עסק ששולח כל שבוע</b> שווה הרבה יותר ממשלוח חד-פעמי.',
+    groups: { what: [B('משלוח חד-פעמי', 1, 'send|לשלוח מחירון|0'), B('משלוחים קבועים לעסק', 3, 'send|לשלוח מחירון|0', 'call|לחזור אליו|3')] },
+    def: ['send|לשלוח מחירון|0'], seasons: [],
+    q: '' },
+  { id: 'carrental', name: 'השכרת רכב', cat: 'תחבורה, רכב ומשלוחים', covers: ['השכרת רכב'],
+    how: 'תלוי בתאריך: <b>בין הזמנים, חגים, שמחה.</b> עסק שצריך רכב קבוע הוא לקוח שנתי.',
+    groups: { what: [B('לבין הזמנים', 2, 'date|לבדוק תאריכים|1'), B('לשמחה', 1, 'date|לבדוק תאריך|1'), B('לעסק, קבוע', 3, 'quote|להכין הצעה|2')] },
+    def: ['date|לבדוק תאריך|1'], seasons: ['bein', 'sukkot', 'pesach'],
+    q: '' },
+];
+
+const CATS = Array.from(new Set(TRADES.map((t) => t.cat)));
+const KEY = 'trade-library-notes';
+let A = {};
+try { A = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { A = {}; }
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(A)); } catch (e) {} };
+let cat = '';
+let q = '';
+let db = null;
+
+const stepHTML = (s) => { const [k, l, d] = s.split('|'); return `<span><span class="k">${KIND[k]}</span>${esc(l)} · ${WHEN(+d)}</span>`; };
+const btnRow = (b) => `<div class="btn-row"><span class="b">${esc(b.label)}${b.w >= 3 ? '<span class="w" title="חשוב מאוד">●●●</span>' : b.w === 2 ? '<span class="w" title="חשוב">●●</span>' : ''}</span>
+  <span class="steps">${b.steps.length ? b.steps.map(stepHTML).join('') : '<span class="faint">כמו ברירת המחדל</span>'}</span></div>`;
+function ansHTML(id) {
+  const a = A[id] || {};
+  const o = (v, t) => `<button type="button" data-v="${v}" aria-pressed="${a.v === v}">${t}</button>`;
+  return `<div class="ans" data-id="${id}"><div class="opts">${o('ok', 'נשמע נכון')}${o('fix', 'צריך תיקון')}${o('skip', 'לא מכיר את התחום')}</div>
+    <textarea id="note-${id}" aria-label="הערות על ${esc(id)}" placeholder="מה אתה יודע על התחום הזה? מה חסר, מה מיותר, איך הם באמת עובדים">${esc(a.note || '')}</textarea></div>`;
+}
+function cardHTML(t) {
+  const a = A[t.id];
+  return `<article class="card${a && (a.v || a.note) ? ' done' : ''}" id="t-${t.id}">
+    <div class="c-head"><h2>${esc(t.name)}</h2><span class="cat">${esc(t.cat)}</span></div>
+    <div class="covers">${t.covers.map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+    <p class="how">${t.how}</p>
+    <div class="groups">${Object.keys(G).filter((g) => t.groups[g]).map((g) => `<div><div class="label">${G[g]}</div><div class="group">${t.groups[g].map(btnRow).join('')}</div></div>`).join('')}</div>
+    <div class="meta-row"><span><b>בלי שום סימון:</b> ${t.def.map(stepHTML).join(' + ')}</span>
+      <span><b>עונה:</b> ${t.seasons.length ? t.seasons.map((s) => `<span class="season">${SEASON[s]}</span>`).join('') : 'כל השנה'}</span></div>
+    ${t.q ? `<p class="q"><b>שאלה אליך:</b> ${esc(t.q)}</p>` : ''}
+    ${ansHTML(t.id)}
+  </article>`;
+}
+function renderFilters() {
+  const n = (c) => TRADES.filter((t) => !c || t.cat === c).length;
+  $('#filters').innerHTML = [['', 'הכל']].concat(CATS.map((c) => [c, c])).map(([c, l]) => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${cat === c}">${esc(l)} ${n(c)}</button>`).join('');
+}
+function renderCards() {
+  const list = TRADES.filter((t) => (!cat || t.cat === cat) && (!q || (t.name + ' ' + t.covers.join(' ')).includes(q)));
+  $('#cards').innerHTML = list.map(cardHTML).join('') || '<div class="empty">לא נמצא תחום כזה. אפשר לכתוב אותו למטה, ב"תחום שחסר כאן".</div>';
+}
+function progress() {
+  const n = TRADES.filter((t) => A[t.id] && (A[t.id].v || A[t.id].note)).length;
+  $('#prog-t').textContent = `עברת על ${n} מתוך ${TRADES.length}`;
+  $('#prog-b').style.width = (n / TRADES.length * 100).toFixed(1) + '%';
+}
+function exportText() {
+  const W = { ok: 'נשמע נכון', fix: 'צריך תיקון', skip: 'לא מכיר' };
+  const rows = TRADES.filter((t) => A[t.id] && (A[t.id].v || A[t.id].note)).map((t) => `${t.name}: ${W[A[t.id].v] || ''}${A[t.id].note ? ' — ' + A[t.id].note : ''}`);
+  if (A.missing && A.missing.note) rows.push('תחומים שחסרים: ' + A.missing.note);
+  return rows.join('\n') || 'עוד אין הערות.';
+}
+async function store(id) {
+  saveLocal(); progress();
+  if (!db) return;
+  try { await db.collection('notes').doc(id).set(Object.assign({ at: new Date().toISOString() }, A[id])); $('#store-state').textContent = 'נשמר. Claude יכול לקרוא את ההערות'; }
+  catch (e) { $('#store-state').textContent = 'נשמר רק במכשיר הזה'; }
+}
+
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-cat]');
+  if (c) { cat = c.dataset.cat; renderFilters(); renderCards(); return; }
+  const b = e.target.closest('.ans button');
+  if (b) {
+    const id = b.closest('.ans').dataset.id;
+    const cur = A[id] || {};
+    A[id] = Object.assign({}, cur, { v: cur.v === b.dataset.v ? '' : b.dataset.v });
+    b.closest('.ans').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', A[id].v === x.dataset.v));
+    b.closest('.card').classList.toggle('done', !!(A[id].v || A[id].note));
+    store(id);
+    if (A[id].v === 'fix') { const n = document.getElementById('note-' + id); if (n) n.focus(); }
+  }
+});
+const timers = {};
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'q') { q = e.target.value.trim(); renderCards(); return; }
+  let id = '';
+  if (e.target.id === 'missing') id = 'missing';
+  else { const box = e.target.closest('.ans'); if (!box) return; id = box.dataset.id; }
+  A[id] = Object.assign({}, A[id] || {}, { note: e.target.value });
+  saveLocal();
+  if (id !== 'missing') e.target.closest('.card').classList.toggle('done', !!(A[id].v || A[id].note));
+  clearTimeout(timers[id]); timers[id] = setTimeout(() => store(id), 600);
+});
+$('#show').addEventListener('click', () => { const o = $('#out'); o.hidden = false; o.value = exportText(); });
+$('#copy').addEventListener('click', () => {
+  const t = exportText();
+  const fallback = () => { const o = $('#out'); o.hidden = false; o.value = t; o.focus(); o.select(); $('#store-state').textContent = 'סמן והעתק מהתיבה'; };
+  try { navigator.clipboard.writeText(t).then(() => { $('#store-state').textContent = 'הועתק. אפשר להדביק בשיחה'; }, fallback); } catch (er) { fallback(); }
+});
+
+$('#missing').value = (A.missing && A.missing.note) || '';
+renderFilters(); renderCards(); progress();
+
+// Notes live where Claude can read them. Without the store, this device keeps them.
+(async () => {
+  if (!(window.claude && window.claude.use)) return;
+  try {
+    db = await window.claude.use('db');
+    if (!db) return;
+    $('#store-state').textContent = 'ההערות נשמרות. Claude יכול לקרוא אותן';
+    db.collection('notes').onSnapshot((snap) => {
+      let changed = false;
+      snap.docs.forEach((d) => { const v = d.data() || {}; const cur = A[d.id] || {}; if (cur.v !== v.v || cur.note !== v.note) { A[d.id] = { v: v.v || '', note: v.note || '' }; changed = true; } });
+      if (changed && !(document.activeElement && document.activeElement.tagName === 'TEXTAREA')) {
+        saveLocal(); renderCards(); progress(); $('#missing').value = (A.missing && A.missing.note) || '';
+      }
+    }, () => {});
+  } catch (e) { db = null; }
+})();
+})();
+</script>
