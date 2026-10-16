@@ -338,8 +338,8 @@
   const PROMPT = (text, goal) => `You help an exhibitor at a Hasidic community business fair in Israel set up a lead-capture tablet.
 About his business, in his words (Hebrew):
 """${text.slice(0, 2500)}"""
-His goal at the fair:
-"""${(goal || 'not given').slice(0, 800)}"""
+His goal at the fair — he was asked inside his text "what do you want from this fair"; read it from there${goal ? ', and also from this' : ''}:
+"""${(goal || 'see his text').slice(0, 800)}"""
 
 While talking to a visitor he taps buttons on the tablet. Decide which of these four groups really separate one customer from another FOR THIS BUSINESS AND THIS GOAL — the ones where a different answer means he does something different next. Use one or two groups, three at most:
 - "what": products or services. Only if the difference changes what he does next. Products handled the same way are ONE button, or no group at all.
@@ -414,7 +414,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     'הפעלות': 'הפעלות חוויתיות וטיולים לקבוצות ולמוסדות. העונה החזקה בבין הזמנים.',
     'דפוס': 'דפוס: הזמנות לחתונות, חוברות ושילוט לעסקים. שולחים דוגמאות והצעת מחיר.',
   };
-  const GOALS = ['להכיר לקוחות חדשים', 'לסגור אספקה קבועה למוסדות', 'למכור במקום', 'לבנות רשימת תפוצה', 'לקבוע פגישות'];
+
   function fresh() {
     return {
       phase: 'setup', step: 'account', sub: 'buttons', view: 'booth', shift: 0,
@@ -658,8 +658,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Shell
   // ------------------------------------------------------------------
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
-  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['auto', 'מה המערכת עושה לבד'], ['try', 'ניסיון']];
-  const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
+  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק'], ['send', 'מה שולחים'], ['auto', 'מה המערכת עושה לבד'], ['try', 'ניסיון']];
+  const SETTINGS_NAV = [['account', 'הפרטים שלי'], ['biz', 'העסק'], ['connect', 'מייל ווואטסאפ'], ['custom', 'התאמה אישית']];
   const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
@@ -672,7 +672,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       if (S.phase === 'setup') {
         const i = SETUP.findIndex(([k]) => k === S.step);
         const back = SETUP.find(([k]) => k === S.backTo) || SETUP[2];
-        if (S.step === 'biz') m.insertAdjacentHTML('beforeend', tuneLinks([['buttons', 'להתאים אישית את הכפתורים והצעדים']]));
+        if (S.step === 'biz') m.insertAdjacentHTML('beforeend', tuneLinks([['buttons', 'לכפתורים בדוכן']]));
         // A customization screen reached from a step leads back to that step, not on to the next one.
         if (i < 0) m.insertAdjacentHTML('beforeend', `<div class="next-bar"><button class="btn primary big" data-act="back-flow">← חזרה ל${esc(back[1])}</button></div>`);
         else if (S.step !== 'try') m.insertAdjacentHTML('beforeend', `<div class="next-bar"><button class="btn primary big" data-act="setup-next">הבא: ${esc(SETUP[i + 1][1])} ←</button></div>`);
@@ -720,11 +720,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <p class="muted">נרשמים פעם אחת. אחר כך — כמה מילים על העסק, והמערכת מתאימה את עצמה אליך.</p>
       <label class="label" for="acc-name">שם מלא <small class="req">חובה</small></label>
       <input id="acc-name" class="text-input${accErrors.name ? ' bad' : ''}" data-acc="name" value="${esc(a.name)}" autocomplete="name"${inv('name')}>${err('name')}
-      <label class="label" for="acc-email">אימייל <small>לכאן יגיעו תשובות של לקוחות, אם לא תבחר אחרת</small></label>
+      <label class="label" for="acc-email">מייל <small>לכאן יגיעו תשובות מלקוחות</small></label>
       <input id="acc-email" class="text-input ltr${accErrors.email ? ' bad' : ''}" type="email" data-acc="email" value="${esc(a.email)}" autocomplete="email" placeholder="name@example.com"${inv('email')}>${err('email')}
-      <label class="label" for="acc-phone">טלפון <small>לכאן תגיע הודעת הבוקר</small></label><input id="acc-phone" class="text-input ltr" type="tel" data-acc="phone" value="${esc(a.phone)}" autocomplete="tel">
+      <label class="label" for="acc-phone">טלפון <small>לכאן תגיע כל בוקר רשימת מה לעשות היום</small></label><input id="acc-phone" class="text-input ltr" type="tel" data-acc="phone" value="${esc(a.phone)}" autocomplete="tel">
+      <div class="label">לאן לשלוח לך כל בוקר?</div>
+      <div class="chips">${DIGEST_CH.map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${S.biz.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
       <label class="label" for="acc-biz">שם העסק</label><input id="acc-biz" class="text-input" data-bizname value="${esc(S.biz.name)}" placeholder="למשל: נגריית הדר" autocomplete="organization">
-      <p class="honest">בדוגמית הפרטים נשמרים רק בדפדפן הזה, ואין חשבון אמיתי. במערכת האמיתית — טלפון ואימייל חובה.</p>
     </section>`;
   }
   /** Errors beside the fields, focus on the first: a toast that vanishes is no place for them. */
@@ -732,7 +733,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     accErrors = {};
     if (!S.account.name) accErrors.name = 'מה השם שלך?';
     // The demo asks for a name only; the real system will require the phone and the email too (יצחק, 09/10).
-    if (S.account.email && !emailOk(S.account.email)) accErrors.email = 'צריך אימייל תקין, כמו name@example.com — לשם יגיעו התשובות.';
+    if (S.account.email && !emailOk(S.account.email)) accErrors.email = 'כתובת המייל לא שלמה. למשל: name@gmail.com';
     return !Object.keys(accErrors).length;
   }
   const accountOk = () => !!S.account.name && (!S.account.email || emailOk(S.account.email));
@@ -747,15 +748,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     m.innerHTML = `<div class="onb">
       <section class="card">
         <h1>ספר לי על העסק שלך</h1>
-        <p class="muted">כמה שיותר פרטים — מכל מילה נגזר משהו:</p>
-        <ul class="prompts"><li>מה אתה מוכר, ולמי</li><li>איך עובדים איתך: מחירון, מדידה, טעימה, הזמנה לאירוע</li><li>מה ההזמנה הטיפוסית, ומי הלקוח הכי שווה</li><li>מתי העונה החזקה</li></ul>
+        <p class="muted">כתוב כמו שהיית מספר ללקוח. ככל שתכתוב יותר — הכפתורים בדוכן יתאימו יותר:</p>
+        <ul class="prompts"><li>מה אתה מוכר, ולמי?</li><li>איך מתחילים לעבוד איתך? (מחירון, מדידה בבית, טעימה, פגישה)</li><li>מה לקוח רגיל קונה, ומי הלקוח הכי טוב שלך?</li><li>מתי אצלך הכי עמוס? (לפני פסח, עונת החתונות…)</li><li>מה מבקשים ממך בדוכן בדרך כלל? (קטלוג, מחירון, תמונות)</li>
+          <li class="goal-q"><b>ובעיקר: מה אתה רוצה מהאקספו הזה?</b> למשל: "הפעם אני מחפש מוסדות"</li></ul>
         <textarea id="say" class="say" placeholder="למשל: משווק לחמים ומזונות של מאפיות בוטיק, לאירועים, למוסדות ולכל מי שצריך. יש מחירון, ומי שלוקח קבוע מקבל משלוח.">${esc(S.biz.said)}</textarea>
         <div class="examples"><span class="faint">דוגמה:</span>
           ${Object.keys(EXAMPLES).map((k) => `<button class="chip" data-ex="${esc(k)}">${esc(k)}</button>`).join('')}</div>
-        <h2 style="margin-top:22px">מה המטרה שלך באקספו?</h2>
-        <p class="muted">${ai ? 'לפי זה נקבע מי הכי חשוב לך, ומה עושים אחרי.' : 'נשמר. כאן, בלי בינה מלאכותית, המטרה לא משנה את הכפתורים — בתוך קלוד או כשהבינה המלאכותית מחוברת, היא כן.'}</p>
-        <textarea id="goal" class="say small" placeholder="למשל: לסגור אספקה קבועה עם מוסדות וקייטרינגים">${esc(S.biz.goal)}</textarea>
-        <div class="examples">${GOALS.map((g) => `<button class="chip" data-goal="${esc(g)}" aria-pressed="${S.biz.goal.split(',').map((x) => x.trim()).includes(g)}">${esc(g)}</button>`).join('')}</div>
         <div id="say-actions"></div>
       </section>
       <section class="card" id="preview"></section>
@@ -763,7 +761,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const say = $('#say');
     let t;
     say.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => understandWords(say.value), 220); });
-    $('#goal').addEventListener('input', (e) => { S.biz.goal = e.target.value; save(); renderSayActions(); });
+
     renderSayActions();
     renderPreview();
     if (!S.biz.said && FINE) setTimeout(() => say.focus(), 40);
@@ -773,9 +771,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (!box) return;
     const stale = S.biz.by === 'ai' && ((($('#say') && $('#say').value) !== S.biz.parsedFrom) || S.biz.goal !== S.biz.goalFrom);
     box.innerHTML = ai
-      ? `<div class="actions"><button class="btn primary big" data-act="ai-read" id="ai-btn">✨ תבין אותי</button>
-          <span class="faint" id="ai-note">${stale ? 'שינית משהו — לחץ שוב כדי שאקרא מחדש' : S.biz.by === 'ai' ? 'הובן ע"י בינה מלאכותית' : 'עד שתלחץ — טיוטה מהירה לפי מילים'}</span></div>`
-      : `<p class="honest">כאן הטקסט נקרא לפי רשימת מילים, שמזהה בערך רבע מהעסקים, ואת המטרה היא לא קוראת. בתוך קלוד, או כשהבינה המלאכותית מחוברת בשרת — היא קוראת את שניהם.</p>`;
+      ? `<div class="actions"><button class="btn primary big" data-act="ai-read" id="ai-btn">✨ תסדר לי הכל בשנייה</button>
+          <span class="faint" id="ai-note">${stale ? 'שינית — לחץ שוב לעדכון' : S.biz.by === 'ai' ? '✓ מסודר' : 'בינתיים — הצעה ראשונה'}</span></div>`
+      : '';   // without the AI there is no button at all — and no note about word lists (H25)
   }
   /** Merge a fresh reading into what is there, keeping every hand edit, every removal, and the ids leads are tagged with. */
   function applyReading(r, text) {
@@ -856,11 +854,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         ${b.goalNote ? `<li>המטרה: <b>${esc(b.goalNote)}</b></li>` : ''}
         ${gs.map((g) => `<li>${esc(g.title)}: ${groupButtons(g.id).map((x) => `<b>${esc(x.label)}</b>${x.unsure ? ' <span class="q">?</span>' : ''}`).join(' · ')}</li>`).join('')}
         ${b.buttons.some(isStar) ? `<li>⭐ סימנתי: <b>${esc(b.buttons.filter(isStar).map((x) => x.label).join(', '))}</b> — הם יופיעו קודם</li>` : ''}
-        <li>מי שלא סומן לו כלום: <b>${esc(stepsText(stepsOf(null)))}</b></li>
+        <li>מבקר שלא סימנת לו כלום: <b>${esc(stepsText(stepsOf(null)))}</b></li>
         ${seasons.length ? `<li>העונה החזקה: <b>${esc(seasons.join(' · '))}</b></li>` : ''}
         ${b.unclear.length ? `<li class="warn-li">לא זיהיתי בוודאות: <b>${esc(b.unclear.join(' · '))}</b> — השארתי במילים שלך</li>` : ''}
       </ul>
-      <p class="faint" style="margin-top:12px">${b.by === 'ai' ? 'נקרא ע"י בינה מלאכותית.' : 'נקרא לפי רשימת מילים.'} הכל ניתן לשינוי ב"התאמה אישית".</p>`
+      ${b.buttons.some((x) => x.unsure) ? '<p class="faint" style="margin-top:8px"><span class="q">?</span> = לא בטוח, כדאי לבדוק</p>' : ''}
+      <p class="faint" style="margin-top:12px">אפשר לשנות הכל ב"התאמה אישית".</p>`
       : '<div class="empty">תתחיל לכתוב, ומה שהבנתי יופיע כאן.</div>'}`;
   }
 
@@ -870,8 +869,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const CHANNELS = [
     { k: 'email', ic: '📧', name: 'מייל' },
     { k: 'sms', ic: '💬', name: 'SMS' },
-    { k: 'wa', ic: '🟢', name: 'וואטסאפ (לא רשמי)' },
-    { k: 'waApi', ic: '✅', name: 'וואטסאפ עסקי רשמי' },
+    { k: 'wa', ic: '🟢', name: 'וואטסאפ מהמספר שלך' },
+    { k: 'waApi', ic: '✅', name: 'וואטסאפ עסקי' },
   ];
   const toggle = (k, on, name) => `<button class="toggle" data-toggle="${k}" aria-pressed="${!!on}" aria-label="${esc(name || 'הפעלה')}"></button>`;
   function viewConnect(m) {
@@ -902,7 +901,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       ${Object.values(b.channels).some(Boolean) ? "" : `<p class="warn-box" style="margin-top:14px">⚠️ אין דרך שליחה פעילה. בלי זה, הודעות לא ייצאו מהדוכן.</p>`}
       <p class="honest">בדוגמית שום דבר לא נשלח באמת, והחיבורים מדומים.</p>`;
   }
-  const mailPreview = (prefix) => `${S.biz.name || 'העסק'} <${prefix}@${MAIL_DOMAIN}>  ·  תשובות אל: ${replyTo() || '—'}`;
+  // H37: the technical address says nothing to him — the name it goes out under, and where the answers come.
+  const mailPreview = () => `יוצא בשם: ${S.biz.name || 'העסק'}  ·  תשובות יגיעו אל: ${replyTo() || '—'}`;
   function sheetConnect(k) {
     if (k === 'wa') {
       sheet(`<h2>וואטסאפ לא רשמי</h2>
@@ -917,7 +917,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
 
   /** The way out to customization, from inside a setup step: plain to see, never in the way of "next". */
-  const tuneLinks = (list) => `<div class="card tune" style="margin-top:14px"><span class="faint">רוצה לכוונן?</span> ${list.map(([sub, t]) =>
+  const tuneLinks = (list) => `<div class="card tune" style="margin-top:14px"><span class="faint">רוצה לשנות?</span> ${list.map(([sub, t]) =>
     `<button class="link" data-act="tune" data-tune="${sub}">${esc(t)} ←</button>`).join(' · ')}</div>`;
 
   // ------------------------------------------------------------------
@@ -927,21 +927,21 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const b = S.biz;
     const cat = b.templates.find((t) => t.mat);
     const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{(קובץ|חומר)\}/g, t.mat || 'הקובץ');
-    m.innerHTML = `<h1>מה שולחים ואיך</h1>
-      <p class="muted">שלושה דברים, וכולם ניתנים לשינוי אחר כך.</p>
+    m.innerHTML = `<h1>מה שולחים למבקר</h1>
+      <p class="muted">שלושה דברים קצרים. אפשר לשנות אחר כך.</p>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>1. ערוץ</h2><p class="muted">איך מה שהמבקר ביקש יגיע אליו. אחד מספיק.</p>
+        <section class="card"><h2>1. איך זה יגיע אליו</h2><p class="muted">אחד מספיק.</p>
           <div class="chips">${CHANNELS.map((c) => `<button class="chip" data-quickch="${c.k}" aria-pressed="${!!b.channels[c.k]}">${c.ic} ${esc(c.name)}</button>`).join('')}</div>
-          ${b.channels.email ? `<p class="faint" style="margin-top:8px">מייל: ${esc(mailPreview(b.mail.prefix || 'info'))}</p>` : ''}</section>
+          ${b.channels.email ? `<p class="faint" style="margin-top:8px">${esc(mailPreview(b.mail.prefix || 'info'))}</p>` : ''}</section>
         <section class="card"><h2>2. הקטלוג</h2>
           ${cat ? `<p>📎 <b>${esc(cat.mat)}</b> — מצורף להודעה "${esc(cat.name)}".</p>` : '<p class="muted">מה שמבקרים יבקשו בדוכן: קטלוג, מחירון, תמונות. אפשר גם לדלג ולהוסיף בדוכן.</p>'}
           <div class="add-row"><input id="cat-name" class="text-input" value="${cat ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
-            <label class="btn" for="cat-file">📷 ${cat ? 'עוד קובץ' : 'קובץ'}</label></div><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></section>
-        ${cat ? `<section class="card"><h2>3. הנוסח</h2><p class="muted">מה המבקר יקבל יחד עם הקובץ. {שם} ו-{עסק} מתמלאים לבד.</p>
+            <label class="btn" for="cat-file">📷 לצרף קובץ</label></div><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></section>
+        ${cat ? `<section class="card"><h2>3. מה ייכתב לו</h2><p class="muted">כדי שהשם שלו יופיע, כתוב {שם} — המערכת תשים במקומו את השם. כך גם {עסק}.</p>
           <textarea id="cat-text" class="say small">${esc(cat.text)}</textarea>
           <p class="faint" id="cat-prev">${esc(sample(cat))}</p></section>` : ''}
       </div>
-      ${tuneLinks([['materials', 'כל ההודעות, והודעה לכל ערוץ'], ['connect', 'הגדרות מתקדמות של הערוצים']])}`;
+      ${tuneLinks([['materials', 'עוד הודעות'], ['connect', 'הגדרות מייל ווואטסאפ']])}`;
     const txt = $('#cat-text');
     if (txt) txt.addEventListener('input', (e) => { cat.text = e.target.value; save(); $('#cat-prev').textContent = sample(cat); });
     $('#cat-file').addEventListener('change', (e) => {
@@ -1205,7 +1205,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const ready = sendReady();
     m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> ${tried ? 'כשתתחיל את יום התערוכה — הניסיון יימחק.' : 'נסה כמה שמות: הקלד כמה אותיות מהשם ונגע בשם.'}</span>
       <button class="btn${tried ? ' primary' : ''}" data-act="go-live">סיימתי — ליום התערוכה ←</button></div>
-      ${ready ? tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לכוונן?', '<b>הכל מוכן.</b> רוצה לכוונן לפני?')
+      ${ready ? tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לשנות?', '<b>הכל מוכן.</b> רוצה לשנות משהו לפני?')
         : `<div class="card tune warn-tune" style="margin-top:14px"><b>חסר: ${esc(sendMissing())} למבקר.</b> <button class="link" data-act="setup-send">להגדיר ←</button></div>`}<div id="boothwrap"></div>`;
     viewBooth($('#boothwrap'));
   }
@@ -1921,6 +1921,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!b.templates) b.templates = clone(DEF_TEMPLATES);
     if (!b.rules) b.rules = clone(DEF_RULES);
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
+    if (b.digest.ch === 'sms') b.digest.ch = 'wa';
     if (!b.digestNotes) b.digestNotes = [];
     if (b.afterSale === undefined) b.afterSale = 7;   // days after a deal to ask how it went; 0 = never
     // A step kind that no longer exists (the regular-customer step, 08/10) becomes a call wherever it was saved:
@@ -2105,6 +2106,8 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
 
   // ---- messages ----
   const CH_NAMES = { any: 'הערוץ הזמין הראשון', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
+  // The morning message: WhatsApp or mail. SMS does not reach a kosher phone (יצחק, 16/10).
+  const DIGEST_CH = ['wa', 'email'];
   const OPT_OUT = 'להסרה מרשימת התפוצה השיבו "הסר".';
   /** A template filled in for one lead. Messages to a group carry the opt-out line the law asks for. */
   const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{(קובץ|חומר)\}/g, t.mat || 'הקובץ') + (toGroup ? '\n' + OPT_OUT : '');
@@ -3199,7 +3202,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
         <section class="card"><h2>אחרי עסקה שנסגרה</h2><p class="muted">בדיקה אחת: איך היה? לקוח מרוצה — זה הרגע להציע את ההזמנה הבאה.</p>
           <div class="chips">${[[0, "לא לבדוק"], [3, "אחרי 3 ימים"], [7, "אחרי שבוע"], [14, "אחרי שבועיים"], [30, "אחרי חודש"]].map(([d, t]) => `<button class="chip" data-aftersale="${d}" aria-pressed="${b.afterSale === d}">${t}</button>`).join("")}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>הודעת בוקר</h2><p class="muted">כל בוקר: מה לטיפול היום, ומה בצינור. נשלחת אליך מהמספר של מערכת הדוכן.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
-          ${b.digest.on ? `<div class="label">לאן</div><div class="chips">${['wa', 'email', 'sms'].map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
+          ${b.digest.on ? `<div class="label">לאן</div><div class="chips">${DIGEST_CH.map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
           <div class="label">באיזו שעה</div><div class="chips">${['07:00', '08:00', '09:00', '10:00'].map((h) => `<button class="chip" data-digesth="${h}" aria-pressed="${b.digest.hour === h}">${h}</button>`).join('')}</div>` : ''}</section>
       </div>`;
   }
@@ -3238,9 +3241,10 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     if (s) s.remove();
     if (restart !== false && openId && $('#slot')) startIdle();
   }
-  function sheetConfirm(title, text, act, extra) {
+  /** A question before an act. The yes button says what happens ("להחליף", "למחוק הכל"), never just "כן". */
+  function sheetConfirm(title, text, act, extra, yes) {
     sheet(`<h2>${esc(title)}</h2><p class="muted">${esc(text)}</p>
-      <div class="opts"><button class="opt danger" data-act="${act}" ${extra || ''}>כן</button><button class="opt" data-act="sheet-close">ביטול</button></div>`);
+      <div class="opts"><button class="opt danger" data-act="${act}" ${extra || ''}>${esc(yes || 'כן')}</button><button class="opt" data-act="sheet-close">ביטול</button></div>`);
   }
   function sheetDevices() {
     sheet(`<h2>חיבור עוד טאבלט</h2>
@@ -3503,17 +3507,10 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
 
     if (d.ex) {
       const say = $('#say');
-      if (say.value.trim() && say.value.trim() !== EXAMPLES[d.ex]) { exPending = d.ex; return sheetConfirm('להחליף את מה שכתבת?', 'הטקסט שכתבת על העסק יוחלף בדוגמה.', 'ex-yes'); }
+      if (say.value.trim() && say.value.trim() !== EXAMPLES[d.ex]) { exPending = d.ex; return sheetConfirm('להחליף את מה שכתבת?', 'הטקסט שכתבת על העסק יוחלף בדוגמה.', 'ex-yes', '', 'להחליף'); }
       return useExample(d.ex);
     }
-    if (d.goal) {   // a goal chip toggles: tapped once it is in the text, tapped again it is out
-      const g = $('#goal');
-      const parts = g.value.split(',').map((x) => x.trim()).filter(Boolean);
-      const next = parts.includes(d.goal) ? parts.filter((x) => x !== d.goal) : parts.concat(d.goal);
-      g.value = next.join(', '); S.biz.goal = g.value; save();
-      b.setAttribute('aria-pressed', next.includes(d.goal));
-      return renderSayActions();
-    }
+
     if (d.addstd) return addGroup(d.addstd);
     if (d.editgroup) return sheetGroup(d.editgroup);
     if (d.egmulti !== undefined) { document.querySelectorAll('[data-egmulti]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }

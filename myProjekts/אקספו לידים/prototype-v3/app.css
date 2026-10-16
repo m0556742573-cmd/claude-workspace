@@ -1077,3 +1077,6 @@ button.stat:disabled { cursor: default; } button.stat:disabled:hover { backgroun
 /* Not set up to send (16/10): a red dot on the send button, never a state of the visitor. */
 .btn.has-dot { position: relative; }
 .red-dot { position: absolute; inset-block-start: -4px; inset-inline-end: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--hot); box-shadow: 0 0 0 2px var(--surface); }
+
+/* The goal, asked inside the business description (B8): set apart, so it is not missed. */
+.prompts li.goal-q { margin-top: 6px; color: var(--ink); }
