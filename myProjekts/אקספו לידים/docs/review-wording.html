@@ -207,7 +207,7 @@ section.s > h3{margin-top:8px}
 .row .upd b{color:var(--warm)}
 .re-link{font-size:13.5px;color:var(--ink-2);background:var(--warm-soft);border-radius:var(--r-sm);padding:6px 10px}
 .re-link b{color:var(--warm)}
-ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px}
+ul.plain,ol.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px}
 #open-list{font-size:14px;color:var(--ink-2);line-height:1.9}
 details.rest{margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 details.rest > summary{cursor:pointer;list-style:none;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:8px 0}
@@ -221,8 +221,8 @@ details.rest[open] > summary::before{transform:rotate(90deg)}
 <div class="wrap">
 <header class="top">
   <div class="eyebrow"><span class="mark"></span>חוות דעת חיצונית · 13/10/2026 · עודכן 16/10 אחרי התשובות שלך</div>
-  <h1>שתי שאלות אחרונות.</h1>
-  <p class="lede">צמצמתי לשאלות בלבד. ההמלצה שלי מסומנת בירוק, ו"מסכים" אומר שאתה הולך איתה. </p>
+  <h1>מה הוחלט. רשימה אחת, מוכנה לבנייה.</h1>
+  <p class="lede">אין עוד שאלות. למטה, בקיפול: כל הסבבים והרשימה המלאה.</p>
   <div class="meta"><span>הוחלף: המסמך מהבוקר (review-wording.md)</span><span>שום דבר במערכת לא שונה</span><span>הכל הצעה עד שתאמר</span></div>
   <div class="progress"><span id="prog-t" class="faint">עוד לא ענית על אף סעיף</span><div class="bar" aria-hidden="true"><span id="prog-b"></span></div></div>
 </header>
@@ -232,8 +232,52 @@ details.rest[open] > summary::before{transform:rotate(90deg)}
 </nav>
 
 <section class="s" id="ask">
-  <div class="sec-head"><span class="n">?</span><h2>רק השאלות הפתוחות</h2><p>סבב 5 (16/10). נסגרו גם: הכללים עוברים להקמה, עם "סימנת קר ← לשאול אותי" · אני חוקר שמות לפני שמציע. קודם לכן נסגרו: "מבקרים" ביום התערוכה ו"לידים" ב-CRM · אין שום "ממתין" — הכל מוכן מראש · כוכב אחד לחשיבות · המטרה כשאלה בתוך התיאור, בהדגשה · הודעת הבוקר: וואטסאפ או מייל (SMS לא מגיע לטלפון כשר). ליד כל שאלה: "מסכים" = עם ההמלצה שלי (בירוק). "אחרת…" = לכתוב מה במקום. כל השאר בדף הוא חומר לעיון, ולא צריך לעבור עליו.</p></div>
-  <div class="cards" id="qq"></div>
+  <div class="sec-head"><span class="n">✓</span><h2>מה הוחלט — רשימה אחת, מוכנה לבנייה</h2><p>הסיכום של כל הסבבים (13–16/10). <b>שום דבר עוד לא נבנה.</b> הבנייה תתחיל רק כשתגיד "לבנות".</p></div>
+
+  <h3>א · שינויים בהתנהגות המערכת (לא רק מילים)</h3>
+  <ol class="plain">
+    <li><b>"לא רלוונטי" ו"קהל" הופכים ל"רשימת תפוצה".</b> הכפתור: "לרשימת התפוצה", והוא שואל "בטוח?". "רשימת תפוצה" הוא גם השלב האחרון ברשימת השלבים. <span class="faint">X1, W3</span></li>
+    <li><b>שלב חדש בהקמה: "מה המערכת עושה לבד".</b> בו 3–4 כללים מוכנים, כתובים במילים, ואפשר להדליק, לכבות ולשנות כל אחד. אחד מהם: "סימנת קר ← לשאול אותי בסוף היום". עורך הכללים המלא עובר לכלים המתקדמים. <span class="faint">C1, X10</span></li>
+    <li><b>"קר" — המערכת לא מפרשת אותו לבד.</b> כרטיס סוף היום יהיה: "3 סומנו קר — מה איתם? · + משימה · לרשימת התפוצה". את "חם" ו"פושר" המערכת ממשיכה לפרש כמו היום. <span class="faint">A1, B1</span></li>
+    <li><b>אין "ממתין לחומר".</b> כשלוחצים "סיימתי — ליום התערוכה", המערכת בודקת שיש דרך שליחה ויש הודעה. אם חסר אחד מהם — התראה עם "להגדיר ←". בדוכן, אם עדיין חסר, יש נקודה אדומה על כפתור השליחה. הודעה נשלחת מיד או לא נשלחת. <span class="faint">B5, D42</span></li>
+    <li><b>יש רק הודעות.</b> טקסט, עם קובץ או בלי. המילה "חומר" יורדת מכל מקום. <span class="faint">W18</span></li>
+    <li><b>חשיבות: כוכב אחד.</b> הבינה המלאכותית מציעה אותו בהקמה לפי גודל העסקאות, ואתה מאשר. אין שדה שווי ואין סכומים במסך. מה שנבנה ("חשוב" ו"חשוב מאוד") מתקצר לכוכב. <span class="faint">X5, B7, C3, D1</span></li>
+    <li><b>המטרה בהקמה</b> היא שאלה מנחה מודגשת בתוך תיאור העסק, בלי שדה נפרד. <span class="faint">B8</span></li>
+    <li><b>הודעת הבוקר</b> יוצאת ב-08:00. בהקמה שואלים "לאן לשלוח לך כל בוקר? וואטסאפ · מייל". <span class="faint">X11, B6</span></li>
+    <li><b>ה-CRM:</b> דף הבית · לידים · משימות · דשבורד. דף הבית לא מציג שוב את רשימת המשימות. <span class="faint">X4, A5</span></li>
+    <li><b>הכלים המתקדמים — מאחורי דלת אחת.</b> <span class="faint">X10</span></li>
+    <li><b>הדוגמאות בשדות</b> (הטקסט האפור) נכתבות לפי העסק של המציג. <span class="faint">M69, M29</span></li>
+    <li><b>"רשימת המארגנים" לא מוצגת לאף אחד. הטלפון הוא שדה חובה.</b> <span class="faint">W24, D26</span></li>
+    <li><b>פס הדגמה אחד</b> במקום כל הערות הדוגמית. <span class="faint">K15</span></li>
+  </ol>
+
+  <h3>ב · מילים</h3>
+  <ul class="plain">
+    <li>ביום התערוכה <b>"מבקר"</b>, וב-CRM <b>"ליד"</b>. אין מסך שמערבב את שתי המילים. <span class="faint">B3</span></li>
+    <li>"צעד" ← <b>"משימה"</b>, והשאלה בכל מקום: <b>"מה הלאה?"</b> <span class="faint">W2</span></li>
+    <li>שמות החום (ברירת מחדל): <b>רציני · שוקל · לא עכשיו</b>, ואפשר לשנות אותם בהגדרות. "בלי חום" ← "לא סומן". <span class="faint">A7, S3</span></li>
+    <li><b>"נסגרה עסקה"</b>, גם כשם של השלב. <span class="faint">W10</span></li>
+    <li><b>"קשר"</b> במקום "מענה" ו"מגע", ו"עוד לא היה קשר". <span class="faint">W11</span></li>
+    <li>"צינור" יוצא, ובמקומו <b>"שלבים"</b>. <span class="faint">W13</span></li>
+    <li>הכללים נקראים <b>"מה המערכת עושה לבד"</b>, ובהיסטוריה של המבקר: "⚙️ לבד:". ⚠️ הקוד קורא את שורות ההיסטוריה לפי המילים, ולכן משנים אותן רק יחד עם הקוד. <span class="faint">W14</span></li>
+    <li>"חיבורים" ← <b>"מייל ווואטסאפ"</b>. <b>"ברירת מחדל" נשארת.</b> "הרשמה" בהגדרות ← "הפרטים שלי". <span class="faint">W16, W17, W26</span></li>
+    <li>"נקלט" ← <b>"נרשם"</b>. <b>"נקלט ע״י"</b> נשאר ככותרת של השדה. "בעלים" ← "בעל הדוכן". "טאבלט עובד" נשאר. <span class="faint">W20, W25, K8</span></li>
+    <li>"מדומה" ← <b>"לדוגמה"</b>. כפתורי הבינה המלאכותית: ✨ ופועל. <span class="faint">W21, W22</span></li>
+    <li>תאריכים: <b>"יום ג׳, ז׳ כסלו"</b>. "בעוד 3 ימים · שבועיים · פעמיים". פנייה ביחיד ("אתה"). כפתורים על מבקר: "מה סימנו". <span class="faint">W27, W28, W29, W9</span></li>
+    <li><b>"אקספו"</b> הוא שם האירוע. <span class="faint">W23</span></li>
+    <li>בדוכן: <b>"↶ ביטול השינויים" נשאר</b>. בחיפוש: "שם או עסק…", בלי "שם משפחה". <span class="faint">X6, D1, D2</span></li>
+    <li>התפריט ⋯: <b>הגדרות · להוסיף טאבלט · איפוס מערכת</b>. באישור: "למחוק הכל? כל המבקרים, הכפתורים וההגדרות יימחקו". <span class="faint">K9</span></li>
+    <li>בנוסח ההודעה, הסוגריים <b>{שם} ו-{עסק}</b> נשארים, עם הסבר קצר. <span class="faint">H40</span></li>
+    <li>ההרשמה נשארת השלב הראשון בהקמה. <span class="faint">X9</span></li>
+    <li>ועוד כל השורות ברשימה המלאה שסימנת עליהן "מסכים", בנוסח המעודכן (↻).</li>
+  </ul>
+
+  <h3>ג · מה עוד פתוח — לא עוצר את הבנייה</h3>
+  <ul class="plain">
+    <li><b>שם המוצר.</b> ההצעות שלי לא היו טובות, ולא אמשיך לנחש. ההמלצה שלי: שם שיבוא ממך, או מאיש שיווק מהמגזר. זה גם מה שחוזר בכל הכתבות על פרסום לציבור. עד אז, במקום השם יופיע "[שם המוצר]".</li>
+    <li><b>השמות של מסך הדוכן ושל מסך הערב.</b> הם מחכים לשם המוצר, כמו שכתבת.</li>
+    <li><b>כמה ניסוחים שלא ענית עליהם, ואני אבחר בהם לבד אם תגיד:</b> ההודעה כשסיים את כל המשימות ("יישר כח! סיימת את כל מה שהיה להיום"), כפתור הבינה המלאכותית בהקמה ("✨ תסדר לי הכל בשנייה"), השאלות המנחות בהקמה, וההצעה הרכה על מבקרים מאותו מוסד.</li>
+  </ul>
 </section>
 
 <details class="rest" id="rest"><summary><h2>כל השאר — לעיון בלבד</h2><span class="faint">הסבב הראשון, הסבב השני והרשימה המלאה</span></summary>
@@ -976,6 +1020,7 @@ const QQ = [
   note:'אחרי שתבחר: לבדוק שאין עסק בשם הזה, ושהדומיין פנוי. ואם אף אחד מאלה לא קרוב, תגיד איזה דפוס, ואעמיק בו.'},
 ];
 function renderQQ() {
+  if (!$('#qq')) return;
   $('#qq').innerHTML = QQ.map((x, i) => `<article class="ch" id="${x.id}">
     <div class="ch-head"><span class="tag code">${i + 1}</span><h3>${esc(x.q)}</h3></div>
     ${x.ctx ? `<p>${esc(x.ctx)}</p>` : ''}
@@ -1153,9 +1198,8 @@ function rowHTML(r) {
     ${keep ? '' : ansHTML(id)}</div></div>`;
 }
 function progress() {
-  const n = QQ.filter((x) => A[x.id] && (A[x.id].v || A[x.id].note)).length;
-  $('#prog-t').textContent = `ענית על ${n} מתוך ${QQ.length} השאלות`;
-  $('#prog-b').style.width = (n / QQ.length * 100).toFixed(1) + '%';
+  $('#prog-t').textContent = 'כל השאלות נענו · 16/10';
+  $('#prog-b').style.width = '100%';
 }
 function exportText() {
   const W = { yes: 'מסכים', no: 'לא', other: 'אחרת' };
