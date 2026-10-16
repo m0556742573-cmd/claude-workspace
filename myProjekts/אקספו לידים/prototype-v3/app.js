@@ -239,7 +239,7 @@
   const MAIL_DOMAIN = 'yourdomain.co.il';   // placeholder: the system's own sending domain, to be named
   const STEPS = {
     call:     { name: 'להתקשר', days: 2, icon: '📞', label: 'לחזור אליו' },
-    send:     { name: 'לשלוח חומר', days: 0, icon: '📎', label: 'לשלוח חומר' },
+    send:     { name: 'לשלוח הודעה', days: 0, icon: '📎', label: 'לשלוח הודעה' },
     quote:    { name: 'הצעת מחיר', days: 2, icon: '🧾', label: 'להכין הצעת מחיר' },
     meet:     { name: 'פגישה או ביקור', days: 3, icon: '🤝', label: 'לתאם פגישה' },
     date:     { name: 'תלוי תאריך', days: 1, icon: '📅', label: 'לבדוק תאריך' },
@@ -426,7 +426,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         grades: 'classic', derive: true, idleSec: 12, hideVisited: true, coldDo: 'ask',
         materials: [], channels: { email: true, sms: false, wa: false, waApi: false },
         mail: { replyTo: '', prefix: '' }, smsName: '',
-        chOrder: ['wa', 'waApi', 'email', 'sms'], sendAll: false, template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}. נשמח לעמוד לשירותך.',
+        chOrder: ['wa', 'waApi', 'email', 'sms'], sendAll: false, template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {קובץ}. נשמח לעמוד לשירותך.',
         devices: 1,
       },
       leads: [], seq: 1, nseq: 1, ai: { dash: null, crm: null },
@@ -659,7 +659,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
   const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['auto', 'מה המערכת עושה לבד'], ['try', 'ניסיון']];
   const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
-  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
+  const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
   function render() {
     renderTop();
@@ -877,7 +877,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const prefix = b.mail.prefix || 'info';
     const on = chOrder().filter((c) => b.channels[c]);
     m.innerHTML = `<h1>חיבורים</h1>
-      <p class="muted">איך החומר והתשובות יוצאים למבקר. אפשר לחבר כמה ערוצים, ולבחור באיזה קודם.</p>
+      <p class="muted">איך מה שאתה שולח מגיע למבקר. אפשר כמה, ולבחור מה קודם.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><div class="toggle-row"><div><h2>📧 מייל</h2><p class="muted">לכל מבקר יש מייל ברשימת המארגנים. יוצא מהמערכת, בשם העסק שלך.</p></div>${toggle('ch:email', b.channels.email, 'מייל')}</div>
           ${b.channels.email ? `<div class="label">הכתובת שממנה זה יוצא</div>
@@ -892,12 +892,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           ${b.channels.wa ? '<button class="btn" data-act="disconnect" data-ch="wa">מחובר · לנתק</button>' : '<button class="btn primary" data-act="connect" data-ch="wa">לחבר</button>'}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>✅ וואטסאפ עסקי רשמי</h2><p class="muted">רק אם כבר יש לך חשבון רשמי. מתחברים אליו, לא פותחים חדש.</p></div>
           ${b.channels.waApi ? '<button class="btn" data-act="disconnect" data-ch="waApi">מחובר · לנתק</button>' : '<button class="btn primary" data-act="connect" data-ch="waApi">לחבר</button>'}</div></section>
-        ${on.length > 1 ? `<section class="card"><h2>באיזה ערוץ קודם</h2><p class="muted">חומר יוצא בערוץ הראשון ברשימה שמחובר.</p>
+        ${on.length > 1 ? `<section class="card"><h2>מה קודם</h2><p class="muted">נשלח בראשון שמחובר.</p>
           <div class="step-list">${on.map((k, i) => `<div class="stage-line"><span class="pn">${i + 1}. ${esc(chName(k))}</span>
             <button class="btn ghost" data-chmove="${k}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-chmove="${k}:1" aria-label="למטה" ${i < on.length - 1 ? '' : 'disabled'}>▼</button></div>`).join('')}</div>
-          <div class="toggle-row" style="margin-top:12px"><div><b>לשלוח בכל הערוצים</b><p class="muted">המבקר יקבל את אותו חומר בכל ערוץ מחובר. וואטסאפ — פעם אחת בלבד.</p></div>${toggle('sendAll', b.sendAll, 'לשלוח בכל הערוצים')}</div></section>` : ''}
+          <div class="toggle-row" style="margin-top:12px"><div><b>לשלוח בכל הערוצים</b><p class="muted">המבקר יקבל את אותה הודעה בכל ערוץ מחובר. וואטסאפ — פעם אחת בלבד.</p></div>${toggle('sendAll', b.sendAll, 'לשלוח בכל הערוצים')}</div></section>` : ''}
       </div>
-      ${Object.values(b.channels).some(Boolean) ? "" : `<p class="warn-box" style="margin-top:14px">⚠️ אין אף ערוץ פעיל. בלי ערוץ, חומר לא יישלח מהדוכן — רק יסומן "ממתין".</p>`}
+      ${Object.values(b.channels).some(Boolean) ? "" : `<p class="warn-box" style="margin-top:14px">⚠️ אין דרך שליחה פעילה. בלי זה, הודעות לא ייצאו מהדוכן.</p>`}
       <p class="honest">בדוגמית שום דבר לא נשלח באמת, והחיבורים מדומים.</p>`;
   }
   const mailPreview = (prefix) => `${S.biz.name || 'העסק'} <${prefix}@${MAIL_DOMAIN}>  ·  תשובות אל: ${replyTo() || '—'}`;
@@ -924,7 +924,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function viewSend(m) {
     const b = S.biz;
     const cat = b.templates.find((t) => t.mat);
-    const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{חומר\}/g, t.mat || 'החומר');
+    const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{(קובץ|חומר)\}/g, t.mat || 'הקובץ');
     m.innerHTML = `<h1>מה שולחים ואיך</h1>
       <p class="muted">שלושה דברים, וכולם ניתנים לשינוי אחר כך.</p>
       <div class="stack" style="margin-top:14px">
@@ -1162,7 +1162,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const b = S.biz;
     const groups = [['wa', 'וואטסאפ', b.channels.wa || b.channels.waApi], ['email', 'מייל', b.channels.email], ['sms', 'SMS', b.channels.sms]].filter((g) => g[2]);
     const pkgOpts = (sel) => `<option value="" ${!sel ? 'selected' : ''}>—</option>` + b.templates.map((t) => `<option value="${esc(t.id)}" ${sel === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
-    m.innerHTML = `<h1>הודעות וחומרים</h1>
+    m.innerHTML = `<h1>הודעות</h1>
       <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בדוכן, בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>ההודעות</h2>
@@ -1201,9 +1201,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function viewTry(m) {
     // "Done" stands out only after one visitor was tried: before that, the loud button said "skip the practice" (UX review U-3).
     const tried = S.leads.some((l) => l.practice);
-    m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> ${tried ? 'מה שתקלוט כאן יימחק כשתתחיל את יום התערוכה.' : 'נסה מבקר אחד: הקלד שם משפחה ונגע בשם.'}</span>
+    // H45: "all ready" only when it is — what is missing to send is named, with the way to set it.
+    const ready = sendReady();
+    m.innerHTML = `<div class="practice-banner"><span><b>דוכן לניסיון.</b> ${tried ? 'כשתתחיל את יום התערוכה — הניסיון יימחק.' : 'נסה כמה שמות: הקלד כמה אותיות מהשם ונגע בשם.'}</span>
       <button class="btn${tried ? ' primary' : ''}" data-act="go-live">סיימתי — ליום התערוכה ←</button></div>
-      ${tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לכוונן?', '<b>הכל מוכן.</b> רוצה לכוונן לפני?')}<div id="boothwrap"></div>`;
+      ${ready ? tuneLinks(SUBS.map(([k, t]) => [k, t])).replace('רוצה לכוונן?', '<b>הכל מוכן.</b> רוצה לכוונן לפני?')
+        : `<div class="card tune warn-tune" style="margin-top:14px"><b>חסר: ${esc(sendMissing())} למבקר.</b> <button class="link" data-act="setup-send">להגדיר ←</button></div>`}<div id="boothwrap"></div>`;
     viewBooth($('#boothwrap'));
   }
 
@@ -1278,7 +1281,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     slot.innerHTML = heldBar + lastBar + again + added + (rows ? `<div class="results">${rows}</div>` : '<div class="empty">לא נמצא ברשימה.</div>') + more + addNew;
   }
   const newLead = (key, r) => ({ id: S.seq++, key, i: r.i, b: r.b, at: now(), lastAt: now(), created: Date.now(), visits: 1, warmth: null, warmBy: null, tags: [],
-    eventDate: '', roleOf: '', sent: [], queue: [], pendingMat: false, practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, notes: [],
+    eventDate: '', roleOf: '', sent: [], queue: [], practice: practice(), log: [], done: [], moved: {}, manual: [], noAnswer: 0, notes: [],
     stage: 'new', value: null, contact: { phone: '', email: '' }, files: [], ruled: {}, by: worker() ? 'עובד' : 'בעלים' });
   function pick(key) {
     let l = leadByKey(key);
@@ -1368,9 +1371,13 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const autoSent = bs.some((b) => stepsOf(b).some(immediate));
     const ts = tasks(l);
     const queued = (l.queue || []).map((q) => (pkgById(q.pkg) || { name: 'ברירת המחדל' }).name);
-    const sendBtn = autoSent
-      ? `<span class="sent-note">📎 ${queued.length ? 'יישלח בסגירה: ' + esc(queued.join(', ')) : l.sent.length ? 'נשלח: ' + esc(l.sent.join(', ')) : l.pendingMat ? 'ממתין לחומר' : 'יישלח'}</span>`
-      : `<button class="btn" data-act="send" data-lid="${l.id}">${esc(l.sent.length ? '📎 נשלח: ' + l.sent.join(', ') : l.pendingMat ? '📎 ממתין לחומר' : '📎 שלח חומר')}</button>`;
+    // Nothing waits (יצחק, 16/10): a message goes out at once or not at all. What is not set up yet is a red dot, not a state of the visitor.
+    const ready = sendReady();
+    const sendBtn = !ready && !l.sent.length
+      ? `<button class="btn has-dot" data-act="not-ready">📎 לשלוח לו<span class="red-dot" aria-label="עוד לא הוגדר איך לשלוח"></span></button>`
+      : autoSent
+        ? `<span class="sent-note">📎 ${queued.length ? 'יישלח כשתסיים: ' + esc(queued.join(', ')) : l.sent.length ? 'נשלח: ' + esc(l.sent.join(', ')) : 'יישלח'}</span>`
+        : `<button class="btn" data-act="send" data-lid="${l.id}">${esc(l.sent.length ? '📎 נשלח: ' + l.sent.join(', ') : '📎 לשלוח לו')}</button>`;
     const last = l.notes[l.notes.length - 1];
     return `
       <div class="lead-head"><div><span class="nm">${esc(People.rowName(l))}</span>${l.b != null ? '<span class="badge biz">עסק</span>' : ''} <span class="muted">${esc(People.town(l))}</span>
@@ -1445,7 +1452,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /* Packages (08/10): a message and the material attached to it travel together, under a name the owner gives.
    * Whatever goes to a visitor — from the booth, a button, a task, a rule or a group send — is a package.
    * Each channel has a default package: what goes out on it when no package was chosen. */
-  const PKG_TEXT = 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}.';
+  const PKG_TEXT = 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {קובץ}.';
   const pkgById = (id) => S.biz.templates.find((t) => t.id === id);
   const CH_GROUP = { wa: 'wa', waApi: 'wa', email: 'email', sms: 'sms' };
   const pkgFor = (id, k) => pkgById(id) || pkgById((S.biz.chDefault || {})[CH_GROUP[k]]) || (S.biz.templates.length === 1 ? S.biz.templates[0] : null);
@@ -1464,10 +1471,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (l.optOut && (o.toGroup || byRule)) return false;
     if (chosen && !o.toGroup && l.sent.includes(chosen.name)) return true;   // already has it
     const keys = sendKeys();
-    if (!keys.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין ערוץ שליחה פעיל. מפעילים ב"חיבורים".'); return false; }
+    if (!keys.length) { if (!o.quiet && !byRule) sheetNotReady(); return false; }
     const out = keys.map((k) => [k, pkgFor(id, k)]).filter(([, p]) => p);
-    if (!out.length) { l.pendingMat = true; if (!o.quiet && !byRule) toast('אין הודעה לשליחה. מגדירים ב"הודעות וחומרים".'); return false; }
-    l.pendingMat = false;
+    if (!out.length) { if (!o.quiet && !byRule) sheetNotReady(); return false; }
     // The practice booth searches real names: nothing it does may reach a real person (K3).
     if (l.practice) {
       out.forEach(([k, p]) => { if (!l.sent.includes(p.name)) l.sent.push(p.name); log(l, `📎 "${p.name}" — בניסיון, לא נשלח (היה יוצא ב${chName(k)})`); });
@@ -1491,11 +1497,21 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function autoSend(l, b) {
     stepsOf(b).filter(immediate).forEach((s) => {
       const has = pkgById(s.pkg) || keysHaveDefault();
-      if (has) l.queue = (l.queue || []).filter((q) => q.btn !== b.id).concat({ btn: b.id, pkg: s.pkg || '' });
-      else if (!l.pendingMat) { l.pendingMat = true; log(l, '📎 ממתין לחומר'); toast('📎 עוד אין הודעה לשליחה — סומן "ממתין לחומר"'); }
+      // Not set up yet: nothing is queued and nothing is marked — the red dot on the card says so.
+      if (has && sendKeys().length) l.queue = (l.queue || []).filter((q) => q.btn !== b.id).concat({ btn: b.id, pkg: s.pkg || '' });
     });
   }
   const keysHaveDefault = () => sendKeys().some((k) => pkgFor('', k));
+  /** Everything ready before the fair (יצחק, 16/10): a way to send, and a message to send. What is missing is named. */
+  const sendMissing = () => (!sendKeys().length ? 'איך לשלוח' : !S.biz.templates.length ? 'מה לשלוח' : '');
+  const sendReady = () => !sendMissing();
+  function sheetNotReady() {
+    const m = sendMissing();
+    sheet(`<h2>עוד לא הגדרת ${esc(m || 'איך לשלוח')} למבקר</h2>
+      <p class="muted">${m === 'מה לשלוח' ? 'אין עדיין הודעה לשליחה.' : 'אין עדיין דרך שליחה פעילה — מייל או וואטסאפ.'} כרגע שום דבר לא יוצא.</p>
+      ${worker() ? '<p class="faint">את זה מגדירים בטאבלט של בעל הדוכן.</p>' : ''}
+      <div class="actions">${worker() ? '' : '<button class="btn primary" data-act="setup-send">להגדיר ←</button>'}<button class="btn ghost" data-act="sheet-close">סגירה</button></div>`);
+  }
   const unqueue = (l, b) => { l.queue = (l.queue || []).filter((q) => q.btn !== b.id); };
   const unqueueAll = (l) => { l.queue = []; };   // what waited for the card to close does not go out
   function flushSends(l) {
@@ -1511,12 +1527,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const pkgs = S.biz.templates;
     const withFile = pkgs.filter((x) => x.mat).length;
     sheet(`<h2>מה לשלוח${l ? ' ל' + esc(People.rowName(l)) : ''}?</h2>
-      ${pkgs.length ? `<div class="opts">${pkgs.map((x) => `<button class="opt" data-sendmat="${esc(x.id)}" data-lid="${l ? l.id : ''}" aria-pressed="${l ? l.sent.includes(x.name) : false}">${x.mat ? '📎' : '💬'} ${esc(x.name)}<small>${esc(x.mat ? 'עם ' + x.mat : 'הודעה בלבד')}</small></button>`).join('')}</div>` : '<p class="muted">עוד אין מה לשלוח.</p>'}
+      ${pkgs.length ? `<div class="opts">${pkgs.map((x) => `<button class="opt" data-sendmat="${esc(x.id)}" data-lid="${l ? l.id : ''}" aria-pressed="${l ? l.sent.includes(x.name) : false}">${x.mat ? '📎' : '💬'} ${esc(x.name)}<small>${esc(x.mat ? 'מצורף: ' + x.mat : 'רק טקסט')}</small></button>`).join('')}</div>` : '<p class="muted">עוד אין מה לשלוח.</p>'}
       ${worker() ? '' : `<div class="label">${withFile ? 'הודעה חדשה עם קובץ' : 'להוסיף קטלוג עכשיו'}</div>
         <input id="mat-name" class="text-input" value="${withFile ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
         <div class="opts"><label class="opt" for="mat-file">📷 לצלם או לבחור קובץ<small>תמונה או PDF</small></label></div>
         <input id="mat-file" type="file" accept="image/*,application/pdf" hidden>`}
-      ${!withFile && l ? `<div class="opts"><button class="opt" data-act="mat-later" data-lid="${l.id}">לא עכשיו<small>יסומן "ממתין לחומר", ויופיע בדשבורד</small></button></div>` : ''}
       <div class="actions"><button class="btn" data-act="sheet-close">סיום</button></div>`);
     bindMatFile(l);
   }
@@ -1655,7 +1670,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       taken.add(key);
       const hand = Math.random() < 0.4;
       const l = Object.assign(newLead(key, People.row(key)), { at: now() - rnd(8 * 3600000), created: 0, visits: Math.random() < 0.08 ? 2 : 1,
-        warmth: hand ? rnd(3) : null, warmBy: hand ? 'hand' : null, pendingMat: Math.random() < 0.1, demo: true });
+        warmth: hand ? rnd(3) : null, warmBy: hand ? 'hand' : null, demo: true });
       liveGroups().forEach((g) => { if (Math.random() < 0.55) { const bs = groupButtons(g.id); l.tags.push(bs[rnd(bs.length)].id); } });
       if (tagged(l).some((b) => b.axis === 'who' && b.weight >= 2) && Math.random() < 0.7) l.roleOf = groups[rnd(groups.length)];
       if (Math.random() < 0.15) l.notes.push({ id: 'n' + (S.nseq++), at: l.at, text: ['ביקש לחזור אחרי החגים', 'מתעניין בכמות גדולה', 'מכיר אותנו מהשכונה'][rnd(3)], audio: false, tr: '' });
@@ -1680,12 +1695,12 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     // G2: "cold" is the owner's call — the system cannot know what he meant by it, so it asks: a task, or the mailing list.
     const cold = L.filter((l) => effWarm(l) === 2 && undecided(l));
     if (cold.length || filledCold.size) out.push({ cold: true, q: cold.length ? `${cold.length} סומנו "${words()[2]}" — מה איתם?` : '✓ כולם הוחלטו.', leads: cold.concat(L.filter((l) => filledCold.has(l.id) && !cold.includes(l))) });
-    const waiting = L.filter((l) => l.pendingMat);
-    if (waiting.length) out.push({ mat: true, q: `${waiting.length} מחכים לחומר${S.biz.templates.length ? '' : ', ועוד אין מה לשלוח'}.` });
+    // Not set up to send: one line about the business, not a list of visitors waiting (יצחק, 16/10).
+    if (!sendReady() && !worker()) out.push({ setup: true, q: `עוד לא הגדרת ${sendMissing()} למבקר — מהדוכן לא יוצאת שום הודעה.` });
     return out;
   }
   /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
-  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'שליחות חומר', date: 'בדיקות תאריך', register: 'פרטי הרשמה' };
+  const PLURAL = { call: 'שיחות', meet: 'תיאומי פגישה', quote: 'הצעות מחיר להכין', send: 'הודעות לשלוח', date: 'בדיקות תאריך', register: 'פרטי הרשמה' };
   function nextDayLine(L) {
     const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
     if (!all.length) return 'אין משימות.';
@@ -1725,7 +1740,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     let body = '';
     if (a.fill) body = fillOpen === a.fill ? fillList(a.leads, a.fill) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="${a.fill}">להשלים</button></div>`;
     else if (a.cold) body = fillOpen === 'cold' ? coldList(a.leads) : `<div class="actions"><button class="btn${pri}" data-act="fill-open" data-kind="cold">להחליט</button></div>`;
-    else if (a.mat) body = `<div class="actions"><button class="btn${pri}" data-act="mat-evening">${S.biz.templates.length ? 'לשלוח להם' : 'להוסיף חומר'}</button></div>`;
+    else if (a.setup) body = `<div class="actions"><button class="btn${pri}" data-act="setup-send">להגדיר ←</button></div>`;
     // An open list closes with its own button, or with a tap anywhere outside it (יצחק, 12/10).
     const open = (a.fill && fillOpen === a.fill) || (a.cold && fillOpen === 'cold');
     return `<div class="ask-card${open ? ' open' : ''}"><div class="q">${esc(a.q)}</div>${body}${open ? '<div class="actions"><button class="btn ghost" data-act="fill-close">סגירת הרשימה</button></div>' : ''}</div>`;
@@ -1777,7 +1792,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       const held = L.filter((l) => plan(l).type === 'season');
       if (held.length) { const p = plan(held[0]); out.push({ text: `${held.length} שמורים ל${p.season || 'עונה'}. יחזרו אליך ב${H.label(p.due)}.`, leadIds: held.map((l) => l.id), action: null }); }
       const twice = L.filter((l) => l.noAnswer >= 2 && !l.sent.length && tasks(l).length);
-      if (twice.length) out.push({ text: `${twice.length} לא ענו פעמיים. לשלוח להם חומר במקום עוד שיחה?`, leadIds: twice.map((l) => l.id), action: { kind: 'step', type: 'send' } });
+      if (twice.length) out.push({ text: `${twice.length} לא ענו פעמיים. לשלוח להם הודעה במקום עוד שיחה?`, leadIds: twice.map((l) => l.id), action: { kind: 'step', type: 'send' } });
       const groups = {};   // one institution, several people: one approach for all of them
       L.forEach((l) => { if (l.roleOf && tasks(l).length) (groups[l.roleOf] = groups[l.roleOf] || []).push(l); });
       Object.keys(groups).filter((g) => groups[g].length >= 2).forEach((g) => out.push({ text: `${groups[g].length} אנשים מ${g}. כדאי לדבר איתם כאחד.`, leadIds: groups[g].map((l) => l.id), action: null }));
@@ -1893,6 +1908,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const b = S.biz;
     if (!b.stages) b.stages = clone(DEF_STAGES);
     if (!b.coldDo) b.coldDo = 'ask';
+    (b.templates || []).forEach((t) => { if (t.text) t.text = t.text.replace(/\{חומר\}/g, '{קובץ}'); });   // only messages, with a file or without (W18)
     if (!b.listV) {   // 16/10: "audience" and "not relevant" are one — the mailing list, the last stage
       b.listV = true;
       const lost = b.stages.find((s) => s.kind === 'lost');
@@ -1961,6 +1977,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (!l.ruleHits) l.ruleHits = {};
     if (!l.queue) l.queue = [];
     if (!l.by) l.by = 'בעלים';
+    delete l.pendingMat;   // 16/10: nothing waits — a message goes out at once or not at all
   }
   const stageById = (id) => S.biz.stages.find((s) => s.id === id) || S.biz.stages[0];
   const stageOf = (kind) => S.biz.stages.find((s) => s.kind === kind);
@@ -1990,7 +2007,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     if (tries(l).length) return 'tried';
     return 'none';
   }
-  const ANSWER = { none: 'עוד לא', tried: 'ניסינו ולא ענה', sent: 'קיבל חומר או הודעה', talked: 'דיברנו' };
+  const ANSWER = { none: 'עוד לא', tried: 'ניסינו ולא ענה', sent: 'קיבל הודעה', talked: 'דיברנו' };
   const reached = (l) => ['sent', 'talked'].includes(answerState(l));
 
   function setStage(l, id, why) {
@@ -2088,7 +2105,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   const CH_NAMES = { any: 'הערוץ הזמין הראשון', email: 'מייל', sms: 'SMS', wa: 'וואטסאפ' };
   const OPT_OUT = 'להסרה מרשימת התפוצה השיבו "הסר".';
   /** A template filled in for one lead. Messages to a group carry the opt-out line the law asks for. */
-  const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{חומר\}/g, t.mat || 'החומר') + (toGroup ? '\n' + OPT_OUT : '');
+  const fillFor = (t, l, toGroup) => t.text.replace(/\{שם\}/g, People.rowName(l)).replace(/\{עסק\}/g, S.biz.name || 'העסק').replace(/\{(קובץ|חומר)\}/g, t.mat || 'הקובץ') + (toGroup ? '\n' + OPT_OUT : '');
   const sendTemplate = (l, tid, quiet, toGroup) => sendPackage(l, tid, { quiet, toGroup });
 
   // ---- Excel ----
@@ -2212,7 +2229,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   function lastTouch(l) {
     const t = touched(l);
     const e = t[t.length - 1];
-    return e ? { at: e.at, kind: isTalk(e.t) ? 'דיברנו' : /^📎/.test(e.t) ? 'חומר' : 'הודעה' } : null;
+    return e ? { at: e.at, kind: isTalk(e.t) ? 'דיברנו' : 'הודעה' } : null;
   }
   function agoText(at) {
     if (!at) return 'עוד לא';
@@ -2400,7 +2417,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <section class="card" style="margin-top:14px"><h2>14 הימים שאחרי התערוכה</h2>
         <div class="days14" aria-label="יום ${Math.min(day, 14)} מתוך 14">${Array.from({ length: 14 }, (_, i) => `<span class="${i < day - 1 ? 'past' : i === day - 1 ? 'now' : ''}"></span>`).join('')}</div>
         <p style="margin:8px 0 0">${day > 14 ? 'עברו 14 הימים.' : `יום ${day} מתוך 14.`} מ-${real.length} לידים מהתערוכה:
-          <b>${st.talked}</b> דיברתם, <b>${st.sent}</b> קיבלו חומר או הודעה, <b>${st.tried}</b> ${st.tried === 1 ? 'לא ענה' : 'לא ענו'}, ו-<b>${st.none}</b> ${st.none === 1 ? 'עוד לא קיבל' : 'עוד לא קיבלו'} שום מענה.
+          <b>${st.talked}</b> דיברתם, <b>${st.sent}</b> קיבלו הודעה, <b>${st.tried}</b> ${st.tried === 1 ? 'לא ענה' : 'לא ענו'}, ו-<b>${st.none}</b> ${st.none === 1 ? 'עוד לא קיבל' : 'עוד לא קיבלו'} שום מענה.
           נסגרו <b>${won.length}</b> עסקאות${won.length ? ` (${nis(won.reduce((a, l) => a + leadValue(l), 0))})` : ''}.</p>
         ${st.none + st.tried ? `<div class="actions"><button class="btn" data-act="view-noanswer">לראות את ${st.none + st.tried} שעוד לא קיבלו מענה</button></div>` : ''}</section>
       <div class="two-col">
@@ -2581,7 +2598,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   const colById = (id) => COLS.find((c) => c.id === id);
   const FILTERS = {
     warm: { t: 'חום', opts: () => words().map((w, k) => [String(k), w]).concat([['none', 'בלי חום']]), ok: (l, v) => (v === 'none' ? effWarm(l) == null : effWarm(l) === +v) },
-    answer: { t: 'מענה', opts: () => [['none', 'עוד לא היה קשר'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל חומר או הודעה'], ['talked', 'דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
+    answer: { t: 'מענה', opts: () => [['none', 'עוד לא היה קשר'], ['tried', 'ניסינו ולא ענה'], ['sent', 'קיבל הודעה'], ['talked', 'דיברנו']], ok: (l, v) => (v === 'notyet' ? answerState(l) !== 'talked' : v === 'none' ? ['none', 'tried'].includes(answerState(l)) : answerState(l) === v) },
     stage: { t: 'שלב', opts: () => S.biz.stages.map((s) => [s.id, s.name]), ok: (l, v) => l.stage === v },
     btn: { t: 'כפתור', more: true, opts: () => [['nobtn', 'בלי כפתור']].concat(S.biz.buttons.map((b) => [b.id, b.label])), ok: (l, v) => (v === 'nobtn' ? !l.tags.length : l.tags.includes(v)) },
     kind: { t: 'סוג', more: true, opts: () => [['biz', 'עסק'], ['private', 'פרטי']], ok: (l, v) => (v === 'biz') === (l.b != null) },
@@ -2898,9 +2915,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       <div class="label">קובץ מצורף</div><div class="chips" id="tp-mats"><button class="chip" data-tpmat="" aria-pressed="${!t.mat}">בלי קובץ</button>${S.biz.materials.map((x) => `<button class="chip" data-tpmat="${esc(x.name)}" aria-pressed="${t.mat === x.name}">📎 ${esc(x.name)}</button>`).join('')}</div>
       <div class="actions" style="margin-top:6px"><label class="btn" for="tp-file">📎 לצרף קובץ חדש</label></div><input id="tp-file" type="file" accept="image/*,application/pdf" hidden>
       <label class="label" for="tp-text">ההודעה</label>
-      <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ העסק שלך'], ['{חומר}', '+ חומר']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
+      <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ שם העסק'], ['{קובץ}', '+ שם הקובץ']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
       <textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
-      <p class="faint">{חומר} = שם הקובץ המצורף. בלי קובץ מצורף — עדיף לא לכתוב "מצורף".</p>
+      <p class="faint">{קובץ} = שם הקובץ המצורף. בלי קובץ — לא לכתוב "מצורף".</p>
       <p class="faint">בשליחה לקבוצה נוספת לבד השורה: "${esc(OPT_OUT)}"</p>
       <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
         ${id ? `<button class="btn ghost danger far" data-act="tpl-del" data-id="${esc(id)}">למחוק</button>` : ''}</div>`);
@@ -2933,7 +2950,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   let callOpen = false;
   let tlFilter = 'all';
   let tlAuto = false;
-  const TL_KINDS = { all: 'הכל', calls: '📞 שיחות', msgs: '💬 הודעות וחומר', notes: '📝 הערות', stages: '➜ שלבים' };
+  const TL_KINDS = { all: 'הכל', calls: '📞 שיחות', msgs: '💬 הודעות', notes: '📝 הערות', stages: '➜ שלבים' };
   const tlKind = (t) => (isAuto(t) ? 'auto' : /^📞/.test(t) ? 'calls' : /^(💬|📎)/.test(t) ? 'msgs' : /^📝/.test(t) ? 'notes' : /^➜/.test(t) ? 'stages' : 'other');
   function recordPage(box, l) {
     const ts = tasks(l);
@@ -3647,7 +3664,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       }
       case 'go-live': {
         const n = S.leads.filter((l) => l.practice).length;
-        return sheetConfirm('להתחיל את יום התערוכה?', n ? `${n} לידים של ניסיון יימחקו, וההגדרות נשארות.` : 'ההגדרות נשארות, ואפשר לשנות אותן מהתפריט ⋯.', 'go-live-yes');
+        const miss = sendMissing();
+        return sheet(`<h2>להתחיל את יום התערוכה?</h2>
+          <p class="muted">${n ? (n === 1 ? 'מבקר הניסיון יימחק. ' : n + ' מבקרי הניסיון יימחקו. ') : ''}ההגדרות נשארות.</p>
+          ${miss ? `<p class="warn-box">⚠️ חסר: ${esc(miss)} למבקר. אפשר להתחיל בכל זאת — אבל מהדוכן לא תצא שום הודעה. <button class="link" data-act="setup-send">להגדיר ←</button></p>` : ''}
+          <div class="opts"><button class="opt" data-act="go-live-yes">להתחיל</button><button class="opt" data-act="sheet-close">ביטול</button></div>`);
       }
       case 'settings':
         if (worker()) return ownerOnly('ההגדרות');
@@ -3942,30 +3963,22 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       case 'go-live-yes':
         S.leads = S.leads.filter((l) => !l.practice);
         S.phase = 'live'; S.view = 'booth'; openId = null; stopIdle(); closeSheet(false); save(); render();
-        return toast('יום התערוכה. בהצלחה!');
-      case 'send-all': {
-        const p = pkgById(d.mat);
-        const waiting = leadsNow().filter((l) => l.pendingMat);
-        const n = waiting.filter((l) => sendPackage(l, d.mat, { quiet: true })).length;
-        save(); closeSheet(false); render();
-        return toast(`📎 "${p ? p.name : 'ברירת המחדל'}" נשלח ל-${n}`);
-      }
+        return toast('בהצלחה רבה, ובשעה טובה!');
       case 'send': {
         const l = L || leadById(openId);
         if (!l) return;
-        if (!S.biz.templates.length && worker()) { l.pendingMat = true; save(); refreshLead(l); return toast('סומן "ממתין לחומר".'); }
+        if (!sendReady()) return sheetNotReady();
         if (S.biz.templates.length === 1 && !l.sent.length) { sendPackage(l, S.biz.templates[0].id); save(); return refreshLead(l); }
         return sheetMaterials(l);
       }
-      case 'mat-later': { if (L) { L.pendingMat = true; save(); closeSheet(); refreshLead(L); } return toast('סומן "ממתין לחומר". יופיע בדשבורד.'); }
-      case 'mat-evening': {
-        if (!S.biz.templates.length) return sheetMaterials(null);
-        const waiting = leadsNow().filter((l) => l.pendingMat);
-        return sheet(`<h2>לשלוח ל-${waiting.length} שמחכים לחומר</h2>
-          <div class="label">מה לשלוח</div>
-          <div class="opts">${S.biz.templates.map((x) => `<button class="opt" data-act="send-all" data-mat="${esc(x.id)}">${x.mat ? '📎' : '💬'} ${esc(x.name)} — לשלוח ל-${waiting.length}<small>${esc(x.text.slice(0, 70))}</small></button>`).join('')}</div>
-          <p class="faint" style="margin-top:8px">יוצא ב${esc(channelsOn().join(' + ') || '— אין ערוץ פעיל')}. מקבלים: ${esc(waiting.map((l) => People.rowName(l)).join(', '))}</p>
-          <div class="actions"><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
+      case 'not-ready': return sheetNotReady();
+      // Where the missing part is set: during setup its own step, afterwards the settings — the way to send first, then the message.
+      case 'setup-send': {
+        if (worker()) return ownerOnly('ההגדרות');
+        closeLead(); closeHeld(); closeSheet(false);
+        if (S.phase === 'setup') { S.backTo = S.step === 'send' ? null : S.step; S.step = 'send'; }
+        else { S.phase = 'settings'; if (!sendKeys().length) S.step = 'connect'; else { S.step = 'custom'; S.sub = 'materials'; } }
+        save(); render(); return window.scrollTo(0, 0);
       }
       case 'note': { const l = L || leadById(openId); if (l) sheetNote(l, false); return; }
       case 'note-rec': { const l = L || leadById(openId); if (l) sheetNote(l, true); return; }

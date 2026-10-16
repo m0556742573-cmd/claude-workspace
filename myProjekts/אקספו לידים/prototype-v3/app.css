@@ -1073,3 +1073,7 @@ button.stat:disabled { cursor: default; } button.stat:disabled:hover { backgroun
 .tb-quick { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .tb-quick .chip { min-height: 44px; }
 .more-filters > summary { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; color: var(--ink-2); font-size: 14.5px; }
+
+/* Not set up to send (16/10): a red dot on the send button, never a state of the visitor. */
+.btn.has-dot { position: relative; }
+.red-dot { position: absolute; inset-block-start: -4px; inset-inline-end: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--hot); box-shadow: 0 0 0 2px var(--surface); }
