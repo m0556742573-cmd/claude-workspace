@@ -423,7 +423,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         removed: [], removedGroups: [], groups: [], buttons: [], bseq: 1,
         defSteps: [{ type: 'call', label: 'לחזור אליו', days: 3 }], defByHand: false,
         seasons: [], seasonsByHand: false, seasonDefs: JSON.parse(JSON.stringify(H.SEASONS)), remindWeeks: 3,
-        grades: 'classic', derive: true, idleSec: 12, hideVisited: true,
+        grades: 'classic', derive: true, idleSec: 12, hideVisited: true, coldDo: 'ask',
         materials: [], channels: { email: true, sms: false, wa: false, waApi: false },
         mail: { replyTo: '', prefix: '' }, smsName: '',
         chOrder: ['wa', 'waApi', 'email', 'sms'], sendAll: false, template: 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {חומר}. נשמח לעמוד לשירותך.',
@@ -608,11 +608,14 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function tasks(l) {
     if (l.lost || l.audience) return [];
     const w = effWarm(l);
-    let list = w === 2 ? [] : derived(l);
+    // "Cold" means whatever the owner meant by it (יצחק, 16/10): he says beforehand what follows from it — ask him in the
+    // evening (the default), the mailing list, or the same tasks as anyone.
+    const coldHold = w === 2 && S.biz.coldDo !== 'tasks';
+    let list = coldHold ? [] : derived(l);
     const saidNone = list.some((s) => s.type === 'none');
     list = list.filter((s) => s.type !== 'none' && !immediate(s));
     // Buttons that only send at once still leave someone to follow up with.
-    if (!list.length && w !== 2 && !saidNone && tagged(l).length) list = stepsOf(null).map((s, i) => Object.assign({}, s, { key: 'def:' + (s.sid || i) })).filter((s) => s.type !== 'none' && !immediate(s));
+    if (!list.length && !coldHold && !saidNone && tagged(l).length) list = stepsOf(null).map((s, i) => Object.assign({}, s, { key: 'def:' + (s.sid || i) })).filter((s) => s.type !== 'none' && !immediate(s));
     const season = seasonStart();
     return list.concat(l.manual).filter((s) => !l.done.includes(s.key))
       .map((s) => Object.assign({}, s, { due: dueOf(l, s), season: s.type === 'season' && season ? season.name : undefined }))
@@ -622,7 +625,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
    * follow-up is on the mailing list. Whoever is not relevant at all is simply not recorded. The list is the last stage;
    * a lead whose buttons say "no task" is on it too, without a tap. */
   const saidNone = (l) => derived(l).some((s) => s.type === 'none');
-  const inList = (l) => !!l.lost || (!l.won && !tasks(l).length && saidNone(l));
+  const inList = (l) => !!l.lost || (!l.won && !tasks(l).length && (saidNone(l) || (S.biz.coldDo === 'list' && effWarm(l) === 2)));
   /** No step, not closed, not on the list: the owner has not said what to do with him yet. */
   const undecided = (l) => !l.won && !inList(l) && !tasks(l).length;
   const listStage = () => (stageOf('lost') || {}).id || 'lost';
@@ -654,7 +657,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Shell
   // ------------------------------------------------------------------
   // Setting up is four steps; everything else is customization, one clear link away and in the settings afterwards (08/10).
-  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['try', 'ניסיון']];
+  const SETUP = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['send', 'מה שולחים ואיך'], ['auto', 'מה המערכת עושה לבד'], ['try', 'ניסיון']];
   const SETTINGS_NAV = [['account', 'הרשמה'], ['biz', 'העסק והמטרה'], ['connect', 'חיבורים'], ['custom', 'התאמה אישית']];
   const SUBS = [['buttons', 'הכפתורים'], ['booth', 'החום והדוכן'], ['seasons', 'עונות'], ['materials', 'הודעות וחומרים'], ['crm', 'שלבים ובוקר'], ['auto', 'כללים (אוטומציות)']];
   const LIVE = [['booth', 'הדוכן'], ['dash', 'דשבורד'], ['crm', 'המעקב שלי']];
@@ -664,7 +667,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     // The tracking view and the settings are mostly used on a computer (יצחק, 11–12/10): they take the width. A tablet is narrower anyway.
     m.classList.toggle('wide', S.phase === 'settings' || (S.phase === 'live' && S.view === 'crm'));
     if (S.phase !== 'live') {
-      ({ account: viewAccount, biz: viewBiz, send: viewSend, connect: viewConnect, custom: viewCustom, try: viewTry }[S.step] || viewAccount)(m);
+      ({ account: viewAccount, biz: viewBiz, send: viewSend, auto: viewAutoSetup, connect: viewConnect, custom: viewCustom, try: viewTry }[S.step] || viewAccount)(m);
       if (S.phase === 'setup') {
         const i = SETUP.findIndex(([k]) => k === S.step);
         const back = SETUP.find(([k]) => k === S.backTo) || SETUP[2];
@@ -961,8 +964,27 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   }
   /** The rules left the tracking view (11/10): they are settings — what the system does by itself, written once. */
   function viewRules(m) {
-    m.innerHTML = `<h1>כללים (אוטומציות)</h1><div id="rules-box"></div>`;
+    m.innerHTML = `<div id="auto-simple"></div><h2 class="rules-head" style="margin-top:28px">עורך הכללים המלא <small class="faint">מתקדם</small></h2><div id="rules-box"></div>`;
+    viewAutoSetup($('#auto-simple'));
     crmAuto($('#rules-box'));
+  }
+  /* Setup (יצחק, 16/10): what the system does by itself is set before the fair, in words — a few ready rules,
+   * each on or off, and what "cold" means for him. The full editor stays with the advanced tools. */
+  const COLD_DO = [['ask', 'לשאול אותי בסוף היום'], ['list', 'להעביר לרשימת התפוצה'], ['tasks', 'לתת לו משימות כמו לכל מבקר']];
+  function viewAutoSetup(m) {
+    const b = S.biz;
+    const rules = b.rules || [];
+    m.innerHTML = `<h1>מה המערכת עושה לבד</h1>
+      <p class="muted">כמה דברים שהמערכת עושה בשבילך. אפשר להדליק, לכבות ולשנות כל אחד — גם אחר כך, בהגדרות.</p>
+      <div class="stack" style="margin-top:14px">
+        <section class="card"><h2>כשסימנת "${esc(words()[2])}"</h2>
+          <p class="muted">רק אתה יודע מה התכוונת. לכן המערכת לא מחליטה לבד, אלא עושה מה שתבחר כאן.</p>
+          <div class="chips">${COLD_DO.map(([k, t]) => `<button class="chip" data-colddo="${k}" aria-pressed="${b.coldDo === k}">${esc(t)}</button>`).join('')}</div></section>
+        <section class="card"><h2>עוד דברים שהמערכת עושה</h2>
+          <div class="rules">${rules.map((r) => { const t = ruleText(r); return `<div class="rule${r.on ? '' : ' off'}">${toggle('rule:' + r.id, r.on, 'הפעלת הכלל')}
+            <div class="rule-body"><span class="when">${esc(t.when)}</span><span class="then">⚙️ ${esc(t.then)}${sendsOut(r) ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span></div></div>`; }).join('')}</div>
+          ${S.phase === 'setup' ? '<div class="actions"><button class="link" data-act="tune" data-tune="auto">לשנות או להוסיף — בעורך הכללים המלא ←</button></div>' : ''}</section>
+      </div>`;
   }
 
   // ---- buttons, in groups ----
@@ -1870,6 +1892,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   function upgrade() {
     const b = S.biz;
     if (!b.stages) b.stages = clone(DEF_STAGES);
+    if (!b.coldDo) b.coldDo = 'ask';
     if (!b.listV) {   // 16/10: "audience" and "not relevant" are one — the mailing list, the last stage
       b.listV = true;
       const lost = b.stages.find((s) => s.kind === 'lost');
@@ -3508,6 +3531,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       else S.biz[k] = !S.biz[k];
       save(); return render();
     }
+    if (d.colddo) { S.biz.coldDo = d.colddo; save(); return render(); }
     if (d.idle) { S.biz.idleSec = +d.idle; save(); return render(); }
     if (d.remind) { S.biz.remindWeeks = +d.remind; save(); return render(); }
     if (d.aftersale !== undefined) { S.biz.afterSale = +d.aftersale; save(); return render(); }
