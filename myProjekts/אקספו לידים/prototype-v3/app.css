@@ -1247,3 +1247,15 @@ details.adv > summary h2 { font-size: 17px; }
 .mod span { font-size: 14px; color: var(--muted); }
 .mod:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .search-row .help { align-self: center; }
+
+/* The "?" explanation: beside the mark, on hover or a tap — not a dialog over the screen. */
+.helppop { position: fixed; z-index: 60; display: grid; gap: 4px; padding: var(--s3) var(--s4); background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--shadow-lg); font-size: 14.5px; line-height: 1.55; text-align: right; }
+.helppop b { font-size: 15px; }
+/* The agent's own findings in the CRM, above the conversation. */
+.as-miss { display: grid; gap: var(--s2); padding: var(--s3); border: 1px solid var(--ai-line); border-radius: var(--r); background: var(--ai-soft); }
+.as-item { display: flex; gap: var(--s3); align-items: center; justify-content: space-between; font-size: 14.5px; border-top: 1px solid var(--ai-line); padding-top: var(--s2); }
+.as-item:first-of-type { border-top: 0; padding-top: 0; }
+.as-item .btn { flex: none; }
+.miss-n { color: var(--ai) !important; font-weight: 700 !important; }
+/* The booth's send button with a default message: one tap. */
+.send-def[aria-pressed="true"] { background: var(--good-soft); border-color: var(--good-line); color: var(--good); }

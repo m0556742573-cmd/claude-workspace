@@ -752,13 +752,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="brand">${esc(S.biz.name || 'דוכן חכם')}${S.phase === 'settings' ? ' <span class="faint">· הגדרות</span>' : setup ? ' <span class="faint">· הקמה</span>' : ''}</div>
       ${nav}
       <span class="saved-ind" id="saved-ind" aria-live="polite"></span>
-      ${assist ? '<button class="btn assist-btn" data-act="assist">✨ עוזר</button>' : ''}
-      ${S.signed ? `<button class="icon-btn bell-btn" data-act="bell" aria-label="הודעות${n ? ' — ' + n + ' חדשות' : ''}">🔔${n ? '<span class="red-dot"></span>' : ''}</button>` : ''}
+      ${assist ? '<button class="btn assist-btn" data-act="assist">✨ סוכן AI</button>'
+ : ''}
+      ${S.signed && !worker() && S.phase !== 'settings' ? '<button class="icon-btn" data-act="settings" aria-label="הגדרות" title="הגדרות">⚙️</button>' : ''}
+      ${S.signed ? `<button class="icon-btn bell-btn"
+ data-act="bell" aria-label="הודעות${n ? ' — ' + n + ' חדשות' : ''}">🔔${n ? '<span class="red-dot"></span>' : ''}</button>` : ''}
       ${worker() ? '<span class="lock">🔒 טאבלט עובד</span>' : ''}
       ${S.signed ? '<button class="icon-btn" data-act="menu" aria-label="תפריט">⋯</button>' : ''}
     </div>`;
     paintSaved();
+    if (AS.open) renderAssist();   // the agent follows the screen he is on
   }
+
   /* "✓ נשמר", in the top bar, a moment after every change in the settings (יצחק, 17/10): there is no "save" button to look for. */
   // Kept as a moment, not as an element: the top bar is redrawn by the same tap that saved.
   let savedAt = 0;
@@ -784,7 +789,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     sheet(`<h2>הודעות</h2>
       <div class="support"><b>תמיכה ביום התערוכה</b><span>טלפון: <bdi dir="ltr">${esc(SUPPORT.phone)}</bdi></span><span>מייל: <bdi dir="ltr">${esc(SUPPORT.email)}</bdi></span></div>
       ${list.length ? `<ul class="notices">${list.map((x) => `<li class="${x.read ? '' : 'new'}${x.urgent ? ' urgent' : ''}"><span class="when">${esc(H.heDate(new Date(x.at)))} ${new Date(x.at).toTimeString().slice(0, 5)}</span>${x.urgent ? '<b>דחוף · </b>' : ''}${esc(x.text)}</li>`).join('')}</ul>` : '<p class="muted">אין הודעות.</p>'}
+      <div class="label">פנייה למפעילים <small>תקלה, שאלה, משהו לא עובד</small></div>
+      <textarea id="tk-text" class="say small" placeholder="מה קרה? למשל: הטאבלט לא מוצא שמות"></textarea>
+      <div class="actions"><button class="btn" data-act="ticket-send">לשלוח למפעילים</button></div>
+      ${(S.tickets || []).length ? `<div class="label">הפניות שלך</div><ul class="notices">${S.tickets.slice().reverse().map((x) => `<li><span class="when">${esc(H.heDate(new Date(x.at)))} ${new Date(x.at).toTimeString().slice(0, 5)} · ${esc(x.status)}</span>${esc(x.text)}</li>`).join('')}</ul>` : ''}
       <div class="actions"><button class="btn primary" data-act="bell-read">סגירה</button></div>`);
+  }
+  /** A request to the operators (יצחק, 17/10): kept with its status. In the demo it is received, not sent anywhere. */
+  function sendTicket() {
+    const v = ($('#tk-text') && $('#tk-text').value.trim()) || '';
+    if (!v) { if ($('#tk-text')) $('#tk-text').focus(); return toast('מה קרה?'); }
+    S.tickets = (S.tickets || []).concat({ at: Date.now(), text: v.slice(0, 600), status: 'התקבלה — נחזור אליך' });
+    save(); sheetBell(); toast('✓ הפנייה נשלחה למפעילים (בהדגמה — לא יוצאת)');
   }
   const notify = (text, urgent) => { S.notices = (S.notices || []).concat({ id: 'n' + Date.now(), at: Date.now(), text, urgent: !!urgent, read: false }); };
 
@@ -1041,42 +1057,47 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     `<button class="link" data-act="tune" data-tune="${sub}">${esc(t)} ←</button>`).join(' · ')}</div>`;
 
   // ------------------------------------------------------------------
-  // Setup 3 — what goes out, and how: one channel, the catalogue, its words
+  // Setup 3 — what goes out: how it reaches him, and the messages
   // ------------------------------------------------------------------
+  /* 17/10 (יצחק): the second part of "what goes out" is the messages themselves — a message, and the way to add
+   * more. "What will be written to him" is not a part of its own: it is the message. Each one can be written by the
+   * AI, and one of them is the booth's default — what the send button on a visitor's card sends. */
   function viewSend(m) {
     const b = S.biz;
-    const cat = b.templates.find((t) => t.mat);
+    const def = boothDefault();
     const sample = (t) => t.text.replace(/\{שם\}/g, 'משה כהן').replace(/\{עסק\}/g, b.name || 'העסק').replace(/\{(קובץ|חומר)\}/g, t.mat || 'הקובץ');
     m.innerHTML = `<h1>מה שולחים למבקר ${help('send')}</h1>
-      <p class="muted">שלושה דברים קצרים. אפשר לשנות אחר כך.</p>
+      <p class="muted">שני דברים קצרים. אפשר לשנות הכל אחר כך, בהגדרות.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>1. איך המבקרים יקבלו את מה ששלחת?</h2>${channelQuestion()}
           <p class="faint" style="margin-top:8px">${esc(mailPreview(b.mail.prefix || 'info'))}</p></section>
-        <section class="card"><h2>2. הקטלוג</h2>
-          ${cat ? `<p>📎 <b>${esc(cat.mat)}</b> — מצורף להודעה "${esc(cat.name)}".</p>` : '<p class="muted">מה שמבקרים יבקשו בדוכן: קטלוג, מחירון, תמונות. אפשר גם לדלג ולהוסיף בדוכן.</p>'}
-          <div class="add-row"><input id="cat-name" class="text-input" value="${cat ? '' : 'קטלוג'}" placeholder="שם — קטלוג, מחירון, תמונות עבודות" autocomplete="off">
-            <label class="btn" for="cat-file">📷 לצרף קובץ</label></div><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></section>
-        ${cat ? `<section class="card"><h2>3. מה ייכתב לו</h2><p class="muted">כדי שהשם שלו יופיע, כתוב {שם} — המערכת תשים במקומו את השם. כך גם {עסק}.</p>
-          <textarea id="cat-text" class="say small">${esc(cat.text)}</textarea>
-          <p class="faint" id="cat-prev">${esc(sample(cat))}</p></section>` : ''}
-      </div>
-      ${tuneLinks([['materials', 'עוד הודעות'], ['channels', 'הגדרות המייל והוואטסאפ']])}`;
-    const txt = $('#cat-text');
-    if (txt) txt.addEventListener('input', (e) => { cat.text = e.target.value; save(); $('#cat-prev').textContent = sample(cat); });
+        <section class="card"><h2>2. ההודעות ${help('messages')}</h2>
+          <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ: קטלוג, מחירון, תמונות. נגיעה בהודעה פותחת אותה לעריכה${ai ? ', וגם "✨ תכתוב לי"' : ''}.</p>
+          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.booth ? ' <span class="booth-tag">ברירת המחדל בדוכן</span>' : ''}</span><span class="pnext">${esc(sample(t).slice(0, 110))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
+          <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button>${ai ? '<button class="btn" data-act="tpl-ai">✨ תכתוב לי הודעה</button>' : ''}
+            <label class="btn" for="cat-file">📎 הודעה עם קובץ</label><input id="cat-file" type="file" accept="image/*,application/pdf" hidden></div>
+          <div class="label">מה שולח כפתור השליחה בכרטיס המבקר, בדוכן</div>
+          <div class="chips">${b.templates.map((t) => `<button class="chip" data-boothdef="${esc(t.id)}" aria-pressed="${!!(def && def.id === t.id)}">${t.mat ? '📎' : '💬'} ${esc(t.name)}</button>`).join('')}
+            <button class="chip" data-boothdef="" aria-pressed="${!def}">בלי ברירת מחדל — לבחור בכל פעם</button></div>
+          <p class="faint" style="margin-top:6px">${def ? `בדוכן: נגיעה אחת ב"📎 לשלוח", ו"${esc(def.name)}" יוצאת.` : 'בדוכן: נגיעה ב"לשלוח" מראה את ההודעות ככפתורים קטנים, ובוחרים.'}</p></section>
+      </div>`;
     $('#cat-file').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const name = (($('#cat-name') && $('#cat-name').value.trim()) || file.name.replace(/\.[^.]+$/, '') || 'קטלוג').slice(0, 30);
+      const name = (file.name.replace(/\.[^.]+$/, '') || 'קטלוג').slice(0, 30);
       if (b.materials.some((x) => x.name === name)) return toast('כבר יש קובץ בשם הזה');
       const id = addPackageWithFile(name, file.name);
-      // The first catalogue is the one offered at the booth, and what goes out on every channel when nothing else was chosen.
-      if (!b.templates.some((t) => t.booth)) pkgById(id).booth = true;
-
+      // The first catalogue is the booth's default, and what goes out on every channel when nothing else was chosen.
+      if (!boothDefault()) setBoothDefault(id);
       b.chDefault = b.chDefault || {};
       ['wa', 'email', 'sms'].forEach((k) => { if (!b.chDefault[k]) b.chDefault[k] = id; });
-      save(); render(); toast(name + ' נשמר');
+      save(); render(); sheetTemplate(id); toast('"' + name + '" נוספה. אפשר לשנות את השם ואת המילים');
     });
   }
+  /** One message is the booth's default (יצחק, 17/10): the send button on the card sends it. None — he chooses each time. */
+  const boothDefault = () => S.biz.templates.find((t) => t.booth) || null;
+  const setBoothDefault = (id) => { S.biz.templates.forEach((t) => { t.booth = !!id && t.id === id; }); };
+
 
   // ------------------------------------------------------------------
   // Settings — the setup's screens, in two places (יצחק, 17/10: mixing them was "a strategic mistake")
@@ -1085,7 +1106,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const det = S.step === 'details';
     const subs = det ? SUBS_DET : SUBS_HOW;
     if (!subs.some(([k]) => k === S.sub)) S.sub = subs[0][0];
-    const back = { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
+    const back = S.backSetup ? 'להקמה' : { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
     m.innerHTML = `<p class="muted set-intro">${det ? 'הפרטים שלך, ודרכי השליחה: מי אתה, ואיך מה ששולחים מגיע.' : 'מה קורה כשמסמנים, מה המערכת עושה לבד, ואיך הדוכן מתנהג.'} כל שינוי נשמר מיד.</p>
       <nav class="subtabs" aria-label="${det ? 'פרטים וחיבורים' : 'איך המערכת פועלת'}">${subs.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>
       <button class="float-back" data-act="settings-done">← חזרה ${back}</button>`;
@@ -1344,10 +1365,10 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const groups = [['email', 'מייל', true], ['wa', 'וואטסאפ', b.channels.wa], ['sms', 'SMS', b.channels.sms]].filter((g) => g[2]);
     const pkgOpts = (sel) => `<option value="" ${!sel ? 'selected' : ''}>—</option>` + b.templates.map((t) => `<option value="${esc(t.id)}" ${sel === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     m.innerHTML = `<h1>הודעות ${help('messages')}</h1>
-      <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם. בדוכן מופיעות רק אלה שסימנת "נשלחת מהדוכן".</p>
+      <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם. אחת מהן היא ברירת המחדל בדוכן: כפתור השליחה בכרטיס המבקר שולח אותה.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>ההודעות</h2>
-          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.booth ? ' <span class="booth-tag">נשלחת מהדוכן</span>' : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
+          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.booth ? ' <span class="booth-tag">ברירת המחדל בדוכן</span>' : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
           <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button>${ai ? '<button class="btn" data-act="tpl-ai">✨ תכתוב לי הודעה</button>' : ''}</div></section>
         <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו הודעה</h2>
           ${groups.length ? groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')
@@ -1473,7 +1494,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       <label class="label" for="np-first">שם פרטי</label><input id="np-first" class="text-input" autocomplete="off">
       <label class="label" for="np-last">שם משפחה</label><input id="np-last" class="text-input" value="${esc(q)}" autocomplete="off">
       <label class="label" for="np-town">עיר <small>רשות</small></label><input id="np-town" class="text-input" autocomplete="off">
-      <label class="label" for="np-phone">טלפון <small>רשות</small></label><input id="np-phone" class="text-input ltr" type="tel" inputmode="tel" autocomplete="off">
+      <label class="label" for="np-phone">טלפון ${practice() ? '<small>בהדגמה — רשות</small>' : '<small class="req">חובה</small>'}</label><input id="np-phone" class="text-input ltr" type="tel" inputmode="tel" autocomplete="off">
       <div class="actions"><button class="btn primary" data-act="np-save">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button></div>`);
     setTimeout(() => $('#np-first') && $('#np-first').focus(), 30);
   }
@@ -1482,6 +1503,8 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const first = v('#np-first');
     const last = v('#np-last');
     if (!first && !last) { $('#np-first').focus(); return toast('מה השם שלו?'); }
+    // The phone is required only for real (יצחק, 17/10): a sample visitor has none.
+    if (!practice() && !v('#np-phone')) { $('#np-phone').focus(); return toast('מה הטלפון שלו?'); }
 
     const l = newLead('c:' + S.seq, { i: null, b: null });
     l.custom = { first, last, town: v('#np-town') };
@@ -1529,8 +1552,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     paused = false;
     stopIdle();
   }
-  /** The messages offered at the booth: the ones marked "נשלחת מהדוכן" in the settings, or all of them while none is. */
-  const boothPkgs = () => { const t = S.biz.templates; const m = t.filter((x) => x.booth); return (m.length ? m : t).slice(0, 4); };
+
   /** One lead editor, used at the booth and in a sheet from the dashboard or the CRM. */
   function leadBody(l, inSheet) {
     const w = effWarm(l);
@@ -1541,12 +1563,16 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const queued = (l.queue || []).map((q) => (pkgById(q.pkg) || { name: 'ברירת המחדל' }).name);
     // Nothing waits (יצחק, 16/10): a message goes out at once or not at all. What is not set up yet is a red dot, not a state of the visitor.
     const ready = sendReady();
-    // At the booth a message is chosen, never written (יצחק, 17/10): the ready messages are small buttons, and a tap sends.
+    // At the booth a message is chosen, never written (יצחק, 17/10). With a default, the send button sends it in one tap;
+    // without one, the messages show as small buttons, and a tap sends.
+    const dflt = boothDefault();
     const sendBtn = !ready && !l.sent.length
       ? `<button class="btn has-dot" data-act="not-ready">📎 לשלוח לו<span class="red-dot" aria-label="עוד לא הוגדר איך לשלוח"></span></button>`
       : autoSent
         ? `<span class="sent-note">📎 ${queued.length ? 'יישלח כשתסיים: ' + esc(queued.join(', ')) : l.sent.length ? 'נשלח: ' + esc(l.sent.join(', ')) : 'יישלח'}</span>`
-        : `<span class="send-row"><span class="faint">לשלוח לו:</span>${boothPkgs().map((t) => `<button class="chip send-chip" data-sendnow="${esc(t.id)}" data-lid="${l.id}" aria-pressed="${l.sent.includes(t.name)}">${l.sent.includes(t.name) ? '✓ ' : t.mat ? '📎 ' : '💬 '}${esc(t.name)}</button>`).join('')}</span>`;
+        : dflt
+          ? `<button class="btn send-def" data-sendnow="${esc(dflt.id)}" data-lid="${l.id}" aria-pressed="${l.sent.includes(dflt.name)}">${l.sent.includes(dflt.name) ? '✓ נשלח: ' : '📎 לשלוח: '}${esc(dflt.name)}</button>`
+          : `<span class="send-row"><span class="faint">לשלוח לו:</span>${S.biz.templates.slice(0, 5).map((t) => `<button class="chip send-chip" data-sendnow="${esc(t.id)}" data-lid="${l.id}" aria-pressed="${l.sent.includes(t.name)}">${l.sent.includes(t.name) ? '✓ ' : t.mat ? '📎 ' : '💬 '}${esc(t.name)}</button>`).join('')}</span>`;
     const last = l.notes[l.notes.length - 1];
     const hintPause = !inSheet && practice() && !(S.seen && S.seen.pause);
     return `
@@ -2128,6 +2154,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     delete b.team;   // the team was taken out (יצחק, 09/10): a lead belongs to the business
     if (!b.templates) b.templates = clone(DEF_TEMPLATES);
     if (!b.rules) b.rules = clone(DEF_RULES);
+    b.templates.filter((t) => t.booth).slice(1).forEach((t) => { t.booth = false; });   // one booth default, never several
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
     if (b.digest.ch === 'sms') b.digest.ch = 'wa';
     if (!b.digestNotes) b.digestNotes = [];
@@ -2420,7 +2447,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         ${CRM_TABS.map(([k, t, icon]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}">${ic(icon)}<span>${t}</span>${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
         <span class="crm-nav-sep"></span>
         <button class="ctab minor" data-act="crm-rules">${ic('repeat')}<span>כללים</span></button>
-        ${worker() ? '' : `<button class="ctab minor" data-act="assist">${ic('spark')}<span>עוזר AI</span></button>`}
+        ${worker() ? '' : (() => { const n = crmMisses().length; return `<button class="ctab minor" data-act="assist">${ic('spark')}<span>סוכן AI</span>${n ? `<span class="cn miss-n">${n}</span>` : ''}</button>`; })()}
         <button class="ctab minor" data-act="settings">${ic('auto')}<span>הגדרות</span></button></nav>
       <div class="crm-main">
         <div class="crm-head">${full || S.crmTab === 'overview' ? '' : `<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>`}
@@ -3149,7 +3176,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       ${ai ? `<div class="ai-write"><input id="tp-ask" class="text-input" placeholder="על מה ההודעה? למשל: תודה על הביקור, והמחירון מצורף" autocomplete="off"><button class="btn" data-act="tpl-write" id="tp-write">✨ תכתוב לי</button></div>` : ''}
       <div class="chips">${[['{שם}', '+ שם'], ['{עסק}', '+ שם העסק'], ['{קובץ}', '+ שם הקובץ']].map(([v, l]) => `<button class="chip small" data-tplvar="${v}">${l}</button>`).join('')}</div>
       <textarea id="tp-text" class="say small">${esc(t.text)}</textarea>
-      <label class="check-line"><input type="checkbox" id="tp-booth" ${t.booth ? 'checked' : ''}> נשלחת מהדוכן <span class="faint">— תופיע ככפתור בכרטיס של המבקר</span></label>
+      <label class="check-line"><input type="checkbox" id="tp-booth" ${t.booth ? 'checked' : ''}> ברירת המחדל בדוכן <span class="faint">— כפתור השליחה בכרטיס המבקר שולח אותה</span></label>
       <p class="faint">{קובץ} = שם הקובץ המצורף. בלי קובץ — לא לכתוב "מצורף".</p>
       <p class="faint">בשליחה לקבוצה נוספת לבד השורה: "${esc(OPT_OUT)}"</p>
       <div class="actions"><button class="btn primary" data-act="tpl-save" data-id="${esc(t.id)}">שמירה</button><button class="btn ghost" data-act="sheet-close">ביטול</button>
@@ -3408,7 +3435,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
       l.at -= back; l.log.forEach((e) => { e.at -= back; }); l.notes.forEach((n) => { n.at -= back; });
       upgradeLead(l);
       l.by = Math.random() < 0.7 ? 'בעלים' : 'עובד';
-      l.contact = { phone: '050-000-' + String(1000 + rnd(9000)), email: 'demo' + l.id + '@example.com' };
+      // יצחק, 17/10: in the demo no lead has a phone or a mail. Only the real system has them, from the organisers' list.
+      l.contact = practice() ? { phone: '', email: '' } : { phone: '050-000-' + String(1000 + rnd(9000)), email: 'demo' + l.id + '@example.com' };
 
       const ev = (d, t) => l.log.push({ at: l.at + d * H.DAY + rnd(6) * 3600000, t });
       const r = Math.random();
@@ -3467,7 +3495,7 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     collect: ['גם לאסוף לרשימת התפוצה', 'כבוי, אלא אם אתה רוצה בזה. כשהוא דלוק, בכרטיס יש כפתור "רק לרשימת התפוצה": המבקר נרשם כדי לקבל ממך הודעות, אבל הוא לא ליד — אין לו משימות ואין אחריו מעקב.'],
     stages: ['שלבי המכירה', 'איפה כל ליד עומד: מליד חדש ועד עסקה. "נסגרה עסקה" ו"לא נסגרה" מסיימים את המעקב. רשימת התפוצה היא דבר נפרד: לקוח יכול להיות בה בכל שלב.'],
     digest: ['הודעת הבוקר', 'כל בוקר, בשעה שבחרת: מי מחכה לך היום, מה באיחור, ומה המערכת עשתה לבד. נשלחת אליך בלבד.'],
-    messages: ['הודעות', 'כל מה שיוצא למבקר הוא הודעה עם שם, ואפשר לצרף לה קובץ. הודעה שסימנת "נשלחת מהדוכן" מופיעה ככפתור קטן בכרטיס של המבקר — נגיעה, והיא יוצאת.'],
+    messages: ['הודעות', 'כל מה שיוצא למבקר הוא הודעה עם שם, ואפשר לצרף לה קובץ. הודעה אחת היא ברירת המחדל בדוכן: כפתור השליחה בכרטיס המבקר שולח אותה בנגיעה. בלי ברירת מחדל — ההודעות מופיעות ככפתורים קטנים, ובוחרים.'],
     buttons: ['כפתורים ומשימות', 'הכפתורים שבכרטיס, בקבוצות. מאחורי כל כפתור יש משימה אחת או יותר. שינוי באמצע התערוכה חל על המבקרים הבאים, והמערכת שואלת אם להחיל אותו גם על הקיימים.'],
     seasons: ['עונות', 'התקופות שבהן קונים ממך הכי הרבה, לפי הלוח העברי. ליד שנשמר "לעונה" חוזר אליך כמה שבועות לפני שהיא מתחילה.'],
     booth: ['הדוכן', 'כמה אותיות מהשם, ונגיעה בשם — הוא נשמר. כל השאר רשות: החום, הכפתורים, הערה. הכרטיס נסגר לבד אחרי כמה שניות בלי נגיעה, או ב"✓ סיום". מי שלא ברשימה — "＋ מבקר חדש".'],
@@ -3476,11 +3504,32 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     home: ['דף הבית', 'מה מחכה לך היום, והבא בתור: ליד אחד, עם מה שצריך לעשות איתו. נגיעה במספר פותחת את הרשימה שלו.'],
   };
   const help = (k) => (HELP[k] ? `<button class="help" data-help="${k}" aria-label="הסבר: ${esc(HELP[k][0])}">?</button>` : '');
-  function sheetHelp(k) {
-    const h = HELP[k];
+  /* The explanation opens beside the "?" when the mouse rests on it (יצחק, 17/10), and on a tablet with a tap;
+   * it closes when the mouse leaves, or with a tap anywhere else. It never covers the screen like a dialog. */
+  let helpFor = null;
+  function showHelp(b) {
+    hideHelp();
+    const h = HELP[b.dataset.help];
     if (!h) return;
-    sheet(`<h2>${esc(h[0])}</h2><p>${esc(h[1])}</p><div class="actions"><button class="btn primary" data-act="sheet-close">הבנתי</button></div>`);
+    const p = document.createElement('div');
+    p.id = 'helppop'; p.className = 'helppop'; p.setAttribute('role', 'tooltip');
+    p.innerHTML = `<b>${esc(h[0])}</b><span>${esc(h[1])}</span>`;
+    document.body.appendChild(p);
+    const r = b.getBoundingClientRect();
+    const w = Math.min(320, innerWidth - 24);
+    p.style.width = w + 'px';
+    p.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+    const below = r.bottom + 8;
+    p.style.top = (below + p.offsetHeight > innerHeight - 8 ? Math.max(8, r.top - p.offsetHeight - 8) : below) + 'px';
+    helpFor = b;
   }
+  function hideHelp() { const p = $('#helppop'); if (p) p.remove(); helpFor = null; }
+  if (FINE) document.addEventListener('mouseover', (e) => {
+    const b = e.target.closest && e.target.closest('.help');
+    if (b && b !== helpFor) showHelp(b);
+    else if (!b && helpFor && !(e.target.closest && e.target.closest('#helppop'))) hideHelp();
+  });
+  window.addEventListener('scroll', hideHelp, { passive: true });
 
   // ------------------------------------------------------------------
   // The assistant (יצחק, 17/10): one panel, everywhere but the booth. It knows where he is; it answers, and in the
@@ -3502,6 +3551,25 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     dash: ['איך היה היום?', 'מה הכי חשוב להשלים עכשיו?'],
     other: ['מה אפשר לעשות כאן?'],
   };
+  /* In the CRM the agent does not wait to be asked (יצחק, 17/10: "gives advice, reports what was missed"): it opens
+   * with what it noticed — counted from the data, not guessed — each with the way to the leads it means. */
+  function crmMisses() {
+    const L = crmLeads();
+    const t0 = dayNo(now());
+    const out = [];
+    const late = L.filter((l) => { const p = plan(l); return tasks(l).length && p.due && dayNo(p.due.getTime()) < t0; });
+    if (late.length) out.push({ text: `${many(late.length, 'משימה אחת באיחור', 'משימות באיחור')}.`, act: 'go-today', go: 'לרשימה' });
+    const hot = L.filter((l) => effWarm(l) === 0 && isOpenLead(l) && !reached(l) && t0 - dayNo(l.at) >= 2);
+    if (hot.length) out.push({ text: `${hot.length === 1 ? 'ליד אחד שסימנת' : hot.length + ' לידים שסימנת'} "${words()[0]}" — ועוד לא היה איתם קשר. מהירות החזרה היא מה שהכי משפיע על סגירה.`, act: 'miss-hot', go: 'להציג' });
+    const decide = L.filter(undecided);
+    if (decide.length) out.push({ text: decide.length === 1 ? 'אחד מחכה שתחליט מה איתו.' : decide.length + ' מחכים שתחליט מה איתם.', act: 'go-decide', go: 'להחליט' });
+    const twice = L.filter((l) => (l.noAnswer || 0) >= 2 && tasks(l).length && !l.sent.length);
+    if (twice.length) out.push({ text: `${twice.length === 1 ? 'אחד לא ענה' : twice.length + ' לא ענו'} פעמיים, ועוד לא קיבלו ממך הודעה. אולי הודעה במקום עוד שיחה.`, act: 'view-noanswer', go: 'להציג' });
+    const noPhone = L.filter((l) => { const p = plan(l); return tasks(l).length && ['call', 'meet'].includes(p.type) && !l.contact.phone; });
+    // The samples have no phone by design (17/10): not a miss.
+    if (noPhone.length && !practice()) out.push({ text: `${noPhone.length === 1 ? 'לאחד יש' : 'ל-' + noPhone.length + ' יש'} שיחה מתוכננת — ואין טלפון.`, act: 'go-today', go: 'לרשימה' });
+    return out;
+  }
   function renderAssist() {
     let p = $('#assist');
     if (!AS.open) { if (p) p.remove(); document.body.classList.remove('with-assist'); return; }
@@ -3511,12 +3579,13 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const chg = (x, mi, ci) => `<div class="as-change"><span>${esc(changeText(x))}${x.why ? `<small>${esc(x.why)}</small>` : ''}</span>
       ${x.done ? '<span class="faint">✓ הוחל</span>' : `<button class="btn" data-asapply="${mi}:${ci}">להחיל</button>`}</div>`;
     const msg = (x, mi) => `<div class="as-msg ${x.who}">${esc(x.text)}${(x.changes || []).map((y, ci) => chg(y, mi, ci)).join('')}</div>`;
-    p.innerHTML = `<div class="as-head"><b>✨ עוזר</b><span class="faint">אתה ב${esc(c.where)}</span><button class="icon-btn" data-act="assist-close" aria-label="סגירה">✕</button></div>
-      <div class="as-body" id="as-body">${AS.msgs.length ? AS.msgs.map(msg).join('') : `<p class="muted">אפשר לשאול כל דבר על המערכת ועל הלידים שלך.${c.kind === 'settings' ? ' בהגדרות אני גם מציע שינויים — והם קורים רק כשתלחץ "להחיל".' : ''}</p>`}
+    p.innerHTML = `<div class="as-head"><b>✨ סוכן AI</b><span class="faint">אתה ב${esc(c.where)}</span><button class="icon-btn" data-act="assist-close" aria-label="סגירה">✕</button></div>
+      <div class="as-body" id="as-body">${c.kind === 'crm' ? (() => { const ms = crmMisses(); return `<section class="as-miss"><b>מה שמתי לב אליו</b>${ms.length ? ms.map((x) => `<div class="as-item"><span>${esc(x.text)}</span><button class="btn" data-act="${x.act}">${esc(x.go)}</button></div>`).join('') : '<p class="faint">לא פספסת כלום. הכל בזמן.</p>'}</section>`; })() : ''}
+        ${AS.msgs.length ? AS.msgs.map(msg).join('') : `<p class="muted">אפשר לשאול כל דבר על המערכת ועל הלידים שלך.${c.kind === 'settings' ? ' בהגדרות אני גם מציע שינויים — והם קורים רק כשתלחץ "להחיל".' : ''}</p>`}
         ${AS.busy ? '<div class="as-msg ai faint">חושב…</div>' : ''}
         ${!AS.msgs.length ? `<div class="chips">${(AS_SUGGEST[c.kind] || AS_SUGGEST.other).map((q) => `<button class="chip" data-asq="${esc(q)}">${esc(q)}</button>`).join('')}</div>` : ''}</div>
       ${ai ? `<form class="as-ask" data-askform><input id="as-q" class="text-input" placeholder="לשאול משהו…" aria-label="שאלה לעוזר" autocomplete="off"><button class="btn primary" data-act="assist-ask" ${AS.busy ? 'disabled' : ''}>לשאול</button></form>`
-        : '<p class="as-off">העוזר לא מחובר בהדגמה הזו. במערכת האמיתית הוא עונה כאן על כל שאלה, ובהגדרות גם מציע שינויים שאפשר להחיל בנגיעה.</p>'}`;
+        : '<p class="as-off">הסוכן לא מחובר בהדגמה הזו. במערכת האמיתית הוא עונה כאן על כל שאלה, ובהגדרות גם מציע שינויים שאפשר להחיל בנגיעה.</p>'}`;
     const body = $('#as-body');
     if (body) body.scrollTop = body.scrollHeight;
   }
@@ -3696,7 +3765,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     const m = document.createElement('div');
     m.className = 'menu'; m.id = 'menu';
     m.innerHTML = [
-      S.phase !== 'setup' && !worker() ? '<button data-act="settings">⚙️ הגדרות</button>' : '',
+      !worker() && S.phase !== 'settings' ? '<button data-act="settings">⚙️ הגדרות</button>' : '',
       afterFair() ? '' : '<button data-act="devices">להוסיף טאבלט</button>',
       '<div class="menu-sep">הדגמה בלבד</div>',
       '<button data-act="sys">מצב המערכת (של יצחק)</button>',
@@ -3840,6 +3909,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
   document.addEventListener('submit', (e) => e.preventDefault());   // the ask box is a form only so Enter works
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button');
+    if (helpFor && !(b && b.classList.contains('help')) && !e.target.closest('#helppop')) hideHelp();
     // A dashboard list that is open closes on a tap outside it — before the tap does whatever else it does.
     const outside = fillOpen && S.phase === 'live' && S.view === 'dash' && !e.target.closest('.ask-card.open') && !e.target.closest('#scrim') && !e.target.closest('#toast');
     if (outside && (!b || b.dataset.act !== 'fill-open')) { fillOpen = false; render(); if (!b) return; }
@@ -3865,7 +3935,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillSnap = {}; filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; if (S.phase === 'settings') S.sub = (d.step === 'details' ? SUBS_DET : SUBS_HOW)[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     if (d.sub) { S.sub = d.sub; save(); render(); return window.scrollTo(0, 0); }
-    if (d.help) return sheetHelp(d.help);
+    if (d.help) { if (helpFor === b) hideHelp(); else showHelp(b); return; }
     // The booth card in the business step: try it, or edit its buttons in place.
     if (d.pvmode) { PVW.mode = d.pvmode; return renderPreview(); }
     if (d.pvtag) { const t = btnById(d.pvtag); if (!t) return; if (PVW.tags.includes(t.id)) PVW.tags = PVW.tags.filter((x) => x !== t.id); else { const g = groupById(t.axis); if (!g || !g.multi) PVW.tags = PVW.tags.filter((x) => { const o = btnById(x); return !o || o.axis !== t.axis; }); PVW.tags.push(t.id); } return renderPreview(); }
@@ -3874,6 +3944,8 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (d.chq) { const k = d.chq; if (k === 'wa' && !S.biz.channels.wa) return sheetConnect(); S.biz.channels[k] = !S.biz.channels[k]; save(); return render(); }
     if (d.noansdo) { S.biz.noAnsDo = d.noansdo; save(); return render(); }
     if (d.ruletab) { ruleTab = d.ruletab; return render(); }
+    if (d.boothdef !== undefined) { setBoothDefault(d.boothdef); save(); return render(); }
+
     if (d.sys) return setSys(d.sys);
     if (d.asq) return askAssist(d.asq);
     if (d.asapply) { const [mi, ci] = d.asapply.split(':').map(Number); return applyChange(mi, ci); }
@@ -4102,8 +4174,10 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         if (!checkAccount()) { S.step = 'account'; render(); return toast('מה השם שלך?'); }
         S.phase = 'live'; S.view = afterFair() ? 'crm' : 'booth'; save(); render(); window.scrollTo(0, 0);
         return toast(practice() ? 'ההקמה הסתיימה. זה הדוכן — לדוגמה, עד שהמערכת תעבור למצב אמיתי.' : 'ההקמה הסתיימה. בהצלחה!');
+      // The settings are open at any time, the setup's first run included (יצחק, 17/10); from the setup, "back" returns to its step.
       case 'settings':
         if (worker()) return ownerOnly('ההגדרות');
+        if (S.phase === 'setup') S.backSetup = S.step;
         return goSettings(S.sub && S.sub !== 'custom' ? S.sub : 'buttons');
       case 'settings-done':
         if (S.backSetup) { S.phase = 'setup'; S.step = S.backSetup; S.backSetup = null; }
@@ -4116,6 +4190,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'si-code': { const v = ($('#si-code') && $('#si-code').value.trim()) || ''; if (!/^\d{4}$/.test(v)) { toast('4 ספרות'); return $('#si-code').focus(); } return signedIn(); }
       case 'sign-out': S.signed = false; signStep = null; closeLead(); AS.open = false; renderAssist(); save(); render(); return window.scrollTo(0, 0);
       case 'bell': return sheetBell();
+      case 'ticket-send': return sendTicket();
       case 'bell-read': (S.notices || []).forEach((x) => { x.read = true; }); save(); closeSheet(false); return render();
       case 'notice-read': { const x = (S.notices || []).find((y) => y.id === d.id); if (x) x.read = true; save(); return render(); }
       case 'sys': return sheetSys();
@@ -4329,9 +4404,10 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         const pm = document.querySelector('[data-tpmat][aria-pressed="true"]');
         const mat = pm ? pm.dataset.tpmat : '';
         const booth = !!($('#tp-booth') && $('#tp-booth').checked);
-        const t = d.id ? S.biz.templates.find((x) => x.id === d.id) : null;
-        if (t) Object.assign(t, { name, text, mat, booth });
-        else S.biz.templates.push({ id: 't' + Date.now(), name, text, mat, booth });
+        let t = d.id ? S.biz.templates.find((x) => x.id === d.id) : null;
+        if (t) Object.assign(t, { name, text, mat });
+        else { t = { id: 't' + Date.now(), name, text, mat, booth: false }; S.biz.templates.push(t); }
+        if (booth) setBoothDefault(t.id); else t.booth = false;   // one default only
         save(); closeSheet(false); return render();
       }
       case 'tpl-del': { const id = d.id; closeSheet(false); undoable('ההודעה נמחקה', () => { S.biz.templates = S.biz.templates.filter((x) => x.id !== id); }); return render(); }
@@ -4340,6 +4416,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'go-today': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'today'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
       case 'go-week': crmPlace(); S.crmTab = 'tasks'; S.crmView.tasks = 'list'; S.crmLead = null; crmFilter = 'week'; crmQuery = ''; save(); render(); return window.scrollTo(0, 0);
       case 'view-noanswer': S.tb.f = { answer: 'none' }; tbIds = null; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; save(); render(); return window.scrollTo(0, 0);
+      case 'miss-hot': S.tb.f = { warm: '0', answer: 'none' }; tbIds = null; tbQuery = ''; tbPage = 0; S.crmTab = 'table'; S.crmLead = null; save(); render(); return window.scrollTo(0, 0);
       case 'move-send': case 'move-hold': {
         if (!L) return;
         closeSheet(false);
