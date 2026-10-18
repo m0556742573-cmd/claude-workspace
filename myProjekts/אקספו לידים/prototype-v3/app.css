@@ -1091,3 +1091,159 @@ details.adv > summary::-webkit-details-marker { display: none; }
 details.adv > summary::before { content: "‹"; color: var(--faint); font-weight: 700; transition: transform .15s ease; display: inline-block; }
 details.adv[open] > summary::before { transform: rotate(-90deg); }
 details.adv > summary h2 { font-size: 17px; }
+
+/* ====================================================================== */
+/* 17–18/10 — after Yitzhak's own walk through the system. Same tokens,    */
+/* same ladder, nothing above overridden except where the markup changed:  */
+/* sign-in, the thin setup line, the settings in two, the bell, the       */
+/* assistant panel, the booth's pause and its small send buttons, the CRM  */
+/* side menu and home page — and dialogs in the middle on a tablet.       */
+/* ====================================================================== */
+
+/* A sheet cut at the bottom of a tablet looked broken (17/10): from a tablet's width up it is a dialog in the middle. */
+@media (min-width: 600px) {
+  .scrim { align-items: center; padding: var(--s4); }
+  .sheet { border-radius: var(--r-lg); border-bottom: 1px solid var(--line); max-height: calc(100vh - 2 * var(--s6)); }
+}
+
+/* Sign-in */
+.sign-in { margin-top: var(--s8); text-align: center; }
+.sign-in h1 { font-size: 30px; }
+.sign-in .opts { max-width: 360px; margin-inline: auto; }
+.sign-in .opt { text-align: center; }
+.sign-in .text-input, .sign-in .label { max-width: 360px; margin-inline: auto; text-align: start; }
+.sign-in .actions { justify-content: center; }
+.opt.google { display: flex; align-items: center; justify-content: center; gap: var(--s2); }
+.opt.google .g { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); display: inline-grid; place-items: center; font-weight: 700; font-size: 14px; }
+.card.narrow { max-width: var(--w-prose); margin-inline: auto; }
+
+/* Setup: a thin line of steps (17/10) — where he is, and what is behind and ahead. */
+.stepper { display: flex; gap: var(--s2); flex: 1; min-width: 0; }
+.stepper .st { flex: 1; min-width: 0; border: 0; background: transparent; padding: var(--s1) 0 0; display: grid; gap: 4px; text-align: start; color: var(--faint); font-size: 13px; font-weight: 600; }
+.stepper .st .bar { display: block; height: 3px; border-radius: var(--pill); background: var(--surface-3); }
+.stepper .st.done .bar { background: var(--ink-2); }
+.stepper .st[aria-current="true"] { color: var(--ink); }
+.stepper .st[aria-current="true"] .bar { background: var(--ink); }
+.stepper .st .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stepper .st:disabled { opacity: .5; cursor: default; }
+@media (max-width: 700px) { .stepper .st:not([aria-current="true"]) .t { visibility: hidden; } }
+.next-bar { gap: var(--s2); align-items: center; }
+
+/* "saved" in the top bar, a moment after each change in the settings. */
+.saved-ind { font-size: 13.5px; font-weight: 600; color: var(--good); opacity: 0; transition: opacity .25s; white-space: nowrap; }
+.saved-ind.on { opacity: 1; }
+.set-intro { max-width: none; margin: 0 0 var(--s3); }
+/* The way back from the settings floats at the bottom, always in reach. */
+.float-back { position: fixed; bottom: var(--s5); inset-inline-start: var(--s5); z-index: 25; border: 1px solid var(--ink); background: var(--ink); color: var(--accent-ink); border-radius: var(--pill); min-height: 48px; padding: 0 var(--s5); font-weight: 700; box-shadow: var(--shadow-lg); }
+.float-back:hover { background: var(--ink-2); }
+
+/* "?" beside a step or a part of a screen. */
+.help { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700; padding: 0; vertical-align: middle; margin-inline-start: 6px; line-height: 1; }
+.help:hover { background: var(--surface-2); color: var(--ink); }
+@media (pointer: coarse) { .help { width: 30px; height: 30px; } }
+
+/* The bell, the urgent bar, support. */
+.bell-btn { position: relative; }
+.bell-btn .red-dot { inset-block-start: -3px; inset-inline-end: -3px; }
+.urgent-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); max-width: var(--w-work); margin: 0 auto var(--s4); padding: var(--s3) var(--s4); background: var(--hot-soft); border: 1px solid var(--hot-line); border-radius: var(--r); font-weight: 600; }
+.support { display: grid; gap: 2px; padding: var(--s3) var(--s4); background: var(--surface-2); border-radius: var(--r); margin: var(--s3) 0; font-size: 14.5px; }
+.notices { list-style: none; padding: 0; margin: var(--s3) 0 0; display: grid; gap: var(--s2); }
+.notices li { padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r); font-size: 14.5px; }
+.notices li.new { border-color: var(--line-ink); }
+.notices li.urgent b { color: var(--hot); }
+.notices .when { display: block; font-size: 13px; color: var(--faint); }
+.menu-sep { font-size: 12px; font-weight: 700; color: var(--faint); padding: var(--s2) var(--s3) 2px; border-top: 1px solid var(--line); margin-top: var(--s1); }
+
+/* The assistant: a panel at the side on a computer, a full sheet on a tablet. It never covers the booth. */
+.assist-btn { color: var(--ai); border-color: var(--ai-line); background: var(--ai-soft); }
+.assist-btn:hover { background: var(--ai-soft); border-color: var(--ai); }
+.assist { position: fixed; z-index: 35; inset-block: 0; inset-inline-end: 0; width: min(400px, 100%); background: var(--surface); border-inline-start: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); display: grid; grid-template-rows: auto 1fr auto; }
+.as-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
+.as-head b { color: var(--ai); }
+.as-head .icon-btn { margin-inline-start: auto; }
+.as-body { overflow: auto; padding: var(--s4); display: grid; gap: var(--s3); align-content: start; }
+.as-msg { padding: var(--s3) var(--s4); border-radius: var(--r); font-size: 15px; max-width: 92%; }
+.as-msg.me { background: var(--surface-2); justify-self: start; }
+.as-msg.ai { background: var(--ai-soft); border: 1px solid var(--ai-line); justify-self: end; }
+.as-change { display: flex; gap: var(--s3); align-items: center; justify-content: space-between; margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--ai-line); font-size: 14px; }
+.as-change small { display: block; color: var(--muted); }
+.as-ask { display: flex; gap: var(--s2); padding: var(--s3) var(--s4); border-top: 1px solid var(--line); }
+.as-ask input { flex: 1; }
+.as-off { margin: 0; padding: var(--s3) var(--s4); border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); background: var(--surface-2); }
+@media (min-width: 1180px) { body.with-assist main { margin-inline-end: 400px; } }
+
+/* The booth: "new" beside the search, the pause, the read-only "what next", the small send buttons. */
+.search-row { display: flex; gap: var(--s2); max-width: var(--w-work); margin-inline: auto; align-items: stretch; }
+.search-row .search { flex: 1; min-width: 0; }
+.new-btn { font-weight: 700; border-color: var(--ink-2); min-height: 62px; padding: 0 var(--s4); white-space: nowrap; }
+.add-new { max-width: var(--w-work); margin-inline: auto; justify-content: center; }
+.add-new .new-btn { min-height: 52px; width: 100%; border-style: dashed; }
+.pause-btn { white-space: nowrap; }
+.pause-btn[aria-pressed="true"] { background: var(--warm-soft); border-color: var(--warm-line); }
+.pause-hint { background: var(--warm-soft); border: 1px solid var(--warm-line); border-radius: var(--r-sm); padding: var(--s2) var(--s3); color: var(--ink-2); font-size: 14px; }
+.next-line.ro { cursor: default; }
+.next-line.ro:hover { border-color: var(--line); background: var(--surface-2); }
+.send-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.send-chip[aria-pressed="true"] { background: var(--good-soft); border-color: var(--good-line); color: var(--good); }
+.practice-banner { max-width: var(--w-work); margin-inline: auto; }
+@media (max-width: 560px) { .head-acts { flex-wrap: wrap; justify-content: flex-end; } .saved-tag { display: none; } }
+
+/* The business step's preview: the booth card itself, tried or edited in place. */
+.pv-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.pv-card { margin-top: var(--s3); }
+.pv-card .lead-head .nm { font-size: 19px; }
+.pv-card .warm-btn { min-height: 48px; font-size: 16px; }
+.pv-card.editing .chip { border-style: dashed; }
+.pv-add { display: inline-flex; gap: 4px; }
+.pv-add .text-input { width: 120px; min-height: 36px; padding: 4px 8px; }
+
+/* The channel question: three lines, the first always ticked. */
+.check-list { display: grid; gap: var(--s2); margin-top: var(--s3); }
+.check-opt { display: flex; gap: var(--s3); align-items: flex-start; text-align: start; border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--r); padding: var(--s3) var(--s4); min-height: 52px; }
+.check-opt b { display: block; font-size: 15px; }
+.check-opt small { display: block; color: var(--muted); font-size: 13.5px; font-weight: 400; }
+.check-opt .box { flex: none; width: 22px; height: 22px; border-radius: var(--r-xs); border: 1.5px solid var(--line-strong); display: grid; place-items: center; font-weight: 700; font-size: 14px; margin-top: 2px; }
+.check-opt[aria-pressed="true"] { border-color: var(--line-ink); }
+.check-opt[aria-pressed="true"] .box { background: var(--ink); border-color: var(--ink); color: var(--accent-ink); }
+.check-opt:disabled { cursor: default; opacity: 1; background: var(--surface-2); color: var(--ink); }
+
+/* Rules: where each one comes from; a change after the fair began, before and after. */
+.rule-body .src { font-size: 13px; color: var(--faint); }
+.booth-tag { display: inline-block; font-size: 12px; font-weight: 700; color: var(--good); background: var(--good-soft); border: 1px solid var(--good-line); border-radius: var(--pill); padding: 0 8px; margin-inline-start: 6px; }
+.apply-prev { display: grid; gap: var(--s2); margin: var(--s3) 0; }
+.apply-prev > div { display: grid; gap: 2px; padding: var(--s2) var(--s3); background: var(--surface-2); border-radius: var(--r-sm); }
+.ai-write { display: flex; gap: var(--s2); margin-bottom: var(--s2); }
+.ai-write input { flex: 1; }
+
+/* The CRM as a real CRM (17/10): a side menu with every place in it, and a home page. */
+.ctab .ic { width: 18px; height: 18px; flex: none; }
+.ctab { display: inline-flex; align-items: center; gap: var(--s2); }
+@media (min-width: 1000px) {
+  .crm-shell { grid-template-columns: 220px minmax(0, 1fr); }
+  .crm-nav { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) var(--s2); min-height: calc(100vh - 160px); }
+  .crm-nav .ctab { min-height: 44px; width: 100%; }
+  .crm-nav .ctab[aria-current="true"] { background: var(--accent-soft); box-shadow: inset -3px 0 0 var(--ink); }
+  .crm-nav-title { font-size: 13px; letter-spacing: .02em; }
+}
+.home-hello h1 { font-size: 28px; }
+.home-hello p { margin: 2px 0 0; }
+.wait-strip { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.wait { display: grid; gap: 0; text-align: start; border: 0; border-inline-start: 1px solid var(--line); background: transparent; padding: var(--s3) var(--s4); min-height: 72px; }
+.wait:first-child { border-inline-start: 0; }
+.wait .n { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.wait .t { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.wait.bad .n { color: var(--hot); }
+.wait:hover:not(:disabled) { background: var(--surface-2); }
+.wait:disabled { cursor: default; }
+.wait:disabled .n { color: var(--faint); }
+@media (max-width: 600px) { .wait-strip { grid-template-columns: repeat(2, 1fr); } .wait:nth-child(3) { border-inline-start: 0; } .wait:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.quick { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+.next-card.done { text-align: start; }
+.modules { margin-top: var(--s6); }
+.mod-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s3); margin-top: var(--s2); }
+.mod { display: grid; gap: 4px; text-align: start; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: var(--s4); }
+.mod .ic { width: 22px; height: 22px; color: var(--ink-2); }
+.mod b { font-size: 16px; }
+.mod span { font-size: 14px; color: var(--muted); }
+.mod:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.search-row .help { align-self: center; }
