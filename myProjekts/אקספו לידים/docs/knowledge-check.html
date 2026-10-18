@@ -434,7 +434,7 @@ document.addEventListener('click', (e) => {
   const id = b.closest('.item').dataset.id;
   if (b.dataset.note) { A[id] = Object.assign({}, A[id] || {}, { note: (A[id] && A[id].note) || '' }); A[id].open = true; refreshItem(id); const t = document.getElementById('n-' + id); if (t) t.focus(); return; }
   const cur = A[id] || {};
-  A[id] = Object.assign({}, cur, { v: cur.v === b.dataset.v ? '' : b.dataset.v });
+  A[id] = Object.assign({}, cur, { v: cur.v === b.dataset.v ? '' : b.dataset.v, at: new Date().toISOString() });
   refreshItem(id);
   store(id);
   if (A[id].v === 'part' || A[id].v === 'no') { const t = document.getElementById('n-' + id); if (t) t.focus(); }
@@ -444,10 +444,15 @@ document.addEventListener('input', (e) => {
   let id = '';
   if (e.target.id === 'missing') id = 'missing';
   else { const el = e.target.closest('.item'); if (!el) return; id = el.dataset.id; }
-  A[id] = Object.assign({}, A[id] || {}, { note: e.target.value });
+  A[id] = Object.assign({}, A[id] || {}, { note: e.target.value, at: new Date().toISOString() });
   saveLocal();
   if (id !== 'missing') e.target.closest('.item').classList.toggle('answered', !!(A[id].v || A[id].note));
   clearTimeout(timers[id]); timers[id] = setTimeout(() => store(id), 600);
+});
+// Leaving a field saves at once, so the last letters are never left behind.
+document.addEventListener('focusout', (e) => {
+  const id = e.target.id === 'missing' ? 'missing' : (e.target.closest && e.target.closest('.item') ? e.target.closest('.item').dataset.id : '');
+  if (id && A[id] && e.target.tagName === 'TEXTAREA') { clearTimeout(timers[id]); store(id); }
 });
 $('#show').addEventListener('click', () => { const o = $('#out'); o.hidden = false; o.value = exportText(); });
 $('#copy').addEventListener('click', () => {
@@ -468,7 +473,7 @@ renderNav(); render(); progress();
     $('#store-state').textContent = 'התשובות נשמרות. Claude יכול לקרוא אותן';
     db.collection('answers').onSnapshot((snap) => {
       let changed = false;
-      snap.docs.forEach((d) => { const v = d.data() || {}; const cur = A[d.id] || {}; if (cur.v !== v.v || cur.note !== v.note) { A[d.id] = { v: v.v || '', note: v.note || '' }; changed = true; } });
+      snap.docs.forEach((d) => { const v = d.data() || {}; const cur = A[d.id] || {}; if (cur.at && v.at && v.at <= cur.at) return; if (cur.v !== v.v || cur.note !== v.note) { A[d.id] = { v: v.v || '', note: v.note || '', at: v.at }; changed = true; } });
       if (changed && !(document.activeElement && document.activeElement.tagName === 'TEXTAREA')) {
         saveLocal(); render(); progress(); $('#missing').value = (A.missing && A.missing.note) || '';
       }

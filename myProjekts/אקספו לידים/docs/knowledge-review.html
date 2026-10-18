@@ -1,0 +1,348 @@
+<title>מה עולה מהתשובות שלך</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column; a summary strip; conflicts as cards with a decision box;
+   what closed as a quiet list; questions answered in place. "דוכן חכם" tokens: colour means something. */
+:root{
+  --bg:#f5f8fa;--surface:#ffffff;--surface-2:#edf2f6;--surface-3:#e1e7eb;
+  --ink:#061721;--ink-2:#30414b;--muted:#576772;--faint:#697882;
+  --line:#dde3e7;--line-strong:#c4ced4;--brand:#00586a;--focus:#2b63e0;
+  --hot:#b22d0a;--hot-soft:#f7e8e4;--hot-line:#e5b8ac;
+  --warm:#895900;--warm-soft:#f2ede3;--warm-line:#d7c7a8;
+  --good:#1f764d;--good-soft:#e6f0eb;--good-line:#b3d0c2;
+  --sans:"IBM Plex Sans Hebrew",Heebo,"Segoe UI","Arial Hebrew",Arial,sans-serif;
+  --r-xs:4px;--r-sm:6px;--r:12px;--pill:9999px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#091014;--surface:#141c22;--surface-2:#1e272e;--surface-3:#29343b;
+  --ink:#eff3f6;--ink-2:#c9d2d8;--muted:#98a5ae;--faint:#819099;
+  --line:#273137;--line-strong:#3c474f;--brand:#73c6d9;--focus:#81afff;
+  --hot:#ff9279;--hot-soft:#3a2f30;--hot-line:#694641;
+  --warm:#f9b557;--warm-soft:#39342a;--warm-line:#665335;
+  --good:#7ad0a0;--good-soft:#243936;--good-line:#395d4f;
+  color-scheme:dark}
+html{direction:rtl}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.65}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 96px}
+h1,h2,h3{text-wrap:balance;letter-spacing:-.004em;margin:0;font-weight:700}
+h1{font-size:clamp(28px,5vw,38px);line-height:1.15}
+h2{font-size:22px;line-height:1.25}
+h3{font-size:17px;line-height:1.35}
+p{margin:0}
+b{font-weight:700}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--brand);display:flex;gap:10px;align-items:center}
+.eyebrow .mark{display:inline-block;width:18px;height:3px;background:var(--brand)}
+.lede{font-size:17px;color:var(--ink-2);max-width:62ch}
+.muted{color:var(--muted)}
+header.top{display:grid;gap:16px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.strip div{padding:12px 16px;border-inline-start:1px solid var(--line);display:grid;gap:0}
+.strip div:first-child{border-inline-start:0}
+.strip .n{font-size:26px;font-weight:700;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.strip .t{font-size:13px;color:var(--muted)}
+.strip .hot .n{color:var(--hot)} .strip .warm .n{color:var(--warm)} .strip .good .n{color:var(--good)}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:20px}
+nav.toc a{flex:none;font-size:14px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:5px 12px;border-radius:var(--pill);border:1px solid var(--line-strong);background:var(--surface)}
+nav.toc a:hover{background:var(--surface-2)}
+section.s{padding-top:44px;display:grid;gap:16px;scroll-margin-top:70px}
+.s-head{display:grid;gap:6px}
+.s-head .n{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--faint)}
+.s-head p{color:var(--muted);max-width:62ch}
+/* Conflicts: one card each, the decision box at its foot. */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:12px}
+.card h3 .letter{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:13px;margin-inline-end:8px;vertical-align:2px}
+.refs{font-size:12.5px;color:var(--faint)}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+dl.facts dt{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--faint);padding-top:3px;white-space:nowrap}
+dl.facts dd{margin:0;color:var(--ink-2)}
+@media (max-width:560px){dl.facts{grid-template-columns:1fr}dl.facts dt{padding-top:6px}}
+.view{background:var(--surface-2);border-radius:var(--r-sm);padding:12px 14px;color:var(--ink)}
+.view .who{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--brand);display:block;margin-bottom:2px}
+.view.warn{background:var(--warm-soft);border:1px solid var(--warm-line)}
+.view.warn .who{color:var(--warm)}
+.view.stop{background:var(--hot-soft);border:1px solid var(--hot-line)}
+.view.stop .who{color:var(--hot)}
+ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:4px}
+/* Closed list and explanations: rows with hairlines. */
+.rows{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.rows > div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:12px 16px;border-top:1px solid var(--line)}
+.rows > div:first-child{border-top:0}
+.rows .ic{font-size:14px;color:var(--good);padding-top:2px;font-weight:700}
+.rows .ref{font-size:12px;color:var(--faint);font-weight:700;padding-top:3px;min-width:3.4em;font-variant-numeric:tabular-nums}
+.rows .note{display:block;font-size:14px;color:var(--muted);margin-top:2px}
+details.ex{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+details.ex + details.ex{margin-top:-9px;border-top-left-radius:0;border-top-right-radius:0}
+details.ex summary{cursor:pointer;list-style:none;display:flex;gap:10px;align-items:baseline;padding:13px 16px;font-weight:600}
+details.ex summary::-webkit-details-marker{display:none}
+details.ex summary .ref{font-size:12px;color:var(--faint);min-width:3.4em}
+details.ex summary::after{content:"+";margin-inline-start:auto;color:var(--faint);font-weight:400;font-size:20px;line-height:1}
+details.ex[open] summary::after{content:"−"}
+details.ex .body{padding:0 16px 14px;color:var(--ink-2);display:grid;gap:6px}
+/* Answer boxes. */
+.ans{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.ans .lbl{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--faint)}
+.ans .opts{display:flex;flex-wrap:wrap;gap:6px}
+.ans .opts button{font:inherit;font-size:14px;font-weight:600;min-height:38px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.ans .opts button:hover{background:var(--surface-2)}
+.ans .opts button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+textarea{width:100%;font:inherit;font-size:15px;line-height:1.55;min-height:60px;padding:9px 12px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);resize:vertical}
+textarea:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(37,99,235,.22)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;gap:10px}
+.q .qt{font-weight:600}
+.q .qt .num{color:var(--faint);font-variant-numeric:tabular-nums;margin-inline-end:6px}
+.q blockquote{margin:0;padding:6px 12px;border-inline-start:2px solid var(--line-strong);color:var(--muted);font-size:15px}
+.foot{margin-top:40px;display:grid;gap:10px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-size:15px;font-weight:700;min-height:44px;padding:0 18px;border-radius:var(--r-sm);border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line-strong);font-weight:600}
+#store-state{font-size:14px;color:var(--muted)}
+#out{min-height:150px;font-size:14px}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow"><span class="mark"></span>דוכן חכם · אחרי ספר הידע · 18/10/2026</div>
+  <h1>מה עולה מהתשובות שלך</h1>
+  <p class="lede">עברתי על כל 186 התשובות, ובדקתי אותן מול ההחלטות הקודמות ומול מה שסיכמנו בצ'אט ב-17/10. כאן: איפה יש סתירה ומה דעתי, מה נסגר, הסברים למה שלא היה ברור, והשאלות שנשארו. <b>לא נגעתי בקוד ולא במסמכים.</b></p>
+  <div class="strip" role="list">
+    <div role="listitem"><span class="n">186</span><span class="t">תשובות</span></div>
+    <div role="listitem" class="good"><span class="n">113</span><span class="t">נכון</span></div>
+    <div role="listitem" class="warm"><span class="n">69</span><span class="t">לא מדויק</span></div>
+    <div role="listitem" class="hot"><span class="n">3</span><span class="t">לא נכון</span></div>
+    <div role="listitem"><span class="n">7</span><span class="t">סתירות להכרעה</span></div>
+    <div role="listitem"><span class="n">8</span><span class="t">שאלות אליך</span></div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="פרקים">
+  <a href="#s1">1 · סתירות</a><a href="#s2">2 · מה נסגר</a><a href="#s3">3 · הסברים</a><a href="#s4">4 · שאלות</a><a href="#s5">5 · מסמכים</a>
+</nav>
+
+<section class="s" id="s1">
+  <div class="s-head"><span class="n">פרק 1 · 7 נושאים</span><h2>סתירות. כאן צריך הכרעה</h2><p>כל כרטיס: מה כתבת, עם מה זה מתנגש, ומה דעתי. בתחתית כל כרטיס אפשר לסמן ולכתוב.</p></div>
+  <div id="conflicts"></div>
+</section>
+
+<section class="s" id="s2">
+  <div class="s-head"><span class="n">פרק 2</span><h2>מה נסגר עכשיו, בלי סתירה</h2><p>אלה עוברים לזיכרון שלי ולמסמכים כמו שהם.</p></div>
+  <div class="rows" id="closed"></div>
+</section>
+
+<section class="s" id="s3">
+  <div class="s-head"><span class="n">פרק 3</span><h2>הסברים למה שלא היה ברור</h2><p>לחיצה על שורה פותחת את ההסבר.</p></div>
+  <div id="explain"></div>
+</section>
+
+<section class="s" id="s4">
+  <div class="s-head"><span class="n">פרק 4</span><h2>שאלות שנשארו אצלי</h2></div>
+  <div id="questions" style="display:grid;gap:10px"></div>
+</section>
+
+<section class="s" id="s5">
+  <div class="s-head"><span class="n">פרק 5</span><h2>מה אעשה כשתגיד, במסמכים בלבד</h2><p>שום דבר מזה לא נוגע בקוד. הקוד מחכה עד שהשאלות ייסגרו.</p></div>
+  <div id="docs" style="display:grid;gap:10px"></div>
+</section>
+
+<div class="foot">
+  <h3>לשלוח לי את התשובות</h3>
+  <p class="muted">התשובות נשמרות לבד במקום שאני קורא ממנו. אם השמירה לא עובדת אצלך, אפשר להעתיק ולהדביק בצ'אט.</p>
+  <div class="actions"><button class="btn" id="copy" type="button">להעתיק את התשובות</button><button class="btn ghost" id="show" type="button">להציג אותן כאן</button><span id="store-state">נשמר במכשיר הזה</span></div>
+  <textarea id="out" aria-label="כל התשובות" hidden readonly></textarea>
+</div>
+</div>
+
+<script>
+(function () {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* Conflicts: id, title, refs, what he wrote, what it meets, my view (kind: plain / warn / stop), the choices. */
+const CONFLICTS = [
+  { id: 'c-a', L: 'א', t: 'תוצאת הליד ורשימת התפוצה הם שני דברים נפרדים', refs: 'D9 · I3 · I7',
+    wrote: 'כל ליד מגיע לעסקה או ל"לא נסגרה", ובכל זאת יכול להישאר ברשימת התפוצה.',
+    meets: 'ב-16/10 הוחלט ש"רשימת תפוצה" היא <b>השלב האחרון</b>, במקום "לא רלוונטי". לפי ההערה שלך אלה שני צירים: <b>תוצאה</b> (נסגרה / לא נסגרה) ו<b>ברשימה</b> (כן / לא). לקוח שסגר עסקה יכול להיות גם ברשימה. זה בדיוק "שני הצירים" מ-23/09, שהלכו לאיבוד בדרך.',
+    view: 'אתה צודק, והמודל היום שגוי. "ביקש להסיר" פשוט מוציא מהרשימה. נשאר לברר מה קורה ברשימת התפוצה בסוף, כי ההערה שלך שם נחתכה.', kind: '',
+    opts: ['שני צירים, כמו שכתבתי', 'להשאיר כמו היום'] },
+  { id: 'c-b', L: 'ב', t: 'הגרלות וקיוסק להרשמה, מול הלקח של התערוכה הראשונה', refs: 'D3 · E14 · E15',
+    wrote: '"ייתכן שנוסיף הגרלות", וקיוסק למי שרוצה להגדיל את רשימת התפוצה ולתמרץ הרשמה.',
+    meets: 'זה בדיוק מה שנכשל בתערוכה הראשונה, ומה <b>שהמארגן הסיר במכוון</b> (החלטה 0001).',
+    view: 'כאן אני חולק. אם זה חוזר דרך הכלי שלך, אתה עלול להיתפס בעיני המארגן כמי שהחזיר את מה שהוא ביטל. אם בכל זאת: מצב נפרד, "להגדיל את רשימת התפוצה", שהמציג מדליק במפורש. הוא מופרד לגמרי מהלידים, ועדיף אחרי בדיקה עם המארגן דרך אחיך.', kind: 'stop',
+    opts: ['לא להוסיף', 'מצב נפרד, אחרי בדיקה עם המארגן', 'להוסיף'] },
+  { id: 'c-c', L: 'ג', t: 'ליד הוא הזדמנות לעסקה, לא חבר שבא לתת גב', refs: 'C8 · D8',
+    wrote: 'Lead = הזדמנות ל-Deal. המערכת לא נועדה לחבר שבא לתת גב, אלא אם המציג רוצה להגדיל את רשימת התפוצה.',
+    meets: 'העיקרון מ-23/09: "הנפוץ הוא חבר שבא לתת גב, ונגיעה אחת בשבילו".',
+    view: 'מסכים, וזה מחדד את המוצר. ההשלכה: הדוכן לא מעודד לרשום מי שאינו הזדמנות. מי שרוצה לאסוף גם אותם, זה מצב "רשימת התפוצה" מכרטיס ב׳.', kind: '',
+    opts: ['נכון, לעדכן את העיקרון', 'לא בדיוק'] },
+  { id: 'c-d', L: 'ד', t: 'ערוצים: התשובה שלך ב-C3 משנה את התמונה', refs: 'C3 · C5–C7 · J6 · P8',
+    wrote: 'לכולם בקהילה טלפון כשר לגמרי, בלי SMS ובלי אינטרנט. ל-95% יש מייל. לבעלי עסקים יש בנוסף מכשיר חכם עם <b>מספר נפרד</b>.',
+    meets: 'המספר ברשימת המארגנים הוא כמעט תמיד <b>הכשר</b>. כלומר וואטסאפ ו-SMS למבקר יגיעו רק אם הוא נתן מספר נוסף, ומייל הוא בפועל הערוץ למבקרים. גם ויכוח "בדיקת וואטסאפ לכל המספרים" כמעט מתייתר.',
+    view: 'ההצעה שלי: <b>מייל תמיד.</b> וואטסאפ או SMS רק למבקר שמסר מספר נוסף (שדה רשות בכרטיס. איפה בדיוק, פתוח). למציגים, להודעת הבוקר, וואטסאפ בהחלט. הניסוח "ערוץ אחד, הראשון שמחובר" יוצא, ובמקומו מייל תמיד ועוד מה שנבחר.', kind: '',
+    opts: ['מסכים', 'אחרת'] },
+  { id: 'c-e', L: 'ה', t: 'הרשימה הפרטית שלך: "למערכת ודאי שהיא נכנסת"', refs: 'K4 · K5',
+    wrote: 'על השורה "רשימת הקהילה הפרטית שלך לא נכנסת לשום מקום" כתבת: "למערכת ודאי שהיא נכנסת".',
+    meets: 'לפי החלטה 0003 (22/09, אישרת): <b>הרשימה הפרטית שלך</b>, שהגיעה אליך מעבודה קודמת, לא נכנסת למערכת. במקומה נכנסת <b>הרשימה הרשמית של המארגנים</b>, והיא כמובן נכנסת.',
+    view: 'כאן אני חושש שהיה בלבול, וזה חשוב לברר. אם התכוונת לרשימת המארגנים, הכל בסדר. אם אתה רוצה שהרשימה הפרטית תיכנס, זה הופך החלטה, ואני רוצה להבין למה.', kind: 'warn',
+    opts: ['התכוונתי לרשימת המארגנים', 'כן, גם הפרטית'] },
+  { id: 'c-f', L: 'ו', t: '"מוסד" וקבוצות מאותו מוסד', refs: 'H4',
+    wrote: 'אין ברשימה מידע כזה בכלל.',
+    meets: 'בקוד יש תכונה ("כמה אנשים מאותו מוסד"), והפרומט של התובנות מבקש מהבינה המלאכותית למצוא "מוסדות וקבוצות".',
+    view: 'בלי נתונים, הבינה המלאכותית תנחש. להוריד את זה מהפרומט ומהמסך.', kind: '',
+    opts: ['להוריד', 'להשאיר'] },
+  { id: 'c-g', L: 'ז', t: '"המכונה מציעה, האדם גובר": "צריך לשקול שוב"', refs: 'D11',
+    wrote: '"צריך לשקול שוב".',
+    meets: 'שתי החלטות שלך: "אוטומציה גוברת על ההחלטות" (13/10), ו"המערכת מנהלת את העסק" (11/10).',
+    view: 'מה לשקול? האם שהמערכת <b>כן</b> תדרוס משימה שאדם קבע, אם חל כלל?', kind: '',
+    opts: ['כלל יכול לדרוס', 'אדם תמיד גובר', 'אסביר'] },
+];
+const CLOSED = [
+  ['B3', '<b>התאריך: ו׳ כסלו תשפ״ז = יום שני, 16/11/2026.</b>'],
+  ['B8', '"התפרנסו" אינם המארגנים. נמחק.'],
+  ['C9', '<b>סוגי הפונים לכל עסק בנפרד,</b> לפי מה שהוא רוצה להבדיל. מתיישב עם קבוצות כפתורים שניתנות לעריכה.'],
+  ['C1', 'בתערוכה הקודמת היו כ-100 בעלי דוכנים, ועוד רבים שבאו לדבר על עסקים בלי דוכן.'],
+  ['C11', 'בעל לא ייצג את העסק של אשתו כמציג, אבל כן כמבקר.'],
+  ['E7', 'הטאבלט הנוסף: רק ביום התערוכה, דוכן וסוף היום, בלי הגדרות ובלי CRM.'],
+  ['E16', '<b>דוכן הניסיון בפרודקשן לא יקבל שמות אמיתיים.</b> זה פותר את החשש שהיה (K3).'],
+  ['J8', 'מייל: "המערכת שולחת בשמי". W-028 נסגר.', 'הדומיין y-h-m.com (J9). כדי שהמיילים לא ייפלו לספאם צריך להגדיר בו רשומות SPF, DKIM ו-DMARC. נעשה את זה יחד כשנגיע.'],
+  ['K12', '<b>בעלות על המידע:</b> כל מציג רואה רק את שלו, וגם מה שהוסיף ידנית נשאר רק אצלו ולא נכנס למאגר. כל עוד ה-CRM פעיל, אפשר להוריד את הלידים.', 'נשאר פתוח: מה קורה כשה-CRM נסגר.'],
+  ['G10', 'רשומות העסקים: "יש לי כבר הכל בסדר". W-033 נסגר.'],
+  ['G17', '"חזר שוב" לא שימושי. מתיישב עם "החום רק ביד" מ-17/10.'],
+  ['E11', 'השורות של "מה המערכת עושה לבד" (E11), "ניסיון בהקמה" (E13) ו"חום נגזר" (G14) כבר הוחלפו ב-17/10.', 'אני מניח שבגלל זה סימנת "לא מדויק" בלי הערה.'],
+  ['A2', '<b>מודל עסקי:</b> ייתכן שבסוף זה יהיה בתשלום, אבל ה-CRM נשאר מוגבל ללידים מהתערוכה.', 'התובנה שלי: תשלום מביא מחויבות לתמיכה ולזמינות, וזה משנה את השאלה "עד מתי ה-CRM פעיל".'],
+  ['P3', '"נשכפל לסביבה אמיתית": הכוונה לעקרונות ולמבנה, לא לקוד עצמו.'],
+  ['O2', 'עובדה סגורה: רק אחרי שהעליתי את דעתי כיועץ ואמרת "לא". אעדכן את הזיכרון שלי.'],
+  ['F13', 'ספריית התחומים: אולי רק כתמיכה בהחלטות של הבינה המלאכותית, ולא כבחירת תחום בהקמה.'],
+  ['F10', 'מילון המילים לא רלוונטי לפרודקשן.'],
+];
+const EXPLAIN = [
+  ['B11', 'הלוח העברי', 'ב-05/10 סוכן ביקורת פירש שבועיים בלי התקדמות כ"התחמקות". אבל אלה היו עשי"ת וסוכות. הכלל שלי: לפני שאני מסיק משהו מתקופה שקטה, אני בודק את לוח השנה. זה כלל שלי, לא תכונה של המערכת.'],
+  ['F14', 'ייבוא שירותים', 'בעמוד של כל עסק באיגוד כתוב "שירותי עסק מרכזיים". הרעיון היה שמציג שרשום שם לא יקליד מה הוא מציע, והמערכת תמשוך את זה משם. עכשיו, כשהבהרת שהם לא המארגנים, אני מציע לוותר.'],
+  ['I11', '"ביקש הסרה"', 'בדף הליד, בתפריט ⋯, יש "ביקש להסיר", למי שהשיב "הסר" להודעה. מי שסומן כך לא יקבל הודעות לקבוצה. לפי כרטיס א׳, זה פשוט "לא ברשימת התפוצה".'],
+  ['I14', 'N1: "דיברנו" סוגר הצעת מחיר', 'המשימה של משה היא "להכין הצעת מחיר". אתה מתקשר אליו בשאלה קטנה ולוחץ "דיברנו", והמערכת מסמנת את <b>ההצעה</b> כבוצעה, אף שלא הכנת אותה. התיקון: "דיברנו" ו"לא ענה" סוגרים או דוחים רק משימות של שיחה.'],
+  ['I15', 'N5: החלון כותב "מייל + SMS"', 'החלון "לשלוח להם" כותב "יוצא במייל + SMS", אבל בפועל יוצא רק מייל. התיקון: לכתוב רק את מה שבאמת יוצא. לפי כרטיס ד׳, זה ממילא ייכתב מחדש.'],
+  ['I16', 'N20: קוד ישן', 'חמש פיסות קוד ישנות, בלי שום כפתור שמפעיל אותן. למשל, שארית של "לא לשמור" שהוחלף. ארבע מהן עדיין בקוד. אין להן השפעה על המשתמש, והשאלה אם למחוק אותן טכנית בלבד.'],
+  ['I17', 'N23–N25: שלושה תיקונים', '<b>N23:</b> כשמוחקים שלב, הלידים שבו עוברים בשקט לשלב הראשון. התיקון: לשאול לאן להעביר אותם.<br><b>N24:</b> כלל שניסה לשלוח ונכשל (אין ערוץ) נספר כ"הופעל". התיקון: לספור רק הצלחות, ולהראות "2 לא נשלחו".<br><b>N25:</b> ב"מה הלאה" כל סוג משימה מופיע פעם אחת. אם כפתור נותן "להציע לקבוצה", "לחזור אליו" נעלם. התיקון: ארבע האפשרויות הבסיסיות תמיד מופיעות.'],
+  ['I18', 'שלושה מקומות ב-CRM במקום ארבעה', 'סוקר הציע לאחד את "דף הבית" ו"משימות של היום", כי הן אותה רשימה פעמיים. אחרי ההחלטה על דף הבית מ-17/10, השאלה כנראה כבר לא רלוונטית.'],
+  ['O9', 'מה זה "לארכב"', 'להעביר שיחה לרשימת "ארכיון" בצד. היא לא נמחקת, ואפשר להחזיר אותה.'],
+];
+const QUESTIONS = [
+  { id: 'q1', t: 'שלוש הערות נחתכו באמצע. מה רצית לכתוב בסופן?', quote: 'A2: "...אם אצטרך להוציא אליו כס" · C3: "...לרובם יש גם מכשיר נוס" · I3: "...מה קורה איתו בסו"', note: 'ייתכן שזו תקלה בדף: כשעוברים מהר בין שדות, האותיות האחרונות לא נשמרות. אתקן אותה.' },
+  { id: 'q2', t: 'סימנת "לא מדויק" בלי הערה. מה לא מדויק?', quote: 'L1: שלושת המקומות של הבינה המלאכותית · M1: הדוגמית והאירוח · N1–N2: שפת העיצוב, וצבע כמשמעות' },
+  { id: 'q3', t: 'הודעת הבוקר: "אני מתחבר לבחירה אישית". בחירה של מה?', opts: ['הערוץ', 'השעה', 'ממי היא נשלחת', 'משהו אחר'] },
+  { id: 'q4', t: 'אם לא "שם או עסק…", מה צריך להיות כתוב בתיבת החיפוש בדוכן?', ref: 'G5' },
+  { id: 'q5', t: 'כללי ברירת המחדל: "לא לגמרי". איזה כלל לא נכון?', quote: 'דלוקים: "7 ימים בלי קשר ← להתקשר" · "עובר להצעה נשלחה ← להודעת הבוקר" · "נרשם עסק ← להודעת הבוקר". כבויים: "לא ענה פעמיים ← הודעה" · "נסגרה עסקה ← תודה".', ref: 'I13' },
+  { id: 'q6', t: 'עברית קהילתית, "רק טיפה מן הים": אילו מושגים כדאי שהבינה המלאכותית תכיר?', ref: 'L4' },
+  { id: 'q7', t: 'כתבת שיש לך הערות על הניווט. מה הן?', ref: 'E4' },
+  { id: 'q8', t: 'לדיון בנפרד, ואני לא שוכח. מתי נדבר?', quote: 'סעיף 7 (מה גובר בין קבוצות כפתורים) · G9 (עסק כשורה נפרדת) · F5 (שיפור רצף המשימות)', opts: ['עכשיו', 'אחרי החלק השני של ההערות'] },
+];
+const DOCS = [
+  { id: 'd1', t: 'P1 + P2: למחוק את overview.md ואת scenarios.md', d: 'שניהם מתארים מוצר שכבר השתנה. הם יישארו בהיסטוריה של git. רק לוודא: התכוונת למחוק את שני הקבצים כולם?', opts: ['למחוק את שניהם', 'רק את overview', 'לא למחוק'] },
+  { id: 'd2', t: 'P4, P6, P8: לעדכן את המסמכים', d: 'כוכב במקום שווי · שמות החום החדשים · SMS נשאר ערוץ.', opts: ['לעדכן', 'לא עכשיו'] },
+  { id: 'd3', t: 'P5: לבדוק 102 מול 81', d: 'ההערכה שלי: 102 הוא מה שהאיגוד מפרסם, ו-81 מה שמופיע בפועל אצל העסקים שאספנו. אוודא.', opts: ['לבדוק', 'לא חשוב'] },
+  { id: 'd4', t: 'לעדכן את ספר הידע ואת הזיכרון שלי', d: 'לפי כל התשובות שלך, כולל מה שנסגר בפרק 2.', opts: ['לעדכן', 'לא עכשיו'] },
+];
+
+const KEY = 'knowledge-review-answers';
+let A = {};
+try { A = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { A = {}; }
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(A)); } catch (e) {} };
+let db = null;
+
+function ansHTML(id, opts, label) {
+  const a = A[id] || {};
+  return `<div class="ans" data-id="${id}">${label ? `<span class="lbl">${label}</span>` : ''}
+    ${opts && opts.length ? `<div class="opts">${opts.map((o) => `<button type="button" data-v="${esc(o)}" aria-pressed="${a.v === o}">${esc(o)}</button>`).join('')}</div>` : ''}
+    <textarea id="t-${id}" aria-label="תשובה" placeholder="מה דעתך?">${esc(a.note || '')}</textarea></div>`;
+}
+function render() {
+  $('#conflicts').innerHTML = CONFLICTS.map((c) => `<article class="card" id="${c.id}">
+    <h3><span class="letter">${c.L}</span>${esc(c.t)}</h3><span class="refs">${esc(c.refs)}</span>
+    <dl class="facts"><dt>מה כתבת</dt><dd>${c.wrote}</dd><dt>מה זה פוגש</dt><dd>${c.meets}</dd></dl>
+    <div class="view ${c.kind}"><span class="who">${c.kind === 'stop' ? 'כאן אני חולק' : c.kind === 'warn' ? 'צריך לברר' : 'דעתי'}</span>${c.view}</div>
+    ${ansHTML(c.id, c.opts, 'ההכרעה שלך')}</article>`).join('<div style="height:12px"></div>');
+  $('#closed').innerHTML = CLOSED.map(([r, t, n]) => `<div><span class="ref">${esc(r)}</span><span>${t}${n ? `<span class="note">${esc(n)}</span>` : ''}</span></div>`).join('');
+  $('#explain').innerHTML = EXPLAIN.map(([r, t, b]) => `<details class="ex"><summary><span class="ref">${esc(r)}</span>${esc(t)}</summary><div class="body">${b}</div></details>`).join('');
+  $('#questions').innerHTML = QUESTIONS.map((q, i) => `<div class="q"><p class="qt"><span class="num">${i + 1}.</span>${esc(q.t)}${q.ref ? ` <span class="refs">${esc(q.ref)}</span>` : ''}</p>
+    ${q.quote ? `<blockquote>${esc(q.quote)}</blockquote>` : ''}${q.note ? `<p class="muted" style="font-size:14px">${esc(q.note)}</p>` : ''}
+    ${ansHTML(q.id, q.opts)}</div>`).join('');
+  $('#docs').innerHTML = DOCS.map((d) => `<div class="q"><p class="qt">${esc(d.t)}</p><p class="muted">${esc(d.d)}</p>${ansHTML(d.id, d.opts)}</div>`).join('');
+}
+function exportText() {
+  const all = CONFLICTS.map((c) => [c.id, 'סתירה ' + c.L]).concat(QUESTIONS.map((q, i) => [q.id, 'שאלה ' + (i + 1)]), DOCS.map((d) => [d.id, d.t.split(':')[0]]));
+  return all.filter(([id]) => A[id] && (A[id].v || A[id].note)).map(([id, n]) => `${n}: ${A[id].v || ''}${A[id].note ? ' — ' + A[id].note : ''}`).join('\n') || 'עוד אין תשובות.';
+}
+async function store(id) {
+  saveLocal();
+  if (!db) return;
+  try { await db.collection('answers').doc(id).set({ v: A[id].v || '', note: A[id].note || '', at: A[id].at }); $('#store-state').textContent = 'נשמר. Claude יכול לקרוא'; }
+  catch (e) { $('#store-state').textContent = 'נשמר רק במכשיר הזה'; }
+}
+const stamp = (id, patch) => { A[id] = Object.assign({}, A[id] || {}, patch, { at: new Date().toISOString() }); };
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.ans .opts button');
+  if (!b) return;
+  const box = b.closest('.ans');
+  const id = box.dataset.id;
+  stamp(id, { v: (A[id] && A[id].v) === b.dataset.v ? '' : b.dataset.v });
+  box.querySelectorAll('.opts button').forEach((x) => x.setAttribute('aria-pressed', A[id].v === x.dataset.v));
+  store(id);
+});
+const timers = {};
+document.addEventListener('input', (e) => {
+  const box = e.target.closest('.ans');
+  if (!box) return;
+  const id = box.dataset.id;
+  stamp(id, { note: e.target.value });
+  saveLocal();
+  clearTimeout(timers[id]); timers[id] = setTimeout(() => store(id), 500);
+});
+// Leaving a field saves at once, so the last letters are never left behind.
+document.addEventListener('focusout', (e) => { const box = e.target.closest && e.target.closest('.ans'); if (box && A[box.dataset.id]) { clearTimeout(timers[box.dataset.id]); store(box.dataset.id); } });
+$('#show').addEventListener('click', () => { const o = $('#out'); o.hidden = false; o.value = exportText(); });
+$('#copy').addEventListener('click', () => {
+  const t = exportText();
+  const fallback = () => { const o = $('#out'); o.hidden = false; o.value = t; o.focus(); o.select(); $('#store-state').textContent = 'סמן והעתק מהתיבה'; };
+  try { navigator.clipboard.writeText(t).then(() => { $('#store-state').textContent = 'הועתק. אפשר להדביק בצ׳אט'; }, fallback); } catch (er) { fallback(); }
+});
+
+render();
+
+(async () => {
+  if (!(window.claude && window.claude.use)) return;
+  try {
+    db = await window.claude.use('db');
+    if (!db) return;
+    $('#store-state').textContent = 'התשובות נשמרות. Claude יכול לקרוא אותן';
+    db.collection('answers').onSnapshot((snap) => {
+      snap.docs.forEach((d) => {
+        const v = d.data() || {};
+        const cur = A[d.id] || {};
+        // A stored copy only wins when it is newer than what this page holds, so typing is never rolled back.
+        if (cur.at && v.at && v.at <= cur.at) return;
+        if (cur.v === v.v && cur.note === v.note) return;
+        A[d.id] = { v: v.v || '', note: v.note || '', at: v.at };
+        const box = document.querySelector(`.ans[data-id="${d.id}"]`);
+        if (!box || box.contains(document.activeElement)) return;
+        box.querySelectorAll('.opts button').forEach((x) => x.setAttribute('aria-pressed', A[d.id].v === x.dataset.v));
+        const t = box.querySelector('textarea'); if (t) t.value = A[d.id].note;
+      });
+      saveLocal();
+    }, () => {});
+  } catch (e) { db = null; }
+})();
+})();
+</script>
