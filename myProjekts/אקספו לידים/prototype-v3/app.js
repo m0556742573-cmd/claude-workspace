@@ -1265,7 +1265,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       <div class="chips">${pkgs.map((x) => `<button class="chip" data-espkg="${esc(x.id)}" aria-pressed="${ES.pkg === x.id}">${x.mat ? '📎' : '💬'} ${esc(x.name)}</button>`).join('')}
         <button class="chip" data-espkg="" aria-pressed="${!ES.pkg}">ברירת המחדל של הערוץ</button></div>
       <div class="label">הודעה חדשה <small>שם, ואפשר לצרף קובץ</small></div>
-      <div class="add-row"><input id="es-pk-name" class="text-input" value="${esc(ES.newName || '')}" placeholder="למשל: קטלוג מטבחים" autocomplete="off">
+      <div class="add-row"><input id="es-pk-name" class="text-input" value="${esc(ES.newName || '')}" placeholder="${esc(sampleWhat() ? "למשל: קטלוג " + sampleWhat() : "למשל: מחירון")}" autocomplete="off">
         <label class="btn" for="es-mat-file">📎 ${ES.newFile ? esc(ES.newFile.name) : 'לצרף קובץ'}</label><button class="btn" data-act="es-pk-add">הוספה</button></div>
       <input id="es-mat-file" type="file" accept="image/*,application/pdf" hidden>`;
     const before = ES.type !== 'date' ? '' : `<div class="label">כמה לפני השמחה</div><div class="chips">${[1, 2, 4, 8, 12].map((w) =>
@@ -1536,7 +1536,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const w = effWarm(l);
     const bs = tagged(l);
     const datey = bs.some((b) => stepsOf(b).some((s) => s.type === 'date')) || (l.manual || []).some((s) => s.type === 'date' && !l.done.includes(s.key));
-    const roley = bs.some((b) => b.axis === 'who' && isStar(b));
     const autoSent = bs.some((b) => stepsOf(b).some(immediate));
     const ts = tasks(l);
     const queued = (l.queue || []).map((q) => (pkgById(q.pkg) || { name: 'ברירת המחדל' }).name);
@@ -1559,7 +1558,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       ${groupsFor(l).map((g) => `<div class="label">${esc(g.title)}</div>
         <div class="chips">${groupButtons(g.id).map((b) => `<button class="chip" data-tag="${b.id}" data-lid="${l.id}" aria-pressed="${l.tags.includes(b.id)}">${esc(b.label)}</button>`).join('')}</div>`).join('')}
       ${datey ? `<div class="label">מתי השמחה?</div><input type="date" class="text-input" data-eventdate="${l.id}" value="${esc(l.eventDate)}">` : ''}
-      ${roley ? `<div class="label">מאיזה מוסד או קבוצה?</div><input class="text-input" data-roleof="${l.id}" value="${esc(l.roleOf)}" placeholder="למשל: קבוצת שערי חסד" autocomplete="off">` : ''}
       ${inSheet
         ? `<button class="next-line" data-act="tasks" data-lid="${l.id}"><span class="faint">מה הלאה:</span> ${planHTML(plan(l))}${ts.length > 1 ? ` <span class="faint">· ועוד ${many(ts.length - 1, 'משימה', 'משימות')}</span>` : ''}<span class="next-edit">שינוי</span></button>`
         // At the booth "what next" is read, not edited (יצחק, 17/10): it follows from the buttons, and is changed in the evening or in the CRM.
@@ -1839,7 +1837,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
   function seedDay() {
     const rnd = (n) => Math.floor(Math.random() * n);
     const taken = new Set(leadsNow().map((l) => l.key));
-    const groups = ['קבוצת שערי חסד', 'ת"ת אור החיים', 'ביהכ"נ אהבת שלום', 'ישיבת בית אהרן'];
     for (let n = 0; n < 20; n++) {
       let key;
       do { key = Math.random() < 0.2 ? 'b:' + rnd(1200) : 'p:' + rnd(People.list.length); } while (taken.has(key) || (key[0] === 'b' && !People.biz(+key.slice(2))));
@@ -1848,7 +1845,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       const l = Object.assign(newLead(key, People.row(key)), { at: now() - rnd(8 * 3600000), created: 0, visits: Math.random() < 0.08 ? 2 : 1,
         warmth: hand ? rnd(3) : null, warmBy: hand ? 'hand' : null, demo: true });
       liveGroups().forEach((g) => { if (Math.random() < 0.55) { const bs = groupButtons(g.id); l.tags.push(bs[rnd(bs.length)].id); } });
-      if (tagged(l).some((b) => b.axis === 'who' && isStar(b)) && Math.random() < 0.7) l.roleOf = groups[rnd(groups.length)];
       if (Math.random() < 0.15) l.notes.push({ id: 'n' + (S.nseq++), at: l.at, text: ['ביקש לחזור אחרי החגים', 'מתעניין בכמות גדולה', 'מכיר אותנו מהשכונה'][rnd(3)], audio: false, tr: '' });
       log(l, 'ביקר בדוכן');
       S.leads.push(l);
@@ -1878,14 +1874,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
   /** The evening's last line: what waits on the next working day, counted, not listed — the list is the CRM's. */
   // S14: one of a kind is said as one ("הצעת מחיר אחת להכין"), never "1 הצעות".
   const PLURAL = { call: ['שיחה אחת', 'שיחות'], meet: ['תיאום פגישה אחד', 'תיאומי פגישה'], quote: ['הצעת מחיר אחת להכין', 'הצעות מחיר להכין'], send: ['הודעה אחת לשלוח', 'הודעות לשלוח'], date: ['בדיקת תאריך אחת', 'בדיקות תאריך'], register: ['פרטי הרשמה לשלוח', 'פרטי הרשמה לשלוח'] };
-  /** M8: under "יישר כח" — what tomorrow holds, in one plain line. */
-  function tomorrowLine(L) {
-    const t1 = dayNo(now()) + 1;
-    const n = {};
-    L.forEach((l) => tasks(l).forEach((t) => { if (t.due && t.type !== 'season' && dayNo(t.due.getTime()) === t1) n[t.type] = (n[t.type] || 0) + 1; }));
-    const parts = PRI.filter((k) => n[k]).map((k) => (PLURAL[k] ? many(n[k], PLURAL[k][0], PLURAL[k][1]) : n[k] + ' ' + STEPS[k].name));
-    return parts.length ? 'מחר: ' + parts.join(' · ') : 'מחר אין משימות';
-  }
   function nextDayLine(L) {
     const all = [].concat(...L.map((l) => tasks(l).filter((t) => t.type !== 'season' && t.due)));
     if (!all.length) return 'אין משימות.';
