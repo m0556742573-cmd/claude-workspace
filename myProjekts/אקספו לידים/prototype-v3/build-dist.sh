@@ -21,8 +21,11 @@ cat > "$out/index.html" <<'HTML'
 </head>
 <body>
 <div id="app" dir="rtl" lang="he">
+  <div id="demo" class="demo-bar"></div>
+  <div id="side" class="side"></div>
   <header id="top" class="top"></header>
   <main id="main"></main>
+  <div id="bar"></div>
 </div>
 <script src="hebcal.js"></script>
 <script src="people.js"></script>
