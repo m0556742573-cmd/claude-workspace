@@ -1,0 +1,6 @@
+# Declared exceptions to the client-data check in כלים/verify-docs.sh
+# One extended regex per line, matched against "file:line:content".
+#
+# Addresses on Yitzhak's own domain. They are the business's public contact
+# addresses, not a client's data - the site exists to publish them.
+@y-h-m\.com

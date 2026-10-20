@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ✏️ Everything to fill in is marked [בסוגריים מרובעים]. Search for "[" to find it all. -->
+<title>[שם העסק]</title>
+<meta name="description" content="[משפט אחד: מה העסק עושה ולמי]">
+<meta property="og:title" content="[שם העסק]">
+<meta property="og:description" content="[משפט אחד: מה העסק עושה ולמי]">
+<meta property="og:url" content="https://y-h-m.com/">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#1f4f8b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f4f8b'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='30' font-weight='700' fill='white' text-anchor='middle'%3EY%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f4f6f9;
+    --text: #1b2430;
+    --muted: #5b6676;
+    --accent: #1f4f8b;
+    --accent-text: #ffffff;
+    --border: #e1e6ed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161d;
+      --bg-soft: #18202a;
+      --text: #e8edf3;
+      --muted: #9aa6b5;
+      --accent: #5b9be0;
+      --accent-text: #0b1118;
+      --border: #263241;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Assistant", "Segoe UI", Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { font-weight: 700; font-size: 20px; color: var(--text); text-decoration: none; }
+  nav a { color: var(--muted); text-decoration: none; margin-inline-start: 20px; font-size: 16px; }
+  nav a:hover { color: var(--accent); }
+  .hero { padding: 88px 0 72px; background: var(--bg-soft); }
+  .hero h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.2; margin: 0 0 16px; }
+  .hero p { font-size: 20px; color: var(--muted); max-width: 640px; margin: 0 0 32px; }
+  .btn {
+    display: inline-block; padding: 12px 28px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-text);
+    text-decoration: none; font-weight: 600;
+  }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); margin-inline-start: 12px; }
+  section { padding: 64px 0; }
+  h2 { font-size: 30px; margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .card { border: 1px solid var(--border); border-radius: 12px; padding: 24px; background: var(--bg); }
+  .card h3 { margin: 0 0 8px; font-size: 20px; }
+  .card p { margin: 0; color: var(--muted); }
+  .contact { background: var(--bg-soft); }
+  .contact ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .contact a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  footer { padding: 24px 0; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  @media (max-width: 560px) {
+    nav { display: none; }
+    .btn.ghost { margin: 12px 0 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#">[שם העסק]</a>
+    <nav>
+      <a href="#about">אודות</a>
+      <a href="#services">שירותים</a>
+      <a href="#contact">צור קשר</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <h1>[כותרת: מה אתה עושה, במשפט אחד]</h1>
+      <p>[שתי שורות: למי זה מיועד, ומה הוא מקבל ממך]</p>
+      <a class="btn" href="#contact">דברו איתי</a>
+      <a class="btn ghost" href="#services">מה אני עושה</a>
+    </div>
+  </div>
+
+  <section id="about">
+    <div class="wrap">
+      <h2>אודות</h2>
+      <p>[פסקה קצרה: מי אתה, כמה זמן אתה בתחום, ומה מייחד אותך]</p>
+    </div>
+  </section>
+
+  <section id="services">
+    <div class="wrap">
+      <h2>שירותים</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>[שירות 1]</h3>
+          <p>[משפט אחד על השירות]</p>
+        </div>
+        <div class="card">
+          <h3>[שירות 2]</h3>
+          <p>[משפט אחד על השירות]</p>
+        </div>
+        <div class="card">
+          <h3>[שירות 3]</h3>
+          <p>[משפט אחד על השירות]</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="contact">
+    <div class="wrap">
+      <h2>צור קשר</h2>
+      <ul>
+        <!-- ✏️ Phone: write it twice, once for display and once inside tel: without dashes. -->
+        <li>📞 <a href="tel:[טלפון-בלי-מקפים]">[טלפון]</a></li>
+        <li>✉️ <a href="mailto:[כתובת]@y-h-m.com">[כתובת]@y-h-m.com</a></li>
+        <!-- ✏️ WhatsApp: international format, no + and no leading 0 (e.g. 9725...). Delete the line if not needed. -->
+        <li>💬 <a href="https://wa.me/[972XXXXXXXXX]" target="_blank" rel="noopener">וואטסאפ</a></li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">© <span id="year"></span> [שם העסק]</div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
