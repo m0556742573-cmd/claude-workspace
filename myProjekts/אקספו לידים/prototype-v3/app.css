@@ -1268,7 +1268,7 @@ details.adv > summary h2 { font-size: 17px; }
 /* part switch, a bar at the bottom with a raised middle, the agent        */
 /* floating above it as a circle, and one help dialog in the middle.       */
 /* ====================================================================== */
-:root { --demo-h: 26px; --nav-w: 248px; --nav-slim: 76px; --panel-w: 400px; --bar-h: 84px; }
+:root { --demo-h: 0px; --nav-w: 248px; --nav-slim: 76px; --panel-w: 400px; --bar-h: 84px; }
 
 /* the demo's own line, above everything */
 .demo-bar { position: sticky; top: 0; z-index: 45; height: var(--demo-h); display: flex; align-items: center; justify-content: center; gap: var(--s3); padding: 0 var(--s4); }
@@ -1478,3 +1478,18 @@ body.is-tab .ov-grid { grid-template-columns: minmax(0, 1fr); }
 /* the booth: one field stands out, with an ink border */
 .search { border-color: var(--ink); min-height: 64px; border-radius: var(--r); }
 .results { border-radius: var(--r); }
+
+/* 20/10: the demo line only once the system is real; the operator's page; the setup's new screens */
+body.has-demo { --demo-h: 26px; }
+.demo-bar:empty { display: none; }
+.welcome-steps { margin: var(--s4) 0; padding-inline-start: 1.4em; display: grid; gap: var(--s3); }
+.welcome-steps li b { display: block; }
+.welcome-steps li span { color: var(--muted); font-size: 15px; }
+.ai-made { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) var(--s4); margin: var(--s2) 0 var(--s4); background: var(--ai-soft); border: 1px solid var(--ai-line); border-radius: var(--r); font-size: 15px; }
+.ai-made .ic { width: 20px; height: 20px; color: var(--ai); flex: none; margin-top: 3px; }
+.msg-parts { display: grid; gap: var(--s6); }
+.part-title { font-size: 20px; margin: 0 0 var(--s2); }
+.pb-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.demo-note { margin-top: var(--s3); }
+body.admin-page main { max-width: var(--w-prose); }
+.admin h2 { margin-top: var(--s6); font-size: 18px; }

@@ -694,12 +694,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // ------------------------------------------------------------------
   // Setting up is four steps, once (יצחק, 17/10). The same screens are the settings afterwards, split in two:
   // how the system works, and his details and connections. Practising is the booth itself, before the fair.
-  const SETUP = [['account', 'פרטי העסק'], ['biz', 'העסק'], ['send', 'מה שולחים'], ['auto', 'מה המערכת עושה לבד']];
-  const SETTINGS_NAV = [['how', 'איך המערכת פועלת'], ['details', 'פרטים וחיבורים']];
+  /* 20/10 (יצחק): settings and setup are the same thing. A one-time registration (welcome, his details, the business),
+   * then the setup IS the settings' two parts — details and connections, opened at "הודעות", and the customization,
+   * headed by what the AI understood and made for him. "סיימתי להגדיר" ends it; afterwards the same screens are the settings. */
+  const SETUP = [['welcome', 'ברוך הבא'], ['account', 'הפרטים שלך'], ['biz', 'העסק'], ['messages', 'הודעות'], ['custom', 'התאמה אישית']];
+  const SETTINGS_NAV = [['details', 'פרטים וחיבורים'], ['how', 'התאמה אישית']];
   const SUBS_HOW = [['buttons', 'כפתורים ומשימות'], ['booth', 'הדוכן'], ['auto', 'מה קורה לבד'], ['seasons', 'עונות'], ['crm', 'שלבי המכירה']];
-  const SUBS_DET = [['account', 'פרטי העסק'], ['biz', 'תיאור העסק'], ['channels', 'איך שולחים'], ['materials', 'הודעות'], ['digest', 'הודעת הבוקר']];
+  // How it is sent, the messages and the morning message are one tab (יצחק, 20/10).
+  const SUBS_DET = [['account', 'פרטי העסק'], ['biz', 'תיאור העסק'], ['messages', 'הודעות']];
   // Old links across the code name a screen by its old place; each lands in its new one.
-  const SUB_ALIAS = { connect: 'channels', send: 'channels' };
+  const SUB_ALIAS = { connect: 'messages', send: 'messages', channels: 'messages', materials: 'messages', digest: 'messages' };
+  /** The part of the settings on screen: in the setup, the step says which. */
+  const setPart = () => (S.phase === 'setup' ? (S.step === 'messages' ? 'details' : 'how') : S.step);
   function goSettings(sub) {
     sub = SUB_ALIAS[sub] || sub || 'buttons';
     if (S.phase !== 'settings') S.backView = S.phase === 'live' ? S.view : S.backView;
@@ -712,17 +718,21 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const LIVE = [['booth', 'הדוכן'], ['dash', 'סוף היום'], ['crm', 'CRM']];
   const liveNav = () => (afterFair() ? [['crm', 'CRM']] : LIVE.filter(([k]) => !(worker() && k === 'crm')));
   function render() {
+    if (adminMode()) return renderAdmin();
     renderTop();
     const m = $('#main');
     if (!S.signed) { m.classList.remove('wide'); return viewSignIn(m); }
     // The tracking view and the settings are mostly used on a computer (יצחק, 11–12/10): they take the width. A tablet is narrower anyway.
     m.classList.toggle('wide', S.phase === 'settings' || (S.phase === 'live' && S.view === 'crm'));
     if (S.phase === 'setup') {
-      ({ account: viewAccount, biz: viewBiz, send: viewSend, auto: viewAutoSetup }[S.step] || viewAccount)(m);
+      if (!SETUP.some(([k]) => k === S.step)) S.step = 'welcome';
+      if (S.step === 'messages' || S.step === 'custom') viewSettings(m);
+      else ({ welcome: viewWelcome, account: viewAccount, biz: viewBiz }[S.step])(m);
       const i = SETUP.findIndex(([k]) => k === S.step);
-      if (S.step === 'biz') m.insertAdjacentHTML('beforeend', tuneLinks([['buttons', 'לכפתורים בדוכן']]));
-      m.insertAdjacentHTML('beforeend', `<div class="next-bar">${i > 0 ? `<button class="btn ghost" data-step="${SETUP[i - 1][0]}">→ חזרה</button>` : ''}
-        ${i < SETUP.length - 1 ? `<button class="btn primary big" data-act="setup-next">הבא: ${esc(SETUP[i + 1][1])} ←</button>` : '<button class="btn primary big" data-act="setup-done">סיום — לדוכן ←</button>'}</div>`);
+      const next = S.step === 'welcome' ? '<button class="btn primary big" data-act="setup-next">נתחיל ←</button>'
+        : S.step === 'custom' ? '<button class="btn primary big" data-act="setup-finish">סיימתי להגדיר ✓</button>'
+        : `<button class="btn primary big" data-act="setup-next">הבא: ${esc(SETUP[i + 1][1])} ←</button>`;
+      m.insertAdjacentHTML('beforeend', `<div class="next-bar">${i > 1 ? `<button class="btn ghost" data-step="${SETUP[i - 1][0]}">→ חזרה</button>` : ''}${next}</div>`);
       return noticeBar(m);
     }
     if (S.phase === 'settings') { viewSettings(m); return noticeBar(m); }
@@ -796,6 +806,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const setup = S.phase === 'setup';
     const shell = shellOn();
     const desk = deskMode();
+    document.body.classList.remove('admin-page');
     document.body.classList.toggle('shell', shell);
     document.body.classList.toggle('is-desk', shell && desk);
     document.body.classList.toggle('is-tab', shell && !desk);
@@ -803,19 +814,19 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     document.body.classList.toggle('with-panel', shell && !!UI.panel);
     document.body.classList.toggle('no-help', !!DEV.helpOff);
     if (UI.panel === 'ai' && !assistOk()) UI.panel = null;
-    // K15: one bar says it is a demo, instead of twenty notes scattered over the screens. Its menu is the demo's own.
-    $('#demo').innerHTML = `<span>הדגמה — שום דבר לא נשלח באמת${S.signed ? ` · מצב המערכת: <b>${esc(SYS_NAMES[S.sys])}</b>` : ''}</span>
-      ${S.signed ? '<button class="demo-menu" data-act="menu" aria-label="תפריט ההדגמה">תפריט ההדגמה ⋯</button>' : ''}
-      <button class="demo-menu" data-act="reset">איפוס מערכת</button>`;   // in sight, not inside the menu (יצחק, 20/10)
+    // The demo shows the final system (יצחק, 20/10): the operator's tools live on their own page (#admin). While the
+    // booth is a sample one, each send says it did not go out; once it is real, one bar says this is still a demo.
+    const bar = S.signed && !practice();
+    document.body.classList.toggle('has-demo', bar);
+    $('#demo').innerHTML = bar ? '<span>הדגמה — שום דבר לא נשלח באמת</span>' : '';
     if (!shell) {
       // Signing in and the setup: a thin header. Setup is a line of steps, not a menu (יצחק, 17/10).
       const at = SETUP.findIndex(([k]) => k === S.step);
       $('#side').innerHTML = ''; $('#bar').innerHTML = '';
       $('#top').innerHTML = `<div class="top-in">
         <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
-        <div class="brand"><span class="mark" aria-hidden="true"></span>${esc(S.biz.name || 'דוכן חכם')}${setup ? ' <span class="faint">· הקמה</span>' : ''}</div>
-        ${setup && S.signed ? `<nav class="stepper" aria-label="שלבי ההקמה">${SETUP.map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}" ${k !== 'account' && !accountOk() ? 'disabled title="קודם פרטי העסק"' : ''}><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>` : ''}
-        ${setup && S.signed ? '<button class="icon-btn" data-act="settings" aria-label="הגדרות" title="הגדרות">⚙️</button>' : ''}
+        <div class="brand"><span class="mark" aria-hidden="true"></span>${esc(S.biz.name || 'דוכן חכם')}${setup && S.signed ? ' <span class="faint">· הקמה</span>' : ''}</div>
+        ${setup && S.signed ? `<nav class="stepper" aria-label="שלבי ההקמה">${SETUP.map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}" ${n > (S.setupReach || 0) ? 'disabled' : ''}><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>` : ''}
       </div>`;
       renderPanel();
       return paintSaved();
@@ -825,6 +836,42 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     renderPanel();
     paintSaved();
   }
+
+  /* ------------------------------------------------------------------
+   * The operator's page (יצחק, 20/10): "the demo shows the final system, so everything about operating it is outside".
+   * The same address with #admin. It shares the browser's storage with the system, so a change here reaches an open
+   * system tab at once (it reloads on the storage event). Nothing here is part of what an exhibitor sees.
+   * ------------------------------------------------------------------ */
+  const adminMode = () => location.hash === '#admin';
+  function renderAdmin() {
+    document.body.className = 'admin-page';
+    ['#side', '#top', '#bar', '#demo'].forEach((s) => { if ($(s)) $(s).innerHTML = ''; });
+    const p = $('#panel'); if (p) p.remove();
+    const sc = $('#pscrim'); if (sc) sc.remove();
+    const opt = (attr, val, on, t, sub) => `<button class="opt" data-${attr}="${val}" aria-pressed="${on}">${esc(t)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
+    $('#main').innerHTML = `<section class="card narrow admin">
+      <div class="eyebrow">לא חלק מהמערכת</div>
+      <h1>מסך מפעיל</h1>
+      <p class="muted">כאן מפעילים את ההדגמה: מצב המערכת, הודעות לכל המציגים, הזמן, והתצוגה. מה שמשנים כאן מגיע מיד לחלון המערכת הפתוח.</p>
+      <h2>מצב המערכת</h2>
+      <div class="opts">${opt('sys', 'demo', S.sys === 'demo', SYS_NAMES.demo, 'הדוכן לדוגמה, ושום דבר לא נשלח. מתאמנים.')}${opt('sys', 'real', S.sys === 'real', SYS_NAMES.real, 'הדוגמאות נמחקות, וכל מציג מקבל הודעה. בהדגמה עדיין שום דבר לא יוצא.')}${opt('sys', 'after', S.sys === 'after', SYS_NAMES.after, 'הדוכן נסגר, ונשאר ה-CRM.')}</div>
+      <h2>הודעה דחופה לכל המציגים</h2>
+      <textarea id="ad-notice" class="say small" placeholder="למשל: הכניסה לאולם נפתחת היום ב-10:00. בעלי דוכנים מתבקשים להגיע עד 9:30."></textarea>
+      <div class="actions"><button class="btn primary" data-act="admin-notice">לשלוח לכל המציגים</button></div>
+      <h2>הזמן</h2>
+      <p class="muted">היום במערכת: ${esc(shortDay(new Date(now())))}${S.shift ? ` (${S.shift} ${S.shift === 1 ? 'יום' : 'ימים'} קדימה)` : ''}.</p>
+      <div class="actions"><button class="btn" data-act="next-day">⏩ יום הבא</button>${S.shift ? '<button class="btn" data-act="today">לחזור להיום</button>' : ''}</div>
+      <h2>התצוגה</h2>
+      <div class="opts">${opt('uiset', 'desk', DEV.ui === 'desk', 'מחשב')}${opt('uiset', 'tab', DEV.ui === 'tab', 'טאבלט')}${opt('uiset', 'auto', !DEV.ui, 'לפי המכשיר')}</div>
+      <h2>איפוס</h2>
+      <p class="muted">מוחק את כל המבקרים, הכפתורים וההגדרות, ומתחילים מההתחלה.</p>
+      <div class="actions"><button class="btn danger" data-act="reset">איפוס מערכת</button></div>
+      <div class="actions" style="margin-top:24px"><button class="btn" data-act="admin-close">← לפתוח את המערכת</button></div>
+    </section>`;
+  }
+  window.addEventListener('hashchange', () => render());
+  // The operator's page and the system in two tabs of one browser: a change in one shows in the other.
+  window.addEventListener('storage', (e) => { if (e.key === KEY || e.key === DEVKEY) location.reload(); });
 
   /** The switch between the two parts, when both are open to him. */
   function partSwitch() {
@@ -1019,7 +1066,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function signedIn() {
     S.signed = true; signStep = null;
     // A returning exhibitor goes on where he was; a new one starts the setup.
-    if (!accountOk()) { S.phase = 'setup'; S.step = 'account'; }
+    if (!accountOk()) { S.phase = 'setup'; S.step = 'welcome'; S.setupReach = 0; }
     save(); render(); window.scrollTo(0, 0);
   }
 
@@ -1032,17 +1079,30 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const err = (k) => (accErrors[k] ? `<div class="err" id="err-${k}">${esc(accErrors[k])}</div>` : '');
     const inv = (k) => (accErrors[k] ? ` aria-invalid="true" aria-describedby="err-${k}"` : '');
     const setup = S.phase === 'setup';
+    const yn = (attr, val, t) => `<button class="chip" data-${attr}="${val}" aria-pressed="${a[attr === 'haswa' ? 'hasWa' : 'waSame'] === (val === '1')}">${t}</button>`;
+    // WhatsApp is a small question, not a field (יצחק, 20/10): have it? on the phone above? if not, which number.
+    const wa = `<div class="label">האם יש לך וואטסאפ?</div><div class="chips">${yn('haswa', '1', 'כן')}${yn('haswa', '0', 'לא')}</div>
+      ${a.hasWa === true && a.phone ? `<div class="label">הוואטסאפ על <bdi dir="ltr">${esc(a.phone)}</bdi>?</div><div class="chips">${yn('wasame', '1', 'כן, על המספר הזה')}${yn('wasame', '0', 'במספר אחר')}</div>` : ''}
+      ${a.hasWa === true && (!a.phone || a.waSame === false) ? `<label class="label" for="acc-wa2">מספר הוואטסאפ</label><input id="acc-wa2" class="text-input ltr" type="tel" data-acc="wa2" value="${esc(a.wa2 || '')}" autocomplete="off">` : ''}`;
     m.innerHTML = `<section class="card narrow">
-      <h1>${setup ? 'ברוך הבא' : 'פרטי העסק'} ${help('account')}</h1>
-      ${setup ? '<p class="muted">כמה פרטים, פעם אחת. אחר כך — כמה מילים על העסק, והמערכת מתאימה את עצמה אליך.</p>' : ''}
+      <h1>${setup ? 'הפרטים שלך' : 'פרטי העסק'} ${help('account')}</h1>
+      ${setup ? '<p class="muted">פעם אחת. כל מה שתכתוב כאן נשמר גם בהגדרות, ואפשר לשנות אותו שם.</p>' : ''}
       ${a.email ? `<p class="faint">מחובר בתור <bdi dir="ltr">${esc(a.email)}</bdi></p>` : ''}
       <label class="label" for="acc-name">השם שלך <small class="req">חובה</small></label>
       <input id="acc-name" class="text-input${accErrors.name ? ' bad' : ''}" data-acc="name" value="${esc(a.name)}" autocomplete="name"${inv('name')}>${err('name')}
       <label class="label" for="acc-biz">שם העסק <small>כמו שהלקוחות מכירים אותו</small></label><input id="acc-biz" class="text-input" data-bizname value="${esc(S.biz.name)}" autocomplete="organization">
       <label class="label" for="acc-phone">טלפון העסק</label><input id="acc-phone" class="text-input ltr" type="tel" data-acc="phone" value="${esc(a.phone)}" autocomplete="tel">
-      <label class="label" for="acc-wa2">וואטסאפ במספר אחר? <small>רשות. אם הוואטסאפ שלך לא על טלפון העסק</small></label><input id="acc-wa2" class="text-input ltr" type="tel" data-acc="wa2" value="${esc(a.wa2 || '')}" autocomplete="off">
-    </section>`;
+      ${wa}
+    </section>
+    ${setup ? '' : `<section class="card narrow" style="margin-top:14px"><h2>הטאבלטים שלך</h2>
+      <p class="muted">מחוברים: ${S.biz.devices} ${S.biz.devices === 1 ? 'טאבלט' : 'טאבלטים'}. טאבלט של עובד רושם ושולח, בלי הגדרות ובלי CRM.</p>
+      <div class="actions">${afterFair() ? '' : '<button class="btn" data-act="devices">+ להוסיף טאבלט</button>'}</div></section>
+    <section class="card narrow" style="margin-top:14px"><h2>החשבון</h2>
+      <p class="muted">${a.email ? `מחובר בתור <bdi dir="ltr">${esc(a.email)}</bdi>.` : 'מחובר.'}</p>
+      <div class="actions"><button class="btn" data-act="sign-out">יציאה מהחשבון</button></div></section>`}`;
   }
+  /** The number his WhatsApp is on, from the small question — or none. */
+  const waNumber = () => (S.account.hasWa ? (S.account.waSame !== false && S.account.phone ? S.account.phone : S.account.wa2) : '');
   /** Errors beside the fields, focus on the first: a toast that vanishes is no place for them. */
   function checkAccount() {
     accErrors = {};
@@ -1214,9 +1274,11 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function viewChannels(m) {
     const b = S.biz;
     const prefix = b.mail.prefix || 'info';
+    // No WhatsApp (he said so in his details): the question is not asked — only how the mail reaches them (יצחק, 20/10).
+    const noWa = S.account.hasWa === false;
     m.innerHTML = `<h1>איך שולחים ${help('channels')}</h1>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>איך המבקרים יקבלו את מה ששלחת?</h2>${channelQuestion()}</section>
+        ${noWa ? '' : `<section class="card"><h2>איך המבקרים יקבלו את מה ששלחת?</h2>${channelQuestion()}</section>`}
         <section class="card"><h2>📧 המייל</h2><p class="muted">יוצא מהמערכת, בשם העסק שלך.</p>
           <div class="label">הכתובת שממנה זה יוצא</div>
           <div class="mail-from ltr"><input class="text-input" data-mail="prefix" value="${esc(b.mail.prefix)}" placeholder="info" autocomplete="off" spellcheck="false"><span>@${MAIL_DOMAIN}</span></div>
@@ -1297,17 +1359,42 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // Settings — the setup's screens, in two places (יצחק, 17/10: mixing them was "a strategic mistake")
   // ------------------------------------------------------------------
   function viewSettings(m) {
-    const det = S.step === 'details';
+    const setup = S.phase === 'setup';
+    const det = setPart() === 'details';
     const subs = det ? SUBS_DET : SUBS_HOW;
-    if (!subs.some(([k]) => k === S.sub)) S.sub = subs[0][0];
-    const back = S.backSetup ? 'להקמה' : { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
+    S.sub = SUB_ALIAS[S.sub] || S.sub;
+    if (!subs.some(([k]) => k === S.sub)) S.sub = det && setup ? 'messages' : subs[0][0];
+    const back = { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
     // The two halves of the settings sat in the old top bar; in the new shell they head the screen (20/10).
-    m.innerHTML = `<div class="set-head"><h1>הגדרות ${help(S.sub)}</h1><nav class="seg-ctl" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button data-step="${k}" aria-pressed="${S.step === k}">${t}</button>`).join('')}</nav></div>
-      <p class="muted set-intro">${det ? 'הפרטים שלך, ודרכי השליחה: מי אתה, ואיך מה ששולחים מגיע.' : 'מה קורה כשמסמנים, מה המערכת עושה לבד, ואיך הדוכן מתנהג.'} כל שינוי נשמר מיד.</p>
-      <nav class="subtabs" aria-label="${det ? 'פרטים וחיבורים' : 'איך המערכת פועלת'}">${subs.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>
-      <button class="float-back" data-act="settings-done">← חזרה ${back}</button>`;
+    // The customization is headed by what the AI made for him, and that all of it can change (יצחק, 20/10).
+    m.innerHTML = `<div class="set-head"><h1>${setup ? (det ? 'פרטים וחיבורים' : 'התאמה אישית') : 'הגדרות'} ${help(S.sub)}</h1><nav class="seg-ctl" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button data-part="${k}" aria-pressed="${setPart() === k}">${t}</button>`).join('')}</nav></div>
+      ${det ? `<p class="muted set-intro">הפרטים שלך, ואיך מה ששולחים מגיע למבקר. כל שינוי נשמר מיד.</p>`
+        : `<div class="ai-made">${ic('spark')}<span><b>זה מה שה-AI הבין על העסק שלך, ויצר לבד.</b> כל דבר כאן אפשר לשנות ולהתאים לך. כל שינוי נשמר מיד.</span></div>`}
+      <nav class="subtabs" aria-label="${det ? 'פרטים וחיבורים' : 'התאמה אישית'}">${subs.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>
+      ${setup ? '' : `<button class="float-back" data-act="settings-done">← חזרה ${back}</button>`}`;
     ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, crm: viewCrmSettings, auto: viewRules,
-      account: viewAccount, biz: viewBiz, channels: viewChannels, materials: viewMaterials, digest: viewDigest }[S.sub] || viewButtons)($('#subview'));
+      account: viewAccount, biz: viewBiz, messages: viewMessages }[S.sub] || viewButtons)($('#subview'));
+  }
+  /* One tab for everything that goes out (יצחק, 20/10): how it is sent, the messages themselves, and the morning
+   * message. Each part is the screen it was; its title steps down to a section heading. */
+  function viewMessages(m) {
+    m.innerHTML = `<div class="msg-parts"><div id="mp-ch"></div><div id="mp-mat"></div><div id="mp-dig"></div></div>`;
+    viewChannels($('#mp-ch')); viewMaterials($('#mp-mat')); viewDigest($('#mp-dig'));
+    m.querySelectorAll('.msg-parts h1').forEach((h) => { const h2 = document.createElement('h2'); h2.className = 'part-title'; h2.innerHTML = h.innerHTML; h.replaceWith(h2); });
+  }
+  /** The welcome (יצחק, 20/10): before his name is known, so it greets no one by name. */
+  function viewWelcome(m) {
+    m.innerHTML = `<section class="card narrow welcome">
+      <h1>ברוך הבא לדוכן חכם</h1>
+      <p class="muted">ארבעה צעדים קצרים, ואתה מוכן לתערוכה:</p>
+      <ol class="welcome-steps">
+        <li><b>הפרטים שלך</b><span>שם, טלפון, והאם יש לך וואטסאפ.</span></li>
+        <li><b>העסק</b><span>כמה מילים על מה שאתה עושה. ה-AI בונה לך מזה את הדוכן.</span></li>
+        <li><b>הודעות</b><span>מה יוצא למבקרים, ואיך. ומתי תקבל את הודעת הבוקר.</span></li>
+        <li><b>התאמה אישית</b><span>לראות מה נבנה בשבילך, ולשנות מה שתרצה.</span></li>
+      </ol>
+      <p class="faint">כל דבר אפשר לשנות גם אחר כך, בהגדרות.${S.account.email ? ` מחובר בתור <bdi dir="ltr">${esc(S.account.email)}</bdi>.` : ''}</p>
+    </section>`;
   }
   /** Everything the system does by itself, in one place (יצחק, 17/10): the rules, and what the buttons do — marked where it comes from. */
   let ruleTab = 'on';
@@ -1363,8 +1450,8 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     m.innerHTML = `<h1>הודעת הבוקר ${help('digest')}</h1>
       <div class="stack" style="margin-top:14px">
         <section class="card"><div class="toggle-row"><div><h2>כל בוקר: מה לטיפול היום</h2><p class="muted">רשימה קצרה של מה מחכה לך היום, ומה המערכת עשתה לבד. נשלחת אליך מהמספר של מערכת הדוכן.</p></div>${toggle('digest', b.digest.on, 'הודעת בוקר')}</div>
-          ${b.digest.on ? `<div class="label">לאן לשלוח לך?</div><div class="chips">${DIGEST_CH.map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
-          ${b.digest.ch === 'wa' && !(S.account.wa2 || S.account.phone) ? '<p class="faint">לאיזה מספר? ממלאים ב"פרטי העסק".</p>' : ''}
+          ${b.digest.on ? `<div class="label">לאן לשלוח לך?</div><div class="chips">${DIGEST_CH.filter((k) => k !== 'wa' || S.account.hasWa !== false).map((k) => `<button class="chip" data-digestch="${k}" aria-pressed="${b.digest.ch === k}">${CH_NAMES[k]}</button>`).join('')}</div>
+          ${b.digest.ch === 'wa' && !waNumber() ? '<p class="faint">לאיזה מספר? ממלאים ב"פרטי העסק".</p>' : ''}
           <div class="label">באיזו שעה</div><div class="chips">${['06:00', '07:00', '08:00', '09:00', '10:00', '12:00'].map((h) => `<button class="chip" data-digesth="${h}" aria-pressed="${b.digest.hour === h}">${h}</button>`).join('')}</div>` : ''}</section>
       </div>`;
   }
@@ -1565,7 +1652,10 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>ההודעות</h2>
           <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.booth ? ' <span class="booth-tag">ברירת המחדל בדוכן</span>' : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
-          <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button>${ai ? '<button class="btn" data-act="tpl-ai">✨ תכתוב לי הודעה</button>' : ''}</div></section>
+          <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button>${ai ? '<button class="btn" data-act="tpl-ai">✨ תכתוב לי הודעה</button>' : ''}</div>
+          <div class="label">מה שולח כפתור השליחה בכרטיס המבקר, בדוכן</div>
+          <div class="chips">${b.templates.map((t) => `<button class="chip" data-boothdef="${esc(t.id)}" aria-pressed="${!!(boothDefault() && boothDefault().id === t.id)}">${t.mat ? '📎' : '💬'} ${esc(t.name)}</button>`).join('')}
+            <button class="chip" data-boothdef="" aria-pressed="${!boothDefault()}">בלי ברירת מחדל — לבחור בכל פעם</button></div></section>
         <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו הודעה</h2>
           ${groups.length ? groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')
             : ''}</section>
@@ -1610,8 +1700,11 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
   let paused = false;      // the open card's countdown stopped by hand (⏸): it waits until he finishes or goes on
   function viewBooth(m) {
     // Before the system goes live (יצחק, 17/10) the booth holds sample visitors, and he may add more to see a full day.
-    const demoBar = practice() ? `<div class="practice-banner"><span><b>דוכן לדוגמה.</b> כאן מתאמנים עד שהמערכת עוברת למצב אמיתי. מה שנרשם עכשיו יימחק אז.</span>
-      ${worker() ? '' : '<button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button>'}</div>` : '';
+    // The sample visitors were added but nothing on this screen showed it (יצחק, 20/10: "לא עשה כלום"). Now the banner
+    // counts them, says where they are, and they can be taken out again.
+    const nDemo = leadsNow().filter((l) => l.demo).length;
+    const demoBar = practice() ? `<div class="practice-banner"><span><b>דוכן לדוגמה.</b> כאן מתאמנים עד שהמערכת עוברת למצב אמיתי. מה שנרשם עכשיו יימחק אז.${nDemo ? ` <br>יש כאן ${nDemo} מבקרים לדוגמה: מחפשים אותם בשם, ורואים אותם ב"סוף היום" וב-CRM.` : ''}</span>
+      ${worker() ? '' : `<span class="pb-acts"><button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button>${nDemo ? '<button class="btn ghost" data-act="seed-remove">להסיר את המבקרים לדוגמה</button>' : ''}</span>`}</div>` : '';
     // "New" stands at the top, beside the search, and again at the end of the results (יצחק, 17/10): a visitor who is not on the list must never be lost.
     m.innerHTML = `${demoBar}${eyebrow('יום התערוכה · הדוכן')}<div class="search-row"><input id="q" class="search" type="search" placeholder="שם או עסק…" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
       <button class="btn new-btn" data-act="new-person">＋ מבקר חדש</button>${help('booth')}</div>
@@ -2336,6 +2429,10 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       if (!S.notices) S.notices = fresh().notices;
       if (!S.seen) S.seen = {};
       if (S.account.wa2 === undefined) S.account.wa2 = '';
+      // 20/10: WhatsApp became a question; a number typed in the old field means "yes, on another number".
+      if (S.account.hasWa === undefined && S.account.wa2) { S.account.hasWa = true; S.account.waSame = false; }
+      // 20/10: the setup's old steps land in their new ones.
+      if (S.phase === 'setup') { S.step = { send: 'messages', auto: 'custom' }[S.step] || S.step; if (S.setupReach === undefined) S.setupReach = Math.max(0, SETUP.findIndex(([k]) => k === S.step)); }
       b.channels = { email: true, wa: !!(b.channels && (b.channels.wa || b.channels.waApi)), sms: !!(b.channels && b.channels.sms) };
       if (!b.waHow) b.waHow = b.channels.wa ? 'own' : '';
       delete b.chOrder; delete b.sendAll; delete b.derive;
@@ -2642,10 +2739,11 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
         <div class="crm-head">${full || S.crmTab === 'overview' ? '' : `<div class="crm-title">${eyebrow('CRM')}<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1></div>`}
           ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
           ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmtab="messages">💬 הודעה לקבוצה</button><button class="btn" data-act="new-person">＋ ליד</button>` : ''}
-          <span class="date-now">היום: ${esc(shortDay(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
+          <span class="date-now">${S.crmTab === 'overview' && !full ? '' : `היום: ${esc(shortDay(new Date(now())))}`}
             ${!full && vs ? `<button class="btn ghost" data-act="view-settings" title="הגדרות: ${esc(vs[1])}" aria-label="הגדרות: ${esc(vs[1])}">⚙️</button>` : ''}</span></div>
         ${!full && practice() && !worker() && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות איך זה נראה? 20 לידים לדוגמה, כאילו עברו שבועיים.</div>
           <div class="actions"><button class="btn primary" data-act="seed-progress">להוסיף דוגמה</button></div></div>` : ''}
+        ${!full && practice() && !worker() && L.some((l) => l.demo) ? `<p class="faint demo-note">יש כאן ${L.filter((l) => l.demo).length} לידים לדוגמה. <button class="link" data-act="seed-remove">להסיר אותם</button></p>` : ''}
         <div class="${side ? 'crm-split' : ''}"><div id="crm-body"></div>${side ? '<aside class="crm-side" id="crm-side" aria-label="הליד"></aside>' : ''}</div>
       </div></div>`;
     if (full) return recordPage($('#crm-body'), rec);
@@ -4029,6 +4127,8 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
   // ------------------------------------------------------------------
   // Typing, and clicks
   // ------------------------------------------------------------------
+  // The WhatsApp question names the phone he typed: it is asked again with the new number once he leaves the field.
+  document.addEventListener('change', (e) => { const d = e.target.dataset || {}; if (d.acc === 'phone' && S.account.hasWa) render(); });
   document.addEventListener('input', (e) => {
     const d = e.target.dataset || {};
     if (d.roleof) { const l = leadById(+d.roleof); if (l) { l.roleOf = e.target.value.trim(); save(); } }
@@ -4126,7 +4226,16 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (d.panel) return openPanel(d.panel);
     if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
     if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillSnap = {}; filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
-    if (d.step) { S.step = d.step; if (S.phase === 'settings') S.sub = (d.step === 'details' ? SUBS_DET : SUBS_HOW)[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
+    if (d.step) { S.step = d.step; if (S.step === 'messages') S.sub = 'messages'; if (S.step === 'custom') S.sub = SUBS_HOW[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
+    // The settings' two parts. In the setup a part is a step: details opens at "הודעות" (יצחק, 20/10).
+    if (d.part) {
+      if (S.phase === 'setup') { S.step = d.part === 'details' ? 'messages' : 'custom'; S.sub = d.part === 'details' ? 'messages' : SUBS_HOW[0][0]; S.setupReach = Math.max(S.setupReach || 0, SETUP.findIndex(([k]) => k === S.step)); }
+      else { S.step = d.part; S.sub = (d.part === 'details' ? SUBS_DET : SUBS_HOW)[0][0]; }
+      save(); render(); return window.scrollTo(0, 0);
+    }
+    if (d.uiset) { DEV.ui = d.uiset === 'auto' ? null : d.uiset; save(); return render(); }
+    if (d.haswa) { S.account.hasWa = d.haswa === '1'; if (!S.account.hasWa) { S.biz.channels.wa = false; S.account.waSame = null; } save(); return render(); }
+    if (d.wasame) { S.account.waSame = d.wasame === '1'; save(); return render(); }
     if (d.sub) { S.sub = d.sub; save(); render(); return window.scrollTo(0, 0); }
     if (d.help) { if (helpFor === b) hideHelp(); else showHelp(b); return; }
     // The booth card in the business step: try it, or edit its buttons in place.
@@ -4360,17 +4469,28 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         }
         if (S.step === 'biz' && !S.biz.buttons.length) { const say = $('#say'); if (say && say.value.trim()) applyReading(parseWords(say.value), say.value); }
         const i = SETUP.findIndex(([k]) => k === S.step);
-        S.step = SETUP[i + 1][0]; save(); render(); return window.scrollTo(0, 0);
+        S.step = SETUP[i + 1][0];
+        S.setupReach = Math.max(S.setupReach || 0, i + 1);
+        if (S.step === 'messages') S.sub = 'messages';
+        if (S.step === 'custom') S.sub = SUBS_HOW[0][0];
+        save(); render(); return window.scrollTo(0, 0);
       }
-      // Setup ends at the booth — a sample one until the system goes real (יצחק, 17/10). Practising is the booth itself.
-      case 'setup-done':
+      // "סיימתי להגדיר" (יצחק, 20/10): a welcome that says the setup is done, and into the system.
+      // It ends at the booth — a sample one until the system goes real (יצחק, 17/10).
+      case 'setup-finish':
         if (!checkAccount()) { S.step = 'account'; render(); return toast('מה השם שלך?'); }
-        S.phase = 'live'; S.view = afterFair() ? 'crm' : 'booth'; save(); render(); window.scrollTo(0, 0);
-        return toast(practice() ? 'ההקמה הסתיימה. זה הדוכן — לדוגמה, עד שהמערכת תעבור למצב אמיתי.' : 'ההקמה הסתיימה. בהצלחה!');
+        return sheet(`<h2>סיימת להגדיר. ברוך הבא!</h2>
+          <p class="muted">מעבירים אותך עכשיו למערכת. כל מה שהגדרת נמצא בהגדרות, ואפשר לשנות אותו בכל רגע.</p>
+          ${practice() ? '<p class="faint">עד שהמערכת עוברת למצב אמיתי, הדוכן הוא לדוגמה: מתאמנים בו, ושום דבר לא נשלח באמת.</p>' : ''}
+          <div class="actions"><button class="btn primary big" data-act="setup-done">${afterFair() ? 'ל-CRM ←' : 'לדוכן ←'}</button></div>`);
+      case 'setup-done':
+        closeSheet(false);
+        if (!checkAccount()) { S.step = 'account'; render(); return toast('מה השם שלך?'); }
+        S.phase = 'live'; S.view = afterFair() ? 'crm' : 'booth'; save(); render(); return window.scrollTo(0, 0);
       // The settings are open at any time, the setup's first run included (יצחק, 17/10); from the setup, "back" returns to its step.
       case 'settings':
         if (worker()) return ownerOnly('ההגדרות');
-        if (S.phase === 'setup') S.backSetup = S.step;
+        if (S.phase === 'setup') return;   // the setup is the settings (יצחק, 20/10)
         return goSettings(S.sub && S.sub !== 'custom' ? S.sub : 'buttons');
       case 'settings-done':
         if (S.backSetup) { S.phase = 'setup'; S.step = S.backSetup; S.backSetup = null; }
@@ -4388,6 +4508,8 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'notice-read': { const x = (S.notices || []).find((y) => y.id === d.id); if (x) x.read = true; save(); return render(); }
       case 'sys': return sheetSys();
       case 'demo-notice': notify('הודעה מהמארגנים: הכניסה לאולם נפתחת היום בשעה 10:00. בעלי דוכנים מתבקשים להגיע עד 9:30.', true); save(); render(); return toast('נשלחה הודעה דחופה (הדגמה)');
+      case 'admin-notice': { const v = ($('#ad-notice') && $('#ad-notice').value.trim()) || ''; if (!v) { $('#ad-notice').focus(); return toast('מה ההודעה?'); } notify(v, true); save(); render(); return toast('✓ נשלחה לכל המציגים'); }
+      case 'admin-close': location.hash = ''; return;
       case 'assist': return openPanel('ai');
       case 'assist-close': case 'panel-close': UI.panel = null; return render();
       case 'nav-fold': DEV.navFolded = !slimNav(); if (!DEV.navFolded) UI.panel = null; save(); return render();
@@ -4758,7 +4880,9 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         closeSheet();
         if (S.phase === 'live' && S.view !== 'booth') render();
         return;
-      case 'seed': seedDay(); return render();
+      case 'seed': seedDay(); render(); return toast('✓ נוספו 20 מבקרים לדוגמה. רואים אותם ב"סוף היום" וב-CRM');
+      case 'seed-remove': { const n = S.leads.filter((l) => l.demo).length; return sheetConfirm('להסיר את המבקרים לדוגמה?', `${n} מבקרים לדוגמה יימחקו. מה שרשמת בעצמך נשאר.`, 'seed-remove-yes', '', 'להסיר'); }
+      case 'seed-remove-yes': S.leads = S.leads.filter((l) => !l.demo); closeSheet(false); save(); render(); return toast('✓ המבקרים לדוגמה הוסרו');
       case 'next-day': S.shift += 1; idleOnce(); save(); return render();
       case 'today': S.shift = 0; idleOnce(); save(); return render();
       case 'devices': return sheetDevices();
