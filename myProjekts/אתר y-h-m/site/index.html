@@ -3,11 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- ✏️ Everything to fill in is marked [בסוגריים מרובעים]. Search for "[" to find it all. -->
-<title>[שם העסק]</title>
-<meta name="description" content="[משפט אחד: מה העסק עושה ולמי]">
-<meta property="og:title" content="[שם העסק]">
-<meta property="og:description" content="[משפט אחד: מה העסק עושה ולמי]">
+<title>YHM Business Ecosystems | מערכות עסקיות חכמות</title>
+<meta name="description" content="מערכות עסקיות חכמות בהתאמה אישית: מערכות מידע, אוטומציה עסקית ובוטים.">
+<meta property="og:title" content="YHM Business Ecosystems">
+<meta property="og:description" content="מערכות עסקיות חכמות בהתאמה אישית: מערכות מידע, אוטומציה עסקית ובוטים.">
 <meta property="og:url" content="https://y-h-m.com/">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#1f4f8b">
@@ -51,6 +50,8 @@
   }
   header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
   .brand { font-weight: 700; font-size: 20px; color: var(--text); text-decoration: none; }
+  .brand-sub { font-weight: 400; color: var(--muted); font-size: 16px; }
+  .eyebrow { color: var(--accent); font-weight: 600; margin-bottom: 8px; }
   nav a { color: var(--muted); text-decoration: none; margin-inline-start: 20px; font-size: 16px; }
   nav a:hover { color: var(--accent); }
   .hero { padding: 88px 0 72px; background: var(--bg-soft); }
@@ -74,6 +75,7 @@
   footer { padding: 24px 0; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
   @media (max-width: 560px) {
     nav { display: none; }
+    .brand-sub { display: none; }
     .btn.ghost { margin: 12px 0 0; }
   }
 </style>
@@ -82,7 +84,7 @@
 
 <header>
   <div class="wrap">
-    <a class="brand" href="#">[שם העסק]</a>
+    <a class="brand" href="#">YHM <span class="brand-sub">Business Ecosystems</span></a>
     <nav>
       <a href="#about">אודות</a>
       <a href="#services">שירותים</a>
@@ -94,8 +96,9 @@
 <main>
   <div class="hero">
     <div class="wrap">
-      <h1>[כותרת: מה אתה עושה, במשפט אחד]</h1>
-      <p>[שתי שורות: למי זה מיועד, ומה הוא מקבל ממך]</p>
+      <div class="eyebrow">YHM · אקו-סיסטם עסקי</div>
+      <h1>מערכות עסקיות חכמות<br>בהתאמה אישית</h1>
+      <p>מערכות מידע, אוטומציה עסקית ובוטים, שנבנים סביב הדרך שבה העסק שלך עובד באמת.</p>
       <a class="btn" href="#contact">דברו איתי</a>
       <a class="btn ghost" href="#services">מה אני עושה</a>
     </div>
@@ -104,7 +107,7 @@
   <section id="about">
     <div class="wrap">
       <h2>אודות</h2>
-      <p>[פסקה קצרה: מי אתה, כמה זמן אתה בתחום, ומה מייחד אותך]</p>
+      <p>YHM בונה לעסקים מערכת אחת שמחברת את כל החלקים: הלקוחות, הנתונים, המשימות וההודעות. במקום עוד תוכנה מהמדף שהעסק צריך להתאים את עצמו אליה, המערכת נבנית לפי העסק, ועושה לבד את מה שהיום נעשה ידנית.</p>
     </div>
   </section>
 
@@ -113,16 +116,16 @@
       <h2>שירותים</h2>
       <div class="grid">
         <div class="card">
-          <h3>[שירות 1]</h3>
-          <p>[משפט אחד על השירות]</p>
+          <h3>מערכות מידע</h3>
+          <p>מערכת לניהול לקוחות ונתונים שבנויה לפי העסק שלך, עם כל המידע במקום אחד.</p>
         </div>
         <div class="card">
-          <h3>[שירות 2]</h3>
-          <p>[משפט אחד על השירות]</p>
+          <h3>אוטומציה עסקית</h3>
+          <p>תהליכים שחוזרים על עצמם, כמו הודעות, תזכורות, מסמכים ומעקב, רצים לבד ובזמן.</p>
         </div>
         <div class="card">
-          <h3>[שירות 3]</h3>
-          <p>[משפט אחד על השירות]</p>
+          <h3>בוטים</h3>
+          <p>בוט בוואטסאפ או באתר שעונה ללקוחות, אוסף פרטים ומעביר אליך רק את מה שצריך.</p>
         </div>
       </div>
     </div>
@@ -132,18 +135,16 @@
     <div class="wrap">
       <h2>צור קשר</h2>
       <ul>
-        <!-- ✏️ Phone: write it twice, once for display and once inside tel: without dashes. -->
-        <li>📞 <a href="tel:[טלפון-בלי-מקפים]">[טלפון]</a></li>
-        <li>✉️ <a href="mailto:[כתובת]@y-h-m.com">[כתובת]@y-h-m.com</a></li>
-        <!-- ✏️ WhatsApp: international format, no + and no leading 0 (e.g. 9725...). Delete the line if not needed. -->
-        <li>💬 <a href="https://wa.me/[972XXXXXXXXX]" target="_blank" rel="noopener">וואטסאפ</a></li>
+        <li>📞 <a href="tel:0556742573" dir="ltr">055-674-2573</a></li>
+        <li>💬 <a href="https://wa.me/972556742573" target="_blank" rel="noopener">וואטסאפ</a></li>
+        <li>✉️ <a href="mailto:info@y-h-m.com" dir="ltr">info@y-h-m.com</a></li>
       </ul>
     </div>
   </section>
 </main>
 
 <footer>
-  <div class="wrap">© <span id="year"></span> [שם העסק]</div>
+  <div class="wrap">© <span id="year"></span> YHM Business Ecosystems</div>
 </footer>
 
 <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
