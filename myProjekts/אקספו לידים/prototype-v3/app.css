@@ -265,6 +265,7 @@ main > input.text-input, main > .text-input {
 /* Field labels are the smallest type in the system, and the loudest tracking:
  * that is what makes them read as labels rather than as text. */
 .label {
+  display: block;   /* a <label> too: a title above its field, never beside it once the field is narrower than the card */
   font-size: 11.5px; font-weight: 700; color: var(--faint);
   letter-spacing: .06em; text-transform: none;
   margin: var(--s5) 0 var(--s2);
