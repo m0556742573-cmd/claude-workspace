@@ -360,7 +360,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     'אירועים ושמחות': 'אני מפיק אירועים ושמחות: עיצוב, תאורה והגברה, לבעלי שמחות ולמוסדות. מתחילים בבדיקת תאריך, ואחר כך פגישה באולם והצעת מחיר. לקוח רגיל הוא בעל שמחה — בר מצווה או שבע ברכות; הלקוח הכי טוב הוא חתונה מלאה או מוסד שעושה דינר שנתי. הכי עמוס בעונת החתונות ובחנוכה. בדוכן מבקשים תמונות מאירועים ושואלים אם התאריך פנוי. מהאקספו אני רוצה להתמלא בתאריכים לחורף.',
     'דפוס ופרסום': 'בית דפוס: הזמנות לחתונה, חוברות, שילוט ומודעות, לבעלי שמחות, לעסקים ולמוסדות. שולחים דוגמאות, ואחרי זה הצעת מחיר לפי כמות. לקוח רגיל הוא בעל שמחה שצריך הזמנות; הלקוח הכי טוב הוא עסק או מוסד שמדפיס כל חודש ומפרסם לפני כל חג. הכי עמוס לפני ראש השנה ובעונת החתונות. בדוכן מבקשים קטלוג דוגמאות ומחירון. מהאקספו אני רוצה עסקים ומוסדות שיעבדו איתי לאורך כל השנה.',
     'הפעלות וטיולים': 'אני מפעיל הפעלות חוויתיות וטיולים לקבוצות, לתלמודי תורה, לישיבות ולמשפחות. מתחילים בשיחה על הגיל, מספר המשתתפים והתאריך, ואחר כך הצעה. לקוח רגיל הוא משפחה לבין הזמנים; הלקוח הכי טוב הוא מוסד שמזמין לכל הכיתות בכל שנה. הכי עמוס בבין הזמנים ובחנוכה. בדוכן מבקשים תוכנייה ומחירים לקבוצה. מהאקספו אני רוצה בעיקר מוסדות — הרשמה מוקדמת לקיץ.',
-    'אופנה ותכשיטים': 'יש לי חנות תכשיטים ושעונים, לחתנים ולכלות, למחותנים ולמתנות. מתחילים בביקור בחנות או בשליחת קטלוג, ומי שבא לחנות מקבל ייעוץ אישי. לקוח רגיל קונה מתנה; הלקוח הכי טוב הוא משפחה לפני חתונה שקונה סט שלם — טבעת, שעון ותכשיטים לכלה. הכי עמוס בעונת החתונות ולפני החגים. בדוכן מבקשים קטלוג ושואלים על הנחה לחתן וכלה. מהאקספו אני רוצה משפחות שעומדות לפני חתונה.',
     'שירותים לבית': 'אני מתקין מזגנים ודודי שמש, ועושה תיקונים ותחזוקה לבתים, לבתי כנסת ולמוסדות. מתחילים בביקור בבית ובבדיקה, ואחריה הצעת מחיר. לקוח רגיל הוא משפחה שהמזגן שלה התקלקל; הלקוח הכי טוב הוא בית כנסת או מוסד שחותם על תחזוקה שנתית. הכי עמוס לפני הקיץ ולפני החורף. בדוכן שואלים כמה עולה התקנה ואם יש אחריות. מהאקספו אני רוצה חוזי תחזוקה עם מוסדות.',
   };
 
@@ -1307,9 +1306,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const back = { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
     // The two halves of the settings sat in the old top bar; in the new shell they head the screen (20/10).
     // The customization is headed by what the AI made for him, and that all of it can change (יצחק, 20/10).
-    // The first setup's messages step shows only the step itself: no settings bar above it, only the progress line (יצחק, 20/10).
+    // In the first setup no settings bar shows above a step — only the progress line (יצחק, 20/10: the messages, then the customization too).
     const bare = setup && det;
-    m.innerHTML = `${bare ? `<h1>הודעות ${help('messages')}</h1><p class="muted set-intro">מה יוצא למבקרים, ואיך — ומתי תקבל את הודעת הבוקר.</p>` : `<div class="set-head"><h1>${setup ? 'התאמה אישית' : 'הגדרות'} ${help(S.sub)}</h1><nav class="seg-ctl" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button data-part="${k}" aria-pressed="${setPart() === k}">${t}</button>`).join('')}</nav></div>`}
+    m.innerHTML = `${bare ? `<h1>הודעות ${help('messages')}</h1><p class="muted set-intro">מה יוצא למבקרים, ואיך — ומתי תקבל את הודעת הבוקר.</p>` : `<div class="set-head"><h1>${setup ? 'התאמה אישית' : 'הגדרות'} ${help(S.sub)}</h1>${setup ? '' : `<nav class="seg-ctl" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button data-part="${k}" aria-pressed="${setPart() === k}">${t}</button>`).join('')}</nav>`}</div>`}
       ${det ? (bare ? '' : `<p class="muted set-intro">הפרטים שלך, ואיך מה ששולחים מגיע למבקר. כל שינוי נשמר מיד.</p>`)
         : ai || S.biz.by === 'ai' ? `<div class="ai-made">${ic('spark')}<span><b>זה מה שה-AI הבין על העסק שלך, ויצר לבד.</b> כל דבר כאן אפשר לשנות ולהתאים לך. כל שינוי נשמר מיד.</span></div>`
         : `<p class="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> אפשר להתחיל מתבנית של התחום שלך, ולשנות ולהתאים כל דבר. כל שינוי נשמר מיד.</p>`}
@@ -1673,7 +1672,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם.</p>
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>ההודעות</h2>
-          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.sugg ? ' <span class="sugg-tag">הצעה</span>' : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
+          <div class="prod-list">${b.templates.map((t) => `<button class="prod-row" data-tpledit="${t.id}"><span class="pn">${t.mat ? '📎' : '💬'} ${esc(t.name)}${t.mat ? ` <span class="faint">· ${esc(t.mat)}</span>` : ''}${t.sugg ? ' <span class="sugg-tag">הצעה</span>' : ''}${!t.mat && /\{(קובץ|חומר)\}/.test(t.text) ? ' <span class="need-file">📎 צריך לצרף את הקובץ</span>' : ''}</span><span class="pnext">${esc(t.text.slice(0, 90))}</span></button>`).join('') || '<div class="faint">עוד אין הודעות.</div>'}</div>
           <div class="actions"><button class="btn" data-act="tpl-add">+ הודעה חדשה</button></div>
           <label class="label" for="booth-def">מה שולח כפתור השליחה בכרטיס המבקר, בדוכן</label>
           <select id="booth-def" class="text-input" data-boothsel><option value="" ${def ? '' : 'selected'}>בלי ברירת מחדל — לבחור בכל פעם</option>
@@ -2390,15 +2389,10 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   ];
   const DEF_TEMPLATES = [
     // The system's own messages are marked "הצעה" until he changes them (יצחק, 20/10); none is the booth's default to begin with.
-    // 20/10 (יצחק): first "תודה שביקרת" and "כמו שדיברנו", then the ones an exhibitor really sends in the weeks after.
+    // 20/10 (יצחק): only three suggestions — thanks for visiting, setting a meeting, and thanks with the catalogue attached.
     { id: 't1', name: 'תודה שביקרת', mat: '', sugg: true, text: 'שלום {שם}, תודה שביקרת בדוכן של {עסק} בתערוכה. היה נעים להכיר. לכל שאלה אני כאן: {טלפון}.\n{השם שלי}' },
-    { id: 't2', name: 'כמו שדיברנו', mat: '', sugg: true, text: 'שלום {שם}, כמו שדיברנו בדוכן — אשמח להמשיך מאיפה שעצרנו. מתי נוח לך שאתקשר?\n{השם שלי}, {עסק} · {טלפון}' },
-    { id: 't5', name: 'לקבוע פגישה', mat: '', sugg: true, text: 'שלום {שם}, אשמח לקבוע איתך פגישה כמו שדיברנו בתערוכה. איזה יום ושעה נוחים לך? אפשר לענות כאן או להתקשר: {טלפון}.' },
-    { id: 't3', name: 'תזכורת לפגישה', mat: '', sugg: true, text: 'שלום {שם}, תזכורת לפגישה שקבענו. אם משהו השתנה, אשמח שתעדכן אותי: {טלפון}.\n{השם שלי}' },
-    { id: 't6', name: 'לא הצלחתי להשיג', mat: '', sugg: true, text: 'שלום {שם}, ניסיתי להשיג אותך בטלפון אחרי התערוכה. מתי נוח שאחזור אליך? אפשר גם להתקשר אליי: {טלפון}.' },
-    { id: 't7', name: 'הצעת המחיר מוכנה', mat: '', sugg: true, text: 'שלום {שם}, כמו שהבטחתי — הצעת המחיר מוכנה. אשמח לעבור עליה איתך בשיחה קצרה. מתי נוח לך?\n{השם שלי}, {עסק}' },
-    { id: 't4', name: 'לפני העונה', mat: '', sugg: true, text: 'שלום {שם}, העונה מתקרבת, וזה הזמן להזמין מראש — לפני העומס. אשמח לעזור: {טלפון}.\n{עסק}' },
-    { id: 't8', name: 'תודה על ההזמנה', mat: '', sugg: true, text: 'שלום {שם}, תודה שבחרת ב{עסק}! אם יש משהו שאפשר לעשות טוב יותר — אשמח לשמוע: {טלפון}.\n{השם שלי}' },
+    { id: 't5', name: 'לקבוע פגישה', mat: '', sugg: true, text: 'שלום {שם}, אשמח לקבוע איתך פגישה כמו שדיברנו בתערוכה. איזה יום ושעה נוחים לך? אפשר לענות כאן או להתקשר: {טלפון}.\n{השם שלי}' },
+    { id: 't9', name: 'תודה שביקרת + הקטלוג', mat: '', sugg: true, text: 'שלום {שם}, תודה שביקרת בדוכן של {עסק}. כפי שביקשת, מצורף {קובץ}. לכל שאלה אני כאן: {טלפון}.\n{השם שלי}' },
   ];
   // Rules that send something to the visitor start switched off: the owner turns them on knowingly.
   const DEF_RULES = [
@@ -2410,7 +2404,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     // Q5 (יצחק, 18/10: "not quite"): a business visitor is not by itself a deal — "lead = an opportunity for a deal".
     // So this one waits among the suggestions, off, for whoever wants it.
     { id: 'r6', on: false, trigger: 'captured', arg: null, cond: { biz: true }, action: { kind: 'notify' }, fired: 0 },
-    { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't8' }, fired: 0 },
+    { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: '' }, fired: 0 },
   ];
   const clone = (x) => JSON.parse(JSON.stringify(x));
   /** Older saved states lack the CRM's fields; fill them in rather than throw the data away. */
@@ -2490,6 +2484,20 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
       const r4 = b.rules.find((r) => r.id === 'r4');
       if (r4 && r4.action && r4.action.tpl === 't1' && !r4.fired) r4.action.tpl = 't8';
       delete b.chDefault;   // no default per channel any more
+    }
+    if (!S.v2010d) {   // 20/10: only three suggested messages
+      S.v2010d = true;
+      const used = new Set([].concat(
+        b.buttons.flatMap((x) => (x.steps || []).map((st) => st.pkg)),
+        (b.defSteps || []).map((st) => st.pkg),
+        (b.rules || []).filter((r) => r.on || r.fired).map((r) => r.action && r.action.tpl),   // a rule that is off and never acted holds nothing
+        S.leads.flatMap((l) => (l.manual || []).map((st) => st.pkg))).filter(Boolean));
+      const keep = b.templates.filter((t) => !t.sugg || t.booth || used.has(t.id) || DEF_TEMPLATES.some((d) => d.id === t.id));
+      const add = DEF_TEMPLATES.filter((d) => !keep.some((t) => t.id === d.id)).map(clone);
+      const order = (t) => { const i = DEF_TEMPLATES.findIndex((d) => d.id === t.id); return i < 0 ? 99 : i; };
+      b.templates = keep.concat(add).sort((x, y) => order(x) - order(y));
+      const r4 = b.rules.find((r) => r.id === 'r4');
+      if (r4 && r4.action && r4.action.tpl === 't8' && !r4.fired && !b.templates.some((t) => t.id === 't8')) r4.action.tpl = '';
     }
     b.templates.filter((t) => t.booth).slice(1).forEach((t) => { t.booth = false; });   // one booth default, never several
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };

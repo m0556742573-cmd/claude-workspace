@@ -1566,3 +1566,4 @@ body.admin-page main { max-width: var(--w-prose); }
 
 /* The agent from the setup's customization on: above the step buttons at the foot. */
 body.setup-ai .ai-fab { bottom: 96px; }
+.need-file { display: inline-block; font-size: 12px; font-weight: 600; color: var(--hot); background: var(--hot-soft); border: 1px solid var(--hot-line); border-radius: var(--pill); padding: 0 8px; margin-inline-start: 6px; }
