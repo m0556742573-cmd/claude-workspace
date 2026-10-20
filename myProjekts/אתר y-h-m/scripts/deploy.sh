@@ -139,7 +139,9 @@ REMOTE
 
 printf '== from the internet ==\n'
 for u in https://y-h-m.com/ https://www.y-h-m.com/; do
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$u" || true)
+  # --ssl-no-revoke: Windows curl (schannel) otherwise fails with 000 when it cannot
+  # reach the revocation list, though the site is fine. Other curl builds ignore it.
+  code=$(curl -s --ssl-no-revoke -o /dev/null -w '%{http_code}' --max-time 15 "$u" || true)
   printf '  %s -> HTTP %s\n' "$u" "${code:-no answer}"
 done
 printf '  (no answer or 52x right after the first deploy: check the DNS records, and wait a minute for the certificate)\n'
