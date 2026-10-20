@@ -69,6 +69,18 @@
     // The CRM's side menu (17/10), on the same grammar.
     home: 'M4 11l8-7 8 7v10H4Z M10 21v-6h4v6',
     bars: 'M3 21h18 M6 21V11 M12 21V4 M18 21v-7',
+    // The shell from the brand book (20/10), on the same grammar.
+    search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z M16 16l5 5',
+    leads: 'M4 20v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2 M9 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6 M16 20v-2a5 5 0 0 0-2-4 M15 4a3 3 0 0 1 0 6',
+    tasks: 'M5 5h14v14H5Z M8 12l3 3 5-6',
+    help: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14 M12 17h.01',
+    stand: 'M3 9l2-5h14l2 5Z M5 9v11h14V9 M9 20v-6h6v6',
+    crm: 'M4 8h16v12H4Z M9 8V5h6v3 M4 13h16',
+    fold: 'M9 6l6 6-6 6',
+    unfold: 'M15 6l-6 6 6 6',
+    plus: 'M12 5v14 M5 12h14',
+    play: 'M8 5l11 7-11 7Z',
+    video: 'M3 5h18v14H3Z M10 9l5 3-5 3Z',
   };
   /* The map holds path DATA, so the element is built here. Sub-paths are
    * separated inside one `d`, which one <path> renders correctly. */
@@ -735,34 +747,215 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   // An error in a button shows at the bottom of the screen, so a tap that "does nothing" names its reason.
   window.addEventListener('error', () => { try { toast('משהו לא עבד. אפשר לנסות שוב.'); } catch (x) { /* before toast exists */ } });
   const unread = () => (S.notices || []).filter((n) => !n.read);
+  /* ------------------------------------------------------------------
+   * The shell, from the brand book (יצחק, 19–20/10; https://claude.ai/artifact/PhXCTLxz4Xu6GhDPCaUaMK).
+   * A computer: a white menu on the side, with a switch between the fair day and the CRM that shows only that part;
+   * help, support, the AI agent and the settings always at its foot. A panel opens beside the menu, the menu folds to
+   * its icons, and the content is pushed aside — nothing is hidden. The menu folds by hand at any time too.
+   * A tablet: a header with the same switch, and a bar at the bottom with a raised middle — "＋ מבקר חדש" on the fair
+   * day, the home screen in the CRM — both sides equal, help and settings always in it. The AI agent floats above the
+   * bar as a circle. Help opens one dialog in the middle with support and the videos.
+   * ------------------------------------------------------------------ */
+  const UI = { panel: null };   // null · 'help' · 'support' · 'ai' · 'menu' (the tablet's one help dialog)
+  /** A computer or a tablet: a mouse and the width for a menu — unless the demo's menu chose one. */
+  const deskMode = () => (DEV.ui ? DEV.ui === 'desk' : FINE && innerWidth >= 1000);
+  const shellOn = () => S.signed && S.phase !== 'setup';
+  const slimNav = () => !!(DEV.navFolded || UI.panel);
+  /** The width the content really has, beside the menu and an open panel. */
+  const contentW = () => innerWidth - (shellOn() && deskMode() ? (UI.panel ? 76 + 400 : DEV.navFolded ? 76 : 248) : 0);
+  const canCrm = () => !worker();
+  const canFair = () => !afterFair();
+  /** Which part he is in. In the settings, the part he came from. */
+  const inFair = () => { const v = S.phase === 'settings' ? S.backView : S.view; return canFair() && (v === 'booth' || v === 'dash' || !canCrm()); };
+  /** The assistant is everywhere but at the booth (יצחק, 17/10): there he talks to a person, not to a screen. */
+  const assistOk = () => shellOn() && !worker() && !(S.phase === 'live' && S.view === 'booth');
+  /** The screen he is on, as the help names it. */
+  const helpHere = () => (S.phase === 'settings' ? (HELP[S.sub] ? S.sub : 'buttons') : S.view === 'crm' ? (S.crmTab === 'overview' ? 'home' : null) : S.view === 'dash' ? 'dash' : 'booth');
+  /** A small label above the screen's title on a computer, naming the part he is in (יצחק, 20/10). */
+  const eyebrow = (t) => (deskMode() ? `<div class="eyebrow">${esc(t)}</div>` : '');
+
+  /** Go to a place in either part. Leaving the settings this way is leaving them. */
+  function goPlace(view, tab) {
+    if (view === 'crm' && !canCrm()) return ownerOnly('המעקב');
+    if (S.phase === 'settings') { S.phase = 'live'; S.backSetup = null; }
+    if (UI.panel && !deskMode()) UI.panel = null;
+    if (UI.panel === 'ai' && view === 'booth') UI.panel = null;
+    S.view = view;
+    if (tab) { S.crmTab = tab; S.crmLead = null; tbSel.clear(); }
+    closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillSnap = {}; filledCold.clear();
+    if (view === 'crm') idleOnce();
+    save(); render(); window.scrollTo(0, 0);
+  }
+  function openPanel(p) {
+    UI.panel = UI.panel === p && deskMode() ? null : p;
+    if (UI.panel === 'support') { (S.notices || []).forEach((x) => { x.read = true; }); save(); }
+    render();
+  }
+
   function renderTop() {
     const setup = S.phase === 'setup';
-    const at = SETUP.findIndex(([k]) => k === S.step);
-    // Setup is a thin line of steps, not a menu (יצחק, 17/10): where he is, what is behind him, what is left.
-    const nav = !S.signed ? ''
-      : S.phase === 'live' ? `<nav class="moments" aria-label="ניווט">${liveNav().length > 1 ? liveNav().map(([k, t]) => `<button class="moment" data-view="${k}" aria-current="${S.view === k}">${t}</button>`).join('') : ''}</nav>`
-      : setup ? `<nav class="stepper" aria-label="שלבי ההקמה">${SETUP.map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}" ${k !== 'account' && !accountOk() ? 'disabled title="קודם פרטי העסק"' : ''}><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>`
-      : `<nav class="moments" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button class="moment" data-step="${k}" aria-current="${S.step === k}">${t}</button>`).join('')}</nav>`;
-    const n = unread().length;
-    // The assistant is everywhere but at the booth (יצחק, 17/10): there he talks to a person, not to a screen.
-    const assist = S.signed && !setup && !worker() && !(S.phase === 'live' && S.view === 'booth');
-    // K15: one bar says it is a demo, instead of twenty notes scattered over the screens.
-    $('#top').innerHTML = `<div class="demo-bar">הדגמה — שום דבר לא נשלח באמת${S.signed ? ` · מצב המערכת: <b>${esc(SYS_NAMES[S.sys])}</b>` : ''}</div><div class="top-in">
-      <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
-      <div class="brand">${esc(S.biz.name || 'דוכן חכם')}${S.phase === 'settings' ? ' <span class="faint">· הגדרות</span>' : setup ? ' <span class="faint">· הקמה</span>' : ''}</div>
-      ${nav}
-      <span class="saved-ind" id="saved-ind" aria-live="polite"></span>
-      ${assist ? '<button class="btn assist-btn" data-act="assist">✨ סוכן AI</button>'
- : ''}
-      ${S.signed && !worker() && S.phase !== 'settings' ? '<button class="icon-btn" data-act="settings" aria-label="הגדרות" title="הגדרות">⚙️</button>' : ''}
-      ${S.signed ? `<button class="icon-btn bell-btn"
- data-act="bell" aria-label="הודעות${n ? ' — ' + n + ' חדשות' : ''}">🔔${n ? '<span class="red-dot"></span>' : ''}</button>` : ''}
-      ${worker() ? '<span class="lock">🔒 טאבלט עובד</span>' : ''}
-      ${S.signed ? '<button class="icon-btn" data-act="menu" aria-label="תפריט">⋯</button>' : ''}
-    </div>`;
+    const shell = shellOn();
+    const desk = deskMode();
+    document.body.classList.toggle('shell', shell);
+    document.body.classList.toggle('is-desk', shell && desk);
+    document.body.classList.toggle('is-tab', shell && !desk);
+    document.body.classList.toggle('nav-slim', shell && desk && slimNav());
+    document.body.classList.toggle('with-panel', shell && !!UI.panel);
+    document.body.classList.toggle('no-help', !!DEV.helpOff);
+    if (UI.panel === 'ai' && !assistOk()) UI.panel = null;
+    // K15: one bar says it is a demo, instead of twenty notes scattered over the screens. Its menu is the demo's own.
+    $('#demo').innerHTML = `<span>הדגמה — שום דבר לא נשלח באמת${S.signed ? ` · מצב המערכת: <b>${esc(SYS_NAMES[S.sys])}</b>` : ''}</span>
+      ${S.signed ? '<button class="demo-menu" data-act="menu" aria-label="תפריט ההדגמה">תפריט ההדגמה ⋯</button>' : ''}`;
+    if (!shell) {
+      // Signing in and the setup: a thin header. Setup is a line of steps, not a menu (יצחק, 17/10).
+      const at = SETUP.findIndex(([k]) => k === S.step);
+      $('#side').innerHTML = ''; $('#bar').innerHTML = '';
+      $('#top').innerHTML = `<div class="top-in">
+        <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
+        <div class="brand"><span class="mark" aria-hidden="true"></span>${esc(S.biz.name || 'דוכן חכם')}${setup ? ' <span class="faint">· הקמה</span>' : ''}</div>
+        ${setup && S.signed ? `<nav class="stepper" aria-label="שלבי ההקמה">${SETUP.map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}" ${k !== 'account' && !accountOk() ? 'disabled title="קודם פרטי העסק"' : ''}><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>` : ''}
+        ${setup && S.signed ? '<button class="icon-btn" data-act="settings" aria-label="הגדרות" title="הגדרות">⚙️</button>' : ''}
+      </div>`;
+      renderPanel();
+      return paintSaved();
+    }
+    if (desk) { $('#side').innerHTML = sideHTML(); $('#top').innerHTML = ''; $('#bar').innerHTML = ''; }
+    else { $('#side').innerHTML = ''; $('#top').innerHTML = tabHeadHTML(); $('#bar').innerHTML = barHTML(); }
+    renderPanel();
     paintSaved();
-    if (AS.open) renderAssist();   // the agent follows the screen he is on
   }
+
+  /** The switch between the two parts, when both are open to him. */
+  function partSwitch() {
+    if (!canCrm() || !canFair()) return '';
+    const fair = inFair();
+    const b = (on, nav, icon, t) => `<button data-nav="${nav}" aria-pressed="${on}" title="${t}" aria-label="${t}">${ic(icon)}<span>${t}</span></button>`;
+    return `<div class="part-switch" role="group" aria-label="חלק במערכת">${b(fair, 'booth', 'stand', 'יום התערוכה')}${b(!fair, 'crm:' + (S.crmTab || 'overview'), 'crm', 'CRM')}</div>`;
+  }
+
+  function sideHTML() {
+    const slim = slimNav();
+    const live = S.phase === 'live';
+    const fair = inFair();
+    const it = (label, icon, on, attrs, sub, cls) => `<button class="nv${cls ? ' ' + cls : ''}" ${attrs} aria-current="${!!on}" title="${esc(label)}" aria-label="${esc(label)}">${ic(icon)}<span class="nv-l">${esc(label)}</span>${sub ? `<span class="nv-s">${sub}</span>` : ''}</button>`;
+    let items;
+    if (fair) items = it('הדוכן', 'search', live && S.view === 'booth', 'data-nav="booth"') + it('סוף היום', 'check', live && S.view === 'dash', 'data-nav="dash"');
+    else {
+      crmPlace();
+      const q = todayQueue(crmLeads()).length;
+      items = CRM_TABS.map(([k, t]) => it(t, { overview: 'home', leads: 'leads', tasks: 'tasks', segments: 'bars', messages: 'mail' }[k], live && S.view === 'crm' && S.crmTab === k, `data-nav="crm:${k}"`, k === 'overview' && q ? String(q) : '')).join('');
+    }
+    const n = unread().length;
+    const misses = assistOk() && S.view === 'crm' && live ? crmMisses().length : 0;
+    return `<div class="side-top"><span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span></div>
+      <div class="side-brand"><span class="mark" aria-hidden="true"></span><span class="nv-l">${esc(S.biz.name || 'דוכן חכם')}</span></div>
+      ${worker() ? `<div class="side-lock nv-l">🔒 טאבלט עובד</div>` : ''}
+      ${partSwitch()}
+      <nav class="side-items" aria-label="${fair ? 'יום התערוכה' : 'CRM'}">${items}</nav>
+      <div class="side-gap"></div>
+      <div class="side-foot">
+        ${it('עזרה', 'help', UI.panel === 'help', 'data-panel="help"', 'סרטונים')}
+        ${it('תמיכה', 'call', UI.panel === 'support', 'data-panel="support"', n ? `<span class="dot-n">${n}</span>` : 'פנייה')}
+        ${assistOk() ? it('סוכן AI', 'spark', UI.panel === 'ai', 'data-panel="ai"', misses ? `<span class="ai-n">${misses}</span>` : '', 'is-ai') : ''}
+        ${worker() ? '' : it('הגדרות', 'auto', S.phase === 'settings', 'data-act="settings"')}
+        ${it(slim ? 'להרחיב את התפריט' : 'לכווץ את התפריט', slim ? 'unfold' : 'fold', false, `data-act="nav-fold" aria-expanded="${!slim}"`, '', 'is-fold')}
+      </div>`;
+  }
+
+  function tabHeadHTML() {
+    return `<div class="tab-head"><span class="mark" aria-hidden="true"></span>
+      <span class="brand">${esc(S.biz.name || 'דוכן חכם')}${S.phase === 'settings' ? ' <span class="faint">· הגדרות</span>' : ''}</span>
+      <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
+      ${worker() ? '<span class="lock">🔒 טאבלט עובד</span>' : ''}
+      ${partSwitch()}</div>`;
+  }
+
+  function barHTML() {
+    const live = S.phase === 'live';
+    const fair = inFair();
+    const helpOn = ['menu', 'help', 'support'].includes(UI.panel);
+    const tab = (label, icon, on, attrs) => `<button class="bt" ${attrs} aria-current="${!!on}">${ic(icon)}<span>${esc(label)}</span><i aria-hidden="true"></i></button>`;
+    const raised = (label, icon, on, attrs) => `<button class="bt-mid" ${attrs} aria-current="${!!on}"><span class="c">${ic(icon)}</span><span>${esc(label)}</span></button>`;
+    const helpTab = tab('עזרה', 'help', helpOn, 'data-panel="menu"');
+    const setTab = worker() ? '' : tab('הגדרות', 'auto', S.phase === 'settings', 'data-act="settings"');
+    let start, mid, end;
+    if (fair) {
+      start = tab('הדוכן', 'search', live && S.view === 'booth' && !UI.panel, 'data-nav="booth"') + tab('סוף היום', 'check', live && S.view === 'dash' && !UI.panel, 'data-nav="dash"');
+      mid = raised('מבקר חדש', 'plus', false, 'data-act="bar-new"');
+      end = helpTab + setTab;
+    } else {
+      crmPlace();
+      const on = (k) => live && S.view === 'crm' && S.crmTab === k && !UI.panel;
+      start = tab('לידים', 'leads', on('leads'), 'data-nav="crm:leads"') + tab('משימות', 'tasks', on('tasks'), 'data-nav="crm:tasks"') + tab('דשבורד', 'bars', on('segments'), 'data-nav="crm:segments"');
+      mid = raised('דף הבית', 'home', on('overview'), 'data-nav="crm:overview"');
+      end = tab('הודעות', 'mail', on('messages'), 'data-nav="crm:messages"') + helpTab + setTab;
+    }
+    return `<nav class="tab-bar" aria-label="ניווט"><div class="bt-side">${start}</div>${mid}<div class="bt-side">${end}</div></nav>
+      ${assistOk() ? `<button class="ai-fab" data-panel="ai" title="סוכן AI" aria-label="סוכן AI">${ic('spark')}</button>` : ''}`;
+  }
+
+  // ---- the panels: beside the menu on a computer, one dialog in the middle on a tablet ----
+  const PANEL_T = { help: 'עזרה', support: 'תמיכה', ai: 'סוכן AI', menu: 'עזרה' };
+  function renderPanel() {
+    let p = $('#panel');
+    let sc = $('#pscrim');
+    const on = shellOn() && UI.panel;
+    if (!on) { if (p) p.remove(); if (sc) sc.remove(); return; }
+    const desk = deskMode();
+    if (!desk && !sc) { sc = document.createElement('button'); sc.id = 'pscrim'; sc.className = 'pscrim'; sc.dataset.act = 'panel-close'; sc.setAttribute('aria-label', 'סגירה'); document.body.appendChild(sc); }
+    if (desk && sc) sc.remove();
+    if (!p) { p = document.createElement('aside'); p.id = 'panel'; document.body.appendChild(p); }
+    p.className = 'panel ' + (desk ? 'is-side' : 'is-dialog');
+    p.setAttribute('role', 'dialog');
+    p.setAttribute('aria-label', PANEL_T[UI.panel]);
+    if (UI.panel === 'ai') return renderAssist();
+    const back = !desk && ['help', 'support'].includes(UI.panel) ? '<button class="p-back" data-panel="menu">→ חזרה</button>' : '';
+    const icon = desk ? ic({ help: 'help', support: 'call' }[UI.panel] || '') : '';
+    p.innerHTML = `<div class="p-head">${back}${icon}<h2>${PANEL_T[UI.panel]}</h2>${UI.panel === 'menu' ? '<span class="faint">הכל במקום אחד</span>' : ''}
+      <button class="icon-btn p-close" data-act="panel-close" aria-label="סגירה">✕</button></div>
+      <div class="p-body">${UI.panel === 'menu' ? helpMenuBody() : UI.panel === 'support' ? supportBody() : helpBody()}</div>`;
+  }
+  /** The short explanation of the screen he is on — the "?" — as the first thing in the help. */
+  function hereCard(big) {
+    const k = helpHere();
+    const h = k && HELP[k];
+    if (!h) return '';
+    return `<section class="p-sec"><div class="eyebrow">על המסך הזה</div>
+      <div class="vrow"><div class="vthumb${big ? ' big' : ''}">${ic('play')}<span class="soon">בקרוב</span></div><div><b>${esc(h[0])}</b><div class="muted">${esc(h[1])}</div></div></div></section>`;
+  }
+  function helpBody() {
+    const keys = Object.keys(HELP);
+    return `<label class="p-search">${ic('search')}<input id="hp-q" type="search" placeholder="לחפש בעזרה" aria-label="לחפש בעזרה" autocomplete="off"></label>
+      ${hereCard(true)}
+      <section class="p-sec"><div class="eyebrow">סרטונים · פחות מדקה כל אחד</div>
+        ${[['booth', 'הדוכן: לרשום מבקר בשתי נגיעות'], ['dash', 'סוף היום: להשלים מה שחסר'], ['home', 'ה-CRM: הבא בתור ומשימות'], ['buttons', 'הגדרות: כפתורים ומשימות']].map(([, t]) => `<div class="vrow"><div class="vthumb">${ic('play')}</div><div><b class="vt">${esc(t)}</b><div class="faint">יצולם לפני התערוכה</div></div></div>`).join('')}</section>
+      <section class="p-sec" id="hp-list"><div class="eyebrow">הסברים קצרים בכתב</div>
+        ${keys.map((k) => `<details class="hp-item" data-hk="${esc((HELP[k][0] + ' ' + HELP[k][1]).toLowerCase())}"><summary>${esc(HELP[k][0])}</summary><p>${esc(HELP[k][1])}</p></details>`).join('')}</section>
+      <div class="p-switch"><span>להציג את ה-? ליד הכותרות</span><button class="switch" role="switch" aria-checked="${!DEV.helpOff}" data-act="help-toggle" aria-label="להציג את ה-? ליד הכותרות"></button></div>`;
+  }
+  function supportBody() {
+    const notes = (S.notices || []).slice().reverse();
+    return `<p class="muted">משהו לא עובד, או יש שאלה? כאן מגיעים לאדם, לא לבוט.</p>
+      <section class="p-sec"><div class="eyebrow">ביום התערוכה — מענה מיידי</div>
+        <div class="contact"><div><b dir="ltr">${esc(SUPPORT.phone)}</b><small>טלפון התמיכה</small></div><button class="btn" data-act="copy" data-copy="${esc(SUPPORT.phone)}">להעתיק</button></div>
+        <div class="contact"><div><b dir="ltr" class="mail">${esc(SUPPORT.email)}</b><small>מייל</small></div><button class="btn" data-act="copy" data-copy="${esc(SUPPORT.email)}">להעתיק</button></div></section>
+      ${notes.length ? `<section class="p-sec"><div class="eyebrow">הודעות מהמפעילים</div><ul class="notices">${notes.map((x) => `<li class="${x.urgent ? 'urgent' : ''}"><span class="when">${esc(H.heDate(new Date(x.at)))} ${new Date(x.at).toTimeString().slice(0, 5)}</span>${x.urgent ? '<b>דחוף · </b>' : ''}${esc(x.text)}</li>`).join('')}</ul></section>` : ''}
+      <section class="p-sec"><div class="eyebrow">פנייה בכתב</div>
+        <label class="label" for="tk-text">מה קרה?</label>
+        <textarea id="tk-text" class="say small" placeholder="למשל: הטאבלט לא מוצא שמות"></textarea>
+        <div class="actions"><button class="btn primary" data-act="ticket-send">לשלוח למפעילים</button><span class="faint">מצורף אוטומטית: המסך שבו אתה נמצא</span></div></section>
+      ${(S.tickets || []).length ? `<section class="p-sec"><div class="eyebrow">הפניות שלך</div>${S.tickets.slice().reverse().map((x) => `<div class="ticket"><div class="ticket-top"><b>${esc(x.text.slice(0, 80))}</b><span class="pill${/נענתה/.test(x.status) ? ' good' : ''}">${esc(x.status.split(' — ')[0])}</span></div><div class="faint">${esc(x.status.split(' — ')[1] || '')} · ${esc(H.heDate(new Date(x.at)))} ${new Date(x.at).toTimeString().slice(0, 5)}</div></div>`).join('')}</section>` : ''}`;
+  }
+  function helpMenuBody() {
+    return `<div class="p-choices">
+        <button class="p-choice" data-panel="support">${ic('call')}<b>תמיכה</b><small>לדבר עם אדם: טלפון, או פנייה בכתב</small></button>
+        <button class="p-choice" data-panel="help">${ic('video')}<b>סרטוני הסבר</b><small>פחות מדקה כל אחד, והסברים בכתב</small></button></div>
+      ${hereCard(true)}
+      <div class="contact"><div><b dir="ltr">${esc(SUPPORT.phone)}</b><small>ביום התערוכה — מענה מיידי בטלפון</small></div></div>`;
+  }
+  // The way of laying out changes with the width: a computer that narrows becomes a tablet, and back.
+  let lastDesk = null;
+  window.addEventListener('resize', () => { const d = deskMode(); if (lastDesk !== null && d !== lastDesk && S.signed) render(); lastDesk = d; });
 
   /* "✓ נשמר", in the top bar, a moment after every change in the settings (יצחק, 17/10): there is no "save" button to look for. */
   // Kept as a moment, not as an element: the top bar is redrawn by the same tap that saved.
@@ -800,7 +993,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const v = ($('#tk-text') && $('#tk-text').value.trim()) || '';
     if (!v) { if ($('#tk-text')) $('#tk-text').focus(); return toast('מה קרה?'); }
     S.tickets = (S.tickets || []).concat({ at: Date.now(), text: v.slice(0, 600), status: 'התקבלה — נחזור אליך' });
-    save(); sheetBell(); toast('✓ הפנייה נשלחה למפעילים (בהדגמה — לא יוצאת)');
+    save(); UI.panel = 'support'; render(); toast('✓ הפנייה נשלחה למפעילים (בהדגמה — לא יוצאת)');
   }
   const notify = (text, urgent) => { S.notices = (S.notices || []).concat({ id: 'n' + Date.now(), at: Date.now(), text, urgent: !!urgent, read: false }); };
 
@@ -1107,7 +1300,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const subs = det ? SUBS_DET : SUBS_HOW;
     if (!subs.some(([k]) => k === S.sub)) S.sub = subs[0][0];
     const back = S.backSetup ? 'להקמה' : { crm: 'ל-CRM', dash: 'לסוף היום' }[S.backView] || (afterFair() ? 'ל-CRM' : 'לדוכן');
-    m.innerHTML = `<p class="muted set-intro">${det ? 'הפרטים שלך, ודרכי השליחה: מי אתה, ואיך מה ששולחים מגיע.' : 'מה קורה כשמסמנים, מה המערכת עושה לבד, ואיך הדוכן מתנהג.'} כל שינוי נשמר מיד.</p>
+    // The two halves of the settings sat in the old top bar; in the new shell they head the screen (20/10).
+    m.innerHTML = `<div class="set-head"><h1>הגדרות ${help(S.sub)}</h1><nav class="seg-ctl" aria-label="הגדרות">${SETTINGS_NAV.map(([k, t]) => `<button data-step="${k}" aria-pressed="${S.step === k}">${t}</button>`).join('')}</nav></div>
+      <p class="muted set-intro">${det ? 'הפרטים שלך, ודרכי השליחה: מי אתה, ואיך מה ששולחים מגיע.' : 'מה קורה כשמסמנים, מה המערכת עושה לבד, ואיך הדוכן מתנהג.'} כל שינוי נשמר מיד.</p>
       <nav class="subtabs" aria-label="${det ? 'פרטים וחיבורים' : 'איך המערכת פועלת'}">${subs.map(([k, t]) => `<button class="chip" data-sub="${k}" aria-pressed="${S.sub === k}">${t}</button>`).join('')}</nav><div id="subview"></div>
       <button class="float-back" data-act="settings-done">← חזרה ${back}</button>`;
     ({ buttons: viewButtons, booth: viewBoothSettings, seasons: viewSeasons, crm: viewCrmSettings, auto: viewRules,
@@ -1417,7 +1612,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const demoBar = practice() ? `<div class="practice-banner"><span><b>דוכן לדוגמה.</b> כאן מתאמנים עד שהמערכת עוברת למצב אמיתי. מה שנרשם עכשיו יימחק אז.</span>
       ${worker() ? '' : '<button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button>'}</div>` : '';
     // "New" stands at the top, beside the search, and again at the end of the results (יצחק, 17/10): a visitor who is not on the list must never be lost.
-    m.innerHTML = `${demoBar}<div class="search-row"><input id="q" class="search" type="search" placeholder="שם או עסק…" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
+    m.innerHTML = `${demoBar}${eyebrow('יום התערוכה · הדוכן')}<div class="search-row"><input id="q" class="search" type="search" placeholder="שם או עסק…" aria-label="חיפוש מבקר" autocomplete="off" autocapitalize="off">
       <button class="btn new-btn" data-act="new-person">＋ מבקר חדש</button>${help('booth')}</div>
       <div id="slot"></div><p class="foot" id="foot"></p>`;
     const q = $('#q');
@@ -1918,7 +2113,7 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
     const demo = L.filter((l) => l.demo).length;
     const ws = [0, 1, 2, null].map((k) => L.filter((l) => effWarm(l) === k).length);
     const asks = dashAsks(L);
-    m.innerHTML = `<h1>בדוכן: ${many(L.length - demo, 'מבקר אחד', 'מבקרים')}${demo ? ` <span class="faint">(ועוד ${demo} לדוגמה)</span>` : ''} ${help('dash')}</h1>
+    m.innerHTML = `${eyebrow('יום התערוכה · סוף היום')}<h1>בדוכן: ${many(L.length - demo, 'מבקר אחד', 'מבקרים')}${demo ? ` <span class="faint">(ועוד ${demo} לדוגמה)</span>` : ''} ${help('dash')}</h1>
       ${lo ? `<p class="faint">ועוד ${lo} שנרשמו רק לרשימת התפוצה.</p>` : ''}
       ${practice() && !worker() && L.length < 8 ? `<div class="ask-card" style="margin-top:12px"><div class="q">רוצה לראות יום מלא?</div>
         <div class="actions"><button class="btn" data-act="seed">להוסיף 20 מבקרים לדוגמה</button></div></div>` : ''}
@@ -2421,7 +2616,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   }
   const viewKey = () => (S.crmTab === 'leads' ? S.crmView.leads : S.crmTab === 'tasks' && S.crmView.tasks === 'time' ? 'time' : S.crmTab);
   /** A computer has the width for the list and the lead side by side; a tablet keeps the lead as its own page. */
-  const wideCRM = () => window.matchMedia && window.matchMedia('(min-width: 1180px)').matches;
+  const wideCRM = () => contentW() >= 1060;
   /** M10: "days without contact" is checked once a day — when the tracking view opens or the day changes — not inside drawing the screen. */
   function idleOnce() {
     const today = dayNo(now());
@@ -2440,17 +2635,10 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     const full = rec && !side;
     const vs = VIEW_SETTINGS[viewKey()];
     const views = CRM_VIEWS[S.crmTab];
-    const count = { overview: todayQueue(L).length };   // the same queue the home page works through
+    // The CRM's own side menu moved into the shell's menu (20/10): one menu for the whole system.
     m.innerHTML = `<div class="crm-shell">
-      <nav class="crm-nav" aria-label="${CRM_NAME}">
-        <div class="crm-nav-title">${esc(S.biz.name || CRM_NAME)}</div>
-        ${CRM_TABS.map(([k, t, icon]) => `<button class="ctab" data-crmtab="${k}" aria-current="${!full && S.crmTab === k}">${ic(icon)}<span>${t}</span>${count[k] ? `<span class="cn">${count[k]}</span>` : ''}</button>`).join('')}
-        <span class="crm-nav-sep"></span>
-        <button class="ctab minor" data-act="crm-rules">${ic('repeat')}<span>כללים</span></button>
-        ${worker() ? '' : (() => { const n = crmMisses().length; return `<button class="ctab minor" data-act="assist">${ic('spark')}<span>סוכן AI</span>${n ? `<span class="cn miss-n">${n}</span>` : ''}</button>`; })()}
-        <button class="ctab minor" data-act="settings">${ic('auto')}<span>הגדרות</span></button></nav>
       <div class="crm-main">
-        <div class="crm-head">${full || S.crmTab === 'overview' ? '' : `<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1>`}
+        <div class="crm-head">${full || S.crmTab === 'overview' ? '' : `<div class="crm-title">${eyebrow('CRM')}<h1>${esc((CRM_TABS.find(([k]) => k === S.crmTab) || ['', CRM_NAME])[1])}</h1></div>`}
           ${!full && views ? `<nav class="tabs" aria-label="איך להציג">${views.map(([k, t]) => `<button class="tab" data-crmview="${k}" aria-pressed="${S.crmView[S.crmTab] === k}">${t}</button>`).join('')}</nav>` : ''}
           ${!full && S.crmTab === 'leads' ? `<button class="btn" data-crmtab="messages">💬 הודעה לקבוצה</button><button class="btn" data-act="new-person">＋ ליד</button>` : ''}
           <span class="date-now">היום: ${esc(shortDay(new Date(now())))} <button class="btn ghost" data-act="next-day">⏩ יום הבא (הדגמה)</button>${S.shift ? '<button class="btn ghost" data-act="today">לחזור להיום</button>' : ''}
@@ -2612,10 +2800,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const nd = nextDayLine(L);
     const mod = (icon, t, d, tab) => `<button class="mod" data-crmtab="${tab}">${ic(icon)}<b>${t}</b><span>${d}</span></button>`;
     box.innerHTML = `
-      <div class="home-hello"><h1>${hello}${first ? ', ר׳ ' + esc(first) : ''} ${help('home')}</h1><p class="muted">${esc(H.label(new Date(now())))} <span class="faint">(${esc(dateShort(now()))})</span></p></div>
+      <div class="home-head"><div class="home-hello">${eyebrow('CRM')}<h1>${hello}${first ? ', ר׳ ' + esc(first) : ''} ${help('home')}</h1><p class="muted">${esc(H.label(new Date(now())))} <span class="faint">(${esc(dateShort(now()))})</span></p></div>
+        <div class="quick">${worker() || !deskMode() ? '' : '<button class="btn primary" data-act="new-person">＋ ליד חדש</button>'}<button class="btn" data-crmtab="messages">💬 הודעה לקבוצה</button>${worker() ? '' : '<button class="btn ghost" data-act="tb-export-ask">⬇ להוריד לאקסל</button>'}</div></div>
       <div class="wait-strip">${num(q.length, 'להיום', 'go-today')}${num(late, 'באיחור', 'go-today', 'bad')}${num(decide, decide === 1 ? 'מחכה להחלטה' : 'מחכים להחלטה', 'go-decide')}${num(week, 'השבוע', 'go-week')}</div>
-      <div class="quick">${worker() ? '' : '<button class="btn" data-act="new-person">＋ ליד חדש</button>'}<button class="btn" data-crmtab="messages">💬 הודעה לקבוצה</button>
-        ${worker() ? '' : '<button class="btn" data-act="tb-export-ask">⬇ להוריד לאקסל</button><button class="btn" data-act="assist">✨ לשאול את העוזר</button>'}</div>
       <div class="ov-grid">
         <div><div class="group-head"><span>הבא בתור</span></div>
           ${q.length ? nextCard(q[0]) : `<section class="next-card done"><p>אין משימות להיום.${nd === 'אין משימות.' ? '' : ' הבאות — ' + nd}</p><p><button class="link" data-crmtab="tasks">לכל המשימות ←</button></p></section>`}</div>
@@ -3539,11 +3726,11 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   function assistCtx() {
     if (S.phase === 'settings') {
       const subs = S.step === 'details' ? SUBS_DET : SUBS_HOW;
-      return { kind: 'settings', where: 'ההגדרות · ' + ((subs.find(([k]) => k === S.sub) || [, ''])[1]) };
+      { const s = (subs.find(([k]) => k === S.sub) || [, ''])[1]; return { kind: 'settings', where: 'ההגדרות · ' + s, at: 'הגדרות · ' + s }; }
     }
-    if (S.view === 'crm') return { kind: 'crm', where: 'ה-CRM · ' + ((CRM_TABS.find(([k]) => k === S.crmTab) || [, ''])[1]) };
-    if (S.view === 'dash') return { kind: 'dash', where: 'סוף היום' };
-    return { kind: 'other', where: 'המערכת' };
+    if (S.view === 'crm') { const t = (CRM_TABS.find(([k]) => k === S.crmTab) || [, ''])[1]; return { kind: 'crm', where: 'ה-CRM · ' + t, at: '-CRM · ' + t }; }
+    if (S.view === 'dash') return { kind: 'dash', where: 'סוף היום', at: 'סוף היום' };
+    return { kind: 'other', where: 'המערכת', at: 'מערכת' };
   }
   const AS_SUGGEST = {
     settings: ['מה כדאי לשנות אצלי לפני התערוכה?', 'איך לוודא שאף ליד חשוב לא יישכח?'],
@@ -3571,15 +3758,14 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     return out;
   }
   function renderAssist() {
-    let p = $('#assist');
-    if (!AS.open) { if (p) p.remove(); document.body.classList.remove('with-assist'); return; }
-    if (!p) { p = document.createElement('aside'); p.id = 'assist'; p.className = 'assist'; p.setAttribute('aria-label', 'עוזר'); document.body.appendChild(p); }
-    document.body.classList.add('with-assist');
+    // The agent lives in the shell's panel (20/10): beside the menu on a computer, a dialog in the middle on a tablet.
+    const p = $('#panel');
+    if (UI.panel !== 'ai' || !p) return;
     const c = assistCtx();
     const chg = (x, mi, ci) => `<div class="as-change"><span>${esc(changeText(x))}${x.why ? `<small>${esc(x.why)}</small>` : ''}</span>
       ${x.done ? '<span class="faint">✓ הוחל</span>' : `<button class="btn" data-asapply="${mi}:${ci}">להחיל</button>`}</div>`;
     const msg = (x, mi) => `<div class="as-msg ${x.who}">${esc(x.text)}${(x.changes || []).map((y, ci) => chg(y, mi, ci)).join('')}</div>`;
-    p.innerHTML = `<div class="as-head"><b>✨ סוכן AI</b><span class="faint">אתה ב${esc(c.where)}</span><button class="icon-btn" data-act="assist-close" aria-label="סגירה">✕</button></div>
+    p.innerHTML = `<div class="p-head as-head">${ic('spark')}<div><h2>סוכן AI</h2><div class="faint">אתה ב${esc(c.at)}</div></div><button class="icon-btn p-close" data-act="panel-close" aria-label="סגירה">✕</button></div>
       <div class="as-body" id="as-body">${c.kind === 'crm' ? (() => { const ms = crmMisses(); return `<section class="as-miss"><b>מה שמתי לב אליו</b>${ms.length ? ms.map((x) => `<div class="as-item"><span>${esc(x.text)}</span><button class="btn" data-act="${x.act}">${esc(x.go)}</button></div>`).join('') : '<p class="faint">לא פספסת כלום. הכל בזמן.</p>'}</section>`; })() : ''}
         ${AS.msgs.length ? AS.msgs.map(msg).join('') : `<p class="muted">אפשר לשאול כל דבר על המערכת ועל הלידים שלך.${c.kind === 'settings' ? ' בהגדרות אני גם מציע שינויים — והם קורים רק כשתלחץ "להחיל".' : ''}</p>`}
         ${AS.busy ? '<div class="as-msg ai faint">חושב…</div>' : ''}
@@ -3768,12 +3954,16 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       !worker() && S.phase !== 'settings' ? '<button data-act="settings">⚙️ הגדרות</button>' : '',
       afterFair() ? '' : '<button data-act="devices">להוסיף טאבלט</button>',
       '<div class="menu-sep">הדגמה בלבד</div>',
+      // To see the tablet on a computer, and back (20/10).
+      `<button data-act="ui-desk" aria-pressed="${DEV.ui === 'desk'}">תצוגת מחשב</button>`,
+      `<button data-act="ui-tab" aria-pressed="${DEV.ui === 'tab'}">תצוגת טאבלט</button>`,
+      `<button data-act="ui-auto" aria-pressed="${!DEV.ui}">תצוגה לפי המכשיר</button>`,
       '<button data-act="sys">מצב המערכת (של יצחק)</button>',
       '<button data-act="demo-notice">לשלוח הודעת מערכת דחופה</button>',
       '<button data-act="sign-out">יציאה מהחשבון</button>',
       '<button data-act="reset">איפוס מערכת</button>',
     ].join('');
-    $('.top-in').appendChild(m);
+    $('#demo').appendChild(m);
   }
   let toastT;
   let undoFn = null;
@@ -3931,6 +4121,8 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         <div class="actions"><button class="btn primary" data-act="ask-yes">כן, לשנות</button><button class="btn" data-act="sheet-close">לא</button></div>`);
     }
 
+    if (d.nav) { const [v, t] = d.nav.split(':'); return goPlace(v, t); }
+    if (d.panel) return openPanel(d.panel);
     if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
     if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillSnap = {}; filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
     if (d.step) { S.step = d.step; if (S.phase === 'settings') S.sub = (d.step === 'details' ? SUBS_DET : SUBS_HOW)[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
@@ -4188,15 +4380,20 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'si-back': signStep = null; return render();
       case 'si-send': { const v = ($('#si-mail') && $('#si-mail').value.trim()) || ''; if (!emailOk(v)) { toast('כתובת המייל לא שלמה. למשל: name@gmail.com'); return $('#si-mail').focus(); } S.account.email = v; signStep = 'code'; return render(); }
       case 'si-code': { const v = ($('#si-code') && $('#si-code').value.trim()) || ''; if (!/^\d{4}$/.test(v)) { toast('4 ספרות'); return $('#si-code').focus(); } return signedIn(); }
-      case 'sign-out': S.signed = false; signStep = null; closeLead(); AS.open = false; renderAssist(); save(); render(); return window.scrollTo(0, 0);
-      case 'bell': return sheetBell();
+      case 'sign-out': S.signed = false; signStep = null; closeLead(); UI.panel = null; save(); render(); return window.scrollTo(0, 0);
+      case 'bell': return openPanel('support');
       case 'ticket-send': return sendTicket();
       case 'bell-read': (S.notices || []).forEach((x) => { x.read = true; }); save(); closeSheet(false); return render();
       case 'notice-read': { const x = (S.notices || []).find((y) => y.id === d.id); if (x) x.read = true; save(); return render(); }
       case 'sys': return sheetSys();
       case 'demo-notice': notify('הודעה מהמארגנים: הכניסה לאולם נפתחת היום בשעה 10:00. בעלי דוכנים מתבקשים להגיע עד 9:30.', true); save(); render(); return toast('נשלחה הודעה דחופה (הדגמה)');
-      case 'assist': AS.open = !AS.open; return renderAssist();
-      case 'assist-close': AS.open = false; return renderAssist();
+      case 'assist': return openPanel('ai');
+      case 'assist-close': case 'panel-close': UI.panel = null; return render();
+      case 'nav-fold': DEV.navFolded = !slimNav(); if (!DEV.navFolded) UI.panel = null; save(); return render();
+      case 'help-toggle': DEV.helpOff = !DEV.helpOff; save(); return render();
+      case 'ui-desk': case 'ui-tab': case 'ui-auto': DEV.ui = d.act === 'ui-auto' ? null : d.act.slice(3); UI.panel = null; save(); render(); return toast(d.act === 'ui-auto' ? 'התצוגה לפי המכשיר' : d.act === 'ui-desk' ? 'תצוגת מחשב' : 'תצוגת טאבלט');
+      case 'copy': try { navigator.clipboard.writeText(d.copy).then(() => toast('✓ הועתק'), () => toast(d.copy)); } catch (er) { toast(d.copy); } return;
+      case 'bar-new': if (S.phase !== 'live' || S.view !== 'booth') goPlace('booth'); return sheetNewPerson();
       case 'assist-ask': { e.preventDefault(); const q = $('#as-q') && $('#as-q').value.trim(); if (q) askAssist(q); return; }
       case 'add-group': return addGroup();
       case 'save-group': {
