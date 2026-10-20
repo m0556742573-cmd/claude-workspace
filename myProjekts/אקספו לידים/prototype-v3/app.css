@@ -1495,3 +1495,40 @@ body.admin-page main { max-width: var(--w-prose); }
 .admin h2 { margin-top: var(--s6); font-size: 18px; }
 .danger-zone { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line); }
 .danger-zone p { margin: 4px 0 var(--s3); font-size: 14.5px; }
+
+/* ------------------------------------------------------------------
+ * 20/10, part 1 of his notes on the setup
+ * ------------------------------------------------------------------ */
+/* The welcome: a message in the middle, not a step — warm, unhurried, the way in is inside it. */
+.sheet.welcome-sheet { max-width: 520px; }
+.welcome-msg { text-align: center; padding: var(--s2) var(--s2) 0; }
+.welcome-msg .mark.big { width: 48px; height: 48px; border-radius: var(--r-lg); margin: 0 auto var(--s4); display: block; }
+.welcome-msg h2 { font-size: 26px; margin-bottom: var(--s2); }
+.welcome-msg .lead-in { color: var(--ink-2); font-size: 16.5px; line-height: 1.6; max-width: 42ch; margin: 0 auto; }
+.welcome-msg .welcome-steps { text-align: start; background: var(--surface-2); border-radius: var(--r-lg); padding: var(--s4) var(--s5); padding-inline-start: 2.2em; margin: var(--s5) 0 var(--s3); }
+.welcome-msg .faint { margin-bottom: var(--s4); }
+.btn.wide-btn { width: 100%; justify-content: center; }
+
+/* A system suggestion, until he changes it. */
+.sugg-tag { display: inline-block; font-size: 12px; font-weight: 700; color: var(--ai); background: var(--ai-soft); border: 1px solid var(--ai-line); border-radius: var(--pill); padding: 0 8px; margin-inline-start: 6px; }
+
+/* What was not taken into the address is said. */
+.warn-line { margin-top: 6px; font-size: 14px; color: var(--hot); background: var(--hot-soft); border: 1px solid var(--hot-line); border-radius: var(--r-sm); padding: 6px var(--s3); }
+
+/* The message window: the message's title right above its box, "✨ תכתוב לי" beside it. */
+.tp-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); }
+.tp-head .label { margin-bottom: var(--s2); }
+.tp-head .btn { margin-bottom: var(--s2); color: var(--ai); border-color: var(--ai-line); background: var(--ai-soft); }
+.chips.vars { margin-bottom: var(--s3); }
+.label small { font-weight: 400; }
+
+/* Buttons: a list, or on the card; and the trade templates where there is no AI. */
+.seg-ctl.small { flex: none; }
+.seg-ctl.small button { padding: 5px 14px; font-size: 14px; }
+.tpl-pick { margin-top: var(--s4); }
+.tpl-pick select { flex: 1; }
+.add-row .btn { flex: none; }
+
+/* The morning hour: any hour and minute. */
+.time-in { max-width: 160px; font-size: 18px; }
+.field-row select { max-width: 280px; }
