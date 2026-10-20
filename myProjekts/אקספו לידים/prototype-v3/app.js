@@ -805,7 +805,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (UI.panel === 'ai' && !assistOk()) UI.panel = null;
     // K15: one bar says it is a demo, instead of twenty notes scattered over the screens. Its menu is the demo's own.
     $('#demo').innerHTML = `<span>הדגמה — שום דבר לא נשלח באמת${S.signed ? ` · מצב המערכת: <b>${esc(SYS_NAMES[S.sys])}</b>` : ''}</span>
-      ${S.signed ? '<button class="demo-menu" data-act="menu" aria-label="תפריט ההדגמה">תפריט ההדגמה ⋯</button>' : ''}`;
+      ${S.signed ? '<button class="demo-menu" data-act="menu" aria-label="תפריט ההדגמה">תפריט ההדגמה ⋯</button>' : ''}
+      <button class="demo-menu" data-act="reset">איפוס מערכת</button>`;   // in sight, not inside the menu (יצחק, 20/10)
     if (!shell) {
       // Signing in and the setup: a thin header. Setup is a line of steps, not a menu (יצחק, 17/10).
       const at = SETUP.findIndex(([k]) => k === S.step);
@@ -4765,7 +4766,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'reset':
         if (worker()) return ownerOnly('איפוס');
         return sheetConfirm('איפוס מערכת?', 'כל המבקרים, הכפתורים וההגדרות יימחקו, ומתחילים מההתחלה.', 'reset-yes', '', 'למחוק הכל');
-      case 'reset-yes': S = fresh(); upgrade(); openId = null; D = null; stopIdle(); closeSheet(false); save(); return render();
+      case 'reset-yes': S = fresh(); upgrade(); openId = null; D = null; UI.panel = null; stopIdle(); closeSheet(false); save(); return render();
     }
   });
 

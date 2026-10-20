@@ -1272,7 +1272,7 @@ details.adv > summary h2 { font-size: 17px; }
 
 /* the demo's own line, above everything */
 .demo-bar { position: sticky; top: 0; z-index: 45; height: var(--demo-h); display: flex; align-items: center; justify-content: center; gap: var(--s3); padding: 0 var(--s4); }
-.demo-menu { border: 0; background: transparent; font-size: 12px; font-weight: 700; color: var(--ink-2); padding: 0 6px; min-height: 22px; border-radius: var(--r-sm); }
+.demo-menu { border: 1px solid var(--warm-line); background: var(--surface); font-size: 12px; font-weight: 700; color: var(--ink-2); padding: 0 6px; min-height: 22px; border-radius: var(--r-sm); }
 .demo-menu:hover { background: rgba(0, 0, 0, .06); }
 .demo-bar .menu { top: calc(var(--demo-h) + 4px); inset-inline-end: var(--s4); font-size: 14.5px; }
 .menu button[aria-pressed="true"] { font-weight: 700; background: var(--accent-soft); }
