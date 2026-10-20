@@ -280,7 +280,7 @@ About his business, in his words (Hebrew):
 His goal at the fair — he was asked inside his text "what do you want from this fair"; read it from there${goal ? ', and also from this' : ''}:
 """${(goal || 'see his text').slice(0, 800)}"""
 
-While talking to a visitor he taps buttons on the tablet. Decide which of these four groups really separate one customer from another FOR THIS BUSINESS AND THIS GOAL — the ones where a different answer means he does something different next. Use one or two groups, three at most:
+While talking to a visitor he taps buttons on the tablet. Prepare buttons for ALL FOUR groups below, each as it would best fit this business. Then decide which one or two of them really separate one customer from another FOR THIS BUSINESS AND THIS GOAL — the ones where a different answer means he does something different next — and name them in "main". Only the main groups are shown at first; the others wait, ready, for when he adds them:
 - "what": products or services. Only if the difference changes what he does next. Products handled the same way are ONE button, or no group at all.
 - "who": the kind of visitor (e.g. פרטי, בעל שמחה, מוסד, גבאי או קבוצה, עסק, בעל קייטרינג, חנות).
 - "size": the size of the order (e.g. יחידה, משפחה, אירוע, מוסד, אספקה קבועה).
@@ -294,8 +294,9 @@ Two steps are welcome where they fit, e.g. send the price list at once AND call 
 Read community Hebrew correctly: "מזונות" = pastries and cakes (the mezonot blessing), not food or catering. "משווק", "סוכן", "מפיץ", "יבואן" = he sells goods made by others; he does not produce or cook them. "בוטיק" = small premium makers. Audiences and occasions (לבתים, לעסקים, למוסדות, לאירועים, לשמחות, "לכל מי שצריך") are visitors, never products. Never add a product or service he did not say.
 
 Reply with ONLY one JSON object, all strings in Hebrew:
-{"trade":"his trade with his role, 1-4 words","goal":"his goal in one short line","axes":{"what":[],"who":[],"size":[],"when":[]},"defaultSteps":[{"step":"call","stepLabel":"...","days":3}],"seasons":[],"unclear":[]}
-- Leave a group as [] when it does not matter for him. At most 6 buttons per group.
+{"trade":"his trade with his role, 1-4 words","goal":"his goal in one short line","axes":{"what":[],"who":[],"size":[],"when":[]},"main":["what"],"defaultSteps":[{"step":"call","stepLabel":"...","days":3}],"seasons":[],"unclear":[]}
+- Fill every group with 2 to 6 buttons that fit him. "main": one or two group names, three at most.
+- Use the step "season" only if he has busy seasons (and then list them in "seasons").
 - defaultSteps: what he does with a visitor he tagged nothing for.
 - seasons: his busy periods, only if clearly so, ids from: ${SEASON_IDS.join(', ')}.
 - unclear: parts of his text you could not understand.`;
@@ -333,6 +334,7 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       seasons: Array.isArray(r.seasons) ? r.seasons.filter((s) => SEASON_IDS.includes(s)) : [],
       unclear: Array.isArray(r.unclear) ? r.unclear.map((u) => str(u, 40)).filter(Boolean) : [],
       dropped: [], defSteps: def.length ? def : null, by: 'ai',
+      main: (Array.isArray(r.main) ? r.main : []).filter((ax) => STD[ax] && axes[ax] && axes[ax].length).slice(0, 3),
     };
   }
 
@@ -637,7 +639,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   const SETUP_ALL = [['account', 'הפרטים שלך'], ['biz', 'העסק'], ['messages', 'הודעות'], ['custom', 'התאמה אישית']];
   const setupSteps = () => SETUP_ALL.filter(([k]) => k !== 'biz' || ai || !aiKnown);
   const SETTINGS_NAV = [['details', 'פרטים וחיבורים'], ['how', 'התאמה אישית']];
-  const SUBS_HOW = [['buttons', 'כפתורים ומשימות'], ['booth', 'הדוכן'], ['auto', 'מה קורה לבד'], ['seasons', 'עונות'], ['crm', 'שלבי המכירה']];
+  // The booth comes first (יצחק, 20/10): it is where he stands on the day.
+  const SUBS_HOW = [['booth', 'הדוכן'], ['buttons', 'כפתורים ומשימות'], ['auto', 'מה קורה לבד'], ['seasons', 'עונות'], ['crm', 'שלבי המכירה']];
   // How it is sent, the messages and the morning message are one tab (יצחק, 20/10).
   const SUBS_DET = [['account', 'פרטי העסק'], ['biz', 'תיאור העסק'], ['messages', 'הודעות']];
   // The business's description is the AI's page: without the AI it is not there (יצחק, 20/10).
@@ -719,7 +722,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   /** Which part he is in. In the settings, the part he came from. */
   const inFair = () => { const v = S.phase === 'settings' ? S.backView : S.view; return canFair() && (v === 'booth' || v === 'dash' || !canCrm()); };
   /** The assistant is everywhere but at the booth (יצחק, 17/10): there he talks to a person, not to a screen. */
-  const assistOk = () => shellOn() && !worker() && !(S.phase === 'live' && S.view === 'booth');
+  // …and from the setup's customization on, all the time (יצחק, 20/10): that is where he shapes what the AI made.
+  const setupAssist = () => S.signed && S.phase === 'setup' && S.step === 'custom';
+  const assistOk = () => (shellOn() || setupAssist()) && !worker() && !(S.phase === 'live' && S.view === 'booth');
   /** The screen he is on, as the help names it. */
   const helpHere = () => (S.phase === 'settings' ? (HELP[S.sub] ? S.sub : 'buttons') : S.view === 'crm' ? (S.crmTab === 'overview' ? 'home' : null) : S.view === 'dash' ? 'dash' : 'booth');
   /** A small label above the screen's title on a computer, naming the part he is in (יצחק, 20/10). */
@@ -763,15 +768,18 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     if (!shell) {
       // Signing in and the setup: a thin header. Setup is a line of steps, not a menu (יצחק, 17/10).
       const at = setupSteps().findIndex(([k]) => k === S.step);
-      $('#side').innerHTML = ''; $('#bar').innerHTML = '';
+      $('#side').innerHTML = '';
+      $('#bar').innerHTML = assistOk() ? `<button class="ai-fab" data-panel="ai" title="סוכן AI" aria-label="סוכן AI">${ic('spark')}</button>` : '';
+      document.body.classList.toggle('setup-ai', assistOk());
       $('#top').innerHTML = `<div class="top-in">
         <span class="bsd" aria-label="בסייעתא דשמיא">בס"ד</span>
         <div class="brand"><span class="mark" aria-hidden="true"></span>${esc(S.biz.name || 'דוכן חכם')}${setup && S.signed ? ' <span class="faint">· הקמה</span>' : ''}</div>
-        ${setup && S.signed ? `<nav class="stepper" aria-label="שלבי ההקמה">${setupSteps().map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}" ${SETUP_ALL.findIndex(([x]) => x === k) > (S.setupReach || 0) ? 'disabled' : ''}><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>` : ''}
+        ${setup && S.signed ? `<nav class="stepper" aria-label="שלבי ההקמה">${setupSteps().map(([k, t], n) => `<button class="st${n < at ? ' done' : ''}" data-step="${k}" aria-current="${S.step === k}"><span class="bar"></span><span class="t">${n + 1}. ${t}</span></button>`).join('')}</nav>` : ''}
       </div>`;
       renderPanel();
       return paintSaved();
     }
+    document.body.classList.remove('setup-ai');
     if (desk) { $('#side').innerHTML = sideHTML(); $('#top').innerHTML = ''; $('#bar').innerHTML = ''; }
     else { $('#side').innerHTML = ''; $('#top').innerHTML = tabHeadHTML(); $('#bar').innerHTML = barHTML(); }
     renderPanel();
@@ -890,9 +898,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
   function renderPanel() {
     let p = $('#panel');
     let sc = $('#pscrim');
-    const on = shellOn() && UI.panel;
+    // In the setup there is no menu to open a panel beside: the agent opens as a dialog in the middle.
+    const on = (shellOn() || (setupAssist() && UI.panel === 'ai')) && UI.panel;
     if (!on) { if (p) p.remove(); if (sc) sc.remove(); return; }
-    const desk = deskMode();
+    const desk = deskMode() && shellOn();
     if (!desk && !sc) { sc = document.createElement('button'); sc.id = 'pscrim'; sc.className = 'pscrim'; sc.dataset.act = 'panel-close'; sc.setAttribute('aria-label', 'סגירה'); document.body.appendChild(sc); }
     if (desk && sc) sc.remove();
     if (!p) { p = document.createElement('aside'); p.id = 'panel'; document.body.appendChild(p); }
@@ -1111,9 +1120,19 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const hand = old.filter((x) => x.byHand);
     const removed = new Set(b.removed);
     const read = [];
+    /* The AI prepares all four groups and names the one or two that matter (יצחק, 20/10). Those are shown; the others
+     * wait in `spare`, and come up already filled when he adds the group. A group that is on screen already stays. */
+    const main = r.main && r.main.length ? r.main : null;
+    b.spare = {};
+    // A season step with no season to come back before is no plan: it becomes a call later on.
+    const noSeason = !(r.seasons && r.seasons.length) && !b.seasonsByHand;
+    const fixSeason = (steps) => (steps || []).map((s) => (noSeason && s.type === 'season' ? { type: 'call', label: 'לחזור אליו בהמשך', days: 30 } : s));
+    if (r.defSteps) r.defSteps = fixSeason(r.defSteps);
     Object.keys(r.axes).forEach((ax) => {
       if (b.removedGroups.includes(ax)) return;
+      if (main && !main.includes(ax) && !groupById(ax)) { b.spare[ax] = (r.axes[ax] || []).map((x) => Object.assign({}, x, { steps: fixSeason(x.steps) })); return; }
       (r.axes[ax] || []).forEach((x) => {
+        x.steps = fixSeason(x.steps);
         if (removed.has(ax + ':' + x.label) || hand.some((h) => h.axis === ax && h.label === x.label)) return;
         const same = old.find((o) => o.axis === ax && o.label === x.label);
         read.push({ id: same ? same.id : 'k' + (b.bseq++), axis: ax, label: x.label, steps: x.steps, weight: x.weight, unsure: x.unsure });
@@ -1179,7 +1198,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     const box = $('#preview');
     if (!box) return;
     const b = S.biz;
-    const gs = liveGroups();
+    // While editing, every group shows — a new, empty one too, so its first button can be added right there (יצחק, 20/10).
+    const gs = PVW.mode === 'edit' ? S.biz.groups : liveGroups();
     if (!gs.length) { box.innerHTML = `<h2>הכרטיס של המבקר בדוכן</h2><div class="empty">${ai && S.phase !== 'settings' && S.sub !== 'buttons' ? 'כתוב על העסק ולחץ על ✨, והכרטיס של המבקר ייבנה כאן.' : 'עוד אין כפתורים. מוסיפים קבוצה למטה, או מתחילים מתבנית.'}</div>`; return; }
     PVW.tags = PVW.tags.filter((id) => btnById(id));
     const fake = { tags: PVW.tags, manual: [], done: [], moved: {}, lost: false, won: false, warmth: PVW.warm, at: now(), frozen: null };
@@ -1193,7 +1213,10 @@ Reply with ONLY one JSON object, all strings in Hebrew:
         <div class="lead-head"><div><span class="nm">משה כהן</span> <span class="muted">בני ברק</span><div class="faint">מבקר לדוגמה</div></div></div>
         <div class="warmth">${words().map((t, k) => `<button class="warm-btn w${k}" data-pvwarm="${k}" aria-pressed="${PVW.warm === k}" ${edit ? 'disabled' : ''}>${esc(t)}</button>`).join('')}</div>
         ${gs.map((g) => `<div class="label">${esc(g.title)}${edit ? ` <button class="link" data-editgroup="${g.id}">עריכה</button>` : ''}</div>
-          <div class="chips">${groupButtons(g.id).map((x) => `<button class="chip" ${edit ? `data-editbtn="${x.id}"` : `data-pvtag="${x.id}"`} aria-pressed="${!edit && PVW.tags.includes(x.id)}">${esc(x.label)}${x.unsure ? ' <span class="q">?</span>' : ''}${isStar(x) ? ' ⭐' : ''}${edit ? ' ✎' : ''}</button>`).join('')}
+          <div class="chips">${groupButtons(g.id).map((x) => { const chip = `<button class="chip" ${edit ? `data-editbtn="${x.id}"` : `data-pvtag="${x.id}"`} aria-pressed="${!edit && PVW.tags.includes(x.id)}">${esc(x.label)}${x.unsure ? ' <span class="q">?</span>' : ''}${isStar(x) ? ' ⭐' : ''}${edit ? ' ✎' : ''}</button>`;
+            // An ✕ on every button while editing: a quick removal, with "ביטול" in the toast (יצחק, 20/10).
+            return edit ? `<span class="chip-ed">${chip}<button class="chip-x" data-act="del-btn" data-id="${x.id}" aria-label="להסיר את ${esc(x.label)}" title="להסיר">✕</button></span>` : chip; }).join('')}
+            ${edit && !groupButtons(g.id).length ? '<span class="faint">עוד אין כפתורים בקבוצה הזו.</span>' : ''}
             ${edit ? `<span class="pv-add"><input class="text-input" data-newbtn="${g.id}" placeholder="+ כפתור" autocomplete="off"><button class="btn" data-addbtn="${g.id}">הוספה</button></span>` : ''}</div>`).join('')}
         <div class="next-line ro"><span class="faint">מה הלאה:</span> ${ts.length ? planHTML(ts[0], true) + (ts.length > 1 ? ` <span class="faint">· ועוד ${many(ts.length - 1, 'משימה', 'משימות')}</span>` : '') : '<b>' + esc(restWord(fake)) + '</b>'}</div>
       </div>
@@ -1356,9 +1379,6 @@ Reply with ONLY one JSON object, all strings in Hebrew:
     m.innerHTML = `<h1>מה המערכת עושה לבד ${help('auto')}</h1>
       <p class="muted">מה שהמערכת עושה בשבילך, בלי שתבקש. אפשר להדליק, לכבות ולשנות כל דבר — גם אחר כך, בהגדרות.</p>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>כשסימנת "${esc(words()[2])}" ${help('cold')}</h2>
-          <p class="muted">רק אתה יודע מה התכוונת. לכן המערכת לא מחליטה לבד, אלא עושה מה שתבחר כאן.</p>
-          <div class="chips">${COLD_DO.map(([k, t]) => `<button class="chip" data-colddo="${k}" aria-pressed="${b.coldDo === k}">${esc(t)}</button>`).join('')}</div></section>
         <section class="card"><h2>כשמבקר לא ענה 3 פעמים ${help('noans')}</h2>
           <p class="muted">אחרי פעם ופעמיים המערכת מנסה שוב ביום העבודה הבא. בפעם השלישית — מה שתבחר כאן.</p>
           <div class="chips">${NOANS_DO.map(([k, t]) => `<button class="chip" data-noansdo="${k}" aria-pressed="${(b.noAnsDo || 'ask') === k}">${esc(t)}</button>`).join('')}</div></section>
@@ -1445,7 +1465,8 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
         : `<div class="axes">${S.biz.groups.map(groupCard).join('') || '<div class="empty">עוד אין קבוצות כפתורים.</div>'}</div>`}
       <section class="card" style="margin-top:14px"><h2>קבוצה חדשה</h2>
         <div class="add-row"><input class="text-input" id="new-group" placeholder="שם הקבוצה — למשל: איך שמע עלינו" autocomplete="off"><button class="btn" data-act="add-group">הוספה</button></div>
-        ${missing.length ? `<div class="chips" style="margin-top:10px">${missing.map((ax) => `<button class="chip add" data-addstd="${ax}">+ ${esc(STD[ax].title)}</button>`).join('')}</div>` : ''}</section>
+        ${missing.length ? `<div class="chips" style="margin-top:10px">${missing.map((ax) => `<button class="chip add" data-addstd="${ax}">+ ${esc(STD[ax].title)}${((S.biz.spare || {})[ax] || []).length ? ' <span class="ai-ready" title="ה-AI כבר הכין כפתורים">✨</span>' : ''}</button>`).join('')}</div>
+          ${missing.some((ax) => ((S.biz.spare || {})[ax] || []).length) ? '<p class="faint" style="margin-top:6px">✨ = ה-AI כבר הכין לקבוצה הזו כפתורים לפי העסק שלך.</p>' : ''}` : ''}</section>
       <div class="label">מי שלא סומן לו כלום</div>
       <button class="prod-row" data-act="edit-def"><span class="pn">ברירת המחדל</span><span class="pnext">${esc(stepsText(stepsOf(null)))}</span></button>`;
     if (btnView === 'card') renderPreview();
@@ -1577,6 +1598,9 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
       <div class="stack" style="margin-top:14px">
         <section class="card"><h2>איך לקרוא לשלוש הדרגות</h2><p class="muted">רק השם משתנה. את החום מסמנים תמיד ביד — המערכת לא מנחשת אותו.</p>
           <div class="opts grid2">${Object.entries(GRADES).map(([k, g]) => `<button class="opt" data-grades="${k}" aria-pressed="${b.grades === k}">${esc(g.words.join(' · '))}<small>${esc(g.name)}</small></button>`).join('')}</div></section>
+        <section class="card"><h2>כשסימנת "${esc(words()[2])}" ${help('cold')}</h2>
+          <p class="muted">רק אתה יודע מה התכוונת. לכן המערכת לא מחליטה לבד, אלא עושה מה שתבחר כאן.</p>
+          <div class="chips">${COLD_DO.map(([k, t]) => `<button class="chip" data-colddo="${k}" aria-pressed="${b.coldDo === k}">${esc(t)}</button>`).join('')}</div></section>
         <section class="card"><h2>כמה זמן הכרטיס נשאר פתוח</h2><p class="muted">בלי נגיעה, הכרטיס נסגר לבד וחוזר לחיפוש. מה שסומן — נשמר. כשצריך עוד זמן, "⏸ עצור" בכרטיס עוצר את השעון.</p>
           <div class="chips">${[8, 12, 15, 20, 30].map((s) => `<button class="chip" data-idle="${s}" aria-pressed="${b.idleSec === s}">${s} שניות</button>`).join('')}</div></section>
         <section class="card"><div class="toggle-row"><div><h2>מי שכבר ביקר לא מופיע שוב בחיפוש</h2>
@@ -1591,9 +1615,23 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
   const rangeText = (s) => (s.greg
     ? s.greg.map(([a, b]) => `${a % 100}/${Math.floor(a / 100)}–${b % 100}/${Math.floor(b / 100)}`).join(', ')
     : s.ranges.map((r) => `${H.gem(r.from[1])} ב${H.HE[r.from[0]]} – ${H.gem(r.to[1])} ב${H.HE[r.to[0]]}`).join(' · '));
+  /* Seasons show only where the system understood there are some (יצחק, 20/10). Otherwise the tab says so kindly —
+   * and still lets him add one, if he knows better. */
+  let seasonsOpen = false;
   function viewSeasons(m) {
     const b = S.biz;
     const today = new Date(now());
+    if (!b.seasons.length && !b.seasonsByHand && !seasonsOpen) {
+      m.innerHTML = `<h1>העונות שלך ${help('seasons')}</h1>
+        <section class="card calm-note">
+          <span class="calm-ic" aria-hidden="true">🗓</span>
+          <h2>נראה שלעסק שלך אין עונות מיוחדות</h2>
+          <p class="muted">${b.said || b.tradeId ? 'ממה שסיפרת על העסק' : 'לפי מה שיש כרגע במערכת'}, אין תקופה בשנה שבה קונים ממך הרבה יותר. לכן המערכת לא תחזיר אליך לידים "לפני העונה" — כל ליד מקבל את המשימות הרגילות שלו.</p>
+          <p class="faint">טעינו? אם יש תקופה שבה אצלך עמוס במיוחד, אפשר לסמן אותה.</p>
+          <div class="actions"><button class="btn" data-act="seasons-open">יש לי עונה — לבחור</button></div>
+        </section>`;
+      return;
+    }
     m.innerHTML = `<h1>העונות שלך ${help('seasons')}</h1>
 
       <p class="muted">לפי הלוח העברי. ליד שנשמר "לעונה" חוזר אליך לפני שהיא מתחילה. אין משימות ותזכורות בשבת ובחג.</p>
@@ -1630,8 +1668,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
    * a file is attached inside a message. */
   function viewMaterials(m) {
     const b = S.biz;
-    const groups = [['email', 'מייל', true], ['wa', 'וואטסאפ', hasWa() && b.channels.wa]].filter((g) => g[2]);
-    const pkgOpts = (sel) => `<option value="" ${!sel ? 'selected' : ''}>—</option>` + b.templates.map((t) => `<option value="${esc(t.id)}" ${sel === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     const def = boothDefault();
     m.innerHTML = `<h1>הודעות ${help('messages')}</h1>
       <p class="muted">כל מה שיוצא למבקר הוא הודעה, ואפשר לצרף לה קובץ. בכפתור, במשימה ובשליחה לקבוצה — בוחרים הודעה לפי השם.</p>
@@ -1643,8 +1679,6 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
           <select id="booth-def" class="text-input" data-boothsel><option value="" ${def ? '' : 'selected'}>בלי ברירת מחדל — לבחור בכל פעם</option>
             ${b.templates.map((t) => `<option value="${esc(t.id)}" ${def && def.id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
           <p class="faint" style="margin-top:6px">${def ? `בדוכן: נגיעה אחת ב"לשלוח", ו"${esc(def.name)}" יוצאת.` : 'בדוכן: נגיעה ב"לשלוח" מראה את ההודעות, ובוחרים.'}</p></section>
-        <section class="card"><h2>מה יוצא בכל ערוץ, כשלא בחרו הודעה</h2>
-          ${groups.map(([k, n]) => `<label class="field-row"><span>${n}</span><select class="text-input" data-chdef="${k}" aria-label="ברירת מחדל ל${n}">${pkgOpts((b.chDefault || {})[k])}</select></label>`).join('')}</section>
       </div>`;
   }
   function bindMatFile(l) {
@@ -1919,8 +1953,8 @@ ${x.out ? ' <span class="out-tag">יוצא למבקר</span>' : ''}</span><span 
    * Each channel has a default package: what goes out on it when no package was chosen. */
   const PKG_TEXT = 'שלום {שם}, תודה שעברת בדוכן של {עסק}. מצורף {קובץ}.';
   const pkgById = (id) => S.biz.templates.find((t) => t.id === id);
-  const CH_GROUP = { wa: 'wa', email: 'email' };
-  const pkgFor = (id, k) => pkgById(id) || pkgById((S.biz.chDefault || {})[CH_GROUP[k]]) || (S.biz.templates.length === 1 ? S.biz.templates[0] : null);
+  // No default per channel any more (יצחק, 20/10): when no message was chosen, the booth's default goes out, if there is one.
+  const pkgFor = (id) => pkgById(id) || boothDefault() || (S.biz.templates.length === 1 ? S.biz.templates[0] : null);
   /** A file brought in anywhere becomes a material and a package of its own, with the default words. Returns the package id. */
   function addPackageWithFile(name, file) {
     if (!S.biz.materials.some((x) => x.name === name)) S.biz.materials.push({ name, file });
@@ -2356,10 +2390,15 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
   ];
   const DEF_TEMPLATES = [
     // The system's own messages are marked "הצעה" until he changes them (יצחק, 20/10); none is the booth's default to begin with.
-    { id: 't1', name: 'תודה על הביקור', mat: '', sugg: true, text: 'שלום {שם}, תודה שעברת בדוכן של {עסק} בתערוכה. נשמח לעמוד לשירותך.' },
-    { id: 't2', name: 'כמו שדיברנו', mat: '', sugg: true, text: 'שלום {שם}, כמו שדיברנו — לכל שאלה אני כאן.' },
-    { id: 't3', name: 'תזכורת לפגישה', mat: '', sugg: true, text: 'שלום {שם}, מזכיר את הפגישה שקבענו. מחכים לך!' },
-    { id: 't4', name: 'לפני העונה', mat: '', sugg: true, text: 'שלום {שם}, העונה מתקרבת — זה הזמן להזמין. נשמח לשמוע ממך.' },
+    // 20/10 (יצחק): first "תודה שביקרת" and "כמו שדיברנו", then the ones an exhibitor really sends in the weeks after.
+    { id: 't1', name: 'תודה שביקרת', mat: '', sugg: true, text: 'שלום {שם}, תודה שביקרת בדוכן של {עסק} בתערוכה. היה נעים להכיר. לכל שאלה אני כאן: {טלפון}.\n{השם שלי}' },
+    { id: 't2', name: 'כמו שדיברנו', mat: '', sugg: true, text: 'שלום {שם}, כמו שדיברנו בדוכן — אשמח להמשיך מאיפה שעצרנו. מתי נוח לך שאתקשר?\n{השם שלי}, {עסק} · {טלפון}' },
+    { id: 't5', name: 'לקבוע פגישה', mat: '', sugg: true, text: 'שלום {שם}, אשמח לקבוע איתך פגישה כמו שדיברנו בתערוכה. איזה יום ושעה נוחים לך? אפשר לענות כאן או להתקשר: {טלפון}.' },
+    { id: 't3', name: 'תזכורת לפגישה', mat: '', sugg: true, text: 'שלום {שם}, תזכורת לפגישה שקבענו. אם משהו השתנה, אשמח שתעדכן אותי: {טלפון}.\n{השם שלי}' },
+    { id: 't6', name: 'לא הצלחתי להשיג', mat: '', sugg: true, text: 'שלום {שם}, ניסיתי להשיג אותך בטלפון אחרי התערוכה. מתי נוח שאחזור אליך? אפשר גם להתקשר אליי: {טלפון}.' },
+    { id: 't7', name: 'הצעת המחיר מוכנה', mat: '', sugg: true, text: 'שלום {שם}, כמו שהבטחתי — הצעת המחיר מוכנה. אשמח לעבור עליה איתך בשיחה קצרה. מתי נוח לך?\n{השם שלי}, {עסק}' },
+    { id: 't4', name: 'לפני העונה', mat: '', sugg: true, text: 'שלום {שם}, העונה מתקרבת, וזה הזמן להזמין מראש — לפני העומס. אשמח לעזור: {טלפון}.\n{עסק}' },
+    { id: 't8', name: 'תודה על ההזמנה', mat: '', sugg: true, text: 'שלום {שם}, תודה שבחרת ב{עסק}! אם יש משהו שאפשר לעשות טוב יותר — אשמח לשמוע: {טלפון}.\n{השם שלי}' },
   ];
   // Rules that send something to the visitor start switched off: the owner turns them on knowingly.
   const DEF_RULES = [
@@ -2371,7 +2410,7 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     // Q5 (יצחק, 18/10: "not quite"): a business visitor is not by itself a deal — "lead = an opportunity for a deal".
     // So this one waits among the suggestions, off, for whoever wants it.
     { id: 'r6', on: false, trigger: 'captured', arg: null, cond: { biz: true }, action: { kind: 'notify' }, fired: 0 },
-    { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't1' }, fired: 0 },
+    { id: 'r4', on: false, trigger: 'won', arg: null, cond: {}, action: { kind: 'message', tpl: 't8' }, fired: 0 },
   ];
   const clone = (x) => JSON.parse(JSON.stringify(x));
   /** Older saved states lack the CRM's fields; fill them in rather than throw the data away. */
@@ -2442,6 +2481,16 @@ warm value: 0 = ${words()[0]}, 1 = ${words()[1]}, 2 = ${words()[2]}. A step acti
     delete b.team;   // the team was taken out (יצחק, 09/10): a lead belongs to the business
     if (!b.templates) b.templates = clone(DEF_TEMPLATES);
     if (!b.rules) b.rules = clone(DEF_RULES);
+    if (!S.v2010c) {   // 20/10, part 2 of his notes
+      S.v2010c = true;
+      // The new set of suggested messages: one he never touched takes the new words; one he changed stays his.
+      const mine = b.templates.filter((t) => !t.sugg);
+      const sugg = DEF_TEMPLATES.filter((d) => !mine.some((t) => t.id === d.id)).map((d) => Object.assign(b.templates.find((t) => t.id === d.id) || {}, clone(d)));
+      b.templates = sugg.concat(mine);
+      const r4 = b.rules.find((r) => r.id === 'r4');
+      if (r4 && r4.action && r4.action.tpl === 't1' && !r4.fired) r4.action.tpl = 't8';
+      delete b.chDefault;   // no default per channel any more
+    }
     b.templates.filter((t) => t.booth).slice(1).forEach((t) => { t.booth = false; });   // one booth default, never several
     if (!b.digest) b.digest = { on: true, ch: 'wa', hour: '08:00' };
     if (b.digest.ch === 'sms') b.digest.ch = 'wa';
@@ -3763,7 +3812,9 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
     const b = S.biz;
     m.innerHTML = `<h1>שלבי המכירה ${help('stages')}</h1>
       <div class="stack" style="margin-top:14px">
-        <section class="card"><h2>שלבי הצינור</h2><p class="muted">אפשר לשנות שמות. "נסגרה עסקה" ו"לא נסגרה" תמיד בסוף. רשימת התפוצה אינה שלב: היא נפרדת, ואפשר להיות בה בכל שלב.</p>
+        <section class="card"><h2>הדרך מליד לעסקה</h2>
+          <p class="muted">כל מבקר שנרשם בדוכן הוא ליד, וכל ליד עובר שלבים: מהרגע שנרשם, דרך השיחה וההצעה, ועד שנסגרה איתו עסקה — או שלא. ב-CRM רואים כמה לידים נמצאים בכל שלב, ומי נתקע באמצע הדרך.</p>
+          <p class="faint">אפשר לשנות שמות, להוסיף ולהוריד שלבים. "נסגרה עסקה" ו"לא נסגרה" תמיד בסוף. רשימת התפוצה אינה שלב: היא נפרדת, ואפשר להיות בה בכל שלב.</p>
           <div class="step-list">${b.stages.map((s, i) => `<div class="stage-line"><input class="text-input" data-stname="${s.id}" value="${esc(s.name)}" aria-label="שם השלב">
             ${s.kind ? `<span class="faint">${s.kind === 'won' ? 'סגירה' : 'בלי עסקה'}</span>`
  : `<button class="btn ghost" data-stmove="${i}:-1" aria-label="למעלה" ${i ? '' : 'disabled'}>▲</button><button class="btn ghost" data-stmove="${i}:1" aria-label="למטה" ${b.stages[i + 1] && !b.stages[i + 1].kind ? '' : 'disabled'}>▼</button><button class="btn ghost danger" data-stdel="${s.id}" aria-label="למחוק">✕</button>`}</div>`).join('')}</div>
@@ -3833,6 +3884,8 @@ Leads${L.length > 100 ? ' (the latest 100)' : ''} (JSON): ${JSON.stringify(facts
   // ------------------------------------------------------------------
   const AS = { open: false, msgs: [], busy: false };
   function assistCtx() {
+    // The setup's customization is the settings, being set for the first time: the agent offers changes here too.
+    if (S.phase === 'setup') { const s = (SUBS_HOW.find(([k]) => k === S.sub) || [, ''])[1]; return { kind: 'settings', where: 'ההקמה · התאמה אישית · ' + s, at: 'הקמה · ' + s }; }
     if (S.phase === 'settings') {
       const subs = S.step === 'details' ? SUBS_DET : SUBS_HOW;
       { const s = (subs.find(([k]) => k === S.sub) || [, ''])[1]; return { kind: 'settings', where: 'ההגדרות · ' + s, at: 'הגדרות · ' + s }; }
@@ -4175,7 +4228,6 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (d.pv) { PV[d.pv] = t.value; return render(); }
     if (d.rd) return readRuleField(d.rd, t.value);
     if (d.lstage) { const l = leadById(+d.lstage); if (l) { setStage(l, t.value, 'ידני'); save(); render(); sheetCRM(l); } return; }
-    if (d.chdef) { S.biz.chDefault = Object.assign({}, S.biz.chDefault, { [d.chdef]: t.value }); save(); return toast('נשמר'); }
     if (d.boothsel !== undefined) { setBoothDefault(t.value); save(); return render(); }
     if (d.digestto) { S.biz.digest[d.digestto] = t.value; save(); return; }
     if (d.digesttime !== undefined) { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(t.value)) { S.biz.digest.hour = t.value; save(); } return; }
@@ -4209,6 +4261,10 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (std) {
       S.biz.groups.push(Object.assign({ id: std, byHand: true }, STD[std]));
       S.biz.removedGroups = S.biz.removedGroups.filter((g) => g !== std);
+      // Prepared by the AI and waiting: the group comes up filled, with what it understood (יצחק, 20/10).
+      const ready = (S.biz.spare || {})[std] || [];
+      ready.forEach((x) => S.biz.buttons.push({ id: 'k' + (S.biz.bseq++), axis: std, label: x.label, steps: x.steps, weight: x.weight, unsure: x.unsure }));
+      if (ready.length) { delete S.biz.spare[std]; toast('✨ "' + STD[std].title + '" נוספה, עם כפתורים לפי מה שה-AI הבין'); }
     } else {
       const v = $('#new-group') && $('#new-group').value.trim();
       if (!v) return;
@@ -4246,7 +4302,12 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
     if (d.panel) return openPanel(d.panel);
     if (d.view === 'crm' && worker()) return ownerOnly('המעקב');
     if (d.view) { S.view = d.view; closeLead(); closeHeld(); closeSheet(false); fillOpen = false; filled.clear(); fillSnap = {}; filledCold.clear(); if (d.view === 'crm') idleOnce(); save(); render(); return window.scrollTo(0, 0); }
-    if (d.step) { S.step = d.step; if (S.step === 'messages') S.sub = 'messages'; if (S.step === 'custom') S.sub = SUBS_HOW[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
+    // The line of steps works like the button at the foot (יצחק, 20/10): any step, at any time — only the required
+    // details are asked for first, just as "הבא" asks for them.
+    if (d.step && S.phase === 'setup' && S.step === 'account' && d.step !== 'account' && !checkAccount()) {
+      render(); const first = $('[aria-invalid="true"]'); if (first) first.focus(); return toast('קודם הפרטים שמסומנים "חובה"');
+    }
+    if (d.step) { S.step = d.step; S.setupReach = Math.max(S.setupReach || 0, SETUP_ALL.findIndex(([k]) => k === d.step)); if (S.step === 'messages') S.sub = 'messages'; if (S.step === 'custom') S.sub = SUBS_HOW[0][0]; openId = null; stopIdle(); save(); render(); return window.scrollTo(0, 0); }
     // The settings' two parts. In the setup a part is a step: details opens at "הודעות" (יצחק, 20/10).
     if (d.part) {
       if (S.phase === 'setup') { S.step = d.part === 'details' ? 'messages' : 'custom'; S.sub = d.part === 'details' ? 'messages' : SUBS_HOW[0][0]; S.setupReach = Math.max(S.setupReach || 0, SETUP_ALL.findIndex(([k]) => k === S.step)); }
@@ -4511,6 +4572,7 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
         return applyTrade(id);
       }
       case 'trade-yes': closeSheet(false); return applyTrade(d.id);
+      case 'seasons-open': seasonsOpen = true; return render();
       case 'welcome-go': S.welcomed = true; closeSheet(false); save(); if ($('#acc-name') && FINE) $('#acc-name').focus(); return;
       case 'wa-same': S.account.wa2 = S.account.phone; delete accErrors.wa2; save(); return render();
       case 'setup-finish':

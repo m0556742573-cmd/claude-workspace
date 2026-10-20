@@ -1532,3 +1532,37 @@ body.admin-page main { max-width: var(--w-prose); }
 /* The morning hour: any hour and minute. */
 .time-in { max-width: 160px; font-size: 18px; }
 .field-row select { max-width: 280px; }
+
+/* ------------------------------------------------------------------
+ * 20/10, part 2 of his notes on the setup
+ * ------------------------------------------------------------------ */
+/* The brand book's forms (יצחק: "מה שולח כפתור" need not run the full width): a field is as wide as what goes in it.
+ * Cards keep their width and air; the controls inside them do not stretch across. */
+#subview .card > select.text-input,
+#subview .card > input.text-input:not(.say),
+#subview .card > .mail-from,
+#subview .card > .add-row,
+#subview .card > .check-list,
+#subview .field-row,
+.tpl-pick .add-row { max-width: 460px; }
+#subview .card > .opts.grid2 { max-width: 640px; }
+#subview .card > input.text-input.time-in { max-width: 160px; }
+#subview .stack { max-width: 860px; }
+
+/* While editing the card: an ✕ on every button, for a quick removal. */
+.chip-ed { display: inline-flex; align-items: stretch; }
+.chip-ed .chip { border-start-end-radius: 0; border-end-end-radius: 0; }
+.chip-x { border: 1px solid var(--line-strong); border-inline-start: 0; background: var(--surface); color: var(--muted); border-start-end-radius: var(--pill); border-end-end-radius: var(--pill); padding: 0 10px; font-size: 13px; cursor: pointer; }
+.chip-x:hover { color: var(--hot); background: var(--hot-soft); border-color: var(--hot-line); }
+
+/* Seasons that do not apply: said calmly, not as an error. */
+.calm-note { text-align: center; padding: var(--s7, 32px) var(--s5); max-width: 620px; }
+.calm-note .calm-ic { font-size: 30px; display: block; margin-bottom: var(--s2); }
+.calm-note .muted { max-width: 52ch; margin: var(--s2) auto; }
+.calm-note .actions { justify-content: center; }
+
+/* A group the AI already prepared. */
+.ai-ready { color: var(--ai); }
+
+/* The agent from the setup's customization on: above the step buttons at the foot. */
+body.setup-ai .ai-fab { bottom: 96px; }
