@@ -842,7 +842,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
    * The same address with #admin. It shares the browser's storage with the system, so a change here reaches an open
    * system tab at once (it reloads on the storage event). Nothing here is part of what an exhibitor sees.
    * ------------------------------------------------------------------ */
-  const adminMode = () => location.hash === '#admin';
+  // The address carries #admin, or the sign-in page's link opened it: a framed page may not let the address change.
+  let adminOn = false;
+  const adminMode = () => adminOn || location.hash === '#admin';
   function renderAdmin() {
     document.body.className = 'admin-page';
     ['#side', '#top', '#bar', '#demo'].forEach((s) => { if ($(s)) $(s).innerHTML = ''; });
@@ -1059,7 +1061,8 @@ Reply with ONLY one JSON object, all strings in Hebrew:
           <p class="faint">בהדגמה: כל 4 ספרות.</p><div class="actions"><button class="btn primary big" data-act="si-code">כניסה</button><button class="btn ghost" data-act="si-back">חזרה</button></div>`
         : `<div class="opts"><button class="opt google" data-act="si-google"><span class="g">G</span> התחברות עם Google</button>
           <button class="opt" data-act="si-mail">📧 קוד למייל<small>בלי חשבון Google</small></button></div>`}
-      <p class="faint" style="margin-top:18px">הדגמה: אין כאן חשבון אמיתי, ושום פרט לא יוצא מהמכשיר.</p>
+      <p class="faint" style="margin-top:18px">הדגמה: אין כאן חשבון אמיתי, ושום פרט לא יוצא מהמכשיר.
+        <button class="link" data-act="admin-open">מסך מפעיל ←</button></p>
     </section>`;
     if (FINE) setTimeout(() => { const f = $('#si-mail') || $('#si-code'); if (f) f.focus(); }, 30);
   }
@@ -4509,7 +4512,9 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'sys': return sheetSys();
       case 'demo-notice': notify('הודעה מהמארגנים: הכניסה לאולם נפתחת היום בשעה 10:00. בעלי דוכנים מתבקשים להגיע עד 9:30.', true); save(); render(); return toast('נשלחה הודעה דחופה (הדגמה)');
       case 'admin-notice': { const v = ($('#ad-notice') && $('#ad-notice').value.trim()) || ''; if (!v) { $('#ad-notice').focus(); return toast('מה ההודעה?'); } notify(v, true); save(); render(); return toast('✓ נשלחה לכל המציגים'); }
-      case 'admin-close': location.hash = ''; return;
+      case 'admin-close': adminOn = false; try { location.hash = ''; } catch (er) { /* framed */ } return render();
+      // The way in from the sign-in page's demo line (יצחק, 20/10: "I don't see where to reset").
+      case 'admin-open': adminOn = true; try { location.hash = '#admin'; } catch (er) { /* framed */ } return render();
       case 'assist': return openPanel('ai');
       case 'assist-close': case 'panel-close': UI.panel = null; return render();
       case 'nav-fold': DEV.navFolded = !slimNav(); if (!DEV.navFolded) UI.panel = null; save(); return render();
