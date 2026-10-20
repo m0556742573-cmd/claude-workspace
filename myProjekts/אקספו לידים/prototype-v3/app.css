@@ -1493,3 +1493,5 @@ body.has-demo { --demo-h: 26px; }
 .demo-note { margin-top: var(--s3); }
 body.admin-page main { max-width: var(--w-prose); }
 .admin h2 { margin-top: var(--s6); font-size: 18px; }
+.danger-zone { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line); }
+.danger-zone p { margin: 4px 0 var(--s3); font-size: 14.5px; }

@@ -1102,7 +1102,9 @@ Reply with ONLY one JSON object, all strings in Hebrew:
       <div class="actions">${afterFair() ? '' : '<button class="btn" data-act="devices">+ להוסיף טאבלט</button>'}</div></section>
     <section class="card narrow" style="margin-top:14px"><h2>החשבון</h2>
       <p class="muted">${a.email ? `מחובר בתור <bdi dir="ltr">${esc(a.email)}</bdi>.` : 'מחובר.'}</p>
-      <div class="actions"><button class="btn" data-act="sign-out">יציאה מהחשבון</button></div></section>`}`;
+      <div class="actions"><button class="btn" data-act="sign-out">יציאה מהחשבון</button></div>
+      <div class="danger-zone"><b>להתחיל מההתחלה</b><p class="muted">מוחק את כל המבקרים, הלידים, הכפתורים וההגדרות שלך, ומחזיר אותך לתחילת ההרשמה. החשבון נשאר.</p>
+        <button class="btn danger" data-act="my-reset">לאפס את המערכת שלי</button></div></section>`}`;
   }
   /** The number his WhatsApp is on, from the small question — or none. */
   const waNumber = () => (S.account.hasWa ? (S.account.waSame !== false && S.account.phone ? S.account.phone : S.account.wa2) : '');
@@ -4512,6 +4514,17 @@ Reply with ONLY JSON: {"name":"2 to 4 Hebrew words naming the message","text":"t
       case 'sys': return sheetSys();
       case 'demo-notice': notify('הודעה מהמארגנים: הכניסה לאולם נפתחת היום בשעה 10:00. בעלי דוכנים מתבקשים להגיע עד 9:30.', true); save(); render(); return toast('נשלחה הודעה דחופה (הדגמה)');
       case 'admin-notice': { const v = ($('#ad-notice') && $('#ad-notice').value.trim()) || ''; if (!v) { $('#ad-notice').focus(); return toast('מה ההודעה?'); } notify(v, true); save(); render(); return toast('✓ נשלחה לכל המציגים'); }
+      // Every exhibitor can reset his own system (יצחק, 20/10): everything of his goes, he stays signed in and starts at the welcome.
+      case 'my-reset':
+        if (worker()) return ownerOnly('איפוס');
+        return sheetConfirm('לאפס את המערכת שלך?', `כל מה שבמערכת שלך יימחק: ${S.leads.length ? many(S.leads.length, 'מבקר אחד', 'מבקרים') : 'המבקרים'}, הכפתורים, ההודעות וההגדרות. אי אפשר להחזיר. החשבון נשאר, ומתחילים מההרשמה.`, 'my-reset-yes', '', 'למחוק הכל ולהתחיל מחדש');
+      case 'my-reset-yes': {
+        const email = S.account.email, sys = S.sys;   // the system mode is the operator's, not his
+        S = fresh(); upgrade(); openId = null; D = null; stopIdle(); UI.panel = null;
+        S.signed = true; S.sys = sys; S.account.email = email; S.phase = 'setup'; S.step = 'welcome'; S.setupReach = 0;
+        closeSheet(false); save(); render(); window.scrollTo(0, 0);
+        return toast('המערכת אופסה. מתחילים מההתחלה');
+      }
       case 'admin-close': adminOn = false; try { location.hash = ''; } catch (er) { /* framed */ } return render();
       // The way in from the sign-in page's demo line (יצחק, 20/10: "I don't see where to reset").
       case 'admin-open': adminOn = true; try { location.hash = '#admin'; } catch (er) { /* framed */ } return render();
