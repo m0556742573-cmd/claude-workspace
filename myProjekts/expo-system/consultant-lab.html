@@ -1,0 +1,397 @@
+<title>מעבדת יועץ ההקמה</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>document.documentElement.dir = "rtl"; document.documentElement.lang = "he";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: the conversation with the consultant on the right, the setup it is building on the left, live; they stack on a phone. */
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --ink: #15202a; --muted: #5d6b78; --line: #dde4ea;
+  --petrol: #0f5f6b; --petrol-soft: #e3f0f1; --ai: #5b3fd0; --ai-soft: #efebfc;
+  --ok: #1f7a4a; --ok-soft: #e4f3ea; --warn: #9a6400; --warn-soft: #fbf1dd;
+  --display: "Frank Ruhl Libre", "David Libre", "Times New Roman", serif;
+  --body: "Assistant", "Heebo", "Arial Hebrew", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+    --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+    --ok: #6fd39c; --ok-soft: #173326; --warn: #f0c062; --warn-soft: #382c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+  --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+  --ok: #6fd39c; --ok-soft: #173326; --warn: #f0c062; --warn-soft: #382c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { direction: rtl; text-align: right; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 40px; }
+h1, h2 { font-family: var(--display); margin: 0; line-height: 1.25; text-wrap: balance; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.15rem; }
+h3 { margin: 0; font-size: .8rem; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+p { margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+.intro { display: grid; gap: 6px; max-width: 75ch; }
+.intro p { color: var(--muted); }
+.notice { background: var(--warn-soft); border-radius: 10px; padding: 10px 14px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+
+.chat-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chat-head h2 { margin-inline-end: auto; }
+.btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 6px 14px; cursor: pointer; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn:focus-visible, textarea:focus-visible, .qr:focus-visible { outline: 2px solid var(--petrol); outline-offset: 2px; }
+.log { display: grid; gap: 10px; max-height: 62vh; overflow-y: auto; padding-inline-end: 4px; }
+.msg { border-radius: 12px; padding: 10px 13px; max-width: 92%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.ai { background: var(--ai-soft); justify-self: start; }
+.msg.me { background: var(--petrol-soft); justify-self: end; }
+.msg.err { background: var(--warn-soft); justify-self: stretch; max-width: 100%; }
+.msg.thinking { color: var(--muted); font-style: italic; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.qr { font: inherit; font-size: .92rem; border: 1.5px solid var(--ai); color: var(--ai); background: var(--surface); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+textarea { font: inherit; width: 100%; min-height: 54px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); resize: vertical; }
+.hint { color: var(--muted); font-size: .9rem; }
+
+.checklist { display: grid; gap: 4px; font-size: .93rem; }
+.check { display: flex; gap: 8px; align-items: baseline; }
+.check .mark { font-weight: 700; width: 1.1em; flex: none; }
+.check.ok .mark { color: var(--ok); }
+.check.no .mark { color: var(--warn); }
+.check.no { color: var(--muted); }
+.score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.score.done { color: var(--ok); }
+.sec { display: grid; gap: 6px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.kv { font-size: .95rem; }
+.kv span { color: var(--muted); }
+.qrow { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; align-items: start; }
+@media (max-width: 460px) { .qrow { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+.qlabel { font-weight: 700; font-size: .9rem; padding-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1.5px solid var(--ink); border-radius: 999px; padding: 1px 10px; font-size: .9rem; }
+.chip small { color: var(--muted); }
+.path { display: grid; gap: 3px; }
+.path-name { font-weight: 700; font-size: .93rem; }
+.path-name small { font-weight: 400; color: var(--muted); }
+.chain { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: .9rem; }
+.step { background: var(--bg); border-radius: 6px; padding: 1px 7px; }
+.arrow { color: var(--muted); }
+.variant { font-size: .88rem; color: var(--muted); padding-inline-start: 10px; }
+.empty { color: var(--muted); font-size: .92rem; }
+.save-state { color: var(--muted); font-size: .85rem; }
+</style>
+
+<div class="wrap" dir="rtl" lang="he">
+  <header class="intro">
+    <h1>מעבדת יועץ ההקמה</h1>
+    <p>שיחה אמיתית עם יועץ ה-AI, כמו שמציג יפגוש בהקמה. משמאל רואים את ההקמה שהוא בונה תוך כדי, ואת רשימת הבדיקה של "הקמה מלוטשת". נסה להיות מציגים שונים: קצר במילים, מבולבל, סותר את עצמו, בלי מטרה, עונה הפוך, או מי שרוצה מבצע תערוכה.</p>
+    <p class="notice" id="notice" hidden></p>
+  </header>
+
+  <div class="grid">
+    <section class="pane" aria-label="השיחה עם היועץ">
+      <div class="chat-head">
+        <h2>השיחה</h2>
+        <span class="save-state" id="save-state" aria-live="polite"></span>
+        <button class="btn" id="stop" hidden>עצור</button>
+        <button class="btn" id="new">שיחה חדשה</button>
+      </div>
+      <div class="log" id="log" aria-live="polite"></div>
+      <div class="quick" id="quick"></div>
+      <form class="composer" id="form">
+        <textarea id="input" placeholder="כתוב כמו שמציג היה כותב…" aria-label="ההודעה שלך"></textarea>
+        <button class="btn primary" id="send" type="submit">שליחה</button>
+      </form>
+      <p class="hint">Enter שולח, Shift+Enter שורה חדשה. כל תשובה לוקחת כמה שניות.</p>
+      <div class="sec">
+        <h3>הערה שלך על השיחה הזו</h3>
+        <textarea id="note" placeholder="מה היועץ עשה טוב, איפה טעה, מה הוא היה צריך לשאול" aria-label="הערה על השיחה"></textarea>
+      </div>
+    </section>
+
+    <section class="pane" aria-label="ההקמה שנבנית">
+      <div class="chat-head"><h2>ההקמה שנבנית</h2><span class="score" id="score"></span></div>
+      <div class="checklist" id="checklist"></div>
+      <div id="setup"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const GREETING = "שלום, אני היועץ של דוכן חכם. בכמה דקות נבנה יחד את הדוכן שלך לתערוכה: מה תסמן אצל כל מבקר, ומה המערכת תעשה איתו אחר כך.\n\nספר לי במשפט או שניים: מה העסק שלך, ולמי אתה מוכר?";
+
+const EMPTY_SETUP = { business: "", goals: { primary: "", secondary: [] }, capacity: "", need: [], when: [], who: [], defaults: { business: "", private: "" }, seasons: [], offers: [], messages: [], open: [] };
+
+const RULES = `You are the setup consultant inside "דוכן חכם", a lead-capture and follow-up system for exhibitors at the Belz community business expo in Israel. The expo is on Monday 16/11/2026 (ו׳ כסלו תשפ״ז). Many visitors are business owners, but the whole community comes. The exhibitors are Haredi business owners aged 20-55, mostly not technical. You are a very smart, experienced sales consultant for exactly this: getting the maximum potential out of the expo for THIS one business.
+
+THINK LIKE A CONSULTANT, NOT A FORM. Your proposals must come from what THIS exhibitor told you about how his business really works, never from a template, a list, or the calendar. Before proposing anything, ask yourself: how do people really buy from him today (website, shop, phone; on impulse or planned; once or again and again)? Who is his most valuable customer? What can a face-to-face meeting at an expo give HIS business that his usual channels do not? What happens after a first contact? Base every proposal on his answers, and give the reason in his own words ("כי אמרת ש...").
+
+THE CONVERSATION, in two phases — no scripted tree:
+PHASE 1, UNDERSTAND (before proposing goals or buttons): 2 to 4 short questions about the business reality above, one at a time. After his answers, say in one line what you understood, and let him correct it.
+PHASE 2, BUILD: fill the SETUP below until the checklist passes. At every turn look at what is still missing or weak, and ask the single most useful next question. When you can infer something, propose it ("נראה לי ש... נכון?") instead of asking. Challenge an unrealistic goal politely. Never invent products, services or customers he did not mention. When the checklist passes, give a short summary of what you built, say that everything can be changed, and keep helping with changes.
+
+ONE QUESTION PER TURN — always exactly one. If his answer does not answer your question (he answered something else, or only part), first take what he did say, then ask your question again, briefly. Never treat a question he skipped as agreed. Keep every unanswered question in "open" until it is answered, and come back to it.
+
+QUESTION CRAFT (learned from the exhibitor's review of 109 businesses):
+- Ask first about his MAIN source of income and what he most wants more of; secondary customers later.
+- Never ask "what is worth more to you, A or B?" — everyone answers "both". Ask "if you had to choose only one" or "which of them brings most of your income".
+- Avoid generic questions everyone answers the same ("how do people buy from you?"). Ask where most deals actually close, or which problem brings most customers.
+- Look for the distinction he earns on (e.g. a body shop: in a third-party claim the injured driver chooses the garage — that is what he sells).
+- Quick replies must all answer the SAME question, on the same dimension, and be really different from each other in community reality (a recommendation usually comes from the rabbi — do not offer both as separate options).
+- Money now before the long term: what brings a near deal comes first; "being known" comes after.
+- When offering a choice, include every option he already mentioned.
+- Before concluding the expo does not fit him, ask who else recommends him.
+- "My most valuable customer in general" is not "what I want from the expo": ask both.
+- A question asked at the booth must be comfortable face to face ("how long have you had your current system?", not "when does your contract end?").
+- State the facts you rely on (the expo is on 16 November); never assume he knows them.
+- Never ask him what only the organisers know (who will attend).
+- The first step after a short booth talk must fit a short talk (a short demo, not a long specification meeting).
+- When he says a direction does not exist, drop it without arguing.
+- FOLLOW-UP STEPS: never propose a ready date or a ready step. Before a path gets a step, ASK him: when it should happen, who does it (him or the customer), what it costs him, and whether it fits every case or only some (a new hall vs one he already works with). Most mistakes were here: "a few days later" was really "the next day", "Av" was really "Sivan", "two days" was really "a week", "send him an explanation and wait" was really "he signs a power of attorney and I pull the report myself".
+- Anything sensitive is asked by voice, never written on the card the visitor sees; the card gets a neutral button ("לבדוק זכאות", not the reason).
+- An offer is not right for every trade (a discount on a massage looks cheap); ask before proposing one.
+- A small card is fine, but a question with ONE button is not a question: leave that question off the card. A card may be just the name.
+- Everything he already said goes onto the card: every buyer type (e.g. the in-laws, not only the groom's father), every timing (e.g. holidays), his main services (e.g. arbitration, half his work).
+- A button that does not serve his goal stays off — it only confuses whoever stands at the booth.
+- Word a button as a plain fact nobody minds tapping in front of others ("עסק בלי עובדים", not "does everything alone").
+- The card describes the visitor, not what happened at the booth ("took a number" is a booth mode, not a button).
+- Break a general button into what really differs (not "a degree" but the fields).
+- "Who does the step" is not always him: a secretary, a son in the shop, a wife who runs the orders, bookkeeping, a technician — or "automatic". Ask.
+- A step that costs time or money is given only to visitors who fit (a free first test only to a business hiring now; a sample tray only to an office of 10+). If the card has no button for that fact, ask whether to add one.
+- The same need gets a different step by what was tapped (a wedding date known → call the next day; a customer abroad → photos; broken now → visit at once; "cashiers" → the same day). When he has said there are several cases, ask about each case separately.
+- A quick reply never contradicts what he already said.
+- A step may be tied to a weekday ("Wednesday before Shabbat").
+- When his answer gives no "when" or "who", do not fill it in yourself — ask. When he already gave them, never ask again.
+- The next step after no answer: offer "tied to an event or a season" as an option (before the fire inspection, before Shavuot when the heat starts, after Rosh Chodesh Elul, before Lag BaOmer, before the next tour).
+- "No second step" is a real answer where time decides (manpower, conventions, a hall date that is released, a small community where one does not chase). Do not ask about a second step there.
+- What a business may not want to say aloud in front of others (how many employees) is asked by voice, not as a button. When he already gave them, never ask again.
+- The next step after no answer: offer "tied to an event or a season" as an option (before the fire inspection, before Shavuot when the heat starts, after Rosh Chodesh Elul, before Lag BaOmer, before the next tour).
+- "No second step" is a real answer where time decides (manpower, conventions, a hall date that is released, a small community where one does not chase). Do not ask about a second step there.
+- What a business may not want to say aloud in front of others (how many employees) is asked by voice, not as a button.
+
+HOW YOU SPEAK: Hebrew, short, warm, respectful, the register of the Haredi business community. No English, no emoji, no jargon (no "CRM", "pipeline", "lead"). Offer 2-4 quick-reply options that answer YOUR one question, when the answer is likely one of a few.
+
+CALENDAR: never assume a season or a holiday matters to him. Ask which periods are busy for him; use a season only after he confirms it. Do not bring up a holiday on your own as a reason.
+
+THE MODEL YOU BUILD:
+1. Goals at the expo (one PRIMARY is required; others secondary): מכירה לעסקים ומוסדות · מכירה ישירה עם תאריך · שיתופי פעולה · מפיצים וחנויות · שיכירו אותי (being known, so people remember him and have his details when a need comes). Consider ALL five against what he told you; propose the one or two that really follow from his answers, each with its reason. If he picks several, ask which one he would choose if only one. If he asks you to choose, choose with a reason that comes from his business, and ask him to confirm. Never set a primary goal he has not confirmed.
+2. The booth card has exactly three questions, in HIS business's words, 2-6 buttons each:
+   - "מה הוא צריך?" — needs. Each need button gets a PATH and a RELATION (לקוח / שותף / מפיץ). A partnership or distribution intent is a need ("שיתוף פעולה בהפניות").
+   - "מתי?" — timing and intent. Each has an effect on the paths: now, a date of the customer (opens under the need that needs it, e.g. the simcha date), before a season, a trigger without a date (e.g. עובר דירה → "check when"), or intent. "רק בודק מחירים" ALWAYS means: send prices/price list at once, then a calmer path.
+   - "מי הוא?" — the visitor's profile (פרטי, מוסד, ועד בית, קבלן...). It selects a variant of a path, raises or lowers importance, and changes the wording. An identity that usually means a partner (e.g. contractor for a handyman) may suggest the partner path.
+   - Every fact belongs to ONE question only. Never repeat a label across questions.
+   - "בשביל מי" (for himself / for the son-groom) only in trades where it changes timing or wording.
+   - NEVER: warmth ratings, "who decides", anything a visitor would be hurt to see — the visitor sees the card. Importance is never shown.
+3. Paths. Actions: לדבר · להיפגש (פגישה, ביקור, מדידה, טעימה, הדגמה) · להכין (הצעה, שרטוט, דוגמה, תפריט, תוכנייה) · לשלוח (digital = the system sends; physical = his task) · לשריין (with "until when") · לבדוק · לחכות ללקוח (with what we wait for, and until when). A path is a CHAIN; each step starts when the previous is done; timing in days after the previous step, or relative to a date or a season. Path patterns to start from:
+   P1 ביקור/מדידה ← הצעה ← שליחה ← בדיקה · P2 חומר מיד ← שיחה · P3 חומר מיד ← בדיקה ← תזכורת לפני התאריך שלו · P4 פגישה ← הצעה ← שליחה ← בדיקה · P5 לחכות ללקוח ← להכין ← פגישה ← בדיקה · P6 חומר ← שיחה ← טעימה/מדידה ← שריון עד ← בדיקה · P7 הרשמה לתאריך של העסק ← תזכורת לפני ← המחזור הבא · P8 שותף: פגישת היכרות ← הסכם ← בדיקת הפניות · P9 מפיץ: דוגמה פיזית ← מסירה ← בדיקה ← הזמנה ראשונה · P10 רשימת תפוצה: מיד ← לפני עונה או מבצע · P11 טריגר בלי תאריך: לבדוק מתי ← לפני התאריך. Any path may add "חזרה קבועה אחרי עסקה" (before every holiday, monthly).
+   Lead time ("how long before a date or season") is per path: ask how long his work takes when it matters.
+4. Capacity: ask how much time a day he will have for follow-up in the two weeks after the expo. Spread steps so he is never buried; say so.
+5. Default when nothing was tapped: one for a visitor who is a business owner (known from the community list), one for a private visitor (usually רשימת תפוצה — do not chase private people without reason).
+6. Calendar rules the system applies by itself: no tasks or sends on Shabbat and Yom Tov; calls and meetings not on Friday by default. Seasons only as confirmed by him (see CALENDAR).
+7. Expo offer (optional): if it fits, ask whether he wants a special expo offer ("מבצע תערוכה", e.g. 10 items at an expo price for whoever closes today, or until a date). Record it in "offers"; a visitor can order from it at the booth, and paths may remind before it ends.
+8. Messages: list the messages his paths need (name and purpose), e.g. "מחירון", "תודה שביקרת + פרטים".
+
+SETUP (JSON) — always return the WHOLE updated setup, keys exactly:
+{"business":"one line","goals":{"primary":"","secondary":[]},"capacity":"","need":[{"label":"","relation":"לקוח|שותף|מפיץ","pattern":"P1..P11 or own","steps":["step (timing)"],"variants":[{"for":"profile label","steps":[]}]}],"when":[{"label":"","effect":"short Hebrew"}],"who":[{"label":"","effect":"short Hebrew"}],"defaults":{"business":"","private":""},"seasons":[],"offers":[{"name":"","items":"","until":""}],"messages":[{"name":"","purpose":""}],"open":["things still to settle, Hebrew"]}
+
+REPLY with ONLY one compact JSON object (no Markdown, no text before or after): {"reply":"your message to him, Hebrew, short","quick":["0-4 short quick replies to your one question"],"setup":{...}}`;
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+let session, sample = null, db = null, busy = false, ctl = null;
+
+function newSession() {
+  session = { id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), startedAt: new Date().toISOString(), turns: [{ role: "assistant", text: GREETING, quick: [] }], setup: JSON.parse(JSON.stringify(EMPTY_SETUP)), note: "" };
+  $("#note").value = "";
+  renderChat(); renderSetup();
+}
+
+function checks(s) {
+  const need = s.need || [], when = s.when || [], who = s.who || [];
+  const labels = [...need, ...when, ...who].map((x) => String(x.label || "").trim()).filter(Boolean);
+  const dup = labels.some((l, i) => labels.indexOf(l) !== i);
+  const sends = need.some((n) => (n.steps || []).concat(...(n.variants || []).map((v) => v.steps || [])).some((t) => /לשלוח|מחירון|קטלוג|מיד/.test(String(t))));
+  return [
+    ["נקבעה מטרה ראשית", !!(s.goals && s.goals.primary)],
+    ["אין שאלה עם כפתור אחד בלבד", [need, when, who].every((a) => a.length !== 1)],
+    ["לכל כפתור צורך יש מסלול", need.every((n) => (n.steps || []).length > 0)],
+    ["לכל צורך נקבע סוג קשר", need.every((n) => /לקוח|שותף|מפיץ/.test(n.relation || ""))],
+    ["הכרטיס נבנה (שאלה אחת לפחות, או \"רק השם\" בכוונה)", need.length + when.length + who.length > 0 || /רק השם/.test((s.open || []).join(" ") + " " + (s.business || ""))],
+    ["אין עובדה שמופיעה בשתי שאלות", labels.length > 0 && !dup],
+    ["נקבעה קיבולת למעקב", !!s.capacity],
+    ["ברירת מחדל לבעל עסק ולפרטי", !!(s.defaults && s.defaults.business && s.defaults.private)],
+    ["יש הודעות לכל שליחה", !sends || (s.messages || []).length > 0],
+  ];
+}
+
+function renderChat() {
+  const log = $("#log"); log.textContent = "";
+  session.turns.forEach((t, i) => {
+    const m = el("div", "msg " + (t.role === "assistant" ? "ai" : t.role === "error" ? "err" : "me"), t.text);
+    if (t.role === "error" && t.retry && i === session.turns.length - 1 && !busy) {
+      const b = el("button", "btn", "נסה שוב"); b.type = "button"; b.style.marginInlineStart = "10px"; b.addEventListener("click", retry); m.append(b);
+    }
+    log.append(m);
+  });
+  if (busy) log.append(el("div", "msg ai thinking", "חושב…"));
+  log.scrollTop = log.scrollHeight;
+  const q = $("#quick"); q.textContent = "";
+  const last = session.turns[session.turns.length - 1];
+  if (!busy && last && last.role === "assistant") (last.quick || []).slice(0, 4).forEach((x) => { const b = el("button", "qr", x); b.type = "button"; b.addEventListener("click", () => send(x)); q.append(b); });
+  $("#send").disabled = busy; $("#stop").hidden = !busy;
+}
+
+function chain(steps) {
+  const c = el("div", "chain");
+  (steps || []).forEach((s, i) => { if (i) c.append(el("span", "arrow", "←")); c.append(el("span", "step", String(s))); });
+  return c;
+}
+function renderSetup() {
+  const s = session.setup, list = checks(s);
+  const cl = $("#checklist"); cl.textContent = "";
+  list.forEach(([t, ok]) => { const r = el("div", "check " + (ok ? "ok" : "no")); r.append(el("span", "mark", ok ? "✓" : "○"), el("span", "", t)); cl.append(r); });
+  const n = list.filter((x) => x[1]).length;
+  const sc = $("#score"); sc.textContent = `${n} מתוך ${list.length}`; sc.className = "score" + (n === list.length ? " done" : "");
+  const box = $("#setup"); box.textContent = "";
+  const sec = (title) => { const d = el("div", "sec"); d.append(el("h3", "", title)); box.append(d); return d; };
+  const kv = (parent, k, v) => { const p = el("p", "kv"); p.append(el("span", "", k + ": "), document.createTextNode(v || "—")); parent.append(p); };
+  const a = sec("העסק והמטרות");
+  kv(a, "העסק", s.business); kv(a, "מטרה ראשית", s.goals && s.goals.primary); kv(a, "מטרות נוספות", ((s.goals && s.goals.secondary) || []).join(" · ")); kv(a, "זמן למעקב", s.capacity);
+  if ((s.seasons || []).length) kv(a, "עונות", s.seasons.join(" · "));
+  const c = sec("הכרטיס בדוכן");
+  [["מה הוא צריך?", s.need], ["מתי?", s.when], ["מי הוא?", s.who]].forEach(([q, items]) => {
+    const r = el("div", "qrow"); r.append(el("span", "qlabel", q));
+    const ch = el("div", "chips");
+    (items || []).forEach((x) => { const chip = el("span", "chip", x.label || ""); if (x.relation && x.relation !== "לקוח") chip.append(" ", el("small", "", "· " + x.relation)); ch.append(chip); });
+    if (!(items || []).length) ch.append(el("span", "empty", "עוד אין"));
+    r.append(ch); c.append(r);
+  });
+  const effects = [...(s.when || []), ...(s.who || [])].filter((x) => x.effect);
+  if (effects.length) { const e = el("div", ""); effects.forEach((x) => { const p = el("p", "kv"); p.append(el("span", "", x.label + ": "), document.createTextNode(x.effect)); e.append(p); }); c.append(e); }
+  const p = sec("המסלולים");
+  if (!(s.need || []).length) p.append(el("p", "empty", "יופיעו כאן כשיתבררו הצרכים."));
+  (s.need || []).forEach((x) => {
+    const d = el("div", "path"); const nm = el("span", "path-name", x.label || "");
+    if (x.pattern) nm.append(" ", el("small", "", "· " + x.pattern)); d.append(nm, chain(x.steps));
+    (x.variants || []).forEach((v) => { const vv = el("div", "variant"); vv.append(el("span", "", "ל" + (v.for || "") + ": ")); vv.append(chain(v.steps)); d.append(vv); });
+    p.append(d);
+  });
+  const df = sec("כשלא סומן כלום");
+  kv(df, "בעל עסק", s.defaults && s.defaults.business); kv(df, "פרטי", s.defaults && s.defaults.private);
+  if ((s.offers || []).length) { const o = sec("מבצע תערוכה"); s.offers.forEach((x) => kv(o, x.name || "מבצע", [x.items, x.until && "עד " + x.until].filter(Boolean).join(" · "))); }
+  if ((s.messages || []).length) { const m = sec("הודעות"); s.messages.forEach((x) => kv(m, x.name, x.purpose)); }
+  if ((s.open || []).length) { const o = sec("עוד פתוח"); s.open.forEach((x) => o.append(el("p", "kv", "• " + x))); }
+}
+
+function cleanSetup(x) {
+  const s = JSON.parse(JSON.stringify(EMPTY_SETUP));
+  if (!x || typeof x !== "object") return session.setup;
+  const str = (v) => (typeof v === "string" ? v.slice(0, 300) : "");
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  s.business = str(x.business);
+  s.goals = { primary: str(x.goals && x.goals.primary), secondary: arr(x.goals && x.goals.secondary).map(str).filter(Boolean) };
+  s.capacity = str(x.capacity);
+  s.need = arr(x.need).slice(0, 10).map((n) => ({ label: str(n && n.label), relation: str(n && n.relation), pattern: str(n && n.pattern), steps: arr(n && n.steps).map(str).filter(Boolean).slice(0, 10), variants: arr(n && n.variants).slice(0, 4).map((v) => ({ for: str(v && v.for), steps: arr(v && v.steps).map(str).filter(Boolean).slice(0, 10) })) })).filter((n) => n.label);
+  s.when = arr(x.when).slice(0, 10).map((n) => ({ label: str(n && n.label), effect: str(n && n.effect) })).filter((n) => n.label);
+  s.who = arr(x.who).slice(0, 10).map((n) => ({ label: str(n && n.label), effect: str(n && n.effect) })).filter((n) => n.label);
+  s.defaults = { business: str(x.defaults && x.defaults.business), private: str(x.defaults && x.defaults.private) };
+  s.seasons = arr(x.seasons).map(str).filter(Boolean).slice(0, 10);
+  s.offers = arr(x.offers).slice(0, 5).map((o) => ({ name: str(o && o.name), items: str(o && o.items), until: str(o && o.until) })).filter((o) => o.name || o.items);
+  s.messages = arr(x.messages).slice(0, 10).map((m) => ({ name: str(m && m.name), purpose: str(m && m.purpose) })).filter((m) => m.name);
+  s.open = arr(x.open).map(str).filter(Boolean).slice(0, 10);
+  return s;
+}
+
+function buildInput() {
+  const gaps = checks(session.setup).filter((c) => !c[1]).map((c) => "- " + c[0]);
+  const head = RULES + "\n\nCURRENT SETUP:\n" + JSON.stringify(session.setup) + "\n\nCHECKLIST ITEMS STILL FAILING:\n" + (gaps.join("\n") || "(none — the setup passes; summarize once, then help with changes)");
+  const turns = session.turns.filter((t) => t.role === "assistant" || t.role === "user").slice(-30).map((t) => ({ role: t.role, content: t.text }));
+  while (turns.length && turns[0].role === "assistant" && turns.length > 1 && turns[1].role === "assistant") turns.shift();
+  return [{ role: "user", content: head }, ...turns];
+}
+
+/* A reply that is not clean JSON is read leniently: the object inside it, then without trailing commas.
+   Plain text with no object at all is still shown as the consultant's message, without touching the setup. */
+function lenient(raw) {
+  const t = String(raw || "");
+  const a = t.indexOf("{"), z = t.lastIndexOf("}");
+  if (a >= 0 && z > a) {
+    const body = t.slice(a, z + 1);
+    for (const s of [body, body.replace(/,\s*([}\]])/g, "$1")]) { try { return JSON.parse(s); } catch (e) { /* next */ } }
+  }
+  return t.trim() && a < 0 ? { reply: t.trim() } : null;
+}
+function take(r) {
+  const reply = r && typeof r.reply === "string" && r.reply.trim() ? r.reply.trim() : "";
+  if (!reply) return false;
+  session.turns.push({ role: "assistant", text: reply, quick: Array.isArray(r.quick) ? r.quick.filter((x) => typeof x === "string").slice(0, 4) : [] });
+  if (r.setup) session.setup = cleanSetup(r.setup);
+  return true;
+}
+function failed(code, raw) {
+  if (raw) { session.failures = (session.failures || []).concat({ at: new Date().toISOString(), code: code || "", raw: String(raw).slice(0, 4000) }).slice(-3); }
+  const msg = code === "cancelled" ? "נעצר." : code === "not_granted" || code === "sampling_disabled" ? "הדף לא קיבל אישור להשתמש ב-Claude. אפשר לאשר בתפריט ההרשאות של הדף." : code === "rate_limited" ? "יותר מדי בקשות כרגע. אפשר לנסות שוב בעוד רגע." : "התשובה לא הגיעה בצורה תקינה.";
+  session.turns.push({ role: "error", text: msg, retry: code !== "not_granted" && code !== "sampling_disabled" });
+}
+async function run() {
+  busy = true; renderChat();
+  ctl = new AbortController();
+  try {
+    const r = await sample.json(buildInput(), { cache: false, signal: ctl.signal, modelTier: "default" });
+    if (!take(r)) failed("invalid_json", JSON.stringify(r));
+  } catch (e) {
+    const code = e && e.code;
+    const fixed = code === "invalid_json" && e.text ? lenient(e.text) : null;
+    if (!(fixed && take(fixed))) failed(code, e && e.text);
+  } finally {
+    busy = false; ctl = null; renderChat(); renderSetup(); save();
+  }
+}
+async function send(text) {
+  text = String(text || "").trim();
+  if (!text || busy) return;
+  if (!sample) { showNotice("היועץ לא זמין בתצוגה הזו. פתח את הדף ב-claude.ai כשאתה מחובר."); return; }
+  session.turns.push({ role: "user", text });
+  $("#input").value = "";
+  return run();
+}
+/* "נסה שוב" asks again for the same turn: the error goes, the message he wrote is not added a second time. */
+function retry() {
+  if (busy || !sample) return;
+  const last = session.turns[session.turns.length - 1];
+  if (last && last.role === "error") session.turns.pop();
+  return run();
+}
+
+let chainP = Promise.resolve();
+function save() {
+  if (!db) return;
+  const body = { version: 2, startedAt: session.startedAt, updatedAt: new Date().toISOString(), turns: session.turns.map((t) => ({ role: t.role, text: t.text, quick: t.quick || [] })), setup: session.setup, note: session.note, failures: session.failures || [], score: checks(session.setup).filter((c) => c[1]).length };
+  const id = session.id;
+  $("#save-state").textContent = "שומר…";
+  chainP = chainP.then(() => db.collection("sessions").doc(id).set(body)).then(() => { $("#save-state").textContent = "נשמר"; }).catch(() => { $("#save-state").textContent = "השמירה לא הצליחה"; });
+}
+function showNotice(t) { const n = $("#notice"); n.textContent = t; n.hidden = false; }
+
+$("#form").addEventListener("submit", (e) => { e.preventDefault(); send($("#input").value); });
+$("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send($("#input").value); } });
+$("#stop").addEventListener("click", () => { if (ctl) ctl.abort(); });
+$("#new").addEventListener("click", () => { if (busy) return; newSession(); });
+let noteT;
+$("#note").addEventListener("input", (e) => { session.note = e.target.value; clearTimeout(noteT); noteT = setTimeout(save, 900); });
+
+newSession();
+(async () => {
+  try { sample = window.claude && typeof window.claude.use === "function" ? await window.claude.use("sample") : null; } catch (e) { sample = null; }
+  try { db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!sample) showNotice("היועץ לא זמין בתצוגה הזו. פתח את הדף ב-claude.ai כשאתה מחובר.");
+  else if (!db) showNotice("השיחות לא נשמרות בתצוגה הזו, אבל היועץ עובד.");
+})();
+</script>

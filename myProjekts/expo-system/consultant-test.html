@@ -1,0 +1,398 @@
+<title>בדיקת יועץ ההקמה</title>
+<script>document.documentElement.dir = "rtl"; document.documentElement.lang = "he";</script>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: one reading column of business cases; each case is the consultant's conversation beside what it built, with the review bar at its foot. */
+:root {
+  --bg: #f3f6f8;
+  --surface: #ffffff;
+  --ink: #15202a;
+  --muted: #5d6b78;
+  --line: #dde4ea;
+  --petrol: #0f5f6b;
+  --petrol-soft: #e3f0f1;
+  --ai: #5b3fd0;
+  --ai-soft: #efebfc;
+  --ok: #1f7a4a;
+  --ok-soft: #e4f3ea;
+  --no: #b3322a;
+  --no-soft: #fbe9e7;
+  --miss: #9a6400;
+  --miss-soft: #fbf1dd;
+  --display: "Frank Ruhl Libre", "David Libre", "Times New Roman", serif;
+  --body: "Assistant", "Heebo", "Arial Hebrew", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+    --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+    --ok: #6fd39c; --ok-soft: #173326; --no: #ff8f84; --no-soft: #3a1d1b; --miss: #f0c062; --miss-soft: #382c14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+  --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+  --ok: #6fd39c; --ok-soft: #173326; --no: #ff8f84; --no-soft: #3a1d1b; --miss: #f0c062; --miss-soft: #382c14;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { direction: rtl; text-align: right; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.25; }
+h1 { font-size: 2.1rem; }
+h2 { font-size: 1.45rem; }
+h3 { font-size: 0.82rem; font-family: var(--body); font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+p { margin: 0; }
+.intro { display: grid; gap: 10px; max-width: 68ch; }
+.intro .lede { color: var(--muted); }
+.how { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: .95rem; }
+.how b { color: var(--ink); }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.progress { font-weight: 700; font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { font: inherit; font-size: .9rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.save-state { color: var(--muted); font-size: .88rem; margin-inline-start: auto; }
+
+.case { background: var(--surface); border-radius: 14px; padding: 20px; display: grid; gap: 16px; border: 1px solid var(--line); }
+.case-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.case-no { font-family: var(--display); color: var(--petrol); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.desc { color: var(--muted); }
+.goals { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .9rem; }
+.goal { border-radius: 6px; padding: 1px 8px; background: var(--petrol-soft); color: var(--petrol); font-weight: 600; }
+.goal.more { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+.cap { color: var(--muted); font-size: .9rem; }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 18px; }
+@media (max-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.talk { display: grid; gap: 10px; align-content: start; background: var(--ai-soft); border-radius: 10px; padding: 14px; }
+.talk h3 { color: var(--ai); }
+.qa { display: grid; gap: 2px; }
+.qa .q { font-weight: 600; }
+.qa .a { color: var(--muted); }
+.qa .a::before { content: "המציג: "; }
+.challenge { border-inline-start: 3px solid var(--ai); padding-inline-start: 10px; }
+.challenge b { color: var(--ai); }
+
+.built { display: grid; gap: 14px; min-width: 0; }
+.qrow { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 8px; align-items: start; }
+@media (max-width: 460px) { .qrow { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+.qlabel { font-weight: 700; font-size: .92rem; padding-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1.5px solid var(--ink); border-radius: 999px; padding: 2px 11px; font-size: .92rem; background: var(--surface); }
+.paths { display: grid; gap: 10px; }
+.path { display: grid; gap: 4px; }
+.path-name { font-weight: 700; font-size: .95rem; }
+.chain { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: .92rem; }
+.step { background: var(--bg); border-radius: 6px; padding: 2px 8px; }
+.arrow { color: var(--muted); }
+.defaults { display: grid; gap: 4px; font-size: .92rem; }
+.defaults span { color: var(--muted); }
+.why { font-size: .95rem; border-top: 1px dashed var(--line); padding-top: 12px; }
+.why b { color: var(--petrol); }
+
+.review { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+.verdicts { display: flex; flex-wrap: wrap; gap: 8px; }
+.verdicts button { font: inherit; font-weight: 600; border-radius: 8px; padding: 6px 16px; cursor: pointer; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); }
+.verdicts button[data-v="ok"][aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.verdicts button[data-v="no"][aria-pressed="true"] { background: var(--no-soft); border-color: var(--no); color: var(--no); }
+.verdicts button[data-v="miss"][aria-pressed="true"] { background: var(--miss-soft); border-color: var(--miss); color: var(--miss); }
+textarea { font: inherit; width: 100%; min-height: 70px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); resize: vertical; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--petrol); outline-offset: 2px; }
+.general { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 10px; }
+.notice { background: var(--miss-soft); color: var(--ink); border-radius: 10px; padding: 10px 14px; }
+@media (prefers-reduced-motion: no-preference) { .verdicts button { transition: background .12s, border-color .12s; } }
+</style>
+
+<div class="wrap" dir="rtl" lang="he">
+  <header class="intro">
+    <h1>בדיקת יועץ ההקמה</h1>
+    <p class="lede">15 עסקים מתחומים שונים. לכל אחד: מה יועץ ה-AI היה שואל בהקמה, איזה כרטיס הוא בונה לדוכן, ואיזה מסלולים עומדים מאחורי הכפתורים. העסקים מומצאים, אבל התחומים וההרגלים לקוחים מעסקי הקהילה.</p>
+    <div class="how"><span><b>נכון</b> — ככה זה צריך להיות</span><span><b>לא ככה</b> — משהו שגוי</span><span><b>חסר</b> — משהו לא נמצא כאן</span><span>ואפשר לכתוב הערה בכל מקרה.</span></div>
+    <p class="notice" id="db-note" hidden></p>
+  </header>
+
+  <div class="bar" role="region" aria-label="התקדמות וסינון">
+    <span class="progress" id="progress">0 מתוך 15 נבדקו</span>
+    <div class="filters" id="filters">
+      <button data-f="all" aria-pressed="true">הכל</button>
+      <button data-f="todo" aria-pressed="false">לא נבדקו</button>
+      <button data-f="ok" aria-pressed="false">נכון</button>
+      <button data-f="no" aria-pressed="false">לא ככה</button>
+      <button data-f="miss" aria-pressed="false">חסר</button>
+    </div>
+    <span class="save-state" id="save-state" aria-live="polite"></span>
+  </div>
+
+  <main id="cases" class="wrap" style="gap:18px"></main>
+
+  <section class="general">
+    <h2>הערה כללית</h2>
+    <p class="desc">על היועץ כולו, על המודל, או על משהו שחוזר בכמה מקרים.</p>
+    <textarea id="note-general" data-case="general" aria-label="הערה כללית"></textarea>
+  </section>
+</div>
+
+<script>
+const CASES = [
+  { id: "c01", name: "נגר: מטבחים, ארונות וריהוט לבתי כנסת", desc: "נגרייה שעובדת עם פרטיים, מוסדות וקבלנים.",
+    main: "מכירה לעסקים ומוסדות", more: ["מכירה ישירה"], cap: "4 מדידות בשבוע",
+    asks: [["מה הכי שווה לך מהתערוכה, עבודה של מוסד אחד או של עשר משפחות?", "מוסדות וקבלנים"], ["כמה זמן עובר ממדידה עד התקנה?", "בערך 8 שבועות"], ["כמה מדידות תוכל לעשות בשבוע אחרי התערוכה?", "4"]],
+    need: ["מטבח", "ארונות קיר", "ריהוט לבית כנסת", "מטבח או כיור לפסח"], when: ["עכשיו", "לדירה חדשה (מתי נכנסים?)", "לפני פסח", "רק בודק מחירים"], who: ["פרטי", "מוסד / בית כנסת", "קבלן"],
+    paths: [["מטבח, לפרטי", ["מדידה בבית, לפי התור (עד 4 בשבוע)", "להכין הצעה (3 ימים)", "לשלוח", "לבדוק: קיבלת? (3 ימים)"]],
+            ["מטבח + לפני פסח", ["אותו מסלול, והמדידה לא יאוחר מאמצע שבט (8 שבועות ייצור)"]],
+            ["ריהוט לבית כנסת", ["לשלוח תמונות עבודות (מיד)", "פגישה במקום (שבוע)", "להכין הצעה רשמית", "לשלוח", "לבדוק (שבועיים)"]],
+            ["קבלן", ["פגישת היכרות על עבודה קבועה (שבוע)", "להכין מחירון לקבלנים", "לבדוק"]]],
+    defBiz: "שיחת היכרות בעוד 3 ימים", defPrivate: "רשימת תפוצה, ותזכורת לפני פסח",
+    why: "המטרה היא מוסדות, ולכן בית כנסת וקבלן עולים לראש התור. המדידות מתפזרות לפי 4 בשבוע, אחרת נוצרות 20 מדידות באיחור כבר בשבוע הראשון." },
+  { id: "c02", name: "הנדימן", desc: "תליות, מדפים ותיקונים קטנים בבית, באזור בני ברק ורמת גן.",
+    main: "שיכירו אותי", more: ["שיתופי פעולה"], cap: "שיחה או שתיים ביום",
+    asks: [["מי מביא לך היום הכי הרבה עבודה?", "ועדי בית ומתווכים"], ["מתי הכי עמוס אצלך?", "לפני פסח"], ["יש לך שותפים קבועים, קבלן או אינסטלטור?", "לא קבוע"]],
+    challenge: "רוב מי שיעבור אצלך לא צריך אותך היום. המטרה בדוכן היא שישמרו את המספר שלך.",
+    need: ["שיתוף פעולה בהפניות", "עבודה עכשיו"], when: ["עובר דירה", "משפץ", "לפני פסח"], who: ["פרטי", "ועד בית", "משכיר דירות", "גבאי", "קבלן / מתווך"],
+    paths: [["כשלא סומן כלום", ["שמור את המספר שלי (מיד)", "תזכורת לפני פסח (ר״ח ניסן)", "רשימת תפוצה"]],
+            ["ועד בית, משכיר או גבאי", ["שיחה על תחזוקה קבועה (יומיים)", "פגישה", "לבדוק"]],
+            ["שיתוף פעולה, קבלן או מתווך", ["פגישת היכרות (שבוע)", "הסכם הפניות", "לבדוק אחרי חודש: הגיעו הפניות?"]],
+            ["עובר דירה", ["לבדוק מתי (חודש)", "שבועיים לפני הכניסה: הצעה לסידורי כניסה"]]],
+    defBiz: "שיחת היכרות על הפניות", defPrivate: "רשימת תפוצה",
+    why: "הערך כאן נמצא במסלול ולא במידע. רוב הכרטיסים יישארו כמעט ריקים, וזה בסדר. נגיעה אחת על ועד בית שווה עשרות לקוחות." },
+  { id: "c03", name: "בית דפוס", desc: "הזמנות לשמחות, חוברות וירחונים למוסדות, ודפוס לעסקים.",
+    main: "מכירה לעסקים ומוסדות", more: ["מכירה ישירה עם תאריך"], cap: "5 שיחות ביום",
+    asks: [["מה עדיף לך, הזמנה חד-פעמית או לקוח שמדפיס כל חודש?", "לקוח קבוע"], ["יש לך קטלוג דוגמאות לשלוח?", "כן, PDF"]],
+    need: ["הזמנות לשמחה", "חוברות וירחונים", "דפוס לעסק", "שילוט"], when: ["לשמחה (מתי?)", "לפני החג", "קבוע כל חודש", "רק בודק מחירים"], who: ["פרטי", "עסק", "מוסד / ישיבה"],
+    paths: [["הזמנות לשמחה", ["לשלוח קטלוג דוגמאות (מיד)", "לבדוק: בחרת? (3 ימים)", "6 שבועות לפני השמחה: תזכורת אחרונה"]],
+            ["חוברות למוסד", ["להכין הצעה לפי כמות (יומיים)", "לשלוח", "לבדוק (3 ימים)", "אחרי עסקה: תזכורת לפני כל חג"]],
+            ["דפוס לעסק", ["לשלוח מחירון (מיד)", "שיחה (יומיים)"]]],
+    defBiz: "מחירון לעסקים, ושיחה", defPrivate: "רשימת תפוצה",
+    why: "מבקר שרוצה גם הזמנות לחתונה וגם חוברת לישיבה מקבל שני מסלולים, ושיחה אחת עם שני נושאים. לקוח שמדפיס כל חודש הוא הזהב, ולכן אחרי עסקה ממשיכים בחזרה קבועה." },
+  { id: "c04", name: "קייטרינג ומאפים", desc: "קייטרינג לשמחות, וגם אספקה קבועה לישיבות ולאולמות.",
+    main: "מכירה ישירה עם תאריך", more: ["מכירה לעסקים ומוסדות", "שיתופי פעולה"], cap: "3 שיחות ביום, טעימות בימי שלישי",
+    asks: [["איך בדרך כלל נסגרת אצלך שמחה?", "אחרי טעימה"], ["כמה זמן מראש מתמלאים התאריכים?", "חודשיים-שלושה"], ["עובד עם מפיקי אירועים?", "לפעמים"]],
+    need: ["שמחה", "קידוש / שבע ברכות", "אספקה קבועה למוסד", "שיתוף פעולה (אולם / מפיק)"], when: ["תאריך השמחה (נפתח מתחת לשמחה)", "רוצה לסגור", "רק בודק מחירים"], who: ["פרטי", "מוסד / ישיבה", "אולם / מפיק אירועים"],
+    paths: [["שמחה", ["לשלוח תפריט ומחירים (מיד)", "שיחה (יומיים)", "טעימה ביום שלישי הקרוב", "לשריין תאריך עד יום חמישי", "לבדוק"]],
+            ["שמחה + רק בודק מחירים", ["אותו מסלול, והשיחה בעוד 4 ימים במקום יומיים. לא יותר, כי מי שתופס ראשון את התאריך זוכה"]],
+            ["אספקה קבועה למוסד", ["טעימה במוסד (שבוע)", "להכין הצעה לפי כמות", "לשלוח", "לבדוק", "אחרי עסקה: בדיקה חודשית"]],
+            ["אולם או מפיק", ["פגישת היכרות על שיתוף פעולה (שבוע)"]]],
+    defBiz: "שיחת היכרות", defPrivate: "רשימת תפוצה",
+    why: "בעסק של תאריכים, \"רק בודק מחירים\" מרגיע רק קצת. הטעימות מרוכזות ביום קבוע, כמו שהוא עובד באמת." },
+  { id: "c05", name: "סוכן ביטוח ופנסיה", desc: "בדיקת תיקים, ביטוח לעסקים וחיסכון למשפחות.",
+    main: "מכירה ישירה", more: ["שיתופי פעולה"], cap: "6 שיחות ביום, 3 פגישות בשבוע",
+    asks: [["מה הצעד הראשון אצלך?", "בדיקה של מה שיש לו היום"], ["מה הלקוח צריך להביא?", "דוח מהמסלקה"], ["עובד עם רואי חשבון?", "רוצה להתחיל"]],
+    need: ["בדיקת ביטוחים קיימים", "ביטוח לעסק", "פנסיה וחיסכון", "שיתוף פעולה (רו״ח / יועץ)"], when: ["עכשיו", "אחרי החגים", "רק בודק"], who: ["שכיר", "עצמאי / בעל עסק", "משפחה צעירה", "רו״ח / יועץ"],
+    paths: [["בדיקת ביטוחים קיימים", ["לשלוח הודעה: איך מוציאים דוח מהמסלקה (מיד)", "לחכות לדוח, עד 7 ימים", "להכין השוואה", "פגישה", "לבדוק"]],
+            ["ביטוח לעסק", ["פגישה בעסק (5 ימים)", "להכין הצעה", "לשלוח", "לבדוק"]],
+            ["שיתוף פעולה", ["פגישת היכרות (שבוע)", "הסכם הפניות"]]],
+    defBiz: "שיחה בעוד 3 ימים", defPrivate: "רשימת תפוצה",
+    why: "כאן הלקוח צריך להביא משהו לפני שאפשר להתקדם: \"לחכות ללקוח\", עם מה מחכים. אם הדוח לא הגיע תוך שבוע, המערכת מזכירה." },
+  { id: "c06", name: "משרד הנהלת חשבונות", desc: "עצמאים, חברות קטנות ועמותות.",
+    main: "מכירה לעסקים ומוסדות", more: [], cap: "4 פגישות בשבוע",
+    asks: [["מתי אנשים מחליפים מנהל חשבונות?", "בתחילת שנת מס, או כשמשהו לא עובד"], ["יש לקוח שהכי שווה לך?", "עמותות"]],
+    challenge: "שנת המס מתחילה בינואר, כשבעה שבועות אחרי התערוכה. זה הזמן הכי טוב בשנה בשבילך, ולכן המסלול קצר ומהיר.",
+    need: ["הנהלת חשבונות שוטפת", "דוח שנתי", "פתיחת עסק", "עמותה"], when: ["מינואר", "עכשיו", "כשהעסק יגדל"], who: ["עצמאי", "חברה", "עמותה / מוסד"],
+    paths: [["שוטפת או עמותה", ["שיחה (יומיים)", "פגישה (שבוע)", "להכין הצעה", "לשלוח", "לבדוק, לפני סוף דצמבר"]],
+            ["פתיחת עסק", ["לשלוח רשימה של מה צריך (מיד)", "שיחה (3 ימים)"]],
+            ["כשהעסק יגדל", ["רשימת תפוצה", "תזכורת לפני שנת המס הבאה"]]],
+    defBiz: "שיחה בעוד יומיים", defPrivate: "רשימת תפוצה",
+    why: "העונה כאן לועזית: תחילת שנת המס. היא קרובה, ולכן כל מסלול מתוזמן להסתיים לפני ינואר." },
+  { id: "c07", name: "אתרים ואוטומציה לעסקים", desc: "בניית אתרים, חנויות אונליין וסדר בעסק.",
+    main: "מכירה לעסקים ומוסדות", more: ["שיתופי פעולה"], cap: "2 פגישות אפיון בשבוע",
+    asks: [["עם מה הלקוח מגיע אליך, מוצר או כאב?", "כאב: \"הכל אצלי בוואטסאפ ובאקסל\""], ["עם מי היית רוצה לשתף פעולה?", "גרפיקאים ומשווקים"]],
+    need: ["אתר לעסק", "חנות אונליין", "סדר בעסק / אוטומציה", "שיתוף פעולה (גרפיקאי / משווק)"], when: ["עכשיו", "בחודשים הקרובים", "רק מתעניין"], who: ["עסק קטן", "עסק בינוני", "מוסד", "גרפיקאי / משווק"],
+    paths: [["אתר, חנות או אוטומציה", ["פגישת אפיון, לפי התור (2 בשבוע)", "להכין הצעה (5 ימים)", "לשלוח", "לבדוק (3 ימים)"]],
+            ["שיתוף פעולה", ["פגישת היכרות (שבוע)", "הסכם הפניות", "לבדוק אחרי חודש"]],
+            ["גרפיקאי שרוצה גם אתר", ["שני מסלולים, ופנייה אחת עם שני נושאים"]]],
+    defBiz: "שיחה קצרה: מה כואב לך?", defPrivate: "רשימת תפוצה",
+    why: "הכפתורים מדברים על הכאב ולא על המוצר, כי בעל עסק לא יודע מה הוא צריך, רק מה מציק לו. מבקר שמזוהה ברשימה כבעל עסק בתחום קרוב מקבל מראש הצעה לשיתוף פעולה." },
+  { id: "c08", name: "יבואן מוצרי מזון", desc: "חטיפים ומוצרי יסוד, לחנויות, לקייטרינג ולמוסדות.",
+    main: "מפיצים וחנויות", more: ["מכירה לעסקים ומוסדות"], cap: "ביקורים בימי ראשון ושני",
+    asks: [["איך חנות מתחילה לעבוד איתך?", "טועמת, ואז הזמנה ראשונה קטנה"], ["יש לך סוכנים באזורים?", "מחפש"]],
+    need: ["להכניס למדף", "אספקה לקייטרינג / מוסד", "להפיץ באזור (סוכן)"], when: ["עכשיו", "לפני החג", "לעונה"], who: ["מכולת / סופר", "קייטרינג", "מוסד", "סוכן / מפיץ"],
+    paths: [["להכניס למדף", ["להכין מארז דוגמאות", "למסור בביקור, ביום ראשון או שני הקרוב (משימה פיזית)", "לבדוק (שבוע)", "הזמנה ראשונה", "אחרי עסקה: לפני כל חג"]],
+            ["אספקה לקייטרינג או מוסד", ["טעימה", "הצעה לפי כמות", "לשלוח", "לבדוק"]],
+            ["סוכן", ["פגישה (שבוע)", "תנאים", "לבדוק"]]],
+    defBiz: "שיחה בעוד 3 ימים", defPrivate: "רשימת תפוצה",
+    why: "\"לשלוח דוגמה\" כאן הוא מארז אמיתי: משימה פיזית שלו, לא הודעה. החזרה הקבועה לפני כל חג היא העיקר, כי מכולת מזמינה שוב ושוב." },
+  { id: "c09", name: "מכללה לקורסים מקצועיים", desc: "הנהלת חשבונות, גרפיקה, והשתלמויות לעובדים.",
+    main: "מכירה ישירה עם תאריך", more: ["מכירה לעסקים ומוסדות"], cap: "צוות של 2, עד 15 שיחות ביום",
+    asks: [["מתי מתחיל המחזור הקרוב?", "א׳ טבת"], ["מי ניגש לדוכן, המועמד עצמו?", "הרבה פעמים האבא, בשביל הבן"]],
+    need: ["קורס הנהלת חשבונות", "קורס גרפיקה", "השתלמות לעובדים"], when: ["למחזור הקרוב (א׳ טבת)", "למחזור הבא", "רק מתעניין"], who: ["לעצמו", "בשביל הבן / הבת", "לעובדים (עסק)"],
+    paths: [["קורס, למחזור הקרוב", ["לשלוח פרטי הרשמה (מיד)", "שיחה (יומיים)", "תזכורת 3 ימים לפני הפתיחה", "אחרי הפתיחה: עובר למחזור הבא"]],
+            ["בשביל הבן", ["אותו מסלול, והנוסח פונה לאב: \"לגבי הקורס עבור...\""]],
+            ["השתלמות לעובדים", ["להכין הצעה לקבוצה", "לשלוח", "לבדוק"]]],
+    defBiz: "לשלוח פרטי השתלמויות", defPrivate: "רשימת תפוצה, ופרטי המחזור הבא",
+    why: "התאריך כאן הוא של העסק, פתיחת הקורס, והמסלול נגמר כשהוא עובר. \"בשביל מי\" משנה כאן משהו, ולכן ה-AI הוסיף אותו." },
+  { id: "c10", name: "הפעלות וטיולים למוסדות", desc: "לתלמודי תורה ולישיבות, ומשחקים לשמחות.",
+    main: "מכירה לעסקים ומוסדות", more: [], cap: "3 שיחות ביום",
+    asks: [["מתי מוסדות סוגרים איתך?", "חנוכה: חודש לפני. בין הזמנים: כבר באדר"], ["יש לך חבילה מוכנה לחנוכה?", "עוד לא"]],
+    challenge: "חנוכה בעוד שלושה שבועות מהתערוכה. כדאי להכין חבילת חנוכה לפני התערוכה, כי זה הדבר הכי חם שיש לך.",
+    need: ["הפעלה לחנוכה", "טיול שנתי", "קייטנה בבין הזמנים", "משחק לשמחה"], when: ["חנוכה", "בין הזמנים", "השנה הבאה"], who: ["ת״ת", "ישיבה", "בית ספר", "משפחה"],
+    paths: [["חנוכה", ["להכין הצעה (מחר)", "לשלוח", "לשריין תאריך, עד 3 ימים", "לבדוק"]],
+            ["בין הזמנים", ["להכין תוכנייה", "לשלוח", "לבדוק", "תזכורת בתחילת אדר"]],
+            ["משחק לשמחה", ["לשלוח פרטים (מיד)", "רשימת תפוצה"]]],
+    defBiz: "לשלוח את חבילת חנוכה", defPrivate: "רשימת תפוצה",
+    why: "שני תאריכים שונים מאוד: חנוכה צמוד לתערוכה, ובין הזמנים רחוק. לכן \"כמה זמן לפני\" נקבע לכל מסלול בנפרד." },
+  { id: "c11", name: "שטריימלים ובגדי חתן", desc: "שטריימלים, בגדי חתן וחליפות למשפחה.",
+    main: "מכירה ישירה עם תאריך", more: [], cap: "מדידות בערבים",
+    asks: [["כמה זמן לוקח להכין שטריימל?", "בערך חודשיים"], ["מי בדרך כלל קונה?", "האבא, בשביל החתן"]],
+    need: ["שטריימל", "בגדי חתן", "חליפות למשפחה"], when: ["לחתונה (מתי?)", "לפני החגים", "רק בודק"], who: ["לעצמו", "לחתן (הבן)", "לנכד"],
+    paths: [["שטריימל לחתן", ["לשלוח קטלוג (מיד)", "לקבוע מדידה, לפחות 10 שבועות לפני החתונה", "לבדוק"]],
+            ["חליפות למשפחה", ["לשלוח קטלוג", "מדידה חודש לפני החתונה"]],
+            ["לפני החגים", ["רשימת תפוצה", "תזכורת לפני פסח"]]],
+    defBiz: "אין הבדל", defPrivate: "רשימת תפוצה",
+    why: "\"בשביל מי\" משנה כאן את התזמון: לחתן לפי תאריך החתונה, לעצמו לפי החגים." },
+  { id: "c12", name: "מתווך נדל״ן", desc: "דירות לזוגות צעירים, דירות להשקעה, ומכירת דירות.",
+    main: "מכירה ישירה", more: ["שיתופי פעולה"], cap: "4 שיחות ביום",
+    asks: [["מי הקונה הכי נפוץ אצלך?", "הורים שמחפשים דירה לבן שמתחתן"], ["באילו ערים?", "ביתר ובית שמש"]],
+    need: ["דירה לזוג", "דירה להשקעה", "למכור דירה", "שיתוף פעולה (מתווך / קבלן)"], when: ["לפני החתונה (מתי?)", "עכשיו", "רק בודק"], who: ["הורים", "משקיע", "בעל דירה"],
+    paths: [["דירה לזוג", ["לשלוח היצע מתאים (יומיים)", "שיחה", "סיור", "4 חודשים לפני החתונה: בדיקה"]],
+            ["למכור דירה", ["פגישה להערכת שווי (שבוע)", "להכין הצעת שיווק", "לבדוק"]],
+            ["השקעה", ["שיחה (3 ימים)", "לשלוח הזדמנויות"]]],
+    defBiz: "שיחה", defPrivate: "רשימת תפוצה, והזדמנויות",
+    why: "הלקוח הוא הבן שמתחתן, אבל מדברים עם ההורים. והתאריך הוא החתונה." },
+  { id: "c13", name: "מתנות ויודאיקה לעסקים", desc: "מתנות לעובדים ולתלמידים לפני החגים, ומתנות לשמחות.",
+    main: "מכירה לעסקים ומוסדות", more: [], cap: "5 שיחות ביום",
+    asks: [["מתי עסקים מזמינים מתנות?", "חודש לפני ראש השנה ופסח, ולפעמים לחנוכה"], ["מה המינימום להזמנה?", "20 יחידות"]],
+    need: ["מתנות לעובדים", "פרסים לתלמידים", "מתנה לשמחה"], when: ["לחנוכה", "לפני פסח", "לפני ראש השנה"], who: ["עסק", "מוסד", "פרטי"],
+    paths: [["מתנות לעובדים או לתלמידים", ["לשלוח קטלוג עסקי (מיד)", "שיחה (יומיים)", "להכין הצעה לפי כמות", "לשלוח", "לבדוק", "אחרי עסקה: 6 שבועות לפני כל חג"]],
+            ["לחנוכה", ["הכל מיד, כי חנוכה בעוד 3 שבועות"]],
+            ["מתנה לשמחה", ["רשימת תפוצה"]]],
+    defBiz: "לשלוח קטלוג עסקי", defPrivate: "רשימת תפוצה",
+    why: "לקוח עסקי שקנה פעם אחת יקנה לפני כל חג. בלי החזרה הקבועה, הוא נעלם מהמערכת אחרי העסקה הראשונה." },
+  { id: "c14", name: "מיזוג אוויר", desc: "התקנה ותחזוקה של מזגנים לבתים, לבתי כנסת ולמוסדות.",
+    main: "מכירה לעסקים ומוסדות", more: ["מכירה ישירה"], cap: "3 סיורים בשבוע",
+    asks: [["מה ההבדל אצלך בין בית לבית כנסת?", "בבית כנסת: סיור, הצעה לוועד, ותהליך ארוך"], ["מתי הכי עמוס?", "לפני הקיץ"]],
+    need: ["מזגן לבית", "מיזוג לבית כנסת / מוסד", "תחזוקה שנתית"], when: ["לפני הקיץ", "עכשיו", "כשיתקלקל"], who: ["פרטי", "בית כנסת", "מוסד", "ועד בית"],
+    paths: [["מיזוג למוסד", ["סיור במקום (שבוע)", "להכין הצעה רשמית", "לשלוח", "לבדוק (שבועיים)", "תזכורת בתחילת אדר"]],
+            ["מזגן לבית + לפני הקיץ", ["רשימת תפוצה", "תזכורת בתחילת ניסן"]],
+            ["תחזוקה שנתית", ["שיחה (שבוע)", "הצעה", "אחרי עסקה: כל שנה לפני הקיץ"]]],
+    defBiz: "שיחה", defPrivate: "רשימת תפוצה, ולפני הקיץ",
+    why: "אותו צורך, מזגן, מקבל מסלול אחר לפרטי ולמוסד. והתערוכה בחורף: רוב הפרטיים הם \"לפני הקיץ\", ואין טעם לרדוף אחריהם עכשיו." },
+  { id: "c15", name: "חנות בגדים", desc: "בגדי גברים וילדים, חנות בבני ברק.",
+    main: "שיכירו אותי", more: ["מכירה ישירה"], cap: "אין זמן לשיחות",
+    asks: [["מה היית רוצה שמבקר יעשה אחרי התערוכה?", "שיבוא לחנות"], ["יש לך מבצע?", "אין"]],
+    challenge: "בלי סיבה לבוא, מעטים יבואו. היועץ מציע מבצע תערוכה עד ר״ח טבת: זו סיבה לבוא, וגם תאריך לתזכורת.",
+    need: ["בגדים לחג", "בגדים לשמחה", "הלבשה למוסד"], when: ["לפני פסח", "לשמחה", "עכשיו (מבצע התערוכה)"], who: ["לעצמו", "למשפחה", "מוסד"],
+    paths: [["כשלא סומן כלום", ["פרטי החנות והמבצע (מיד)", "3 ימים לפני סוף המבצע: תזכורת", "לפני פסח: תזכורת", "רשימת תפוצה"]],
+            ["הלבשה למוסד", ["שיחה (3 ימים)", "הצעה לפי כמות"]],
+            ["לשמחה", ["לשלוח פרטים", "חודש לפני: תזכורת"]]],
+    defBiz: "שיחה על הלבשה למוסד", defPrivate: "רשימת תפוצה",
+    why: "אין לו זמן לשיחות, ולכן כל המסלולים כאן אוטומטיים. המבצע עם תאריך סיום הוא מה שהופך \"שיכירו אותי\" לפעולה." },
+];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const chips = (list) => `<div class="chips">${list.map((x) => `<span class="chip">${esc(x)}</span>`).join("")}</div>`;
+const chain = (steps) => `<div class="chain">${steps.map((s, i) => (i ? '<span class="arrow" aria-hidden="true">←</span>' : "") + `<span class="step">${esc(s)}</span>`).join("")}</div>`;
+
+const state = {};          // id -> { verdict, note }
+let filter = "all";
+
+function caseHTML(c, n) {
+  return `<article class="case" id="${c.id}" data-case-card="${c.id}">
+    <div class="case-head"><span class="case-no">${n}</span><h2>${esc(c.name)}</h2></div>
+    <p class="desc">${esc(c.desc)}</p>
+    <div class="goals"><span class="goal">מטרה ראשית: ${esc(c.main)}</span>${c.more.map((g) => `<span class="goal more">${esc(g)}</span>`).join("")}<span class="cap">· זמן למעקב: ${esc(c.cap)}</span></div>
+    <div class="cols">
+      <section class="talk" aria-label="מה היועץ שואל">
+        <h3>מה היועץ שואל בהקמה</h3>
+        ${c.asks.map(([q, a]) => `<div class="qa"><span class="q">${esc(q)}</span><span class="a">${esc(a)}</span></div>`).join("")}
+        ${c.challenge ? `<p class="challenge"><b>היועץ מאתגר:</b> ${esc(c.challenge)}</p>` : ""}
+      </section>
+      <section class="built" aria-label="מה הוא בונה">
+        <h3>הכרטיס בדוכן</h3>
+        <div class="qrow"><span class="qlabel">מה הוא צריך?</span>${chips(c.need)}</div>
+        <div class="qrow"><span class="qlabel">מתי?</span>${chips(c.when)}</div>
+        <div class="qrow"><span class="qlabel">מי הוא?</span>${chips(c.who)}</div>
+        <h3>המסלולים</h3>
+        <div class="paths">${c.paths.map(([name, steps]) => `<div class="path"><span class="path-name">${esc(name)}</span>${chain(steps)}</div>`).join("")}</div>
+        <div class="defaults"><div><span>כשלא סומן כלום, מבקר שהוא בעל עסק:</span> ${esc(c.defBiz)}</div><div><span>כשלא סומן כלום, מבקר פרטי:</span> ${esc(c.defPrivate)}</div></div>
+      </section>
+    </div>
+    <p class="why"><b>למה ככה:</b> ${esc(c.why)}</p>
+    <div class="review">
+      <div class="verdicts" role="group" aria-label="מה דעתך">
+        <button data-v="ok" data-case="${c.id}" aria-pressed="false">נכון</button>
+        <button data-v="no" data-case="${c.id}" aria-pressed="false">לא ככה</button>
+        <button data-v="miss" data-case="${c.id}" aria-pressed="false">חסר</button>
+      </div>
+      <textarea id="note-${c.id}" data-case="${c.id}" placeholder="הערה (רשות): מה לא נכון, מה חסר, או איך זה באמת עובד אצלם" aria-label="הערה על ${esc(c.name)}"></textarea>
+    </div>
+  </article>`;
+}
+document.getElementById("cases").innerHTML = CASES.map((c, i) => caseHTML(c, i + 1)).join("");
+
+function paint() {
+  CASES.forEach((c) => {
+    const s = state[c.id] || {};
+    document.querySelectorAll(`.verdicts [data-case="${c.id}"]`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === s.verdict)));
+    const ta = document.getElementById("note-" + c.id);
+    if (ta && document.activeElement !== ta && typeof s.note === "string") ta.value = s.note;
+    const card = document.getElementById(c.id);
+    const show = filter === "all" || (filter === "todo" ? !s.verdict : s.verdict === filter);
+    card.hidden = !show;
+  });
+  const g = state.general || {};
+  const gta = document.getElementById("note-general");
+  if (document.activeElement !== gta && typeof g.note === "string") gta.value = g.note;
+  const done = CASES.filter((c) => (state[c.id] || {}).verdict).length;
+  document.getElementById("progress").textContent = `${done} מתוך ${CASES.length} נבדקו`;
+}
+paint();
+
+// Saving: one document per case in the artifact's store, so the answers reach Claude.
+let db = null;
+let readOnly = false;
+const chains = {};
+const saveState = document.getElementById("save-state");
+function write(id) {
+  if (!db || readOnly) return;
+  const body = { verdict: (state[id] || {}).verdict || "", note: (state[id] || {}).note || "", at: new Date().toISOString() };
+  saveState.textContent = "שומר…";
+  chains[id] = (chains[id] || Promise.resolve()).then(() => db.collection("reviews").doc(id).set(body)).then(() => {
+    saveState.textContent = "נשמר";
+  }).catch((e) => {
+    if (e && e.code === "invalid_argument") { readOnly = true; saveState.textContent = "אין לך הרשאה לשמור כאן"; }
+    else saveState.textContent = "השמירה לא הצליחה. ננסה שוב בשינוי הבא";
+  });
+}
+const timers = {};
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".verdicts button");
+  if (b) {
+    const id = b.dataset.case;
+    state[id] = Object.assign({}, state[id], { verdict: (state[id] || {}).verdict === b.dataset.v ? "" : b.dataset.v });
+    paint(); write(id); return;
+  }
+  const f = e.target.closest("#filters button");
+  if (f) { filter = f.dataset.f; document.querySelectorAll("#filters button").forEach((x) => x.setAttribute("aria-pressed", String(x === f))); paint(); }
+});
+document.addEventListener("input", (e) => {
+  const ta = e.target.closest("textarea[data-case]");
+  if (!ta) return;
+  const id = ta.dataset.case;
+  state[id] = Object.assign({}, state[id], { note: ta.value });
+  clearTimeout(timers[id]);
+  timers[id] = setTimeout(() => write(id), 900);
+});
+
+(async () => {
+  const note = document.getElementById("db-note");
+  try { db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!db) { note.textContent = "התשובות לא נשמרות בתצוגה הזו. פתחו את הדף ב-claude.ai כשאתם מחוברים, כדי שיגיעו אליי."; note.hidden = false; return; }
+  db.collection("reviews").onSnapshot((snap) => {
+    snap.docs.forEach((d) => { if (d.exists) { const v = d.data(); state[d.id] = { verdict: v.verdict || "", note: v.note || "" }; } });
+    paint();
+  }, () => { note.textContent = "החיבור לשמירה נפסק. רעננו את הדף."; note.hidden = false; });
+})();
+</script>
