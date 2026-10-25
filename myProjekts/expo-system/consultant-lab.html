@@ -86,6 +86,31 @@ textarea { font: inherit; width: 100%; min-height: 54px; border: 1px solid var(-
 .variant { font-size: .88rem; color: var(--muted); padding-inline-start: 10px; }
 .empty { color: var(--muted); font-size: .92rem; }
 .save-state { color: var(--muted); font-size: .85rem; }
+
+/* The automatic test: each case is a card with the comparison on top and the conversation folded below. */
+.auto { display: grid; gap: 12px; }
+.auto-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.auto-head h2 { margin-inline-end: auto; }
+.cases { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .95rem; }
+.cases label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.result { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; min-width: 0; }
+.result-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.result-head strong { margin-inline-end: auto; }
+.status { color: var(--muted); font-size: .9rem; }
+.verdicts { display: flex; flex-wrap: wrap; gap: 6px; }
+.v { border-radius: 999px; padding: 1px 10px; font-size: .85rem; font-weight: 600; }
+.v.good { background: var(--ok-soft); color: var(--ok); }
+.v.part { background: var(--warn-soft); color: var(--warn); }
+.v.bad { background: var(--ai-soft); color: var(--ai); }
+.cmp { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+.cmp th, .cmp td { border-top: 1px solid var(--line); padding: 6px 6px; vertical-align: top; text-align: right; overflow-wrap: anywhere; white-space: pre-wrap; }
+.cmp th { color: var(--muted); font-weight: 700; font-size: .8rem; }
+.cmp col.area { width: 7.5em; }
+@media (max-width: 700px) { .cmp col.area { width: 5.5em; } .cmp { font-size: .85rem; } }
+.lists p { font-size: .92rem; }
+details summary { cursor: pointer; color: var(--petrol); font-weight: 600; }
+.transcript { display: grid; gap: 6px; margin-top: 8px; max-height: 50vh; overflow-y: auto; }
+.transcript .msg { max-width: 100%; font-size: .92rem; }
 </style>
 
 <div class="wrap" dir="rtl" lang="he">
@@ -122,6 +147,17 @@ textarea { font: inherit; width: 100%; min-height: 54px; border: 1px solid var(-
       <div id="setup"></div>
     </section>
   </div>
+
+  <section class="pane auto" aria-label="בדיקה אוטומטית">
+    <div class="auto-head">
+      <h2>בדיקה אוטומטית מול ההקמות שאישרת</h2>
+      <button class="btn" id="auto-stop" hidden>עצור</button>
+      <button class="btn primary" id="auto-run">הרץ את הנבחרים</button>
+    </div>
+    <p class="hint">היועץ מנהל שיחה שלמה עם "מציג" מדומה. המציג המדומה יודע רק מה שהמציג האמיתי אישר בסבבים, ועונה כמו בעל עסק עסוק. בסוף בודק משווה את ההקמה שהיועץ בנה להקמה המאושרת, תחום אחרי תחום. כל עסק לוקח כמה דקות ועשרות פניות ל-Claude, מהחשבון שלך. התוצאות נשמרות.</p>
+    <div class="cases" id="cases"></div>
+    <div id="results" class="auto"></div>
+  </section>
 </div>
 
 <script>
@@ -301,9 +337,9 @@ function renderSetup() {
   if ((s.open || []).length) { const o = sec("עוד פתוח"); s.open.forEach((x) => o.append(el("p", "kv", "• " + x))); }
 }
 
-function cleanSetup(x) {
+function cleanSetup(x, prev = session.setup) {
   const s = JSON.parse(JSON.stringify(EMPTY_SETUP));
-  if (!x || typeof x !== "object") return session.setup;
+  if (!x || typeof x !== "object") return prev;
   const str = (v) => (typeof v === "string" ? v.slice(0, 300) : "");
   const arr = (v) => (Array.isArray(v) ? v : []);
   s.business = str(x.business);
@@ -320,10 +356,10 @@ function cleanSetup(x) {
   return s;
 }
 
-function buildInput() {
-  const gaps = checks(session.setup).filter((c) => !c[1]).map((c) => "- " + c[0]);
-  const head = RULES + "\n\nCURRENT SETUP:\n" + JSON.stringify(session.setup) + "\n\nCHECKLIST ITEMS STILL FAILING:\n" + (gaps.join("\n") || "(none — the setup passes; summarize once, then help with changes)");
-  const turns = session.turns.filter((t) => t.role === "assistant" || t.role === "user").slice(-30).map((t) => ({ role: t.role, content: t.text }));
+function buildInput(sess = session) {
+  const gaps = checks(sess.setup).filter((c) => !c[1]).map((c) => "- " + c[0]);
+  const head = RULES + "\n\nCURRENT SETUP:\n" + JSON.stringify(sess.setup) + "\n\nCHECKLIST ITEMS STILL FAILING:\n" + (gaps.join("\n") || "(none — the setup passes; summarize once, then help with changes)");
+  const turns = sess.turns.filter((t) => t.role === "assistant" || t.role === "user").slice(-30).map((t) => ({ role: t.role, content: t.text }));
   while (turns.length && turns[0].role === "assistant" && turns.length > 1 && turns[1].role === "assistant") turns.shift();
   return [{ role: "user", content: head }, ...turns];
 }
@@ -339,11 +375,11 @@ function lenient(raw) {
   }
   return t.trim() && a < 0 ? { reply: t.trim() } : null;
 }
-function take(r) {
+function take(r, sess = session) {
   const reply = r && typeof r.reply === "string" && r.reply.trim() ? r.reply.trim() : "";
   if (!reply) return false;
-  session.turns.push({ role: "assistant", text: reply, quick: Array.isArray(r.quick) ? r.quick.filter((x) => typeof x === "string").slice(0, 4) : [] });
-  if (r.setup) session.setup = cleanSetup(r.setup);
+  sess.turns.push({ role: "assistant", text: reply, quick: Array.isArray(r.quick) ? r.quick.filter((x) => typeof x === "string").slice(0, 4) : [] });
+  if (r.setup) sess.setup = cleanSetup(r.setup, sess.setup);
   return true;
 }
 function failed(code, raw) {
@@ -398,11 +434,180 @@ $("#new").addEventListener("click", () => { if (busy) return; newSession(); });
 let noteT;
 $("#note").addEventListener("input", (e) => { session.note = e.target.value; clearTimeout(noteT); noteT = setTimeout(save, 900); });
 
+/* ---------- The automatic test ----------
+   The consultant talks to a simulated exhibitor who knows only what the real one approved in the rounds;
+   a judge then compares the setup the consultant built with the approved one, area by area. */
+const CASES = [{"id":1,"type":"שטריימלך (3 עסקים במדריך)","greeting":"אני מייצר שטריימלך בהתאמה אישית ומשפץ ישנים. רוב הלקוחות שלי הם אבות של חתנים, ומעט מאוד אנשים שמחליפים שטריימל אחרי הרבה שנים.","goals":"מכירה ישירה עם תאריך: אבות שכבר יש להם חתן\nנוספת: חידוש שטריימלים; משפחות בלי חתן — רשימת תפוצה","card":"מה הוא צריך: שטריימל לחתן · חידוש שטריימל\nמתי: יש חתונה (מתי?) · עוד אין חתן · רק בודק מחירים\nמי הוא: אבא החתן · סבא או דוד\n\"עוד אין חתן\" נכנס לרשימת תפוצה בלבד, בלי מעקב.","path":"אבא החתן מוזמן למדידה בחנות תוך שבוע; אם יש כבר תאריך חתונה — אתה מתקשר למחרת. לא הגיע — אתה מתקשר שוב אחרי שבוע (עם תאריך חתונה: אחרי שלושה ימים), ואם גם זה לא — רשימת תפוצה.","capacity":"חצי שעה ביום","untapped":"הודעת תודה, ואז רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","הזמנה למדידה (תוך שבוע (עם תאריך חתונה: אחרי שיחה למחרת))","רשימת התפוצה (דוגמה) (מדי פעם)"],"extra":"יש אבות שהבן שלהם כבר מבוגר ומחכה לשידוך. \"שטריימל לחתן\" צובט אותם, ולכן בהודעה: \"כשתגיע השמחה, בשעה טובה\"."},{"id":11,"type":"שדכנים (4 עסקים)","greeting":"אני שדכן, ומתמחה בעיקר בבחורים ובחורות מבתים חסידיים. ההורים הם הלקוחות שלי, לא הצעירים עצמם.","goals":"מכירה ישירה: הורים שרוצים שיחה","card":"מתי: מתאים עכשיו · בהמשך\nמי הוא: הורים לבן · הורים לבת\nבלי רשימת תפוצה ובלי הודעות לקבוצה.","path":"אתה מתקשר בעצמך, בשקט, תוך יומיים-שלושה. בלי שום הודעה.","capacity":"חצי שעה ביום","untapped":"אתה מתקשר תוך יומיים-שלושה","messages":["אין הודעות בכלל (—)"],"extra":"דיסקרטיות מוחלטת: שום הודעה לא מגיעה לבית, אפילו לא תודה. אני מתקשר בעצמי."},{"id":13,"type":"אמרגנים ומוזיקאים (22 עסקים)","greeting":"אני אמרגן – מארגן מוזיקה לחתונות ולאירועים: זמר, קלידן, תזמורת. מוכר למשפחות שמחתנות ילדים, וגם עובד מול אולמות.","goals":"שיתופי פעולה: אולמות (חדש — להזמין לאירוע; קיים — לדבר על הפניות)\nנוספת: משפחות שמחתנות","card":"מה הוא צריך: מוזיקה לחתונה · שיתוף פעולה\nמתי: יש תאריך (מתי?) · בהמשך\nמי הוא: משפחה · אולם חדש · אולם שכבר עבדנו יחד\nאולם חדש: להזמין לראות אותך באירוע. אולם שכבר עבדתם: לדבר על הפניות.","path":"אולם חדש: אתה מזמין אותו לאירוע הבא שמתאים, ואם לא הגיע — לאירוע שאחריו. אולם קיים: אתה קובע פגישה תוך שבועיים.","capacity":"שעה ביום","untapped":"אולם — אתה מתקשר; משפחה — רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","הזמנה לאירוע (לאירוע הבא שמתאים (אולם חדש))"],"extra":"אי אפשר להזמין זר לחתונה של משפחה אחרת בלי לשאול את המחותנים, ולא כותבים בהודעה איפה ומתי."},{"id":32,"type":"מימוש זכויות (4 עסקים)","greeting":"אני עוזר לאנשים לממש זכויות מביטוח לאומי ומשרדי ממשלה: נכות, סל שיקום, קצבאות. הלקוחות הם משפחות עם ילד עם צרכים מיוחדים, הורים מבוגרים, ואנשים שנפגעו בעבודה ולא יודעים מה מגיע להם.","goals":"מכירה ישירה: מי שמגיע לו ולא יודע; השאלות הרגישות בעל פה","card":"מה הוא צריך: לבדוק זכאות · פרטים כלליים\nמתי: עכשיו · בהמשך\nמי הוא: למשפחה · לעצמו\nמה שרגיש נשאל בעל פה. בכרטיס יש רק \"לבדוק זכאות\", בלי לכתוב למה.","path":"אתה מתקשר בשקט תוך יומיים.","capacity":"חצי שעה ביום","untapped":"אתה מתקשר תוך יומיים","messages":["תודה, בלי לכתוב על מה (בערב של יום התערוכה)"],"extra":"מה שרגיש נשאל בעל פה בדוכן. בכרטיס רק \"לבדוק זכאות\". ההודעה רק עם השם שלי והמספר, בלי לכתוב על מה ובלי שם העסק."},{"id":46,"type":"קצביות ודגים (3 עסקים)","greeting":"קצביה – עופות ובשר, מוכן לסיר. משפחות.","goals":"מכירה ישירה: משפחות קבועות בעיר","card":"מה הוא צריך: הזמנה שבועית · הזמנה לחג\nמתי: עכשיו · לפני החג\n\"מי הוא\" ירדה מהכרטיס, כמו שאמרת: שאלה עם כפתור אחד היא לא שאלה.","path":"הזמנה ראשונה בהנחה: הודעה אוטומטית ביום רביעי לפני שבת, שלוש פעמים, ואז רשימת תפוצה.","capacity":"רק מה שאוטומטי","untapped":"רק רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","הזמנה ראשונה בהנחה (1 מ-3) (יום רביעי, בשבוע הראשון)","הזמנה ראשונה בהנחה (2 מ-3) (יום רביעי, בשבוע השני)","הזמנה ראשונה בהנחה (3 מ-3) (יום רביעי, בשבוע השלישי)","רשימת התפוצה (דוגמה) (מדי פעם)"],"extra":"אותה הודעה שלוש פעמים זה מעצבן: שלוש גרסאות שונות, ובשלישית לכתוב שזו הפעם האחרונה."},{"id":56,"type":"בניית אתרים ומערכות מידע (28 עסקים)","greeting":"בונה אתרים ומערכות לעסקים, כולל אוטומציות. העסקים שאני עובד איתם רוצים לחסוך זמן ולקבל יותר פניות.","goals":"מכירה לעסקים: עסקים שטובעים","card":"מה הוא צריך: טובע בוואטסאפים · מאבד פניות · רוצה אתר\nמתי: עכשיו · בהמשך\nמי הוא: עסק קטן · עסק בינוני · מוסד\nהצעד הראשון: הדגמה קצרה.","path":"אתה מציע הדגמה של עשר דקות, בזום או אצלו, תוך שבוע; אין תשובה — סרטון של שתי דקות אחרי שבוע, ואחר כך רק רשימת תפוצה.","capacity":"שעה ביום","untapped":"בעל עסק — אתה מתקשר; פרטי — רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","קישור להדגמה (תוך שבוע)","סרטון לדוגמה (אחרי שבוע, אם אין תשובה)"],"extra":""},{"id":65,"type":"מזגנים (4 עסקים)","greeting":"מתקין ומוכר מזגנים. בתים ומוסדות.","goals":"מכירה למוסדות\nנוספת: פרטיים — רשימת תפוצה לפני הקיץ","card":"מה הוא צריך: מיזוג למוסד · מזגן לבית · תחזוקה\nמתי: לקיץ הבא · עכשיו\nמי הוא: מוסד · בית כנסת · משפחה","path":"אחרי פורים אתה מתקשר למוסד (מי שיש לו בעיה עכשיו — ביקור מיד); לא חזר — שוב אחרי שבועיים, ואחר כך לפני שבועות, כשמתחיל החום.","capacity":"חצי שעה ביום","untapped":"בעל עסק — אתה מתקשר; פרטי — רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","תזכורת לפני הקיץ (לפני שבועות)"],"extra":""},{"id":78,"type":"אימון קשב וריכוז לבנים (6)","greeting":"מאמן קשב וריכוז לבנים. ההורים פונים, לפעמים אחרי שהמלמד אמר שיש בעיה.","goals":"שיתופי פעולה: מלמדים ומחנכים\nנוספת: הורים","card":"מה הוא צריך: שיחת היכרות · שיתוף פעולה\nמתי: עכשיו · בהמשך\nמי הוא: הורים · מלמד · מחנך","path":"אתה מתקשר תוך יומיים.","capacity":"חצי שעה ביום","untapped":"הודעת תודה, ואז רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)"],"extra":"הורים לא רוצים שהמילה \"קשב\" תופיע בטלפון של הבית, וגם שם העסק שלי כולל אותה. אצלי ההודעה רק עם השם שלי והטלפון."},{"id":100,"type":"מכולות (9)","greeting":"מכולת שכונתית עם משלוחים. משפחות מהשכונה.","goals":"מכירה ישירה: משפחות מכל העיר","card":"כרטיס כמעט ריק בכוונה: שם, וזהו. הערך כולו בהודעה עם המספר להזמנות.","path":"הודעה אוטומטית עם המספר להזמנות, מיד; בלי צעד שני.","capacity":"רק מה שאוטומטי","untapped":"רק רשימת תפוצה","messages":["איך מזמינים (בערב של יום התערוכה (במקום התודה))"],"extra":"לא צריך הודעת תודה. רק הודעה אחת עם המספר להזמנות, באותו ערב."},{"id":105,"type":"אולמות אירועים (1)","greeting":"אולם אירועים. משפחות, מוסדות.","goals":"מכירה ישירה עם תאריך: משפחות אחרי אירוסין; שריון לשבוע","card":"מה הוא צריך: חתונה · אירוע\nמתי: יש תאריך (מתי?) · רק בודק\nמי הוא: משפחה · מוסד\nשריון תאריך לשבוע, כמו שאמרת.","path":"אתה משריין את התאריך לשבוע, באותו יום; לא חזר בשבוע — התאריך משתחרר, בלי צעד שני.","capacity":"שעה ביום","untapped":"הודעת תודה, ואז רשימת תפוצה","messages":["תודה שביקרת (בערב של יום התערוכה)","אישור שריון (באותו יום)"],"extra":"השריון לשבוע בדיוק; אחרי שבוע התאריך משתחרר."}];
+const AUTO_MAX_TURNS = 24;
+const AREAS = ["מטרות", "כרטיס", "מסלול", "זמן למעקב", "מבקר בלי סימון", "הודעות", "רגישות"];
+let autoCtl = null, autoBusy = false;
+const autoState = {};
+
+function facts(c) {
+  return [`סוג העסק: ${c.type}`, `המטרות: ${c.goals}`, `הכרטיס בדוכן: ${c.card || "רק השם"}`, `המסלול אחרי התערוכה: ${c.path}`,
+    `זמן ביום למעקב: ${c.capacity}`, `מבקר שלא סומן אצלו כלום: ${c.untapped}`, `ההודעות: ${c.messages.join(" · ")}`, c.extra && `מה שחשוב לך: ${c.extra}`].filter(Boolean).join("\n");
+}
+function transcript(sess, me) {
+  return sess.turns.filter((t) => t.role === "assistant" || t.role === "user")
+    .map((t) => (t.role === "assistant" ? "היועץ: " + t.text + (t.quick && t.quick.length ? `\n(כפתורי תשובה: ${t.quick.join(" | ")})` : "") : me + ": " + t.text)).join("\n\n");
+}
+function personaInput(c, sess) {
+  return `You play a Haredi business owner, aged 20-55, not technical, busy, setting up his booth for the Belz community business expo with an AI consultant. Stay in character. Write in Hebrew.
+
+WHAT YOU KNOW ABOUT YOUR BUSINESS (the truth; this is what you decided in earlier conversations):
+${facts(c)}
+Your first answer to "what is your business and to whom do you sell": ${c.greeting}
+
+HOW TO ANSWER:
+- Short, like a busy owner: one or two sentences. Answer only what was asked. Never recite the list above, never volunteer the whole setup.
+- Say it in your own words, not the exact wording above.
+- If the consultant proposes something that contradicts what you know, correct him briefly. If he proposes something that matches, agree.
+- If he asks about something the list does not cover (how people buy from you, who recommends you), answer plausibly, consistent with the list, without new products or customers.
+- If he asks something you have no view on, say so briefly ("לא חשבתי על זה, מה אתה מציע?").
+- You may answer with one of his quick-reply buttons when one fits exactly.
+- When he has shown you a full summary of the setup and you have no more corrections, answer "מאשר, תודה" and set done to true. If the summary has a mistake, correct it (done false).
+
+THE CONVERSATION SO FAR:
+${transcript(sess, "אתה")}
+
+REPLY with ONLY a compact JSON object: {"reply":"your next message, Hebrew","done":false}`;
+}
+function judgeInput(c, sess) {
+  return `You judge a setup consultant for an expo lead system. A simulated exhibitor knew the APPROVED SETUP below (approved by the real exhibitor). Compare what the consultant built (FINAL SETUP and the conversation) with the approved setup. Judge meaning, not wording. Write every note in short plain Hebrew.
+
+APPROVED SETUP:
+${facts(c)}
+
+FINAL SETUP THE CONSULTANT BUILT (JSON):
+${JSON.stringify(sess.setup)}
+
+THE CONVERSATION:
+${transcript(sess, "המציג")}
+
+For each area give a verdict: "תואם" (same in substance), "חלקי" (part missing or slightly off), "לא תואם" (wrong or missing). Areas: ${AREAS.join(", ")}.
+"רגישות" = did the consultant respect what is sensitive for this business (what not to write on the card or in messages, discretion); if nothing is sensitive here, "תואם" when he invented no sensitivity problem.
+Also list: "invented" — facts, numbers or steps the consultant put in the setup that the exhibitor never said (not inferences the exhibitor confirmed); "craft" — problems in HOW he ran the conversation (more than one question in a turn, asking again what was answered, assuming a season, a quick reply that contradicts what was said, a summary pasted instead of written fresh).
+
+REPLY with ONLY a compact JSON object: {"areas":[{"area":"","verdict":"תואם|חלקי|לא תואם","approved":"short","built":"short","note":"short"}],"invented":[""],"craft":[""],"summary":"one sentence"}`;
+}
+
+async function ask(input, tier) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { return await sample.json(input, { cache: false, signal: autoCtl.signal, modelTier: tier }); }
+    catch (e) {
+      if (e && e.code === "cancelled") throw e;
+      if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) throw e;
+      const fixed = e && e.code === "invalid_json" && e.text ? lenient(e.text) : null;
+      if (fixed) return fixed;
+      if (e && e.code === "rate_limited") await new Promise((r) => setTimeout(r, 8000));
+    }
+  }
+  return null;
+}
+
+async function runCase(c, runId) {
+  const st = autoState[c.id] = { runId, caseId: c.id, type: c.type, status: "רץ…", sess: { turns: [{ role: "assistant", text: GREETING, quick: [] }], setup: JSON.parse(JSON.stringify(EMPTY_SETUP)) }, judge: null };
+  renderAuto();
+  let n = 0;
+  for (; n < AUTO_MAX_TURNS; n++) {
+    st.status = `סבב ${n + 1}: המציג עונה…`; renderAuto();
+    const p = await ask(personaInput(c, st.sess), "default");
+    if (!p || typeof p.reply !== "string" || !p.reply.trim()) { st.status = "המציג המדומה לא ענה. נעצר."; break; }
+    st.sess.turns.push({ role: "user", text: p.reply.trim() });
+    if (p.done) break;
+    st.status = `סבב ${n + 1}: היועץ חושב…`; renderAuto();
+    const r = await ask(buildInput(st.sess), "default");
+    if (!take(r, st.sess)) { st.sess.turns.push({ role: "error", text: "היועץ לא ענה בצורה תקינה בסבב הזה." }); }
+  }
+  if (n >= AUTO_MAX_TURNS) st.sess.turns.push({ role: "error", text: `הגיע לתקרה של ${AUTO_MAX_TURNS} סבבים בלי סיכום מאושר.` });
+  st.status = "הבודק משווה…"; renderAuto();
+  st.judge = await ask(judgeInput(c, st.sess), "complex");
+  const ai = st.sess.turns.filter((t) => t.role === "assistant");
+  st.stats = { turns: ai.length, multiQ: ai.filter((t) => (t.text.match(/\?/g) || []).length > 1).length, checks: checks(st.sess.setup).filter((x) => x[1]).length, checksOf: checks(st.sess.setup).length };
+  st.status = st.judge ? "הסתיים" : "הסתיים, אבל הבודק לא ענה";
+  renderAuto();
+  if (db) {
+    const doc = { version: 1, runId, caseId: c.id, type: c.type, finishedAt: new Date().toISOString(), stats: st.stats, judge: st.judge, setup: st.sess.setup,
+      turns: st.sess.turns.map((t) => ({ role: t.role, text: t.text, quick: t.quick || [] })) };
+    try { await db.collection("autotests").doc(runId + "_" + c.id).set(doc); } catch (e) { /* the result is still on screen */ }
+  }
+}
+
+async function runAuto() {
+  if (autoBusy) return;
+  if (!sample) { showNotice("היועץ לא זמין בתצוגה הזו. פתח את הדף ב-claude.ai כשאתה מחובר."); return; }
+  const chosen = CASES.filter((c) => { const b = document.getElementById("case-" + c.id); return b && b.checked; });
+  if (!chosen.length) return;
+  autoBusy = true; autoCtl = new AbortController(); $("#auto-run").disabled = true; $("#auto-stop").hidden = false;
+  const runId = "r" + Date.now().toString(36);
+  try { for (const c of chosen) await runCase(c, runId); }
+  catch (e) {
+    const code = e && e.code;
+    Object.values(autoState).forEach((s) => { if (!/^הסתיים/.test(s.status)) s.status = code === "cancelled" ? "נעצר." : "נעצר: הדף לא קיבל אישור להשתמש ב-Claude."; });
+  } finally { autoBusy = false; autoCtl = null; $("#auto-run").disabled = false; $("#auto-stop").hidden = true; renderAuto(); }
+}
+
+function vClass(v) { return v === "תואם" ? "v good" : v === "חלקי" ? "v part" : "v bad"; }
+function renderAuto() {
+  const box = $("#results"); box.textContent = "";
+  CASES.forEach((c) => {
+    const st = autoState[c.id]; if (!st) return;
+    const card = el("article", "result");
+    const head = el("div", "result-head"); head.append(el("strong", "", `${c.id}. ${c.type}`), el("span", "status", st.status));
+    if (st.stats) head.append(el("span", "status", `${st.stats.turns} תורות של היועץ · ${st.stats.multiQ} עם יותר משאלה אחת · רשימת בדיקה ${st.stats.checks}/${st.stats.checksOf}`));
+    card.append(head);
+    const j = st.judge;
+    if (j && Array.isArray(j.areas)) {
+      const vs = el("div", "verdicts"); j.areas.forEach((a) => vs.append(el("span", vClass(a.verdict), `${a.area}: ${a.verdict}`))); card.append(vs);
+      if (j.summary) card.append(el("p", "", j.summary));
+      const t = el("table", "cmp"); const cg = el("colgroup"); cg.append(Object.assign(el("col", "area")), el("col"), el("col"), el("col")); t.append(cg);
+      const hr = el("tr"); ["תחום", "מה אושר", "מה היועץ בנה", "הערת הבודק"].forEach((h) => hr.append(el("th", "", h))); t.append(hr);
+      j.areas.forEach((a) => { const r = el("tr"); r.append(el("td", "", a.area + "\n" + (a.verdict || "")), el("td", "", a.approved || ""), el("td", "", a.built || ""), el("td", "", a.note || "")); t.append(r); });
+      card.append(t);
+      const lists = el("div", "lists");
+      const inv = (j.invented || []).filter(Boolean), cr = (j.craft || []).filter(Boolean);
+      if (inv.length) { lists.append(el("h3", "", "מה היועץ המציא")); inv.forEach((x) => lists.append(el("p", "", "• " + x))); }
+      if (cr.length) { lists.append(el("h3", "", "איך הוא ניהל את השיחה")); cr.forEach((x) => lists.append(el("p", "", "• " + x))); }
+      if (inv.length || cr.length) card.append(lists);
+    }
+    const d = el("details"); d.append(el("summary", "", "השיחה המלאה"));
+    const tr = el("div", "transcript");
+    st.sess.turns.forEach((t) => tr.append(el("div", "msg " + (t.role === "assistant" ? "ai" : t.role === "error" ? "err" : "me"), t.text)));
+    d.append(tr); card.append(d);
+    box.append(card);
+  });
+}
+
+function renderCases() {
+  const box = $("#cases"); box.textContent = "";
+  CASES.forEach((c) => {
+    const l = el("label"); const b = el("input"); b.type = "checkbox"; b.id = "case-" + c.id; b.checked = true;
+    l.append(b, document.createTextNode(`${c.id}. ${c.type.replace(/\s*\(.*\)$/, "")}`)); box.append(l);
+  });
+}
+/* The last saved result of each case comes back when the page opens again. */
+async function loadAuto() {
+  if (!db) return;
+  try {
+    const snap = await db.collection("autotests").orderBy("finishedAt", "desc").limit(60).get();
+    const docs = snap.docs ? snap.docs.map((d) => d.data()) : [];
+    docs.forEach((x) => {
+      if (!x || autoState[x.caseId] || !CASES.some((c) => c.id === x.caseId)) return;
+      autoState[x.caseId] = { runId: x.runId, caseId: x.caseId, type: x.type, status: "תוצאה שמורה · " + new Date(x.finishedAt).toLocaleString("he-IL"), sess: { turns: x.turns || [], setup: x.setup || EMPTY_SETUP }, judge: x.judge, stats: x.stats };
+    });
+    renderAuto();
+  } catch (e) { /* no saved results */ }
+}
+$("#auto-run").addEventListener("click", runAuto);
+$("#auto-stop").addEventListener("click", () => { if (autoCtl) autoCtl.abort(); });
+renderCases();
+
 newSession();
 (async () => {
   try { sample = window.claude && typeof window.claude.use === "function" ? await window.claude.use("sample") : null; } catch (e) { sample = null; }
   try { db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null; } catch (e) { db = null; }
   if (!sample) showNotice("היועץ לא זמין בתצוגה הזו. פתח את הדף ב-claude.ai כשאתה מחובר.");
   else if (!db) showNotice("השיחות לא נשמרות בתצוגה הזו, אבל היועץ עובד.");
+  loadAuto();
 })();
 </script>
