@@ -30,7 +30,7 @@ function deflt(id, s) {
 }
 function card(s, id) {
   const fix = F.cardFix[String(id)];
-  if (!fix) return String(s);
+  if (!fix) return String(s).replace(/^\s+/, '');
   const lines = String(s).split('\n').filter((l) => !/^מה הוא צריך:/.test(l) && !/לקח מספר/.test(l));
   if ((fix.need || []).length > 1) lines.unshift('מה הוא צריך: ' + fix.need.join(' · '));
   return lines.concat(fix.note ? [fix.note] : []).join('\n');
