@@ -68,3 +68,4 @@ textarea { resize: vertical; }
 .center .save { position: static; width: 100%; max-width: 320px; }
 .small { font-size: .88rem; }
 .who { margin-inline-end: auto; }
+.templates { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }

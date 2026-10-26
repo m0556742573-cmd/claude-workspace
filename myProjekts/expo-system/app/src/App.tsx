@@ -7,7 +7,7 @@ import { Booth, today } from './booth/Booth.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
 import { allLeads, saveLead as saveLocal, type LocalLead } from './store/local.ts';
 import {
-  activeSetup, flush, loadDirectory, myExhibitor, saveLead, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, flush, startFromTemplate, loadDirectory, myExhibitor, saveLead, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 
@@ -50,6 +50,7 @@ function Live() {
     myExhibitor().then(async (ex) => {
       setExhibitor(ex);
       if (!ex) return;
+      if (!ex.approved) return;
       setSetup(await activeSetup(ex.id));
       setDirectory(await loadDirectory());
     }).catch((e) => setError(String(e.message ?? e)));
@@ -94,8 +95,27 @@ function Live() {
       </Message>
     );
   }
+  if (!exhibitor.approved) {
+    return (
+      <Message title="הדוכן שלך ממתין לאישור">
+        <p>נכנסת בתור <strong>{session.user.email}</strong>. המייל הזה לא ברשימת המציגים של התערוכה, אז הדוכן ייפתח אחרי אישור של מנהל התערוכה.</p>
+        <button type="button" className="link" onClick={signOut}>יציאה</button>
+      </Message>
+    );
+  }
   if (setup === undefined) return <Message title="טוען…" />;
-  if (!setup) return <Message title="הדוכן שלך עוד לא הוקם"><p>{exhibitor.name}: ההקמה עוד לא מוכנה.</p></Message>;
+  if (!setup) {
+    return (
+      <Message title="בוא נקים את הדוכן">
+        <p>מסך ההקמה המלא בדרך. בינתיים אפשר להתחיל מתבנית של עסק דומה, ולשנות אחר כך.</p>
+        <div className="templates">
+          {fixtures.map((f) => (
+            <button key={f.id} type="button" className="chip" onClick={async () => { await startFromTemplate(exhibitor.id, f.setup); setSetup(f.setup); }}>{f.name}</button>
+          ))}
+        </div>
+      </Message>
+    );
+  }
 
   return (
     <Booth

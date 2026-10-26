@@ -7,7 +7,7 @@ import type { Person } from '../demo/people.ts';
 
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
 
-export interface Exhibitor { id: string; name: string; business: string }
+export interface Exhibitor { id: string; name: string; business: string; approved: boolean }
 
 export async function signInWithGoogle(): Promise<void> {
   await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } });
@@ -15,7 +15,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -24,6 +24,12 @@ export async function activeSetup(exhibitorId: string): Promise<Setup | null> {
   const { data, error } = await supabase.from('setups').select('data').eq('exhibitor_id', exhibitorId).eq('active', true).maybeSingle();
   if (error) throw error;
   return (data?.data as Setup) ?? null;
+}
+
+/** Until the setup screens exist: start from a ready template of a business from the rounds. */
+export async function startFromTemplate(exhibitorId: string, setup: Setup): Promise<void> {
+  const { error } = await supabase.from('setups').insert({ exhibitor_id: exhibitorId, version: 1, data: setup, source: 'manual', active: true });
+  if (error) throw error;
 }
 
 /** The community names (no phone, no mail), kept in memory for a search that does not wait on the network. */
