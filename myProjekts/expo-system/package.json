@@ -8,5 +8,8 @@
   "scripts": {
     "test": "npm test --workspaces --if-present"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
 }

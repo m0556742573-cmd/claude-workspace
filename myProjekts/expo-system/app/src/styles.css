@@ -62,3 +62,9 @@ textarea { resize: vertical; }
 .today ul { list-style: none; margin: 0; padding: 0; display: grid; }
 .today li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line); }
 .today .next { color: var(--petrol); font-weight: 600; font-size: .95rem; }
+
+.center { text-align: center; justify-items: center; gap: 14px; padding-block: 32px; }
+.center h1 { font-family: var(--display); font-size: 1.6rem; margin: 0; }
+.center .save { position: static; width: 100%; max-width: 320px; }
+.small { font-size: .88rem; }
+.who { margin-inline-end: auto; }

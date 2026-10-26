@@ -1,16 +1,15 @@
-// The booth: find the visitor, tap the card, save — in seconds, with or without a network.
-// The next step is computed on the phone at once, by the same engine the server runs.
-import { useEffect, useMemo, useState } from 'react';
+// The booth: find the visitor, tap the card, save — in seconds. Where the lead is stored is the caller's
+// business (the database, or the phone alone in the demo); the next step is computed here at once.
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { nextTask, type Next, type Setup } from '@expo/engine';
-import { fixtures } from '@expo/engine/fixtures/businesses.ts';
-import { searchPeople, type Person } from '../demo/people.ts';
-import { allLeads, saveLead, type LocalLead } from '../store/local.ts';
+import type { Person } from '../demo/people.ts';
+import type { LocalLead } from '../store/local.ts';
 
 const DAYS = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
 const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'להכין', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'לחכות ללקוח' };
 const END: Record<string, string> = { list: 'רשימת תפוצה', stop: 'בלי מעקב', engaged: 'בטיפול', closed: 'נסגר', notRelevant: 'לא רלוונטי', optOut: 'הוסר' };
 
-function today(): string {
+export function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -26,37 +25,32 @@ export function describe(n: Next): string {
   return `${ACT[n.action] ?? n.action} ${who} · ${dayLabel(n.dueOn)}${n.late ? ' (מאוחר)' : ''}`;
 }
 
-function initialBiz(): number {
-  const q = Number(new URLSearchParams(location.search).get('biz'));
-  const i = fixtures.findIndex((f) => f.id === q);
-  return i >= 0 ? i : 0;
+export interface BoothProps {
+  setup: Setup;
+  /** Above the search: the exhibitor's name, the demo's business picker. */
+  header: ReactNode;
+  search: (q: string) => Person[];
+  save: (lead: LocalLead) => Promise<'saved' | 'waiting'>;
+  todays: LocalLead[];
+  waiting: number;
+  online: boolean;
 }
 
-export function Booth() {
-  const [biz, setBiz] = useState(initialBiz);
-  const setup: Setup = fixtures[biz]!.setup;
+export function Booth({ setup, header, search, save, todays, waiting, online }: BoothProps) {
   const [query, setQuery] = useState('');
   const [person, setPerson] = useState<Person | null>(null);
   const [typed, setTyped] = useState<{ name: string; phone: string } | null>(null);
   const [taps, setTaps] = useState<Set<string>>(new Set());
   const [customerDate, setCustomerDate] = useState('');
   const [note, setNote] = useState('');
-  const [leads, setLeads] = useState<LocalLead[]>([]);
   const [toast, setToast] = useState('');
-  const [online, setOnline] = useState(navigator.onLine);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { allLeads().then(setLeads).catch(() => setLeads([])); }, []);
-  useEffect(() => {
-    const on = () => setOnline(true), off = () => setOnline(false);
-    addEventListener('online', on); addEventListener('offline', off);
-    return () => { removeEventListener('online', on); removeEventListener('offline', off); };
-  }, []);
+  useEffect(() => { reset(); }, [setup]);
 
-  const results = useMemo(() => (person || typed ? [] : searchPeople(query)), [query, person, typed]);
+  const results = useMemo(() => (person || typed ? [] : search(query)), [query, person, typed, search]);
   const wantsDate = [...taps].some((t) => t.includes('מתי?'));
-  const ready = !!(person || (typed && typed.name.trim()));
-  const todays = leads.filter((l) => l.capturedOn === today());
-  const waiting = leads.filter((l) => !l.synced).length;
+  const ready = !busy && !!(person || (typed && typed.name.trim()));
 
   function toggle(label: string) {
     setTaps((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
@@ -64,8 +58,9 @@ export function Booth() {
   function reset() {
     setQuery(''); setPerson(null); setTyped(null); setTaps(new Set()); setCustomerDate(''); setNote('');
   }
-  async function save() {
+  async function onSave() {
     if (!ready) return;
+    setBusy(true);
     const lead: LocalLead = {
       id: crypto.randomUUID(),
       capturedOn: today(),
@@ -81,10 +76,10 @@ export function Booth() {
       note: note.trim(),
       synced: false,
     };
-    await saveLead(lead);
-    setLeads((ls) => [lead, ...ls]);
-    setToast(`נשמר: ${lead.name} · ${describe(nextTask(setup, lead, today()))}`);
+    const where = await save(lead);
+    setToast(`${where === 'saved' ? 'נשמר' : 'נשמר בטלפון, יעלה כשתחזור הרשת'}: ${lead.name} · ${describe(nextTask(setup, lead, today()))}`);
     reset();
+    setBusy(false);
     setTimeout(() => setToast(''), 4000);
   }
 
@@ -97,11 +92,9 @@ export function Booth() {
   return (
     <div className="booth">
       <header className="top">
-        <select aria-label="העסק (הדגמה)" value={biz} onChange={(e) => { setBiz(Number(e.target.value)); reset(); }}>
-          {fixtures.map((f, i) => <option key={f.id} value={i}>{f.name}</option>)}
-        </select>
+        {header}
         <span className="count">היום: {todays.length}</span>
-        <span className={'sync' + (online ? '' : ' off')}>{online ? (waiting ? `${waiting} ממתינים לשרת` : 'הכל נשמר') : 'בלי רשת — נשמר בטלפון'}</span>
+        <span className={'sync' + (online && !waiting ? '' : ' off')}>{!online ? 'בלי רשת — נשמר בטלפון' : waiting ? `${waiting} ממתינים לעלות` : 'הכל נשמר'}</span>
       </header>
 
       <section className="step" aria-label="המבקר">
@@ -151,7 +144,7 @@ export function Booth() {
         <textarea id="note" placeholder="הערה (לא חובה)" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
       </section>
 
-      <button type="button" className="save" disabled={!ready} onClick={save}>שמירה</button>
+      <button type="button" className="save" disabled={!ready} onClick={onSave}>שמירה</button>
       {toast && <p className="toast" role="status">{toast}</p>}
 
       <section className="today" aria-label="נרשמו היום">
@@ -160,7 +153,7 @@ export function Booth() {
         <ul>
           {todays.map((l) => (
             <li key={l.id}>
-              <span><strong>{l.name}</strong>{l.taps.length ? <span className="muted"> · {l.taps.join(' · ')}</span> : null}</span>
+              <span><strong>{l.name}</strong>{l.taps.length ? <span className="muted"> · {l.taps.join(' · ')}</span> : null}{!l.synced && <span className="muted"> · ממתין לעלות</span>}</span>
               <span className="next">{describe(nextTask(setup, l, today()))}</span>
             </li>
           ))}
