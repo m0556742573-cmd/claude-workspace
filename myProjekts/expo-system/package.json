@@ -1,0 +1,8 @@
+{
+  "name": "expo-system",
+  "private": true,
+  "workspaces": ["engine"],
+  "scripts": {
+    "test": "npm test --workspaces --if-present"
+  }
+}
