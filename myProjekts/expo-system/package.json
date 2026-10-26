@@ -2,7 +2,8 @@
   "name": "expo-system",
   "private": true,
   "workspaces": [
-    "engine"
+    "engine",
+    "app"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present"
