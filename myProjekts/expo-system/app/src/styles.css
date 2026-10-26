@@ -104,3 +104,62 @@ textarea { resize: vertical; }
 .variant ol { margin: 2px 0 0; padding-inline-start: 22px; }
 .note { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 8px 12px; margin: 0; font-weight: 600; }
 .err { color: var(--warn); }
+
+/* The two parts of the system, and the menu for everything else. */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding: max(8px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-left, 0px)) 6px; display: grid; gap: 6px; }
+.parts { display: flex; gap: 6px; }
+.part { flex: 1; min-height: 40px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); font-weight: 700; cursor: pointer; }
+.part[aria-pressed="true"] { background: var(--petrol); border-color: var(--petrol); color: var(--bg); }
+.part.more { flex: none; padding: 0 14px; color: var(--muted); }
+.bar .tabs { position: static; padding: 0; border: 0; background: none; }
+.menu { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: var(--bg); border-radius: 10px; }
+.tab.here { color: var(--ink); }
+
+/* The booth's card: tapping the name saved him; the card stays while you talk. */
+.results button { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-height: 48px; }
+.tag { margin-inline-start: auto; font-size: .78rem; font-weight: 700; background: var(--petrol-soft); color: var(--petrol); border-radius: 999px; padding: 1px 8px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.card { border-color: var(--petrol); border-width: 1.5px; }
+.card-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.big { font-size: 1.2rem; }
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tool { min-height: 56px; border: 1.5px solid var(--petrol); border-radius: 12px; background: var(--petrol-soft); color: var(--petrol); font-weight: 700; font-size: 1.05rem; cursor: pointer; }
+.tool.on { background: var(--warn); border-color: var(--warn); color: var(--bg); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .75; } }
+@media (prefers-reduced-motion: reduce) { .tool.on { animation: none; } }
+.note-box { display: grid; gap: 8px; }
+.notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.notes li { background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.voice { display: grid; gap: 4px; }
+.voice audio { width: 100%; height: 36px; }
+.next-line { margin: 0; color: var(--muted); }
+.next-line strong { color: var(--petrol); }
+.confirm { display: grid; gap: 8px; background: var(--warn-soft); border-radius: 10px; padding: 10px; }
+.act.danger { background: var(--warn); border-color: var(--warn); color: var(--bg); }
+.quiet { color: var(--muted); font-weight: 500; }
+.today-row { width: 100%; text-align: right; display: grid; gap: 2px; background: none; border: 0; padding: 10px 0; cursor: pointer; }
+.today-row[aria-current="true"] strong { color: var(--petrol); }
+.today li { padding: 0; }
+
+/* תמונת מצב */
+.hero { justify-items: center; text-align: center; gap: 4px; }
+.hero-num { font-family: var(--display); font-size: 3rem; line-height: 1; font-weight: 700; color: var(--petrol); }
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bars li { display: grid; grid-template-columns: minmax(0, 1.4fr) 1fr 2.5ch; gap: 10px; align-items: center; }
+.meter { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; display: block; }
+.meter span { display: block; height: 100%; background: var(--petrol); border-radius: 4px; }
+.bars strong { text-align: left; font-variant-numeric: tabular-nums; }
+
+/* הבא בתור */
+.task.first { border-color: var(--petrol); border-width: 1.5px; box-shadow: 0 1px 0 var(--line); }
+.what { font-weight: 600; }
+.contact { display: flex; gap: 6px; flex-wrap: wrap; }
+.contact .act { text-decoration: none; color: var(--petrol); display: inline-flex; align-items: center; }
+.sheet { display: grid; gap: 10px; background: var(--bg); border-radius: 12px; padding: 12px; }
+.chip-date { min-height: 44px; border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); }
+.save.inline-save { position: static; min-height: 50px; }
+.day-group { display: grid; gap: 4px; }
+.undo { position: sticky; top: 104px; z-index: 4; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--ink); color: var(--bg); border-radius: 10px; padding: 8px 12px; font-weight: 600; }
+.undo .link { color: var(--bg); text-decoration: underline; }

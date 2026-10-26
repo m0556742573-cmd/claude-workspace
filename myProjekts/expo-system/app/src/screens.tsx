@@ -1,29 +1,30 @@
-// The exhibitor's screens after the booth: tasks, leads, the setup, messages, settings — and the admin's.
-// What is built works on the real data; what is not built yet says plainly what it will be.
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { Setup } from '@expo/engine';
+// The exhibitor's screens beside the booth: the snapshot of the day, the follow-up queue, the customers,
+// the setup, messages, settings — and the admin's. What is built works on the real data; what is not says what it will be.
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { nextTask, pathAhead, type Action, type Lead, type Next, type Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
-import { describe, today } from './booth/Booth.tsx';
 import * as text from './lib/describe.ts';
+import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import type { Person } from './demo/people.ts';
+import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  adminApprove, adminExhibitors, changeTemplate, listLeads, listSteps, listTasks, markStep, myGreeting, setCustomerDate, setGreeting,
-  type AdminExhibitor, type Exhibitor, type LeadRow, type StepRow, type TaskRow,
+  addFollowNote, addManual, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  removeManual, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
 const LAB_URL = 'https://claude.ai/artifact/ThNurpj84KQfa4ETqSwUdH';
-const DAYS = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
-const OUTCOME: Record<string, string> = { engaged: 'ענה', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר' };
+const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר' };
+/** For a step that is not a talk, "noAnswer" means only "done, the path goes on". */
+const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
 
 export interface Ctx { exhibitor: Exhibitor; setup: Setup; directory: Person[]; setSetup: (s: Setup) => void }
 
-function dateLabel(d: string): string {
-  if (d === today()) return 'היום';
-  const [y, m, day] = d.split('-').map(Number);
-  return `${DAYS[new Date(y!, m! - 1, day!).getDay()]} ${day}.${m}`;
-}
 function nameOf(l: LeadRow, directory: Person[]): string {
   return l.typed_name ?? directory.find((p) => p.id === l.person_id)?.fullName ?? 'מבקר';
+}
+function cityOf(l: LeadRow, directory: Person[]): string {
+  return directory.find((p) => p.id === l.person_id)?.city ?? '';
 }
 function ownerOf(l: LeadRow, directory: Person[]): boolean {
   return directory.find((p) => p.id === l.person_id)?.businessOwner ?? false;
@@ -38,111 +39,373 @@ function useData<T>(load: () => Promise<T>): [T | undefined, () => void, string]
   useEffect(() => { reload(); }, [reload]);
   return [data, reload, error];
 }
+/** 050-1234567 → 972501234567, for a WhatsApp link. */
+function waNumber(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  return d.startsWith('0') ? '972' + d.slice(1) : d;
+}
 
-// ---------- המשימות שלי
+// ---------- the undo bar: one-tap actions can be taken back for a few seconds
 
-export function Tasks({ ctx }: { ctx: Ctx }) {
-  const load = useCallback(async () => ({ leads: await listLeads(), tasks: await listTasks() }), []);
-  const [data, reload, error] = useData(load);
-  const [busy, setBusy] = useState('');
-  if (error) return <p className="err">{error}</p>;
-  if (!data) return <p className="muted">טוען…</p>;
-  const byId = new Map(data.leads.map((l) => [l.id, l]));
-  const open = data.tasks.filter((t) => t.kind !== 'end' && byId.has(t.lead_id)).sort((a, b) => (a.due_on ?? '').localeCompare(b.due_on ?? ''));
-  const now = open.filter((t) => (t.due_on ?? '') <= today());
-  const later = open.filter((t) => (t.due_on ?? '') > today());
-
-  async function act(t: TaskRow, outcome: string) {
-    setBusy(t.lead_id);
-    const l = byId.get(t.lead_id)!;
-    await markStep(l, t.step_id!, outcome, ctx.exhibitor.id, ctx.setup, ownerOf(l, ctx.directory), today()).catch(() => {});
-    setBusy(''); reload();
-  }
-  async function date(t: TaskRow, d: string) {
-    if (!d) return;
-    setBusy(t.lead_id);
-    const l = byId.get(t.lead_id)!;
-    await setCustomerDate(l, d, ctx.exhibitor.id, ctx.setup, ownerOf(l, ctx.directory), today()).catch(() => {});
-    setBusy(''); reload();
-  }
-  function row(t: TaskRow) {
-    const l = byId.get(t.lead_id)!;
-    const label = t.kind === 'askDate' ? 'לברר את התאריך שלו' : describe({ kind: 'task', stepId: t.step_id!, action: t.action as 'talk', who: t.who as 'me', message: t.message ?? undefined, dueOn: t.due_on!, late: t.late }).split(' · ')[0];
-    return (
-      <li key={t.lead_id} className="task">
-        <div className="task-head">
-          <strong>{nameOf(l, ctx.directory)}</strong>
-          <span className={'when' + ((t.due_on ?? '') < today() ? ' over' : '')}>{t.due_on ? dateLabel(t.due_on) : ''}</span>
-        </div>
-        <div className="muted">{label}{t.message ? ` · ${t.message}` : ''}{l.taps.length ? ` · ${l.taps.join(' · ')}` : ''}</div>
-        {t.kind === 'askDate' ? (
-          <label className="inline">התאריך שלו: <input type="date" disabled={busy === t.lead_id} onChange={(e) => date(t, e.target.value)} /></label>
-        ) : t.who === 'auto' ? (
-          <div className="muted small">יוצא אוטומטית. (השליחה עצמה מתחברת בקרוב.)</div>
-        ) : (
-          <div className="acts">
-            <button type="button" className="act ok" disabled={busy === t.lead_id} onClick={() => act(t, 'engaged')}>ענה</button>
-            <button type="button" className="act" disabled={busy === t.lead_id} onClick={() => act(t, 'noAnswer')}>לא ענה</button>
-            <button type="button" className="act" disabled={busy === t.lead_id} onClick={() => act(t, 'closed')}>נסגרה עסקה</button>
-            <button type="button" className="act" disabled={busy === t.lead_id} onClick={() => act(t, 'notRelevant')}>לא רלוונטי</button>
-          </div>
-        )}
-      </li>
-    );
-  }
+interface Undo { label: string; run: () => Promise<void> }
+function UndoBar({ undo, onDone }: { undo: Undo | null; onDone: () => void }) {
+  useEffect(() => { if (!undo) return; const t = setTimeout(onDone, 10000); return () => clearTimeout(t); }, [undo, onDone]);
+  if (!undo) return null;
   return (
-    <div className="screen">
-      <h2>להיום</h2>
-      {now.length ? <ul className="tasks">{now.map(row)}</ul> : <p className="muted">אין משימות להיום.</p>}
-      <h2>בהמשך</h2>
-      {later.length ? <ul className="tasks">{later.map(row)}</ul> : <p className="muted">אין משימות בהמשך. כל מבקר שתרשום בדוכן יקבל כאן את הצעד הבא שלו.</p>}
-      <Soon title="הודעת בוקר"><p>כל בוקר תגיע אליך בוואטסאפ רשימת המשימות של היום, עם קישור לכאן.</p></Soon>
+    <div className="undo" role="status">
+      <span>{undo.label}</span>
+      <button type="button" className="link" onClick={async () => { onDone(); await undo.run(); }}>ביטול</button>
     </div>
   );
 }
 
-// ---------- הלקוחות שלי
+// ---------- תמונת מצב: the day of the fair, calmly, from this phone
 
-export function Leads({ ctx }: { ctx: Ctx }) {
-  const load = useCallback(async () => ({ leads: await listLeads(), tasks: await listTasks() }), []);
-  const [data, , error] = useData(load);
-  const [open, setOpen] = useState<string | null>(null);
-  const [steps, setSteps] = useState<StepRow[]>([]);
-  useEffect(() => { if (open) listSteps(open).then(setSteps).catch(() => setSteps([])); }, [open]);
-  if (error) return <p className="err">{error}</p>;
-  if (!data) return <p className="muted">טוען…</p>;
-  const task = new Map(data.tasks.map((t) => [t.lead_id, t]));
-  const status = (id: string): string => {
-    const t = task.get(id);
-    if (!t) return '—';
-    if (t.kind === 'end') return ({ list: 'ברשימת התפוצה', stop: 'המעקב נגמר', engaged: 'בטיפול', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'הוסר' } as Record<string, string>)[t.end_reason ?? ''] ?? '—';
-    if (t.kind === 'askDate') return 'לברר תאריך';
-    return `${({ talk: 'שיחה', meet: 'פגישה', send: 'הודעה', reserve: 'שריון', check: 'בדיקה' } as Record<string, string>)[t.action ?? ''] ?? t.action} · ${t.due_on ? dateLabel(t.due_on) : ''}`;
-  };
+export function Snapshot({ setup, todays, notes, waiting }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number }) {
+  const owners = todays.filter((l) => l.businessOwner).length;
+  const ids = new Set(todays.map((l) => l.id));
+  const mine = notes.filter((n) => ids.has(n.leadId));
+  const byNeed = setup.needs.map((n) => ({ label: n.label, count: todays.filter((l) => l.taps.includes(n.label)).length, primary: n.goal === 'primary' }));
+  const nothing = todays.filter((l) => !l.taps.length).length;
+  const ahead = todays.map((l) => nextTask(setup, l, today())).filter((n): n is Extract<Next, { kind: 'task' }> => n.kind === 'task');
+  const week = inDays(7);
+  const myWeek = ahead.filter((n) => n.who === 'me' && n.dueOn <= week).length;
+  const autoWeek = ahead.filter((n) => n.who === 'auto' && n.dueOn <= week).length;
+  const firstDay = ahead.map((n) => n.dueOn).sort()[0];
+  const max = Math.max(1, ...byNeed.map((b) => b.count));
   return (
     <div className="screen">
-      <h2>כל המבקרים ({data.leads.length})</h2>
-      {!data.leads.length && <p className="muted">עוד לא נרשמו מבקרים. הם יופיעו כאן מהרגע שתשמור אותם בדוכן.</p>}
+      <section className="step hero">
+        <span className="hero-num">{todays.length}</span>
+        <span>נרשמו היום{owners ? ` · ${owners} בעלי עסק` : ''}</span>
+        {waiting > 0 && <span className="note">{waiting} עוד ממתינים לעלות לשרת</span>}
+      </section>
+      {byNeed.length > 0 && (
+        <section className="step">
+          <h3>מה ביקשו</h3>
+          <ul className="bars">
+            {byNeed.map((b) => (
+              <li key={b.label}>
+                <span>{b.label}{b.primary ? <span className="muted small"> · המטרה הראשית</span> : null}</span>
+                <span className="meter"><span style={{ width: `${(b.count / max) * 100}%` }} /></span>
+                <strong>{b.count}</strong>
+              </li>
+            ))}
+            {nothing > 0 && <li><span className="muted">בלי סימון</span><span className="meter" /><strong>{nothing}</strong></li>}
+          </ul>
+        </section>
+      )}
+      <section className="step">
+        <h3>מה כבר נאסף</h3>
+        <p>{mine.filter((n) => n.body).length} הערות · {mine.filter((n) => !n.body).length} הקלטות</p>
+      </section>
+      <section className="step">
+        <h3>מה מחכה אחרי התערוכה</h3>
+        {ahead.length ? (
+          <p>בשבוע הקרוב: <strong>{myWeek}</strong> שיחות ופגישות שלך, ו־<strong>{autoWeek}</strong> הודעות שיוצאות לבד.{firstDay ? ` הראשונה ${dayLabel(firstDay)}.` : ''}</p>
+        ) : <p className="muted">כשתרשום מבקרים, יופיע כאן מה מחכה לך בימים שאחרי.</p>}
+      </section>
+    </div>
+  );
+}
+
+// ---------- הבא בתור: one thing at a time, with what is needed to do it
+
+interface Item { row: LeadRow; lead: Lead; next: Next; name: string; city: string; owner: boolean }
+
+function useItems(ctx: Ctx, book: Book | undefined): Item[] {
+  return useMemo(() => {
+    if (!book) return [];
+    return book.leads.map((row) => {
+      const owner = ownerOf(row, ctx.directory);
+      const lead = engineLead(row, book, owner);
+      return { row, lead, next: nextTask(ctx.setup, lead, today()), name: nameOf(row, ctx.directory), city: cityOf(row, ctx.directory), owner };
+    });
+  }, [book, ctx.setup, ctx.directory]);
+}
+
+export function Queue({ ctx }: { ctx: Ctx }) {
+  const [book, reload, error] = useData(loadBook);
+  const items = useItems(ctx, book);
+  const [undo, setUndo] = useState<Undo | null>(null);
+  const clearUndo = useCallback(() => setUndo(null), []);
+  if (error) return <p className="err">{error}</p>;
+  if (!book) return <p className="muted">טוען…</p>;
+
+  const open = items.filter((i) => i.next.kind !== 'end').sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+  const now = open.filter((i) => dueOf(i) <= today());
+  const later = open.filter((i) => dueOf(i) > today());
+  const days = [...new Set(later.map(dueOf))];
+
+  return (
+    <div className="screen">
+      <UndoBar undo={undo} onDone={clearUndo} />
+      {now.length ? (
+        <>
+          <h2>הבא בתור <span className="muted small">· {now.length} להיום</span></h2>
+          <ul className="tasks">
+            {now.map((i, n) => <TaskCard key={i.row.id} item={i} first={n === 0} ctx={ctx} notes={book.notes.filter((x) => x.lead_id === i.row.id)} onChange={reload} onUndo={setUndo} />)}
+          </ul>
+        </>
+      ) : (
+        <section className="step center">
+          <h2>אין מה לעשות היום</h2>
+          <p className="muted">{later.length ? `הבא: ${later[0]!.name}, ${dayLabel(dueOf(later[0]!))}.` : 'כל מבקר שתרשום בדוכן יקבל כאן את הצעד הבא שלו.'}</p>
+        </section>
+      )}
+      {later.length > 0 && (
+        <>
+          <h2>בהמשך</h2>
+          {days.map((d) => (
+            <div key={d} className="day-group">
+              <span className="qlabel">{dayLabel(d)}</span>
+              <ul className="plain">
+                {later.filter((i) => dueOf(i) === d).map((i) => <li key={i.row.id}><strong>{i.name}</strong> <span className="muted">· {short(i.next)}</span></li>)}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
+      <Soon title="הודעת בוקר"><p>כל בוקר תגיע אליך בוואטסאפ רשימת המשימות של היום, עם קישור ישר לכאן.</p></Soon>
+    </div>
+  );
+}
+const dueOf = (i: Item) => (i.next.kind === 'end' ? '9999' : i.next.dueOn);
+function short(n: Next): string {
+  if (n.kind === 'end') return END[n.reason] ?? '';
+  if (n.kind === 'askDate') return 'לברר את התאריך שלו';
+  return `${ACT[n.action] ?? n.action} ${n.who === 'me' ? 'ממך' : 'אוטומטית'}`;
+}
+
+function TaskCard({ item, first, ctx, notes, onChange, onUndo }: { item: Item; first: boolean; ctx: Ctx; notes: NoteRow[]; onChange: () => void; onUndo: (u: Undo) => void }) {
+  const { row, next, name, owner } = item;
+  const [busy, setBusy] = useState(false);
+  const [talk, setTalk] = useState(false);
+  const [more, setMore] = useState(false);
+  const [contact, setContact] = useState<{ phone: string | null } | null>(null);
+  useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
+  if (next.kind === 'end') return null;
+  const stepId = next.stepId;
+  const args = [ctx.exhibitor.id, ctx.setup, owner, today()] as const;
+
+  async function mark(outcome: 'noAnswer' | 'closed' | 'notRelevant' | 'optOut', label: string) {
+    setBusy(true);
+    try {
+      await markStep(row, stepId, outcome, ...args);
+      onUndo({ label: `${name}: ${label}`, run: async () => { await unmarkStep(row, stepId, ...args); onChange(); } });
+    } finally { setBusy(false); setMore(false); onChange(); }
+  }
+  async function date(d: string) {
+    if (!d) return;
+    setBusy(true);
+    await setCustomerDate(row, d, ...args).catch(() => {});
+    setBusy(false); onChange();
+  }
+
+  const isTalk = next.kind === 'task' && (next.action === 'talk' || next.action === 'meet');
+  const isWait = next.kind === 'task' && next.action === 'wait';
+  const isAuto = next.kind === 'task' && next.who === 'auto';
+  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
+
+  return (
+    <li className={'task' + (first ? ' first' : '')}>
+      <div className="task-head">
+        <div><strong className="big">{name}</strong> <span className="muted">{item.city}{owner ? ' · בעל עסק' : ''}</span></div>
+        <span className={'when' + (next.kind === 'task' && next.late ? ' over' : '')}>{next.kind === 'task' && next.late ? 'באיחור' : dayLabel(next.dueOn)}</span>
+      </div>
+      <div className="what">{what}{isAuto ? <span className="muted small"> · אמור לצאת לבד (השליחה מתחברת בקרוב)</span> : null}</div>
+      {row.taps.length > 0 && <div className="muted small">ביקש: {row.taps.join(' · ')}</div>}
+      {(row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
+      {contact?.phone && (
+        <div className="contact">
+          <a className="act" href={`tel:${contact.phone}`}>חיוג {contact.phone}</a>
+          <a className="act" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
+        </div>
+      )}
+
+      {talk ? (
+        <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
+      ) : next.kind === 'askDate' ? (
+        <div className="acts">
+          <label className="inline">התאריך שלו: <input type="date" disabled={busy} onChange={(e) => date(e.target.value)} /></label>
+          <button type="button" className="act" onClick={() => setTalk(true)}>דיברנו</button>
+        </div>
+      ) : (
+        <div className="acts">
+          {isWait ? (
+            <>
+              <button type="button" className="act ok" disabled={busy} onClick={() => setTalk(true)}>הוא חזר אליי</button>
+              <button type="button" className="act" disabled={busy} onClick={() => mark('noAnswer', 'עדיין לא חזר')}>עדיין לא</button>
+            </>
+          ) : isTalk ? (
+            <>
+              <button type="button" className="act ok" disabled={busy} onClick={() => setTalk(true)}>דיברנו</button>
+              <button type="button" className="act" disabled={busy} onClick={() => mark('noAnswer', 'לא ענה')}>לא ענה</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="act ok" disabled={busy} onClick={() => mark('noAnswer', isAuto ? 'נשלח ביד' : 'בוצע')}>{isAuto ? 'שלחתי ביד' : 'בוצע'}</button>
+              <button type="button" className="act" disabled={busy} onClick={() => setTalk(true)}>דיברנו</button>
+            </>
+          )}
+          <button type="button" className="act" aria-expanded={more} onClick={() => setMore(!more)}>עוד</button>
+        </div>
+      )}
+      {more && !talk && (
+        <div className="acts">
+          <button type="button" className="act" disabled={busy} onClick={() => mark('closed', 'נסגרה עסקה')}>נסגרה עסקה</button>
+          <button type="button" className="act" disabled={busy} onClick={() => mark('notRelevant', 'לא רלוונטי')}>לא רלוונטי</button>
+          <button type="button" className="act" disabled={busy} onClick={() => mark('optOut', 'ביקש להסיר')}>ביקש להסיר אותו</button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ---------- דיברנו — מה הלאה: the next step is already chosen; one tap to confirm, or change it
+
+const NEXT_ACTIONS: Action[] = ['talk', 'meet', 'send', 'prepare'];
+const QUICK: [string, number][] = [['היום', 0], ['מחר', 1], ['עוד 3 ימים', 3], ['שבוע', 7], ['שבועיים', 14], ['חודש', 30]];
+
+function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Item; ctx: Ctx; stepId: string | null; onClose: () => void; onChange: () => void; onUndo: (u: Undo) => void }) {
+  const { row, lead, name, owner } = item;
+  // What the path would do after this talk: the step after the current one, as if he had answered.
+  const suggested = useMemo(() => {
+    const after: Lead = stepId ? { ...lead, history: [...lead.history, { stepId, doneOn: today(), outcome: 'noAnswer' }] } : lead;
+    const s = pathAhead(ctx.setup, after);
+    const fits = !!s && s.who === 'me' && NEXT_ACTIONS.includes(s.action);
+    const action: Action = fits ? s.action : 'talk';
+    const days = s && s.timing.kind === 'after' && s.timing.days > 0 ? s.timing.days : 7;
+    return { action, days: fits ? days : 7, fromPath: fits };
+  }, [ctx.setup, lead, stepId]);
+  const [action, setAction] = useState<Action>(suggested.action);
+  const [due, setDue] = useState(inDays(suggested.days));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const args = [ctx.exhibitor.id, ctx.setup, owner, today()] as const;
+
+  async function finish(outcome: 'engaged' | 'closed' | 'notRelevant', withNext: boolean) {
+    setBusy(true);
+    try {
+      const id = stepId ?? `talk:${Date.now()}`;
+      await markStep(row, id, outcome, ...args);
+      const manual = withNext ? await addManual(row, { action, dueOn: due }, ...args) : null;
+      if (note.trim()) await addFollowNote(row.id, note.trim(), ctx.exhibitor.id);
+      const label = outcome === 'engaged' ? (manual ? `${ACT[action]} ${dayLabel(due)}` : 'בלי המשך כרגע') : OUTCOME[outcome]!;
+      onUndo({
+        label: `${name}: ${label}`,
+        run: async () => { if (manual) await removeManual(row, manual, ...args); await unmarkStep(row, id, ...args); onChange(); },
+      });
+      onClose();
+    } finally { setBusy(false); onChange(); }
+  }
+
+  return (
+    <div className="sheet">
+      <strong>דיברנו — מה הלאה?</strong>
+      <div className="q">
+        <span className="qlabel">הצעד הבא{suggested.fromPath ? ' (לפי המסלול שלך)' : ''}</span>
+        <div className="chips">{NEXT_ACTIONS.map((a) => <button key={a} type="button" className="chip" aria-pressed={action === a} onClick={() => setAction(a)}>{ACT[a]}</button>)}</div>
+      </div>
+      <div className="q">
+        <span className="qlabel">מתי</span>
+        <div className="chips">
+          {QUICK.map(([l, d]) => <button key={l} type="button" className="chip" aria-pressed={due === inDays(d)} onClick={() => setDue(inDays(d))}>{l}</button>)}
+          <input type="date" className="chip-date" value={due} min={today()} onChange={(e) => e.target.value && setDue(e.target.value)} />
+        </div>
+      </div>
+      <textarea rows={2} placeholder="מה סוכם (לא חובה)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <button type="button" className="save inline-save" disabled={busy} onClick={() => finish('engaged', true)}>שמירה: {ACT[action]} · {dayLabel(due)}</button>
+      <div className="acts">
+        <button type="button" className="act" disabled={busy} onClick={() => finish('closed', false)}>נסגרה עסקה</button>
+        <button type="button" className="act" disabled={busy} onClick={() => finish('notRelevant', false)}>לא רלוונטי</button>
+        <button type="button" className="act" disabled={busy} onClick={() => finish('engaged', false)}>בלי המשך כרגע</button>
+        <button type="button" className="link" onClick={onClose}>חזרה</button>
+      </div>
+    </div>
+  );
+}
+
+function Notes({ note, notes }: { note: string | null; notes: NoteRow[] }) {
+  return (
+    <ul className="notes">
+      {note && <li>{note}</li>}
+      {notes.map((n) => (n.audio_path ? <Voice key={n.id} path={n.audio_path} when={n.created_at} /> : <li key={n.id}>{n.body}</li>))}
+    </ul>
+  );
+}
+function Voice({ path, when }: { path: string; when: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  return (
+    <li className="voice">
+      <span>הקלטה · {dayLabel(when.slice(0, 10))}</span>
+      {url ? <audio controls autoPlay src={url} /> : <button type="button" className="link" onClick={() => voiceUrl(path).then(setUrl)}>להשמיע</button>}
+    </li>
+  );
+}
+
+// ---------- הלקוחות: everyone, with where he stands and what happened
+
+export function Leads({ ctx }: { ctx: Ctx }) {
+  const [book, reload, error] = useData(loadBook);
+  const items = useItems(ctx, book);
+  const [open, setOpen] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [undo, setUndo] = useState<Undo | null>(null);
+  const clearUndo = useCallback(() => setUndo(null), []);
+  if (error) return <p className="err">{error}</p>;
+  if (!book) return <p className="muted">טוען…</p>;
+  const shown = items.filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()));
+  return (
+    <div className="screen">
+      <UndoBar undo={undo} onDone={clearUndo} />
+      <h2>כל המבקרים ({items.length})</h2>
+      {items.length > 6 && <input className="search" placeholder="חיפוש לפי שם או עיר" value={q} onChange={(e) => setQ(e.target.value)} />}
+      {!items.length && <p className="muted">עוד לא נרשמו מבקרים. הם יופיעו כאן מהרגע שתקיש על שמם בדוכן.</p>}
       <ul className="leads">
-        {data.leads.map((l) => (
-          <li key={l.id}>
-            <button type="button" className="lead" onClick={() => setOpen(open === l.id ? null : l.id)}>
-              <strong>{nameOf(l, ctx.directory)}</strong>
-              <span className="muted">{l.taps.join(' · ') || 'בלי סימון'}</span>
-              <span className="status">{status(l.id)}</span>
+        {shown.map((i) => (
+          <li key={i.row.id}>
+            <button type="button" className="lead" aria-expanded={open === i.row.id} onClick={() => setOpen(open === i.row.id ? null : i.row.id)}>
+              <strong>{i.name}</strong>
+              <span className="muted">{i.row.taps.join(' · ') || 'בלי סימון'}</span>
+              <span className="status">{describe(i.next)}</span>
             </button>
-            {open === l.id && (
-              <div className="lead-detail">
-                <p className="muted small">נרשם {dateLabel(l.captured_on)}{l.customer_date ? ` · התאריך שלו: ${l.customer_date.split('-').reverse().join('.')}` : ''}{l.typed_phone ? ` · ${l.typed_phone}` : ''}</p>
-                {l.note && <p>הערה: {l.note}</p>}
-                <h4>מה קרה עד עכשיו</h4>
-                {steps.length ? <ul className="history">{steps.map((s) => <li key={s.step_id}>{dateLabel(s.done_on)} · {OUTCOME[s.outcome] ?? s.outcome}</li>)}</ul> : <p className="muted small">עוד לא היה צעד.</p>}
-              </div>
-            )}
+            {open === i.row.id && <LeadDetail item={i} ctx={ctx} book={book} onChange={reload} onUndo={setUndo} />}
           </li>
         ))}
       </ul>
-      <Soon title="עוד בלקוחות"><p>סינון לפי מצב, חיפוש, ייצוא לאקסל, ותשובות שהגיעו מהלקוח בוואטסאפ, בציר הזמן של כל אחד.</p></Soon>
+      <Soon title="עוד בלקוחות"><p>סינון לפי מצב, ייצוא לאקסל, ותשובות שהגיעו מהלקוח בוואטסאפ, בציר הזמן של כל אחד.</p></Soon>
+    </div>
+  );
+}
+
+function LeadDetail({ item, ctx, book, onChange, onUndo }: { item: Item; ctx: Ctx; book: Book; onChange: () => void; onUndo: (u: Undo) => void }) {
+  const { row, next } = item;
+  const [talk, setTalk] = useState(false);
+  const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null>(null);
+  useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
+  const steps = book.steps.filter((s) => s.lead_id === row.id);
+  const manual = book.manual.filter((m) => m.lead_id === row.id);
+  const notes = book.notes.filter((n) => n.lead_id === row.id);
+  const stepId = next.kind === 'end' ? null : next.stepId;
+  const finished = next.kind === 'end' && next.reason !== 'engaged' && next.reason !== 'list' && next.reason !== 'stop';
+  return (
+    <div className="lead-detail">
+      <p className="muted small">
+        נרשם {dayLabel(row.captured_on)}{row.customer_date ? ` · התאריך שלו: ${row.customer_date.split('-').reverse().join('.')}` : ''}
+        {contact?.phone ? ` · ${contact.phone}` : ''}{contact?.email ? ` · ${contact.email}` : ''}
+      </p>
+      {(row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
+      <h4>מה קרה עד עכשיו</h4>
+      {steps.length || manual.length ? (
+        <ul className="history">
+          {steps.map((s) => <li key={s.step_id}>{dayLabel(s.done_on)} · {(s.step_id.startsWith('m:') || s.step_id.startsWith('talk:') ? OUTCOME : DONE)[s.outcome] ?? s.outcome}</li>)}
+          {manual.filter((m) => !steps.some((s) => s.step_id === `m:${m.id}`)).map((m) => <li key={m.id}>נקבע: {ACT[m.action]} · {dayLabel(m.due_on)}</li>)}
+        </ul>
+      ) : <p className="muted small">עוד לא היה צעד.</p>}
+      {!finished && (talk
+        ? <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
+        : <button type="button" className="act" onClick={() => setTalk(true)}>דיברנו איתו</button>)}
     </div>
   );
 }
@@ -218,7 +481,7 @@ export function Messages({ ctx }: { ctx: Ctx }) {
         {[...ids].map((m) => <li key={m}><strong>{m}</strong></li>)}
       </ul>
       <Soon title="הנוסח של כל הודעה"><p>כאן תראה ותערוך את הטקסט שהמבקר מקבל. הנוסחים שאושרו בסבב 9 ייכנסו כברירת מחדל, עם הפנייה שבחרת בהגדרות.</p></Soon>
-      <Soon title="איך הן יוצאות"><p>בוואטסאפ מהמספר שלך, ובמייל למי שאין לו וואטסאפ. בקצב איטי ומפוזר, אף פעם לא בשבת וביום טוב.</p></Soon>
+      <Soon title="איך הן יוצאות"><p>שלוש דרכים, לבחירתך: חיבור הוואטסאפ שלך בסריקת קוד; שליחה בהקשה (נפתח וואטסאפ עם ההודעה מוכנה, אתה לוחץ שלח); או מייל בלבד. הודעה לכמה אנשים יחד יוצאת במייל, כדי לא לסכן את המספר שלך.</p></Soon>
     </div>
   );
 }

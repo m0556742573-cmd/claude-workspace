@@ -1,7 +1,15 @@
 // The engine: given an exhibitor's setup and one lead, which path applies and what the next task is.
 // It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
 import { addDays, isRestDay, nextOccurrence, weekday } from './calendar.ts';
+import { manualId } from './model.ts';
 import type { Action, Condition, Lead, LocalDate, NeedPath, Path, Setup, Step, Timing, Who } from './model.ts';
+
+/** What the path would do next if he had not answered — the likely next step to offer after a talk. */
+export function pathAhead(setup: Setup, lead: Lead): Step | undefined {
+  const { path } = choosePath(setup, lead);
+  const recorded = new Set(lead.history.map((h) => h.stepId));
+  return path.steps.filter((s) => matches(s.onlyIf, lead.taps)).find((s) => !recorded.has(s.id));
+}
 
 export function matches(c: Condition | undefined, taps: string[]): boolean {
   if (!c) return true;
@@ -44,7 +52,19 @@ export type Next =
 /** The next thing to do for this lead, or why there is nothing. `today` is when the question is asked. */
 export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
   const last = lead.history[lead.history.length - 1];
-  if (last && last.outcome !== 'noAnswer') return { kind: 'end', reason: last.outcome };
+  // A deal, "not relevant" or "remove me" ends everything, manual steps included.
+  if (last && (last.outcome === 'closed' || last.outcome === 'notRelevant' || last.outcome === 'optOut')) return { kind: 'end', reason: last.outcome };
+
+  // A step he set by hand comes first: it is what was agreed with the visitor.
+  const recorded = new Set(lead.history.map((h) => h.stepId));
+  const manual = (lead.manual ?? []).filter((m) => !recorded.has(manualId(m.id))).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+  const m = manual[0];
+  if (m) {
+    const late = m.dueOn < today;
+    return { kind: 'task', stepId: manualId(m.id), action: m.action, who: m.who, message: m.message, dueOn: settle(late ? today : m.dueOn, m.action, m.who), late };
+  }
+  // He answered and nothing was set by hand: the path's ladder of attempts is over; he is in the exhibitor's hands.
+  if (last && last.outcome === 'engaged') return { kind: 'end', reason: 'engaged' };
 
   const { path } = choosePath(setup, lead);
   const steps = path.steps.filter((s) => matches(s.onlyIf, lead.taps));

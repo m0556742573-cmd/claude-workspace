@@ -88,6 +88,15 @@ export interface StepRecord {
   outcome: Outcome;
 }
 
+/** A step the exhibitor set by hand, after a talk ("a meeting next week"). It comes before the path. */
+export interface ManualStep {
+  id: string;
+  action: Action;
+  who: Who;
+  dueOn: LocalDate;
+  message?: string;
+}
+
 export interface Lead {
   id: string;
   capturedOn: LocalDate;
@@ -97,4 +106,8 @@ export interface Lead {
   /** From the community list: is the visitor a business owner. */
   businessOwner: boolean;
   history: StepRecord[];
+  manual?: ManualStep[];
 }
+
+/** A manual step is recorded in the history under this id, so the path's own steps never collide with it. */
+export const manualId = (id: string) => `m:${id}`;

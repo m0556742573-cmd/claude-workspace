@@ -162,3 +162,23 @@ test('a wedding in three weeks: the "month before" step is late, so it goes out 
 test('no date given: the exhibitor is asked to find out when', () => {
   assert.deepEqual(nextTask(clothing, lead(['הלבשת חתן ומשפחה']), EXPO), { kind: 'askDate', stepId: 'month', dueOn: '2026-11-17' });
 });
+
+// ---- manual steps: what was agreed after a talk comes before the path
+
+test('after "talked", a step set by hand comes first; a deal ends it all', () => {
+  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17', 'engaged')], manual: [{ id: 'a1', action: 'meet', who: 'me', dueOn: '2026-11-24' }] });
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-18'), { kind: 'task', stepId: 'm:a1', action: 'meet', who: 'me', message: undefined, dueOn: '2026-11-24', late: false });
+  l.history.push(rec('m:a1', '2026-11-24', 'engaged'));
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-24'), { kind: 'end', reason: 'engaged' });
+  l.manual!.push({ id: 'a2', action: 'talk', who: 'me', dueOn: '2026-11-27' });   // Friday → Sunday
+  assert.equal((nextTask(shtreimel, l, '2026-11-24') as { dueOn: string }).dueOn, '2026-11-29');
+  l.history.push(rec('m:a2', '2026-11-29', 'closed'));
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-29'), { kind: 'end', reason: 'closed' });
+});
+
+test('a manual step that is overdue goes out today and says so', () => {
+  const l = lead(['שטריימל לחתן'], { manual: [{ id: 'a1', action: 'talk', who: 'me', dueOn: '2026-11-17' }] });
+  const n = nextTask(shtreimel, l, '2026-11-23') as { dueOn: string; late: boolean };
+  assert.equal(n.dueOn, '2026-11-23');
+  assert.equal(n.late, true);
+});

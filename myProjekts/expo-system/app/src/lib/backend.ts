@@ -1,11 +1,12 @@
-// The booth's connection to the database. Every lead is written to Supabase at once; when there is no
-// network it waits in the phone's own store and goes up as soon as the network is back — the booth never waits.
+// The app's connection to the database. Every lead and note is written to the phone first and to Supabase at once;
+// without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
 import { createClient, type Session } from '@supabase/supabase-js';
-import { nextTask, type Setup } from '@expo/engine';
-import { allLeads, saveLead as saveLocal, type LocalLead } from '../store/local.ts';
+import { nextTask, type Action, type Lead, type ManualStep, type Setup, type StepRecord, type Who } from '@expo/engine';
+import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import type { Person } from '../demo/people.ts';
 
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
+export type { Session };
 
 export interface Exhibitor { id: string; name: string; business: string; approved: boolean }
 
@@ -32,7 +33,18 @@ export async function startFromTemplate(exhibitorId: string, setup: Setup): Prom
   if (error) throw error;
 }
 
-/** The community names (no phone, no mail), kept in memory for a search that does not wait on the network. */
+/** A new version of the setup; the old one stays in the history, inactive. */
+export async function changeTemplate(exhibitorId: string, setup: Setup): Promise<void> {
+  const { data } = await supabase.from('setups').select('version').eq('exhibitor_id', exhibitorId).order('version', { ascending: false }).limit(1);
+  const version = (data?.[0]?.version ?? 0) + 1;
+  const off = await supabase.from('setups').update({ active: false }).eq('exhibitor_id', exhibitorId).eq('active', true);
+  if (off.error) throw off.error;
+  const { error } = await supabase.from('setups').insert({ exhibitor_id: exhibitorId, version, data: setup, source: 'manual', active: true });
+  if (error) throw error;
+}
+
+// ---------- the community names (no phone, no mail), kept in memory for a search that does not wait
+
 export async function loadDirectory(): Promise<Person[]> {
   const { data, error } = await supabase.rpc('people_directory');
   if (error) throw error;
@@ -43,109 +55,150 @@ export async function loadDirectory(): Promise<Person[]> {
 export function searchIn(directory: Person[], q: string, max = 8): Person[] {
   const words = q.trim().split(/\s+/).filter(Boolean);
   if (q.trim().length < 2) return [];
-  return directory.filter((p) => words.every((w) => p.fullName.includes(w))).slice(0, max);
+  return directory.filter((p) => words.every((w) => p.fullName.includes(w) || p.city.includes(w))).slice(0, max);
 }
 
-async function upload(lead: LocalLead, exhibitorId: string, setup: Setup): Promise<void> {
-  const { error } = await supabase.from('leads').upsert({
-    id: lead.id,
-    exhibitor_id: exhibitorId,
-    person_id: lead.personId ?? null,
-    typed_name: lead.personId ? null : lead.name,
-    typed_phone: lead.typedPhone ?? null,
-    taps: lead.taps,
-    customer_date: lead.customerDate ?? null,
-    note: lead.note || null,
-    captured_at: lead.capturedAt,
-    captured_on: lead.capturedOn,
-  }, { onConflict: 'id', ignoreDuplicates: true });
-  if (error) throw error;
-  const n = nextTask(setup, lead, lead.capturedOn);
-  const task = n.kind === 'task'
+// ---------- the booth: leads and notes, phone first
+
+function taskRow(exhibitorId: string, leadId: string, setup: Setup, lead: Lead, onDay: string) {
+  const n = nextTask(setup, lead, onDay);
+  const task: Omit<TaskRow, 'lead_id'> = n.kind === 'task'
     ? { kind: 'task', step_id: n.stepId, action: n.action, who: n.who, message: n.message ?? null, due_on: n.dueOn, late: n.late, end_reason: null }
     : n.kind === 'askDate'
       ? { kind: 'askDate', step_id: n.stepId, action: null, who: null, message: null, due_on: n.dueOn, late: false, end_reason: null }
       : { kind: 'end', step_id: null, action: null, who: null, message: null, due_on: null, late: false, end_reason: n.reason };
-  const t = await supabase.from('tasks').upsert({ lead_id: lead.id, exhibitor_id: exhibitorId, ...task, computed_at: new Date().toISOString() });
+  return { lead_id: leadId, exhibitor_id: exhibitorId, ...task, computed_at: new Date().toISOString() };
+}
+
+async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Promise<void> {
+  const { error } = await supabase.from('leads').upsert({
+    id: l.id, exhibitor_id: exhibitorId, person_id: l.personId ?? null,
+    typed_name: l.personId ? null : l.name, typed_phone: l.typedPhone ?? null,
+    taps: l.taps, customer_date: l.customerDate ?? null, note: l.note || null,
+    captured_at: l.capturedAt, captured_on: l.capturedOn,
+  });
+  if (error) throw error;
+  const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, l.id, setup, l, l.capturedOn));
   if (t.error) throw t.error;
 }
 
-/** Save: to the phone first (never lost), then up to the server; a failure leaves it waiting. */
-export async function saveLead(lead: LocalLead, exhibitorId: string, setup: Setup): Promise<'saved' | 'waiting'> {
-  await saveLocal({ ...lead, synced: false });
-  try {
-    await upload(lead, exhibitorId, setup);
-    await saveLocal({ ...lead, synced: true });
-    return 'saved';
-  } catch {
-    return 'waiting';
-  }
+/** Save a lead: on the phone first (never lost), then up to the server. A failure leaves it waiting. */
+export async function saveLead(l: LocalLead, exhibitorId: string, setup: Setup): Promise<'saved' | 'waiting'> {
+  await putLead({ ...l, synced: false });
+  try { await uploadLead(l, exhibitorId, setup); await putLead({ ...l, synced: true }); return 'saved'; } catch { return 'waiting'; }
 }
 
-/** Send up whatever is still waiting on the phone. Returns how many are still waiting. */
+/** "ביטול הרישום": the lead goes with its notes and recordings, on the phone and on the server. */
+export async function removeLead(id: string, exhibitorId: string): Promise<void> {
+  await dropLead(id);
+  for (const n of (await allNotes()).filter((x) => x.leadId === id)) await dropNote(n.id);
+  const folder = `${exhibitorId}/${id}`;
+  const { data: files } = await supabase.storage.from('voice').list(folder);
+  if (files?.length) await supabase.storage.from('voice').remove(files.map((f) => `${folder}/${f.name}`));
+  const { error } = await supabase.from('leads').delete().eq('id', id);
+  if (error) throw error;
+}
+
+async function uploadNote(n: LocalNote, exhibitorId: string): Promise<void> {
+  let audioPath: string | null = null;
+  if (n.audio) {
+    audioPath = `${exhibitorId}/${n.leadId}/${n.id}.${n.audio.type.includes('mp4') ? 'm4a' : 'webm'}`;
+    const up = await supabase.storage.from('voice').upload(audioPath, n.audio, { upsert: true, contentType: n.audio.type || 'audio/webm' });
+    if (up.error) throw up.error;
+  }
+  const { error } = await supabase.from('lead_notes').upsert({ id: n.id, lead_id: n.leadId, exhibitor_id: exhibitorId, body: n.body || null, audio_path: audioPath, transcript: n.transcript || null, created_at: n.createdAt });
+  if (error) throw error;
+}
+
+export async function saveNote(n: LocalNote, exhibitorId: string): Promise<'saved' | 'waiting'> {
+  await putNote({ ...n, synced: false });
+  try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); return 'saved'; } catch { return 'waiting'; }
+}
+
+/** Send up whatever still waits on the phone: leads first (a note needs its lead). Returns how many still wait. */
 export async function flush(exhibitorId: string, setup: Setup): Promise<number> {
-  const waiting = (await allLeads()).filter((l) => !l.synced);
-  let left = waiting.length;
-  for (const l of waiting) {
-    try { await upload(l, exhibitorId, setup); await saveLocal({ ...l, synced: true }); left--; } catch { break; }
+  let left = 0;
+  for (const l of (await allLeads()).filter((x) => !x.synced)) {
+    try { await uploadLead(l, exhibitorId, setup); await putLead({ ...l, synced: true }); } catch { left++; }
+  }
+  for (const n of (await allNotes()).filter((x) => !x.synced)) {
+    try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); } catch { left++; }
   }
   return left;
 }
 
-export type { Session };
-
-// ---------- after the expo: tasks, leads, history
+// ---------- after the fair: the leads with everything the engine needs
 
 export interface LeadRow {
   id: string; person_id: string | null; typed_name: string | null; typed_phone: string | null; taps: string[];
   customer_date: string | null; note: string | null; captured_on: string; captured_at: string;
 }
 export interface TaskRow {
-  lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: string | null; who: string | null;
+  lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
   message: string | null; due_on: string | null; late: boolean; end_reason: string | null;
 }
-export interface StepRow { lead_id: string; step_id: string; done_on: string; outcome: string }
+export interface StepRow { lead_id: string; step_id: string; done_on: string; outcome: StepRecord['outcome']; created_at: string }
+export interface ManualRow { id: string; lead_id: string; action: Action; who: Who; due_on: string; message: string | null }
+export interface NoteRow { id: string; lead_id: string; body: string | null; audio_path: string | null; transcript: string | null; created_at: string }
 
-export async function listLeads(): Promise<LeadRow[]> {
-  const { data, error } = await supabase.from('leads').select('*').order('captured_at', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-export async function listTasks(): Promise<TaskRow[]> {
-  const { data, error } = await supabase.from('tasks').select('*');
-  if (error) throw error;
-  return data ?? [];
-}
-export async function listSteps(leadId?: string): Promise<StepRow[]> {
-  let q = supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome').order('created_at');
-  if (leadId) q = q.eq('lead_id', leadId);
-  const { data, error } = await q;
-  if (error) throw error;
-  return data ?? [];
+export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[] }
+
+export async function loadBook(): Promise<Book> {
+  const [leads, tasks, steps, manual, notes] = await Promise.all([
+    supabase.from('leads').select('*').order('captured_at', { ascending: false }),
+    supabase.from('tasks').select('*'),
+    supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').order('created_at'),
+    supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message'),
+    supabase.from('lead_notes').select('id, lead_id, body, audio_path, transcript, created_at').order('created_at'),
+  ]);
+  for (const r of [leads, tasks, steps, manual, notes]) if (r.error) throw r.error;
+  return { leads: leads.data ?? [], tasks: tasks.data ?? [], steps: steps.data ?? [], manual: manual.data ?? [], notes: notes.data ?? [] };
 }
 
-function toLead(row: LeadRow, steps: StepRow[], businessOwner: boolean) {
+export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'>, businessOwner: boolean): Lead {
   return {
     id: row.id, capturedOn: row.captured_on, taps: row.taps, customerDate: row.customer_date ?? undefined, businessOwner,
-    history: steps.map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome as 'engaged' })),
+    history: book.steps.filter((s) => s.lead_id === row.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome })),
+    manual: book.manual.filter((m) => m.lead_id === row.id).map((m): ManualStep => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
   };
 }
 
+/** Recompute one lead's task from what the server holds now. */
 async function recompute(row: LeadRow, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
-  const steps = await listSteps(row.id);
-  const n = nextTask(setup, toLead(row, steps, businessOwner), onDay);
-  const task = n.kind === 'task'
-    ? { kind: 'task', step_id: n.stepId, action: n.action, who: n.who, message: n.message ?? null, due_on: n.dueOn, late: n.late, end_reason: null }
-    : n.kind === 'askDate'
-      ? { kind: 'askDate', step_id: n.stepId, action: null, who: null, message: null, due_on: n.dueOn, late: false, end_reason: null }
-      : { kind: 'end', step_id: null, action: null, who: null, message: null, due_on: null, late: false, end_reason: n.reason };
-  const { error } = await supabase.from('tasks').upsert({ lead_id: row.id, exhibitor_id: exhibitorId, ...task, computed_at: new Date().toISOString() });
+  const [steps, manual] = await Promise.all([
+    supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').eq('lead_id', row.id).order('created_at'),
+    supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message').eq('lead_id', row.id),
+  ]);
+  if (steps.error) throw steps.error;
+  if (manual.error) throw manual.error;
+  const lead = engineLead(row, { steps: steps.data ?? [], manual: manual.data ?? [] }, businessOwner);
+  const { error } = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setup, lead, onDay));
   if (error) throw error;
 }
 
 /** He did the step: how it ended. The engine sets the next one at once. */
-export async function markStep(row: LeadRow, stepId: string, outcome: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+export async function markStep(row: LeadRow, stepId: string, outcome: StepRecord['outcome'], exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
   const { error } = await supabase.from('lead_steps').upsert({ lead_id: row.id, step_id: stepId, done_on: onDay, outcome }, { onConflict: 'lead_id,step_id' });
+  if (error) throw error;
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
+
+/** "ביטול": the mark goes, and the task returns to what it was. */
+export async function unmarkStep(row: LeadRow, stepId: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('lead_steps').delete().eq('lead_id', row.id).eq('step_id', stepId);
+  if (error) throw error;
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
+
+/** After a talk: what was agreed, as a step of its own. Returns the step's id (for undo). */
+export async function addManual(row: LeadRow, step: { action: Action; dueOn: string; message?: string }, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string): Promise<string> {
+  const { data, error } = await supabase.from('manual_steps').insert({ lead_id: row.id, exhibitor_id: exhibitorId, action: step.action, who: 'me', due_on: step.dueOn, message: step.message ?? null }).select('id').single();
+  if (error) throw error;
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+  return data.id;
+}
+export async function removeManual(row: LeadRow, id: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('manual_steps').delete().eq('id', id);
   if (error) throw error;
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
@@ -155,6 +208,22 @@ export async function setCustomerDate(row: LeadRow, date: string, exhibitorId: s
   const { error } = await supabase.from('leads').update({ customer_date: date }).eq('id', row.id);
   if (error) throw error;
   await recompute({ ...row, customer_date: date }, exhibitorId, setup, businessOwner, onDay);
+}
+
+export async function addFollowNote(leadId: string, body: string, exhibitorId: string) {
+  const { error } = await supabase.from('lead_notes').insert({ id: crypto.randomUUID(), lead_id: leadId, exhibitor_id: exhibitorId, body });
+  if (error) throw error;
+}
+
+/** The visitor's phone and mail: only for a lead of his own (the community list stays closed). */
+export async function leadContact(leadId: string): Promise<{ phone: string | null; email: string | null; has_whatsapp: boolean | null } | null> {
+  const { data } = await supabase.rpc('lead_contact', { lead: leadId });
+  return data?.[0] ?? null;
+}
+
+export async function voiceUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from('voice').createSignedUrl(path, 600);
+  return data?.signedUrl ?? null;
 }
 
 // ---------- settings and the admin
@@ -180,15 +249,5 @@ export async function adminExhibitors(): Promise<AdminExhibitor[]> {
 }
 export async function adminApprove(id: string, ok: boolean) {
   const { error } = await supabase.rpc('admin_approve', { exhibitor: id, ok });
-  if (error) throw error;
-}
-
-/** A new version of the setup from a template; the old one stays in the history, inactive. */
-export async function changeTemplate(exhibitorId: string, setup: Setup): Promise<void> {
-  const { data } = await supabase.from('setups').select('version').eq('exhibitor_id', exhibitorId).order('version', { ascending: false }).limit(1);
-  const version = (data?.[0]?.version ?? 0) + 1;
-  const off = await supabase.from('setups').update({ active: false }).eq('exhibitor_id', exhibitorId).eq('active', true);
-  if (off.error) throw off.error;
-  const { error } = await supabase.from('setups').insert({ exhibitor_id: exhibitorId, version, data: setup, source: 'manual', active: true });
   if (error) throw error;
 }
