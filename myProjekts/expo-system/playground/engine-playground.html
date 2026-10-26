@@ -1,0 +1,372 @@
+<title>מגרש המנוע</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>document.documentElement.dir = "rtl"; document.documentElement.lang = "he";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: the booth card on the right, the path it produces on the left, as a dated timeline; they stack on a phone. Same palette as the consultant lab. */
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --ink: #15202a; --muted: #5d6b78; --line: #dde4ea;
+  --petrol: #0f5f6b; --petrol-soft: #e3f0f1; --ai: #5b3fd0; --ai-soft: #efebfc;
+  --ok: #1f7a4a; --ok-soft: #e4f3ea; --warn: #9a6400; --warn-soft: #fbf1dd;
+  --display: "Frank Ruhl Libre", "David Libre", "Times New Roman", serif;
+  --body: "Assistant", "Heebo", "Arial Hebrew", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+    --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+    --ok: #6fd39c; --ok-soft: #173326; --warn: #f0c062; --warn-soft: #382c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #17212a; --ink: #e7edf2; --muted: #9aa8b5; --line: #2a3742;
+  --petrol: #5fc2cd; --petrol-soft: #16323a; --ai: #a996ff; --ai-soft: #251f42;
+  --ok: #6fd39c; --ok-soft: #173326; --warn: #f0c062; --warn-soft: #382c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { direction: rtl; text-align: right; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 40px; }
+h1, h2 { font-family: var(--display); margin: 0; line-height: 1.25; text-wrap: balance; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.15rem; }
+h3 { margin: 0; font-size: .8rem; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+p { margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+.intro { display: grid; gap: 6px; max-width: 75ch; }
+.intro p { color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.field { display: grid; gap: 4px; }
+.field label, .qlabel { font-weight: 700; font-size: .9rem; }
+select, input[type="date"] { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--surface); color: var(--ink); max-width: 100%; }
+.added { background: var(--warn-soft); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: .92rem; }
+.added b { color: var(--warn); }
+.q { display: grid; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: .93rem; border: 1.5px solid var(--line); border-radius: 999px; padding: 3px 12px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--petrol); border-color: var(--petrol); color: var(--bg); }
+.chip small { opacity: .75; }
+.empty { color: var(--muted); font-size: .92rem; }
+.check { display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+.btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 4px 12px; cursor: pointer; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); }
+.btn:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--petrol); outline-offset: 2px; }
+.source { font-size: .95rem; }
+.source b { color: var(--petrol); }
+.timeline { display: grid; gap: 0; }
+.row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+@media (max-width: 520px) { .row { grid-template-columns: minmax(0, 1fr) auto; } .row .when { grid-column: 1 / -1; } }
+.when { font-variant-numeric: tabular-nums; }
+.when .greg { font-weight: 700; }
+.when .heb { color: var(--muted); font-size: .88rem; }
+.what { display: grid; gap: 2px; min-width: 0; }
+.what .act { font-weight: 700; }
+.tag { display: inline-block; border-radius: 999px; padding: 0 8px; font-size: .8rem; font-weight: 700; margin-inline-start: 6px; }
+.tag.me { background: var(--petrol-soft); color: var(--petrol); }
+.tag.auto { background: var(--ai-soft); color: var(--ai); }
+.tag.late { background: var(--warn-soft); color: var(--warn); }
+.what .msg { color: var(--muted); font-size: .92rem; overflow-wrap: anywhere; }
+.outcome { font-size: .85rem; color: var(--muted); }
+.end { border-top: 1px solid var(--line); padding-top: 10px; font-weight: 700; }
+.end.good { color: var(--ok); }
+.end.ask { color: var(--warn); }
+.legend { color: var(--muted); font-size: .9rem; }
+</style>
+
+<div class="wrap" dir="rtl" lang="he">
+  <header class="intro">
+    <h1>מגרש המנוע</h1>
+    <p>המנוע האמיתי של המערכת, על עסקים מהסבבים. מסמנים מבקר כמו בדוכן, ומשמאל רואים את המסלול שלו: מה, מי ומתי. כל שורה מניחה שהוא לא ענה; "ענה כאן" מראה מה קורה כשהוא עונה בשלב הזה.</p>
+    <p id="expo"></p>
+  </header>
+
+  <div class="grid">
+    <section class="pane" aria-label="המבקר בדוכן">
+      <div class="field">
+        <label for="biz">העסק</label>
+        <select id="biz"></select>
+      </div>
+      <p class="added" id="added" hidden></p>
+      <div id="card"></div>
+      <label class="check"><input type="checkbox" id="owner"> בעל עסק (לפי רשימת הקהילה)</label>
+      <div class="field">
+        <label for="cdate">התאריך שלו — חתונה, אירוע, ביקורת (אם אמר)</label>
+        <input type="date" id="cdate">
+      </div>
+    </section>
+
+    <section class="pane" aria-label="המסלול">
+      <h2>המסלול שלו</h2>
+      <p class="source" id="source"></p>
+      <div class="timeline" id="timeline"></div>
+      <p class="legend">אין משימות בשבת וביום טוב (לוח ישראל), ושיחות ופגישות שלך לא ביום שישי. שליחה אוטומטית יכולה לצאת ביום שישי.</p>
+    </section>
+  </div>
+</div>
+
+<script type="module">
+import { HDate, months } from "https://cdn.jsdelivr.net/npm/@hebcal/core@5.10.1/+esm";
+// The Jewish calendar the engine needs: rest days (Shabbat and Yom Tov, Israel schedule), and the next
+// occurrence of a point in the Jewish year. Dates are local calendar days, 'YYYY-MM-DD'.
+                                                                         
+
+export function toDate(d           )       {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y , m  - 1, day );
+}
+export function fromDate(d      )            {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+export function addDays(d           , n        )            {
+  const x = toDate(d);
+  x.setDate(x.getDate() + n);
+  return fromDate(x);
+}
+export function weekday(d           )         {
+  return toDate(d).getDay();
+}
+
+const MONTH                              = {
+  tishrei: months.TISHREI, cheshvan: months.CHESHVAN, kislev: months.KISLEV, tevet: months.TEVET,
+  shvat: months.SHVAT, adar: months.ADAR_I, nisan: months.NISAN, iyyar: months.IYYAR,
+  sivan: months.SIVAN, tamuz: months.TAMUZ, av: months.AV, elul: months.ELUL,
+};
+
+/** Adar in a leap year is Adar II: that is where Purim falls. */
+function adarOf(year        )         {
+  return HDate.isLeapYear(year) ? months.ADAR_II : months.ADAR_I;
+}
+
+/** The Hebrew [day, month] of an anchor, in a given Hebrew year. */
+function anchorDay(a                , year        )                   {
+  if ('holiday' in a) {
+    switch (a.holiday) {
+      case 'roshHashana': return [1, months.TISHREI];
+      case 'sukkot': return [15, months.TISHREI];
+      case 'chanukah': return [25, months.KISLEV];
+      case 'purim': return [14, adarOf(year)];
+      case 'pesach': return [15, months.NISAN];
+      case 'lagBaomer': return [18, months.IYYAR];
+      case 'shavuot': return [6, months.SIVAN];
+    }
+  }
+  const m = a.month === 'adar' ? adarOf(year) : MONTH[a.month];
+  return [a.day, m];
+}
+
+/** The first date, on or after `from`, that is this point in the Jewish year. */
+export function nextOccurrence(a                , from           )            {
+  const year = new HDate(toDate(from)).getFullYear();
+  for (const y of [year, year + 1]) {
+    const [day, month] = anchorDay(a, y);
+    const d = fromDate(new HDate(day, month, y).greg());
+    if (d >= from) return d;
+  }
+  throw new Error('unreachable');
+}
+
+/** Yom Tov days in Israel, as [day, month]. */
+const YOM_TOV                     = [
+  [1, months.TISHREI], [2, months.TISHREI], [10, months.TISHREI], [15, months.TISHREI], [22, months.TISHREI],
+  [15, months.NISAN], [21, months.NISAN], [6, months.SIVAN],
+];
+
+export function isYomTov(d           )          {
+  const h = new HDate(toDate(d));
+  return YOM_TOV.some(([day, month]) => h.getDate() === day && h.getMonth() === month);
+}
+export function isShabbat(d           )          {
+  return weekday(d) === 6;
+}
+export function isRestDay(d           )          {
+  return isShabbat(d) || isYomTov(d);
+}
+
+// The engine: given an exhibitor's setup and one lead, which path applies and what the next task is.
+// It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
+                                                                                                               
+
+export function matches(c                       , taps          )          {
+  if (!c) return true;
+  if ('tapped' in c) return taps.includes(c.tapped);
+  if ('all' in c) return c.all.every((x) => matches(x, taps));
+  if ('any' in c) return c.any.some((x) => matches(x, taps));
+  return !matches(c.not, taps);
+}
+
+                             
+                                                                                                
+                 
+             
+ 
+
+/**
+ * One path per lead: one touch per person. When several needs were tapped, the primary goal's need leads,
+ * then the card's order. (Which button leads when several are tapped is still open — the old #7.)
+ */
+export function choosePath(setup       , lead      )             {
+  const tapped = setup.needs.filter((n) => lead.taps.includes(n.label));
+  const ordered = [...tapped.filter((n) => n.goal === 'primary'), ...tapped.filter((n) => n.goal !== 'primary')];
+  for (const need of ordered) {
+    const v = pickVariant(need, lead.taps);
+    if (v) return { source: need.label, path: v };
+  }
+  return { source: 'default', path: lead.businessOwner ? setup.defaults.business : setup.defaults.private };
+}
+
+function pickVariant(need          , taps          )                   {
+  return need.variants.find((v) => matches(v.if, taps))?.path;
+}
+
+                  
+                                                                                                                 
+                                                                                                   
+                                                         
+                                                                                               
+
+/** The next thing to do for this lead, or why there is nothing. `today` is when the question is asked. */
+export function nextTask(setup       , lead      , today           )       {
+  const last = lead.history[lead.history.length - 1];
+  if (last && last.outcome !== 'noAnswer') return { kind: 'end', reason: last.outcome };
+
+  const { path } = choosePath(setup, lead);
+  const steps = path.steps.filter((s) => matches(s.onlyIf, lead.taps));
+  const done = new Set(lead.history.map((h) => h.stepId));
+  const base = last ? last.doneOn : lead.capturedOn;
+
+  const step = steps.find((s) => !done.has(s.id));
+  if (step) return schedule(step, base, lead, today);
+
+  const end = path.end;
+  if (end.kind !== 'repeat') return { kind: 'end', reason: end.kind };
+  const repeats = lead.history.filter((h) => h.stepId.startsWith('repeat:')).length;
+  if (end.times !== undefined && repeats >= end.times) return { kind: 'end', reason: 'stop' };
+  const id = `repeat:${repeats + 1}`;
+  return schedule({ id, action: end.action, who: end.who, message: end.message, timing: { kind: 'after', days: end.everyDays } }, base, lead, today);
+}
+
+function schedule(step      , base           , lead      , today           )       {
+  if (step.timing.kind === 'customerDate' && !lead.customerDate) return { kind: 'askDate', stepId: step.id, dueOn: settle(addDays(base, 1), 'check', 'me') };
+  const raw = rawDue(step.timing, base, lead);
+  const late = raw < today;
+  const dueOn = settle(late ? today : raw, step.action, step.who);
+  return { kind: 'task', stepId: step.id, action: step.action, who: step.who, message: step.message, dueOn, late };
+}
+
+function rawDue(t        , base           , lead      )            {
+  switch (t.kind) {
+    case 'after': return addDays(base, t.days);
+    case 'customerDate': return addDays(lead.customerDate , t.days);
+    case 'calendar': return addDays(nextOccurrence(t.anchor, base), t.days);
+    case 'weekday': {
+      let d = addDays(base, 1);
+      while (weekday(d) !== t.weekday) d = addDays(d, 1);
+      return d;
+    }
+  }
+}
+
+/** No tasks or sends on Shabbat and Yom Tov; his calls and meetings not on Friday. */
+export function settle(d           , action        , who     )            {
+  const personal = who === 'me' && (action === 'talk' || action === 'meet');
+  while (isRestDay(d) || (personal && weekday(d) === 5)) d = addDays(d, 1);
+  return d;
+}
+
+const FIXTURES = [{"id":1,"name":"שטריימלך","added":"מסלול ל\"חידוש שטריימל\", ו\"רק בודק מחירים\" ששולח מחירון מיד","setup":{"business":"","anchor":{"goal":"אבות שכבר יש להם חתן","success":"15 אבות במדידה, 30 שטריימלך לשיפוץ"},"needs":[{"label":"שטריימל לחתן","goal":"primary","relation":"customer","variants":[{"if":{"tapped":"עוד אין חתן"},"path":{"steps":[],"end":{"kind":"list"}}},{"if":{"tapped":"רק בודק מחירים"},"path":{"steps":[{"id":"prices","action":"send","who":"auto","timing":{"kind":"after","days":0},"message":"מחירון"}],"end":{"kind":"list"}}},{"if":{"tapped":"יש חתונה (מתי?)"},"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1}},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":3}}],"end":{"kind":"list"}}},{"path":{"steps":[{"id":"invite","action":"send","who":"auto","timing":{"kind":"after","days":1},"message":"הזמנה למדידה, עם שעות החנות"},{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}}}]},{"label":"חידוש שטריימל","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":3}}],"end":{"kind":"list"}}}]}],"when":[{"label":"יש חתונה (מתי?)","effect":"שיחה למחרת, במקום הזמנה"},{"label":"עוד אין חתן","effect":"רשימת תפוצה בלבד"},{"label":"רק בודק מחירים","effect":"מחירון מיד"}],"who":[{"label":"אבא החתן","effect":"ההזמנה אליו"},{"label":"סבא או דוד","effect":"ההזמנה אליו, בשביל האבא"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":6,"name":"לימוד כתיבת סת\"ם","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"פרטים על הלימוד","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1},"message":"פרטים על הלימוד: זמנים, מחיר, ומה עושים אחרי"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":3}}],"end":{"kind":"list"}}}]},{"label":"פרטים על הזמנים","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1},"message":"פרטים על הלימוד: זמנים, מחיר, ומה עושים אחרי"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":3}}],"end":{"kind":"list"}}}]},{"label":"פרטים על הפרנסה אחרי","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1},"message":"פרטים על הלימוד: זמנים, מחיר, ומה עושים אחרי"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":3}}],"end":{"kind":"list"}}}]}],"when":[{"label":"מוכן להתחיל","effect":"עדיפות"},{"label":"מתלבט","effect":"אותו מסלול"}],"who":[{"label":"לעצמו","effect":"הנוסח אליו"},{"label":"בשביל הבן","effect":"הנוסח לאבא"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1}}],"end":{"kind":"list"}},"private":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":1}}],"end":{"kind":"list"}}},"sensitive":false}},{"id":11,"name":"שדכן","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[],"when":[{"label":"מתאים עכשיו","effect":"עדיפות"},{"label":"בהמשך","effect":"אותו מסלול"}],"who":[{"label":"הורים לבן","effect":"לשיחה"},{"label":"הורים לבת","effect":"לשיחה"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":2}}],"end":{"kind":"stop"}},"private":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":2}}],"end":{"kind":"stop"}}},"sensitive":true}},{"id":19,"name":"דלתות ודלתות אש","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"דלתות אש","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7},"onlyIf":{"all":[{"tapped":"מוסד"},{"tapped":"יש דרישה מכיבוי אש"}]}},{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":14}},{"id":"inspection","action":"talk","who":"me","timing":{"kind":"customerDate","days":-14},"message":"תזכורת לפני ביקורת כיבוי אש"}],"end":{"kind":"stop"}}}]},{"label":"דלתות כניסה","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7},"onlyIf":{"all":[{"tapped":"מוסד"},{"tapped":"יש דרישה מכיבוי אש"}]}},{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":14}},{"id":"inspection","action":"talk","who":"me","timing":{"kind":"customerDate","days":-14},"message":"תזכורת לפני ביקורת כיבוי אש"}],"end":{"kind":"stop"}}}]},{"label":"מנעולים","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7},"onlyIf":{"all":[{"tapped":"מוסד"},{"tapped":"יש דרישה מכיבוי אש"}]}},{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":14}},{"id":"inspection","action":"talk","who":"me","timing":{"kind":"customerDate","days":-14},"message":"תזכורת לפני ביקורת כיבוי אש"}],"end":{"kind":"stop"}}}]}],"when":[{"label":"יש דרישה מכיבוי אש","effect":"ביקור חינם למוסד"},{"label":"בשיפוץ","effect":"אותו מסלול"},{"label":"בהמשך","effect":"אותו מסלול"}],"who":[{"label":"מוסד","effect":"ביקור חינם, אם יש דרישה"},{"label":"קבלן","effect":"בלי ביקור חינם"},{"label":"פרטי","effect":"בלי ביקור חינם"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":27,"name":"הסעות","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"הסעות קבועות","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"intro","action":"talk","who":"me","timing":{"kind":"after","days":2}},{"id":"sivan","action":"send","who":"auto","timing":{"kind":"calendar","anchor":{"month":"sivan","day":1},"days":0},"message":"תזכורת לשנה הבאה"},{"id":"tamuz","action":"talk","who":"me","timing":{"kind":"calendar","anchor":{"month":"tamuz","day":1},"days":0}}],"end":{"kind":"stop"}}}]},{"label":"נסיעה חד-פעמית","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":2}}],"end":{"kind":"list"}}}]}],"when":[{"label":"לשנה הבאה","effect":"תזכורת בסיוון"},{"label":"עכשיו","effect":"שיחה"},{"label":"יש תאריך (מתי?)","effect":"לפי התאריך"}],"who":[{"label":"מוסד","effect":"הסעות קבועות"},{"label":"משפחה","effect":"נסיעה חד-פעמית"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":33,"name":"מוסך פחחות","added":"נהג שסימן \"יש תאונה עכשיו\" מקבל שיחה באותו יום","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"תיקון אחרי תאונה","goal":"primary","relation":"customer","variants":[{"if":{"tapped":"יש תאונה עכשיו"},"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":0}}],"end":{"kind":"list"}}},{"path":{"steps":[],"end":{"kind":"list"}}}]},{"label":"שיתוף פעולה","goal":"secondary","relation":"partner","variants":[{"path":{"steps":[{"id":"meet","action":"meet","who":"me","timing":{"kind":"after","days":14}},{"id":"again","action":"meet","who":"me","timing":{"kind":"after","days":30}}],"end":{"kind":"stop"}}}]},{"label":"לשמור את המספר שלי","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[],"end":{"kind":"list"}}}]}],"when":[{"label":"יש תאונה עכשיו","effect":"שיחה באותו יום"},{"label":"למקרה הצורך","effect":"רשימת תפוצה"}],"who":[{"label":"נהג","effect":"תיקון"},{"label":"סוכן ביטוח","effect":"שותף"},{"label":"עסק עם רכבים","effect":"עוד לא נקבע"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":35,"name":"בנייה ושיפוצים","added":"בדיקה כל שלושה חודשים, ארבע פעמים — מה שאושר בסבב 3 ונעלם","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"הרחבה","goal":"primary","relation":"customer","variants":[{"if":{"tapped":"יש תוכנית מאדריכל"},"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}},{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}},{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}}]},{"label":"שיפוץ פנים","goal":"secondary","relation":"customer","variants":[{"if":{"tapped":"יש תוכנית מאדריכל"},"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}},{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}},{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}}]},{"label":"מרפסת","goal":"secondary","relation":"customer","variants":[{"if":{"tapped":"יש תוכנית מאדריכל"},"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}},{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}},{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"repeat","everyDays":90,"times":4,"action":"check","who":"me"}}}]}],"when":[{"label":"עוד לפני היתר","effect":"בדיקה תקופתית"},{"label":"יש היתר","effect":"בדיקה תקופתית"},{"label":"יש תוכנית מאדריכל","effect":"ביקור בבית"},{"label":"רק חושבים על זה","effect":"בדיקה תקופתית"}],"who":[{"label":"משפחה","effect":"לקוח"},{"label":"אדריכל","effect":"שותף"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":41,"name":"חנות ריהוט","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"סלון","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"invite","action":"talk","who":"me","timing":{"kind":"after","days":7},"message":"הזמנה לערב בחנות, לזוג ולהורים יחד"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":14}}],"end":{"kind":"list"}}}]},{"label":"חדר שינה","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"invite","action":"talk","who":"me","timing":{"kind":"after","days":7},"message":"הזמנה לערב בחנות, לזוג ולהורים יחד"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":14}}],"end":{"kind":"list"}}}]},{"label":"פינת אוכל","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"invite","action":"talk","who":"me","timing":{"kind":"after","days":7},"message":"הזמנה לערב בחנות, לזוג ולהורים יחד"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":14}}],"end":{"kind":"list"}}}]},{"label":"נגרות בהזמנה","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"invite","action":"talk","who":"me","timing":{"kind":"after","days":7},"message":"הזמנה לערב בחנות, לזוג ולהורים יחד"},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":14}}],"end":{"kind":"list"}}}]}],"when":[{"label":"אחרי וורט","effect":"הזמנה לחנות"},{"label":"חתונה (מתי?)","effect":"הזמנה לחנות"},{"label":"רק בודק מחירים","effect":"מחירון"}],"who":[{"label":"הורים","effect":"ההזמנה אליהם"},{"label":"הזוג","effect":"ההזמנה אליהם"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":46,"name":"קצביה","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"הזמנה שבועית","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"wed1","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (1 מ-3)"},{"id":"wed2","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (2 מ-3)"},{"id":"wed3","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (3 מ-3)"}],"end":{"kind":"list"}}}]},{"label":"הזמנה לחג","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"wed1","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (1 מ-3)"},{"id":"wed2","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (2 מ-3)"},{"id":"wed3","action":"send","who":"auto","timing":{"kind":"weekday","weekday":3},"message":"הזמנה ראשונה בהנחה (3 מ-3)"}],"end":{"kind":"list"}}}]}],"when":[{"label":"עכשיו","effect":"אותו מסלול"},{"label":"לפני החג","effect":"אותו מסלול"}],"who":[],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":59,"name":"בגדי גברים","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"הלבשת חתן ומשפחה","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"month","action":"send","who":"auto","timing":{"kind":"customerDate","days":-30},"message":"הזמנה לחנות לפני החתונה"},{"id":"twoWeeks","action":"send","who":"auto","timing":{"kind":"customerDate","days":-14},"message":"הזמנה לחנות לפני החתונה"}],"end":{"kind":"stop"}}}]},{"label":"בגדים לחג","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[],"end":{"kind":"list"}}}]}],"when":[{"label":"חתונה (מתי?)","effect":"לפי התאריך"},{"label":"לפני החג","effect":"רשימת תפוצה"}],"who":[{"label":"אבא","effect":"ההזמנה אליו"},{"label":"חתן","effect":"ההזמנה אליו"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":65,"name":"מזגנים","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"מיזוג למוסד","goal":"primary","relation":"customer","variants":[{"if":{"tapped":"עכשיו"},"path":{"steps":[{"id":"visit","action":"meet","who":"me","timing":{"kind":"after","days":1}}],"end":{"kind":"stop"}}},{"path":{"steps":[{"id":"purim","action":"talk","who":"me","timing":{"kind":"calendar","anchor":{"holiday":"purim"},"days":1}},{"id":"again","action":"talk","who":"me","timing":{"kind":"after","days":14}},{"id":"shavuot","action":"talk","who":"me","timing":{"kind":"calendar","anchor":{"holiday":"shavuot"},"days":-14}}],"end":{"kind":"stop"}}}]},{"label":"מזגן לבית","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[],"end":{"kind":"list"}}}]},{"label":"תחזוקה","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[],"end":{"kind":"list"}}}]}],"when":[{"label":"לקיץ הבא","effect":"אחרי פורים"},{"label":"עכשיו","effect":"ביקור מיד"}],"who":[{"label":"מוסד","effect":"מסלול מוסד"},{"label":"בית כנסת","effect":"מסלול מוסד"},{"label":"משפחה","effect":"רשימת תפוצה"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":82,"name":"הפעלות לתלמודי תורה","added":"תזכורת לפני בין הזמנים — אושרה בסבב 3 ונעלמה","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"ל\"ג בעומר","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"afterPesach","action":"send","who":"auto","timing":{"kind":"calendar","anchor":{"holiday":"pesach"},"days":8},"message":"תזכורת לפני ל\"ג בעומר"},{"id":"call","action":"talk","who":"me","timing":{"kind":"calendar","anchor":{"holiday":"lagBaomer"},"days":-14}}],"end":{"kind":"stop"}}}]},{"label":"בין הזמנים","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"tamuz","action":"send","who":"auto","timing":{"kind":"calendar","anchor":{"month":"tamuz","day":1},"days":0},"message":"תזכורת לפני בין הזמנים"},{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":14}}],"end":{"kind":"stop"}}}]},{"label":"אירוע גיבוש","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}}}]}],"when":[{"label":"יש תאריך","effect":"לפי התאריך"},{"label":"לשנה הבאה","effect":"תזכורת לפני העונה"}],"who":[{"label":"תלמוד תורה","effect":"מוסד"},{"label":"בית ספר","effect":"מוסד"},{"label":"מחנה","effect":"מוסד"}],"defaults":{"business":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":7}}],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":86,"name":"צעצועים","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"מתנות לחנוכה","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"week","action":"send","who":"auto","timing":{"kind":"calendar","anchor":{"holiday":"chanukah"},"days":-7},"message":"מבצע החנוכה"},{"id":"twoDays","action":"send","who":"auto","timing":{"kind":"calendar","anchor":{"holiday":"chanukah"},"days":-2},"message":"מבצע החנוכה"}],"end":{"kind":"list"}}}]},{"label":"צעצועים","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[],"end":{"kind":"list"}}}]}],"when":[{"label":"לחנוכה","effect":"מבצע החנוכה"},{"label":"בהמשך","effect":"רשימת תפוצה"}],"who":[{"label":"הורים","effect":"הנוסח"},{"label":"סבים","effect":"הנוסח"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}},{"id":100,"name":"מכולת","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[],"when":[],"who":[],"defaults":{"business":{"steps":[{"id":"order","action":"send","who":"auto","timing":{"kind":"after","days":0},"message":"איך מזמינים"}],"end":{"kind":"stop"}},"private":{"steps":[{"id":"order","action":"send","who":"auto","timing":{"kind":"after","days":0},"message":"איך מזמינים"}],"end":{"kind":"stop"}}},"sensitive":false}},{"id":105,"name":"אולם אירועים","setup":{"business":"","anchor":{"goal":"","success":""},"needs":[{"label":"חתונה","goal":"primary","relation":"customer","variants":[{"path":{"steps":[{"id":"reserve","action":"reserve","who":"me","timing":{"kind":"after","days":0},"message":"אישור שריון, עם התאריך שבו השריון משתחרר"}],"end":{"kind":"stop"}}}]},{"label":"אירוע","goal":"secondary","relation":"customer","variants":[{"path":{"steps":[{"id":"call","action":"talk","who":"me","timing":{"kind":"after","days":2}}],"end":{"kind":"list"}}}]}],"when":[{"label":"יש תאריך (מתי?)","effect":"שריון לשבוע"},{"label":"רק בודק","effect":"מחירון"}],"who":[{"label":"משפחה","effect":"חתונה"},{"label":"מוסד","effect":"אירוע"}],"defaults":{"business":{"steps":[],"end":{"kind":"list"}},"private":{"steps":[],"end":{"kind":"list"}}},"sensitive":false}}];
+const EXPO = "2026-11-16";
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const ACT = { talk: "שיחה", meet: "פגישה", prepare: "להכין", send: "שליחה", reserve: "שריון", check: "בדיקה", wait: "לחכות ללקוח" };
+const WHO = { me: "אתה", auto: "אוטומטי" };
+const DAYS = ["יום א׳", "יום ב׳", "יום ג׳", "יום ד׳", "יום ה׳", "יום ו׳", "שבת"];
+const END = { list: "עובר לרשימת התפוצה", stop: "המעקב נגמר", engaged: "ענה — עובר לטיפול שלך", closed: "נסגרה עסקה", notRelevant: "לא רלוונטי", optOut: "ביקש להסיר" };
+
+let state = { fx: FIXTURES[0], taps: new Set(), owner: false, cdate: "", answeredAt: null };
+
+function gregLabel(d) { const [y, m, day] = d.split("-"); return `${DAYS[toDate(d).getDay()]} ${day}.${m}.${y}`; }
+function hebLabel(d) { try { return new HDate(toDate(d)).renderGematriya(true); } catch (e) { return ""; } }
+
+function renderSelect() {
+  const s = $("#biz");
+  FIXTURES.forEach((f, i) => { const o = el("option", null, `${f.id}. ${f.name}`); o.value = String(i); s.append(o); });
+  s.addEventListener("change", () => { state = { fx: FIXTURES[Number(s.value)], taps: new Set(), owner: false, cdate: "", answeredAt: null }; $("#owner").checked = false; $("#cdate").value = ""; render(); });
+}
+
+function renderCard() {
+  const box = $("#card"); box.textContent = "";
+  const f = state.fx.setup;
+  const groups = [["מה הוא צריך?", f.needs.map((n) => ({ label: n.label, note: n.goal === "primary" ? "ראשית" : "" }))], ["מתי?", f.when.map((b) => ({ label: b.label }))], ["מי הוא?", f.who.map((b) => ({ label: b.label }))]];
+  let any = false;
+  groups.forEach(([title, items]) => {
+    if (!items.length) return;
+    any = true;
+    const q = el("div", "q"); q.append(el("span", "qlabel", title));
+    const chips = el("div", "chips");
+    items.forEach((it) => {
+      const b = el("button", "chip", it.label); b.type = "button";
+      if (it.note) b.append(" ", el("small", null, "· " + it.note));
+      b.setAttribute("aria-pressed", String(state.taps.has(it.label)));
+      b.addEventListener("click", () => { state.taps.has(it.label) ? state.taps.delete(it.label) : state.taps.add(it.label); state.answeredAt = null; render(); });
+      chips.append(b);
+    });
+    q.append(chips); box.append(q);
+  });
+  if (!any) box.append(el("p", "empty", "כרטיס של שם בלבד: אין כפתורים. המסלול נקבע לפי ברירת המחדל."));
+  const a = $("#added");
+  a.hidden = !state.fx.added;
+  if (state.fx.added) { a.textContent = ""; a.append(el("b", null, "תוספת מבדיקת העקביות, לא אושרה: "), document.createTextNode(state.fx.added)); }
+}
+
+/* The whole path when nobody answers, step after step; "answeredAt" makes him answer at one step. */
+function project() {
+  const lead = { id: "demo", capturedOn: EXPO, taps: [...state.taps], businessOwner: state.owner, customerDate: state.cdate || undefined, history: [] };
+  const rows = [];
+  let today = EXPO;
+  for (let i = 0; i < 24; i++) {
+    const n = nextTask(state.fx.setup, lead, today);
+    if (n.kind !== "task") { rows.push(n); break; }
+    const outcome = state.answeredAt === i ? "engaged" : "noAnswer";
+    rows.push({ ...n, i, outcome });
+    lead.history.push({ stepId: n.stepId, doneOn: n.dueOn, outcome });
+    today = n.dueOn;
+  }
+  return { rows, chosen: choosePath(state.fx.setup, lead) };
+}
+
+function renderPath() {
+  const { rows, chosen } = project();
+  const src = $("#source"); src.textContent = "";
+  if (chosen.source === "default") src.append("לא סומן צורך: ", el("b", null, state.owner ? "ברירת המחדל לבעל עסק" : "ברירת המחדל למבקר פרטי"));
+  else src.append("המסלול של הכפתור ", el("b", null, `"${chosen.source}"`));
+  const tl = $("#timeline"); tl.textContent = "";
+  rows.forEach((r) => {
+    if (r.kind === "end") { tl.append(el("p", "end" + (r.reason === "engaged" ? " good" : ""), END[r.reason] || r.reason)); return; }
+    if (r.kind === "askDate") { const p = el("p", "end ask", `${gregLabel(r.dueOn)}: לברר את התאריך שלו — הצעד הבא תלוי בו. הכנס תאריך משמאל לכרטיס כדי לראות את ההמשך.`); tl.append(p); return; }
+    const row = el("div", "row");
+    const when = el("div", "when"); when.append(el("div", "greg", gregLabel(r.dueOn)), el("div", "heb", hebLabel(r.dueOn)));
+    const what = el("div", "what");
+    const act = el("div", "act", ACT[r.action] || r.action);
+    act.append(el("span", "tag " + r.who, WHO[r.who]));
+    if (r.late) act.append(el("span", "tag late", "מאוחר — יוצא מיד"));
+    what.append(act);
+    if (r.message) what.append(el("div", "msg", r.message));
+    what.append(el("div", "outcome", r.outcome === "engaged" ? "כאן הוא ענה" : "בהנחה שלא ענה"));
+    const b = el("button", "btn", state.answeredAt === r.i ? "בטל" : "ענה כאן"); b.type = "button";
+    b.addEventListener("click", () => { state.answeredAt = state.answeredAt === r.i ? null : r.i; renderPath(); });
+    row.append(when, what, b); tl.append(row);
+  });
+}
+
+function render() { renderCard(); renderPath(); }
+
+$("#owner").addEventListener("change", (e) => { state.owner = e.target.checked; state.answeredAt = null; renderPath(); });
+$("#cdate").addEventListener("change", (e) => { state.cdate = e.target.value; state.answeredAt = null; renderPath(); });
+$("#expo").textContent = `התערוכה: ${gregLabel(EXPO)} · ${hebLabel(EXPO)}. כל המסלולים מתחילים ממנה.`;
+renderSelect();
+render();
+</script>
