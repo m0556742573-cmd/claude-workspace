@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { Booth, today } from './booth/Booth.tsx';
+import { Admin, Leads, Messages, Settings, SetupScreen, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
 import { allLeads, saveLead as saveLocal, type LocalLead } from './store/local.ts';
 import {
-  activeSetup, flush, startFromTemplate, loadDirectory, myExhibitor, saveLead, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, flush, isAdmin, startFromTemplate, loadDirectory, myExhibitor, saveLead, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 
@@ -38,6 +39,9 @@ function Live() {
   const [todays, setTodays] = useState<LocalLead[]>([]);
   const [waiting, setWaiting] = useState(0);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState(() => (location.hash.slice(1) || 'booth'));
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { history.replaceState(null, '', '#' + tab); }, [tab]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -53,6 +57,7 @@ function Live() {
       if (!ex.approved) return;
       setSetup(await activeSetup(ex.id));
       setDirectory(await loadDirectory());
+      setAdmin(await isAdmin());
     }).catch((e) => setError(String(e.message ?? e)));
   }, [session]);
 
@@ -117,18 +122,39 @@ function Live() {
     );
   }
 
+  const ctx: Ctx = { exhibitor, setup, directory, setSetup };
   return (
-    <Booth
-      setup={setup}
-      header={<><strong className="who">{exhibitor.name}</strong><button type="button" className="link" onClick={signOut}>יציאה</button></>}
-      search={search}
-      save={async (lead) => { const r = await saveLead(lead, exhibitor.id, setup); await refreshToday(); return r; }}
-      todays={todays}
-      waiting={waiting}
-      online={online}
-    />
+    <div className="shell">
+      <nav className="tabs" aria-label="המערכת">
+        {TABS.filter(([id]) => id !== 'admin' || admin).map(([id, label]) => (
+          <button key={id} type="button" className="tab" aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </nav>
+      {tab === 'booth' && (
+        <Booth
+          setup={setup}
+          header={<strong className="who">{exhibitor.name}</strong>}
+          search={search}
+          save={async (lead) => { const r = await saveLead(lead, exhibitor.id, setup); await refreshToday(); return r; }}
+          todays={todays}
+          waiting={waiting}
+          online={online}
+        />
+      )}
+      {tab === 'tasks' && <Tasks ctx={ctx} />}
+      {tab === 'leads' && <Leads ctx={ctx} />}
+      {tab === 'setup' && <SetupScreen ctx={ctx} />}
+      {tab === 'messages' && <Messages ctx={ctx} />}
+      {tab === 'settings' && <Settings ctx={ctx} onSignOut={signOut} />}
+      {tab === 'admin' && admin && <Admin />}
+    </div>
   );
 }
+
+const TABS: [string, string][] = [
+  ['booth', 'הדוכן'], ['tasks', 'המשימות שלי'], ['leads', 'הלקוחות'], ['setup', 'ההקמה'],
+  ['messages', 'ההודעות'], ['settings', 'הגדרות'], ['admin', 'ניהול'],
+];
 
 /** The demo: invented names, saved on this phone only. */
 function Demo() {
