@@ -1,7 +1,7 @@
 -- The expo system's data. Each exhibitor sees only his own rows (row level security).
 -- The community list stays on the server: the booth searches it through a function that returns names only.
 
-create extension if not exists pg_trgm;
+create extension if not exists pg_trgm with schema extensions;
 
 -- ---------- exhibitors and their setup
 
@@ -53,7 +53,7 @@ create table people (
   has_whatsapp boolean,           -- checked by the WhatsApp server, the way a person would
   created_at timestamptz not null default now()
 );
-create index people_name_trgm on people using gin (full_name gin_trgm_ops);
+create index people_name_trgm on people using gin (full_name extensions.gin_trgm_ops);
 
 -- ---------- leads: a visitor at one exhibitor's booth
 
@@ -176,7 +176,7 @@ alter table people enable row level security;
 
 create function search_people(q text, max int default 12)
 returns table (id uuid, full_name text, city text, business_owner boolean)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select p.id, p.full_name, p.city, p.business_owner
   from people p
   where my_exhibitor() is not null and length(trim(q)) >= 2
@@ -191,3 +191,7 @@ returns table (id uuid, full_name text, city text, business_owner boolean)
 language sql stable security definer set search_path = public as $$
   select p.id, p.full_name, p.city, p.business_owner from people p where my_exhibitor() is not null
 $$;
+
+-- Only signed-in exhibitors may call the functions; never an anonymous visitor of the site.
+revoke execute on function my_exhibitor(), search_people(text, int), people_directory() from public, anon;
+grant execute on function my_exhibitor(), search_people(text, int), people_directory() to authenticated;
