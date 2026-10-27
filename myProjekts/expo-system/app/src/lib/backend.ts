@@ -320,3 +320,13 @@ export async function adminClearPeople(): Promise<number> {
   if (error) throw error;
   return data ?? 0;
 }
+
+/** A button renamed in the setup: the visitors already marked with it are marked with the new name. */
+export async function renameTaps(from: string, to: string): Promise<void> {
+  const { data, error } = await supabase.from('leads').select('id, taps').contains('taps', [from]);
+  if (error) throw error;
+  for (const l of data ?? []) {
+    const u = await supabase.from('leads').update({ taps: (l.taps as string[]).map((t) => (t === from ? to : t)) }).eq('id', l.id);
+    if (u.error) throw u.error;
+  }
+}

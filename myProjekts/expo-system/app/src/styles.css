@@ -285,3 +285,13 @@ button.list-row:hover { background: var(--surface-2); }
 .list-row .row .btn { min-height: 40px; }
 /* A label is bold; what is typed inside it is not. */
 .field .input, .field .area, .field input, .field textarea { font-weight: 400; }
+
+/* Editing the card: a button with its own ✕, a name being changed, the days of a step. */
+.chip-x { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px 0 4px; }
+.chip-x .chip-l { padding: 0 10px; min-height: 42px; font: inherit; color: inherit; background: none; border: 0; }
+.chip-x .text-btn { font-size: 13px; }
+.chip-del { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--pill); border: 0; background: none; color: var(--muted); }
+.chip-del:hover { background: var(--surface-2); color: var(--ink); }
+.chip-edit { display: inline-flex; gap: 6px; align-items: center; }
+.chip-edit .input { width: 200px; }
+.input.days { width: 72px; min-height: 36px; text-align: center; display: inline-block; padding: 0 6px; }

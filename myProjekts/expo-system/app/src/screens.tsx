@@ -2,9 +2,10 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { nextTask, pathAhead, type Action, type Lead, type Next, type Setup } from '@expo/engine';
+import { nextTask, pathAhead, type Action, type Lead, type Next, type Path, type Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
+import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
 import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
@@ -12,7 +13,7 @@ import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, 
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  addFollowNote, addManual, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
   loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, updateMe, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
@@ -891,8 +892,23 @@ function Signature({ ctx }: { ctx: Ctx }) {
 }
 
 function Custom({ ctx }: { ctx: Ctx }) {
-  const s = ctx.setup;
+  const [draft, setDraft] = useState<Setup | null>(null);
+  const [renames, setRenames] = useState<[string, string][]>([]);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState('');
+  const s = draft ?? ctx.setup;
   const [picking, setPicking] = useState(false);
+  async function save() {
+    if (!draft) return;
+    setBusy(true); setSaved('');
+    try {
+      await changeTemplate(ctx.exhibitor.id, draft);
+      for (const [from, to] of renames) await renameTaps(from, to);
+      ctx.setSetup(draft); setDraft(null); setRenames([]);
+      setSaved('נשמר. השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.');
+    } catch (e) { setSaved('לא נשמר: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
   return (
     <>
       <section className="panel-w">
@@ -911,37 +927,121 @@ function Custom({ ctx }: { ctx: Ctx }) {
         <section className="panel-w"><h2>מה תהיה הצלחה בתערוכה</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
       )}
 
-      <section className="panel-w">
-        <h2>הכרטיס בדוכן</h2>
-        {([['מה הוא צריך?', s.needs.map((n) => ({ label: n.label, effect: n.goal === 'primary' ? 'המטרה הראשית' : '' }))], ['מתי?', s.when], ['מי הוא?', s.who]] as [string, { label: string; effect: string }[]][]).map(([q, items]) => (
-          items.length ? (
-            <div key={q} className="q-block"><span className="sec">{q}</span>
-              <ul className="history">{items.map((b) => <li key={b.label}><b style={{ color: 'var(--ink)' }}>{b.label}</b>{b.effect ? ` — ${b.effect}` : null}</li>)}</ul>
+      <section className={draft ? 'held' : 'panel-w'}>
+        <div className="card-top">
+          <h2>הכרטיס בדוכן</h2>
+          {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
+        </div>
+        {draft && <p className="muted small">נגיעה בשם משנה אותו, ✕ מוציא אותו מהכרטיס. שם שמשתנה משתנה גם אצל מי שכבר סומן בו.</p>}
+        {GROUPS.map(([g, q]) => {
+          const items = g === 'needs' ? s.needs.map((n) => ({ label: n.label, effect: n.goal === 'primary' ? 'המטרה הראשית' : '' })) : s[g];
+          if (!items.length && !draft) return null;
+          return (
+            <div key={g} className="q-block"><span className="sec">{q}</span>
+              {draft ? (
+                <div className="chips">
+                  {items.map((b) => <EditChip key={b.label} label={b.label} primary={g === 'needs' && b.effect === 'המטרה הראשית'}
+                    onRename={(to) => { const next = rename(draft, b.label, to); if (next !== draft) { setDraft(next); setRenames([...renames, [b.label, to.trim()]]); } }}
+                    onRemove={() => setDraft(remove(draft, g, b.label))}
+                    onPrimary={g === 'needs' && draft.needs.length > 1 ? () => setDraft(setGoal(draft, b.label)) : undefined} />)}
+                  <AddChip onAdd={(l) => setDraft(add(draft, g, l))} />
+                </div>
+              ) : (
+                <ul className="history">{items.map((b) => <li key={b.label}><b style={{ color: 'var(--ink)' }}>{b.label}</b>{b.effect ? ` — ${b.effect}` : null}</li>)}</ul>
+              )}
             </div>
-          ) : null
-        ))}
-        {!s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
+          );
+        })}
+        {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
       </section>
 
       <section className="panel-w">
         <h2>מה קורה אחרי התערוכה</h2>
-        {s.needs.map((n) => (
+        {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי התערוכה.</p>}
+        {s.needs.map((n, ni) => (
           <div key={n.label} className="q-block">
             <span className="sec">{n.label}</span>
-            {n.variants.map((v, i) => (
-              <div key={i}>
+            {n.variants.map((v, vi) => (
+              <div key={vi}>
                 {n.variants.length > 1 && <span className="muted small">{text.variantTitle(v)}:</span>}
-                <ol className="history" style={{ listStyle: 'decimal', paddingInlineStart: 22 }}>{text.path(v.path).map((line, j) => <li key={j}>{line}</li>)}</ol>
+                <PathLines path={v.path} edit={draft ? (i, d) => setDraft(setDays(draft, { need: ni, variant: vi }, i, d)) : undefined} />
               </div>
             ))}
           </div>
         ))}
         <div className="q-block"><span className="sec">מבקר שלא סומן אצלו כלום</span>
-          <div><span className="muted small">בעל עסק:</span><ol className="history" style={{ listStyle: 'decimal', paddingInlineStart: 22 }}>{text.path(s.defaults.business).map((l, j) => <li key={j}>{l}</li>)}</ol></div>
-          <div><span className="muted small">פרטי:</span><ol className="history" style={{ listStyle: 'decimal', paddingInlineStart: 22 }}>{text.path(s.defaults.private).map((l, j) => <li key={j}>{l}</li>)}</ol></div>
+          <div><span className="muted small">בעל עסק:</span><PathLines path={s.defaults.business} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'business' }, i, d)) : undefined} /></div>
+          <div><span className="muted small">פרטי:</span><PathLines path={s.defaults.private} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'private' }, i, d)) : undefined} /></div>
         </div>
       </section>
+
+      {draft && (
+        <div className="row">
+          <button type="button" className="btn primary tall" disabled={busy || JSON.stringify(draft) === JSON.stringify(ctx.setup)} onClick={save}>שמירת השינויים</button>
+          <button type="button" className="btn tall" disabled={busy} onClick={() => { setDraft(null); setRenames([]); }}>ביטול</button>
+        </div>
+      )}
+      {saved && <p className="note">{saved}</p>}
     </>
+  );
+}
+
+const GROUPS: [Group, string][] = [['needs', 'מה הוא צריך?'], ['when', 'מתי?'], ['who', 'מי הוא?']];
+
+function EditChip({ label, primary, onRename, onRemove, onPrimary }: { label: string; primary: boolean; onRename: (to: string) => void; onRemove: () => void; onPrimary?: () => void }) {
+  const [v, setV] = useState<string | null>(null);
+  if (v !== null) {
+    return (
+      <span className="chip-edit">
+        <input className="input" aria-label={`שם חדש ל${label}`} autoFocus value={v} onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { onRename(v); setV(null); } if (e.key === 'Escape') setV(null); }} />
+        <button type="button" className="btn primary" onClick={() => { onRename(v); setV(null); }}>אישור</button>
+      </span>
+    );
+  }
+  return (
+    <span className="chip chip-x">
+      <button type="button" className="chip-l" onClick={() => setV(label)}>{label}{primary && <span className="faint small"> · ראשית</span>}</button>
+      {onPrimary && !primary && <button type="button" className="text-btn small" onClick={onPrimary}>לסמן כראשית</button>}
+      <button type="button" className="chip-del" aria-label={`להוציא את ${label}`} onClick={onRemove}><Icon name="close" size={16} /></button>
+    </span>
+  );
+}
+
+function AddChip({ onAdd }: { onAdd: (label: string) => void }) {
+  const [v, setV] = useState<string | null>(null);
+  if (v === null) return <button type="button" className="chip" onClick={() => setV('')}><Icon name="plus" size={16} /> כפתור</button>;
+  return (
+    <span className="chip-edit">
+      <input className="input" aria-label="כפתור חדש" placeholder="שם הכפתור" autoFocus value={v} onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { onAdd(v); setV(null); } if (e.key === 'Escape') setV(null); }} />
+      <button type="button" className="btn primary" disabled={!v.trim()} onClick={() => { onAdd(v); setV(null); }}>הוספה</button>
+      <button type="button" className="btn" onClick={() => setV(null)}>ביטול</button>
+    </span>
+  );
+}
+
+/** The steps of a path, numbered; while editing, each step's days are a field. */
+function PathLines({ path, edit }: { path: Path; edit?: (index: number, days: number) => void }) {
+  return (
+    <ol className="history" style={{ listStyle: 'decimal', paddingInlineStart: 22 }}>
+      {path.steps.length === 0 && <li>{text.path(path)[0]}</li>}
+      {path.steps.map((st, i) => {
+        const t = st.timing;
+        if (!edit || t.kind === 'weekday') return <li key={i}>{text.step(st)}</li>;
+        const sign = t.days < 0 ? -1 : 1;
+        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי התערוכה' : 'ימים אחרי הצעד הקודם') : t.kind === 'customerDate' ? (t.days < 0 ? 'ימים לפני התאריך שלו' : 'ימים אחרי התאריך שלו') : (t.days < 0 ? 'ימים לפני' : 'ימים אחרי') + ' ' + text.timing({ ...t, days: 0 });
+        return (
+          <li key={i}>
+            {text.step({ ...st, timing: { kind: 'after', days: 0 } }).split(',')[0]},{' '}
+            <input className="input days" type="number" min={0} max={365} inputMode="numeric" aria-label={unit} value={Math.abs(t.days)}
+              onChange={(e) => edit(i, sign * Math.max(0, Math.min(365, Number(e.target.value) || 0)))} /> {unit}
+            {st.message ? <span className="muted"> — "{st.message}"</span> : null}
+          </li>
+        );
+      })}
+      {path.steps.length > 0 && <li>{text.end(path.end)}</li>}
+    </ol>
   );
 }
 
