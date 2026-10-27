@@ -1009,7 +1009,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
     </section>
   );
   if (steps) {
-    return <>{question}<SetupSteps start={ctx.setup} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
+    return <>{question}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
   }
   return (
     <>

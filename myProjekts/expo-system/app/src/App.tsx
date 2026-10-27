@@ -202,7 +202,7 @@ function Live() {
     return (
       <div className="setup-gate">
         <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">בוא נקים את הדוכן</span></div>
-        <SetupSteps start={null} onSave={async (s) => { await startFromTemplate(exhibitor.id, s); setSetup(s); }} />
+        <SetupSteps start={null} business={exhibitor.business} onSave={async (s) => { await startFromTemplate(exhibitor.id, s); setSetup(s); }} />
       </div>
     );
   }

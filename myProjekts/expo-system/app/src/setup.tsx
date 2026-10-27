@@ -17,13 +17,15 @@ const EMPTY: Setup = {
 const STEPS = ['המטרה', 'נקודת התחלה', 'הכרטיס', 'מה קורה אחרי', 'הזמן שלך', 'בדיקה ושמירה'];
 const MINUTES = [15, 30, 60, 90, 120];
 
-export function SetupSteps({ start, onSave, onCancel }: {
+export function SetupSteps({ start, business, onSave, onCancel }: {
   start: Setup | null;
+  /** The business he gave at sign-up: the first answer until he writes another. */
+  business?: string;
   onSave: (s: Setup, renames: [string, string][]) => Promise<void>;
   onCancel?: () => void;
 }) {
   const [at, setAt] = useState(0);
-  const [s, setS] = useState<Setup>(start ?? EMPTY);
+  const [s, setS] = useState<Setup>(() => { const b = start ?? EMPTY; return { ...b, business: b.business || business || '' }; });
   const [from, setFrom] = useState<number | 'empty' | 'mine' | null>(start ? 'mine' : null);
   const [renames, setRenames] = useState<[string, string][]>([]);
   const [visitors, setVisitors] = useState(40);
