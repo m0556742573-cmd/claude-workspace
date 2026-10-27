@@ -10,6 +10,8 @@ import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
+import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
+import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
@@ -972,6 +974,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const [saved, setSaved] = useState('');
   const s = draft ?? ctx.setup;
   const [picking, setPicking] = useState(false);
+  const [steps, setSteps] = useState(false);
   async function save() {
     if (!draft) return;
     setBusy(true); setSaved('');
@@ -983,13 +986,23 @@ function Custom({ ctx }: { ctx: Ctx }) {
     } catch (e) { setSaved('לא נשמר: ' + String((e as Error).message ?? e)); }
     finally { setBusy(false); }
   }
+  if (steps) {
+    return (
+      <SetupSteps start={ctx.setup} onCancel={() => setSteps(false)} onSave={async (next, names) => {
+        await changeTemplate(ctx.exhibitor.id, next);
+        for (const [from, to] of names) await renameTaps(from, to);
+        ctx.setSetup(next); setSteps(false);
+        setSaved('ההקמה נשמרה. הגרסה הקודמת שמורה למטה, ואפשר לחזור אליה.');
+      }} />
+    );
+  }
   return (
     <>
       <section className="panel-w">
         <h2>איך מקימים</h2>
         <ul className="list" style={{ background: 'var(--surface-2)' }}>
           <li><a className="list-row" href={LAB_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}><div className="row-name">שיחה עם היועץ החכם</div><div className="row-step">בגרסת ניסיון, בחלון נפרד. בקרוב בתוך המערכת, וההקמה תישמר ישר לכאן.</div></a></li>
-          <li className="list-row"><div className="row-name">הקמה בטופס <span className="tag">בבנייה</span></div><div className="row-step">שאלות קצרות לפי הסדר: מטרה, כרטיס, מסלולים, זמן, הודעות.</div></li>
+          <li><button type="button" className="list-row" onClick={() => { setSteps(true); setSaved(''); scrollTo(0, 0); }}><div className="row-name">הקמה שלב אחר שלב</div><div className="row-step">שישה שלבים קצרים: מטרה, נקודת התחלה, כרטיס, מסלולים, זמן, ובדיקה.</div></button></li>
           <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">החלפת תבנית</div><div className="row-step">להתחיל מעסק דומה מהסבבים.</div></button></li>
         </ul>
         {picking && (
@@ -1092,64 +1105,6 @@ function Versions({ ctx }: { ctx: Ctx }) {
   );
 }
 
-const GROUPS: [Group, string][] = [['needs', 'מה הוא צריך?'], ['when', 'מתי?'], ['who', 'מי הוא?']];
-
-function EditChip({ label, primary, onRename, onRemove, onPrimary }: { label: string; primary: boolean; onRename: (to: string) => void; onRemove: () => void; onPrimary?: () => void }) {
-  const [v, setV] = useState<string | null>(null);
-  if (v !== null) {
-    return (
-      <span className="chip-edit">
-        <input className="input" aria-label={`שם חדש ל${label}`} autoFocus value={v} onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { onRename(v); setV(null); } if (e.key === 'Escape') setV(null); }} />
-        <button type="button" className="btn primary" onClick={() => { onRename(v); setV(null); }}>אישור</button>
-      </span>
-    );
-  }
-  return (
-    <span className="chip chip-x">
-      <button type="button" className="chip-l" onClick={() => setV(label)}>{label}{primary && <span className="faint small"> · ראשית</span>}</button>
-      {onPrimary && !primary && <button type="button" className="text-btn small" onClick={onPrimary}>לסמן כראשית</button>}
-      <button type="button" className="chip-del" aria-label={`להוציא את ${label}`} onClick={onRemove}><Icon name="close" size={16} /></button>
-    </span>
-  );
-}
-
-function AddChip({ onAdd }: { onAdd: (label: string) => void }) {
-  const [v, setV] = useState<string | null>(null);
-  if (v === null) return <button type="button" className="chip" onClick={() => setV('')}><Icon name="plus" size={16} /> כפתור</button>;
-  return (
-    <span className="chip-edit">
-      <input className="input" aria-label="כפתור חדש" placeholder="שם הכפתור" autoFocus value={v} onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { onAdd(v); setV(null); } if (e.key === 'Escape') setV(null); }} />
-      <button type="button" className="btn primary" disabled={!v.trim()} onClick={() => { onAdd(v); setV(null); }}>הוספה</button>
-      <button type="button" className="btn" onClick={() => setV(null)}>ביטול</button>
-    </span>
-  );
-}
-
-/** The steps of a path, numbered; while editing, each step's days are a field. */
-function PathLines({ path, edit }: { path: Path; edit?: (index: number, days: number) => void }) {
-  return (
-    <ol className="history" style={{ listStyle: 'decimal', paddingInlineStart: 22 }}>
-      {path.steps.length === 0 && <li>{text.path(path)[0]}</li>}
-      {path.steps.map((st, i) => {
-        const t = st.timing;
-        if (!edit || t.kind === 'weekday') return <li key={i}>{text.step(st)}</li>;
-        const sign = t.days < 0 ? -1 : 1;
-        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי התערוכה' : 'ימים אחרי הצעד הקודם') : t.kind === 'customerDate' ? (t.days < 0 ? 'ימים לפני התאריך שלו' : 'ימים אחרי התאריך שלו') : (t.days < 0 ? 'ימים לפני' : 'ימים אחרי') + ' ' + text.timing({ ...t, days: 0 });
-        return (
-          <li key={i}>
-            {text.step({ ...st, timing: { kind: 'after', days: 0 } }).split(',')[0]},{' '}
-            <input className="input days" type="number" min={0} max={365} inputMode="numeric" aria-label={unit} value={Math.abs(t.days)}
-              onChange={(e) => edit(i, sign * Math.max(0, Math.min(365, Number(e.target.value) || 0)))} /> {unit}
-            {st.message ? <span className="muted"> — "{st.message}"</span> : null}
-          </li>
-        );
-      })}
-      {path.steps.length > 0 && <li>{text.end(path.end)}</li>}
-    </ol>
-  );
-}
 
 // ---------- ניהול (למנהל התערוכה): outside the system's menus, reached from the settings
 

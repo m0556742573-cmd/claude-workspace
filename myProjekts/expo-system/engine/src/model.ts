@@ -77,6 +77,8 @@ export interface Setup {
   defaults: { business: Path; private: Path };
   /** A sensitive business: no business name in messages, mailing list only with consent. */
   sensitive: boolean;
+  /** Minutes a day he will have for the follow-up in the two weeks after the fair (round 7: half an hour by default). */
+  capacity?: number;
 }
 
 /** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops. */

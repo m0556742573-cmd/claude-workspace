@@ -328,3 +328,19 @@ button.list-row:hover { background: var(--surface-2); }
 .harvest-head > span:last-child { display: grid; gap: 2px; }
 .harvest-n { font-size: 26px; font-weight: 700; min-width: 44px; line-height: 1.1; }
 .harvest-names { padding: 0 16px 14px; padding-inline-start: 74px; color: var(--ink-2); font-size: 14.5px; line-height: 1.7; }
+/* The setup step by step. */
+.setup-gate { min-height: 100dvh; padding: 24px 16px 48px; display: grid; gap: 18px; align-content: start; justify-items: center; }
+.setup-gate > .setup-steps { width: min(720px, 100%); }
+.setup-steps .panel-w .switchrow { align-items: flex-start; }
+.steps-head { display: grid; gap: 6px; }
+.steps-head h1 { font-size: 24px; font-weight: 700; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 28px; height: 4px; border-radius: 2px; background: var(--line-strong); }
+.dots i.on { background: var(--ink); }
+.setup-steps select.input { font-weight: 400; }
+.note.warn { background: var(--accent-soft); color: var(--ink); }
+.checks { display: grid; gap: 8px; list-style: none; padding: 0; }
+.checks li { display: flex; gap: 10px; align-items: baseline; }
+.checks li span { width: 22px; height: 22px; border-radius: var(--pill); display: inline-grid; place-items: center; font-size: 13px; font-weight: 700; flex: none; }
+.checks li.ok span { background: var(--ink); color: var(--surface); }
+.checks li.miss span { background: var(--accent-soft); color: var(--ink); border: 1px solid var(--ink-2); }

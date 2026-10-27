@@ -8,6 +8,7 @@ import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { MeForm } from './me.tsx';
 import { Join } from './join.tsx';
+import { SetupSteps } from './setup.tsx';
 import { Booth } from './booth/Booth.tsx';
 import { Admin, Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
@@ -59,7 +60,10 @@ function useToday() {
 export function App() {
   const join = /^#join\/([a-z0-9]+)/i.exec(location.hash);
   if (join) return <Join code={join[1]!} />;
-  return new URLSearchParams(location.search).has('demo') ? <Demo /> : <Live />;
+  const demo = new URLSearchParams(location.search).has('demo');
+  // The setup step by step, to try without an account: nothing is saved.
+  if (demo && location.hash === '#setup') return <TrySetup />;
+  return demo ? <Demo /> : <Live />;
 }
 
 function Gate({ title, children }: { title: string; children?: ReactNode }) {
@@ -180,14 +184,10 @@ function Live() {
   if (setup === undefined) return <Gate title="טוען…" />;
   if (!setup) {
     return (
-      <Gate title="בוא נקים את הדוכן">
-        <p className="muted">מסך ההקמה המלא בדרך. בינתיים אפשר להתחיל מתבנית של עסק דומה, ולשנות אחר כך.</p>
-        <div className="chips" style={{ justifyContent: 'center' }}>
-          {fixtures.map((f) => (
-            <button key={f.id} type="button" className="chip" onClick={async () => { await startFromTemplate(exhibitor.id, f.setup); setSetup(f.setup); }}>{f.name}</button>
-          ))}
-        </div>
-      </Gate>
+      <div className="setup-gate">
+        <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">בוא נקים את הדוכן</span></div>
+        <SetupSteps start={null} onSave={async (s) => { await startFromTemplate(exhibitor.id, s); setSetup(s); }} />
+      </div>
     );
   }
 
@@ -345,6 +345,25 @@ function HelpPanel({ kind, desk, view, onPick, onClose }: { kind: Exclude<Panel,
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function TrySetup() {
+  const [done, setDone] = useState<Setup | null>(null);
+  if (done) {
+    return (
+      <Gate title="ההקמה מוכנה">
+        <p className="muted">בהדגמה היא לא נשמרת. בדוכן אמיתי היא נשמרת, והכרטיס בדוכן נבנה ממנה מיד.</p>
+        <p>{done.needs.length ? `בכרטיס: ${done.needs.map((n) => n.label).join(", ")}` : "כרטיס של שם בלבד"}</p>
+        <button type="button" className="btn" onClick={() => setDone(null)}>להקים שוב</button>
+      </Gate>
+    );
+  }
+  return (
+    <div className="setup-gate">
+      <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">הקמה · הדגמה</span></div>
+      <SetupSteps start={null} onSave={async (s) => setDone(s)} />
     </div>
   );
 }
