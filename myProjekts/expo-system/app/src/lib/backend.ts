@@ -299,3 +299,24 @@ export async function allContacts(): Promise<Map<string, { phone: string | null;
   if (error) throw error;
   return new Map(((data ?? []) as { lead_id: string; phone: string | null; email: string | null }[]).map((r) => [r.lead_id, { phone: r.phone, email: r.email }]));
 }
+
+// ---------- the admin loads the lists (the rows go from the file straight to the server)
+export async function adminCounts(): Promise<{ people: number; listed: number } | null> {
+  const { data } = await supabase.rpc('admin_counts');
+  return data ?? null;
+}
+export async function adminLoadExhibitors(rows: object[]): Promise<{ rows: number; approved: number }> {
+  const { data, error } = await supabase.rpc('admin_load_exhibitor_list', { rows });
+  if (error) throw error;
+  return data;
+}
+export async function adminLoadPeople(rows: object[]): Promise<{ added: number; total: number }> {
+  const { data, error } = await supabase.rpc('admin_load_people', { rows });
+  if (error) throw error;
+  return data;
+}
+export async function adminClearPeople(): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_clear_people');
+  if (error) throw error;
+  return data ?? 0;
+}

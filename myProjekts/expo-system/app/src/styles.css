@@ -99,7 +99,7 @@ a { color: var(--ink); }
 .page.narrow { max-width: 760px; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .panel-w { background: var(--surface); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
-.panel-w h2, .sheet h2 { font-size: 17px; font-weight: 700; }
+.panel-w h2, .sheet h2, .held h2 { font-size: 17px; font-weight: 700; }
 .list { background: var(--surface); border-radius: var(--r); overflow: hidden; list-style: none; margin: 0; padding: 0; }
 .list > li { border-bottom: 1px solid var(--line); }
 .list > li:last-child { border-bottom: 0; }
