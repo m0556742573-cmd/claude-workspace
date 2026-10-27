@@ -7,11 +7,12 @@ import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
 import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
+import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  removeManual, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, updateMe, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -21,7 +22,7 @@ const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'ל
 const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
 
 export interface Ctx {
-  exhibitor: Exhibitor; setup: Setup; directory: Person[]; setSetup: (s: Setup) => void;
+  exhibitor: Exhibitor; setup: Setup; directory: Person[]; setSetup: (s: Setup) => void; setExhibitor: (e: Exhibitor) => void;
   admin: boolean; go: (view: string) => void;
 }
 
@@ -162,6 +163,7 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} />
+      <Thanks ctx={ctx} items={items} />
       <div className="home-grid">
         <section className="stack">
           <div className="sec">הבא בתור</div>
@@ -209,6 +211,7 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page narrow">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
+      <Thanks ctx={ctx} items={items} />
       <section className="stack">
         <div className="sec">להיום · {now.length}</div>
         {now.length ? (
@@ -235,7 +238,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
   const [busy, setBusy] = useState(false);
   const [talk, setTalk] = useState(false);
   const [more, setMore] = useState(false);
-  const [contact, setContact] = useState<{ phone: string | null } | null>(null);
+  const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null>(null);
   useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
   if (next.kind === 'end') return null;
   const stepId = next.stepId;
@@ -270,12 +273,14 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
         {isAuto && <div className="faint small">אמור לצאת לבד. השליחה מתחברת בקרוב, בינתיים אפשר לשלוח ביד.</div>}
       </div>
       {(row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
-      {contact?.phone && (
-        <div className="row">
-          <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>
-          <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
-        </div>
-      )}
+      {next.kind === 'task' && next.message && !talk
+        ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} contact={contact} />
+        : contact?.phone && (
+          <div className="row">
+            <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>
+            <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
+          </div>
+        )}
 
       {talk ? (
         <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
@@ -313,6 +318,87 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
         </div>
       )}
     </li>
+  );
+}
+
+/** The thank-you, on the evening of the fair: everyone registered in the last two weeks who has not had it yet.
+ *  One tap per visitor opens WhatsApp with his thank-you ready; "בלי תודה" takes him off the list. */
+function Thanks({ ctx, items }: { ctx: Ctx; items: Item[] }) {
+  const [done, setDone] = useState<Map<string, Set<string>> | null>(null);
+  const [open, setOpen] = useState(false);
+  const [gone, setGone] = useState<Set<string>>(new Set());
+  useEffect(() => { sentByLead().then(setDone).catch(() => setDone(new Map())); }, []);
+  if (!done) return null;
+  const from = inDays(-14);
+  const left = items.filter((i) => i.row.captured_on >= from && !done.get(i.row.id)?.has(THANKS) && !gone.has(i.row.id))
+    .filter((i) => i.next.kind !== 'end' || i.next.reason !== 'optOut');
+  if (!left.length) return null;
+  const off = (id: string) => setGone(new Set([...gone, id]));
+  return (
+    <section className="stack">
+      <div className="sec">תודה שביקרת · {left.length}</div>
+      <div className="panel-w">
+        <p>{left.length === 1 ? 'מבקר אחד עוד לא קיבל' : `${left.length} מבקרים עוד לא קיבלו`} תודה על הביקור. נגיעה פותחת וואטסאפ עם התודה מוכנה, ואתה לוחץ שלח.</p>
+        <button type="button" className="btn" style={{ justifySelf: 'start' }} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'סגירה' : 'לשלוח עכשיו'}</button>
+      </div>
+      {open && (
+        <ul className="list">
+          {left.map((i) => <ThanksRow key={i.row.id} ctx={ctx} item={i} onDone={() => off(i.row.id)} />)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => void }) {
+  const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null | undefined>(undefined);
+  const texts = useTexts();
+  const me = useMe(ctx);
+  useEffect(() => { leadContact(item.row.id).then(setContact).catch(() => setContact(null)); }, [item.row.id]);
+  const body = fill(textOf(ctx.setup, texts, THANKS), me, item.name);
+  const missing = holes(body);
+  const send = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, item.row.id, channel, THANKS, body).catch(() => {}); setTimeout(onDone, 400); };
+  return (
+    <li className="list-row">
+      <div className="row-name">{item.name}{item.city && <span className="muted"> · {item.city}</span>}</div>
+      {missing.length ? (
+        <div className="row-step">בתודה עוד חסר {missing.join(' · ')}. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים</button></div>
+      ) : (
+        <div className="row">
+          {contact?.phone && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => send('whatsapp')}>וואטסאפ</a>}
+          {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent('תודה שביקרת')}&body=${encodeURIComponent(body)}`} onClick={() => send('email')}><Icon name="mail" />מייל</a>}
+          {contact === null || (contact && !contact.phone && !contact.email) ? <span className="muted">אין טלפון או מייל</span> : null}
+          <button type="button" className="text-btn" onClick={() => { recordSkip(ctx.exhibitor.id, item.row.id, THANKS).catch(() => {}); onDone(); }}>בלי תודה</button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** A step that carries a message: the text, filled for this visitor, goes out with one tap in WhatsApp or mail.
+ *  A text with a hole left in it does not go out; it sends him to fill it first. */
+export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; contact: { phone: string | null; email: string | null } | null; onSent?: () => void }) {
+  const texts = useTexts();
+  const me = useMe(ctx);
+  const [shown, setShown] = useState(false);
+  const body = fill(textOf(ctx.setup, texts, messageId), me, name);
+  const missing = holes(body);
+  const sent = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, leadId, channel, messageId, body).then(onSent).catch(() => {}); };
+  return (
+    <div className="stack">
+      <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
+      {shown && <div className="note preview">{body}</div>}
+      {missing.length ? (
+        <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>
+      ) : (
+        <div className="row">
+          {contact?.phone && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
+          {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל</a>}
+          {contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>}
+          {contact && !contact.phone && !contact.email && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -520,25 +606,93 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   );
 }
 
-// ---------- הודעות
+// ---------- הודעות: the text of each message, as the visitor gets it; one open at a time, in hand
+
+/** The exhibitor as his messages sign: the greeting is kept apart, and a change in the settings reaches here. */
+function useMe(ctx: Ctx): Me {
+  const [greeting, setG] = useState<'shalom' | 'kavod'>('shalom');
+  useEffect(() => {
+    const f = () => myGreeting().then(setG).catch(() => {});
+    f(); addEventListener('expo-greeting', f);
+    return () => removeEventListener('expo-greeting', f);
+  }, []);
+  const e = ctx.exhibitor;
+  return { name: e.name, business: e.business, phone: e.phone, greeting, sensitive: e.sensitive || ctx.setup.sensitive };
+}
+const SAMPLE = 'ישראל ישראלי';
 
 export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
-  const ids = new Set<string>();
-  for (const n of ctx.setup.needs) for (const v of n.variants) for (const st of v.path.steps) if (st.message) ids.add(st.message);
-  for (const p of [ctx.setup.defaults.business, ctx.setup.defaults.private]) for (const st of p.steps) if (st.message) ids.add(st.message);
+  const texts = useTexts();
+  const me = useMe(ctx);
+  const [open, setOpen] = useState<string | null>(null);
+  const list = messagesOf(ctx.setup);
+  const toFill = !texts ? 0 : list.filter((m) => holes(fill(textOf(ctx.setup, texts, m.id), me, SAMPLE)).length).length;
   return (
     <div className="page narrow">
-      <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} tip="ההודעות שהמסלולים שלך שולחים למבקרים, ומתי." />
-      <section className="stack">
-        <div className="sec">ההודעות שהמסלולים שולחים</div>
+      <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
+        tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. מה שבסוגריים מרובעים צריך להשלים, והודעה כזאת לא יוצאת עד שמשלימים." />
+      {!texts ? <p className="muted">טוען…</p> : (
         <ul className="list">
-          <li className="list-row"><div className="row-name">תודה שביקרת</div><div className="row-step">בערב של יום התערוכה</div></li>
-          {[...ids].map((m) => <li key={m} className="list-row"><div className="row-name">{m}</div></li>)}
+          {list.map((m) => {
+            const body = textOf(ctx.setup, texts, m.id);
+            const missing = holes(fill(body, me, SAMPLE));
+            if (open === m.id) return <MessageEdit key={m.id} ctx={ctx} me={me} id={m.id} after={m.after} body={body} own={m.id in texts} onClose={() => setOpen(null)} />;
+            return (
+              <li key={m.id}>
+                <button type="button" className="list-row" onClick={() => setOpen(m.id)}>
+                  <div className="row-name">{m.id}{missing.length > 0 && <span className="tag">להשלים: {missing.length}</span>}{m.id in texts && <span className="tag">הנוסח שלך</span>}</div>
+                  <div className="row-step">{m.id === THANKS ? 'בערב של יום התערוכה, לכל מי שנרשם' : `אחרי: ${m.after.join(' · ')}`}</div>
+                  <div className="row-id">{fill(body, me, SAMPLE).split('\n').find((l, n) => n > 0 && l.trim() && !l.startsWith('לכבוד')) ?? ''}</div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
-      </section>
-      <Soon title="הנוסח של כל הודעה">כאן תראה ותערוך את הטקסט שהמבקר מקבל. הנוסחים שאושרו בסבב 9 ייכנסו כברירת מחדל, עם הפנייה שבחרת בהגדרות.</Soon>
-      <Soon title="איך הן יוצאות">שלוש דרכים, לבחירתך: חיבור הוואטסאפ שלך בסריקת קוד; שליחה בנגיעה (נפתח וואטסאפ עם ההודעה מוכנה, אתה לוחץ שלח); או מייל בלבד. הודעה לכמה אנשים יחד יוצאת במייל, כדי לא לסכן את המספר שלך.</Soon>
+      )}
+      <Soon title="איך הן יוצאות">היום: בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח. בהמשך: חיבור הוואטסאפ שלך בסריקת קוד, ומייל שיוצא לבד. הודעה לכמה אנשים יחד תצא במייל, כדי לא לסכן את המספר שלך.</Soon>
     </div>
+  );
+}
+
+function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me: Me; id: string; after: string[]; body: string; own: boolean; onClose: () => void }) {
+  const [draft, setDraft] = useState(body);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const shown = fill(draft, me, SAMPLE);
+  const missing = holes(shown);
+  const suggested = draftFor(ctx.setup, id);
+  async function run(f: () => Promise<void>) {
+    setBusy(true); setErr('');
+    try { await f(); setTexts(await loadTexts()); onClose(); }
+    catch (e) { setErr(String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  return (
+    <li className="held">
+      <div className="card-top">
+        <div className="who"><b>{id}</b><span className="ctx">{id === THANKS ? 'בערב של יום התערוכה, לכל מי שנרשם' : `אחרי: ${after.join(' · ')}`}</span></div>
+        <button type="button" className="sq" aria-label="סגירה" onClick={onClose}><Icon name="close" /></button>
+      </div>
+      <label className="field" htmlFor="msg-body">הנוסח
+        <textarea id="msg-body" className="area" rows={Math.max(5, draft.split('\n').length + 1)} value={draft} onChange={(e) => setDraft(e.target.value)} />
+      </label>
+      <p className="faint small">[שם] יוחלף בשם המבקר, ו־[שם המציג], [העסק] ו־[טלפון] בפרטים שלך. הפנייה ("שלום" או "לכבוד") נקבעת בהגדרות.</p>
+      <div className="stack">
+        <span className="sec">כך {SAMPLE} יקבל אותה</span>
+        <div className="note preview">{shown}</div>
+      </div>
+      {missing.length > 0 && <p className="note">עוד להשלים: <b>{missing.join(' · ')}</b>. עד שמשלימים, ההודעה לא יוצאת.</p>}
+      {err && <p className="err">{err}</p>}
+      <div className="row">
+        <button type="button" className="btn primary" disabled={busy || draft.trim() === body.trim() || !draft.trim()}
+          onClick={() => run(() => saveText(ctx.exhibitor.id, id, draft.trim()))}>שמירה</button>
+        <button type="button" className="btn" onClick={onClose}>ביטול</button>
+        {own && draft !== suggested && (
+          <button type="button" className="text-btn" disabled={busy}
+            onClick={() => run(() => resetText(ctx.exhibitor.id, id))}>חזרה לנוסח המוצע</button>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -562,7 +716,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   const [greeting, setG] = useState<'shalom' | 'kavod' | null>(null);
   const [tips, setTips] = useState(tipsOn);
   useEffect(() => { myGreeting().then(setG).catch(() => setG('shalom')); }, []);
-  async function choose(g: 'shalom' | 'kavod') { setG(g); await setGreeting(ctx.exhibitor.id, g).catch(() => {}); }
+  async function choose(g: 'shalom' | 'kavod') { setG(g); await setGreeting(ctx.exhibitor.id, g).catch(() => {}); dispatchEvent(new Event('expo-greeting')); }
   return (
     <>
       <section className="panel-w">
@@ -580,6 +734,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
       </section>
       <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>
       <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
+      <Signature ctx={ctx} />
       <section className="panel-w">
         <h2>החשבון</h2>
         <p>{ctx.exhibitor.name}{ctx.exhibitor.business ? ` · ${ctx.exhibitor.business}` : ''}</p>
@@ -589,6 +744,40 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </div>
       </section>
     </>
+  );
+}
+
+/** The details at the foot of every message: [שם המציג], [העסק] · [טלפון]. */
+function Signature({ ctx }: { ctx: Ctx }) {
+  const e = ctx.exhibitor;
+  const [f, setF] = useState({ name: e.name, business: e.business, phone: e.phone ?? '', email: e.email ?? '' });
+  const [state, setState] = useState('');
+  const changed = f.name !== e.name || f.business !== e.business || f.phone !== (e.phone ?? '') || f.email !== (e.email ?? '');
+  async function save() {
+    setState('busy');
+    const next = { name: f.name.trim(), business: f.business.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null };
+    try { await updateMe(e.id, next); ctx.setExhibitor({ ...e, ...next }); setState('saved'); }
+    catch (err) { setState(String((err as Error).message ?? err)); }
+  }
+  const field = (k: keyof typeof f, label: string, more: object = {}) => (
+    <label className="field" htmlFor={'me-' + k}>{label}<input id={'me-' + k} className="input" value={f[k]} onChange={(ev) => { setF({ ...f, [k]: ev.target.value }); setState(''); }} {...more} /></label>
+  );
+  return (
+    <section className="panel-w">
+      <h2>הפרטים שבחתימה</h2>
+      <p className="muted">כל הודעה נחתמת בהם: השם, העסק והטלפון.{ctx.setup.sensitive || e.sensitive ? ' בעסק שלך החתימה בלי שם העסק.' : ''}</p>
+      <div className="typed">
+        {field('name', 'השם שלך')}
+        {field('business', 'שם העסק')}
+        {field('phone', 'טלפון', { inputMode: 'tel', dir: 'ltr', style: { textAlign: 'right' } })}
+        {field('email', 'מייל', { inputMode: 'email', dir: 'ltr', style: { textAlign: 'right' } })}
+      </div>
+      <div className="row">
+        <button type="button" className="btn primary" disabled={!changed || !f.name.trim() || state === 'busy'} onClick={save}>שמירה</button>
+        {state === 'saved' && <span className="muted">נשמר.</span>}
+        {state && state !== 'busy' && state !== 'saved' && <span className="err">{state}</span>}
+      </div>
+    </section>
   );
 }
 

@@ -279,3 +279,9 @@ button.list-row:hover { background: var(--surface-2); }
 .gate-box { width: min(440px, 100%); background: var(--surface); border-radius: var(--r); padding: 28px 24px; display: grid; gap: 14px; text-align: center; justify-items: center; }
 .gate-box h1 { font-size: 26px; font-weight: 700; }
 .gate-box .brand { justify-content: center; }
+
+/* A message as the visitor gets it: its own lines, its own breaks. */
+.note.preview { white-space: pre-wrap; line-height: 1.6; color: var(--ink-2); }
+.list-row .row .btn { min-height: 40px; }
+/* A label is bold; what is typed inside it is not. */
+.field .input, .field .area, .field input, .field textarea { font-weight: 400; }

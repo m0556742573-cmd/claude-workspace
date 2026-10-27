@@ -176,7 +176,7 @@ function Live() {
     );
   }
 
-  const ctx: Ctx = { exhibitor, setup, directory, setSetup, admin, go: (v) => go(v as View) };
+  const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
   const items = part === 'day' ? DAY : CRM;
   const slim = desk && (folded || !!panel);

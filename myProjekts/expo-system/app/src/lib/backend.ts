@@ -8,7 +8,7 @@ import type { Person } from '../demo/people.ts';
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
 export type { Session };
 
-export interface Exhibitor { id: string; name: string; business: string; approved: boolean }
+export interface Exhibitor { id: string; name: string; business: string; approved: boolean; phone: string | null; email: string | null; sensitive: boolean }
 
 export async function signInWithGoogle(): Promise<void> {
   await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } });
@@ -16,7 +16,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -249,5 +249,46 @@ export async function adminExhibitors(): Promise<AdminExhibitor[]> {
 }
 export async function adminApprove(id: string, ok: boolean) {
   const { error } = await supabase.rpc('admin_approve', { exhibitor: id, ok });
+  if (error) throw error;
+}
+
+// ---------- the text of each message: only what the exhibitor changed is stored; the rest is the suggested text
+
+export async function loadTexts(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.from('message_templates').select('id, body');
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((r) => [r.id as string, r.body as string]));
+}
+export async function saveText(exhibitorId: string, id: string, body: string): Promise<void> {
+  const { error } = await supabase.from('message_templates').upsert({ exhibitor_id: exhibitorId, id, body });
+  if (error) throw error;
+}
+/** Back to the suggested text: his own version is taken out. */
+export async function resetText(exhibitorId: string, id: string): Promise<void> {
+  const { error } = await supabase.from('message_templates').delete().eq('exhibitor_id', exhibitorId).eq('id', id);
+  if (error) throw error;
+}
+
+// ---------- what was sent by hand (a tap opened WhatsApp or mail with the text ready): kept in the outbox as sent
+export async function recordSent(exhibitorId: string, leadId: string, channel: 'whatsapp' | 'email', templateId: string, body: string): Promise<void> {
+  const { error } = await supabase.from('outbox').insert({ exhibitor_id: exhibitorId, lead_id: leadId, channel, template_id: templateId, body, status: 'sent', sent_at: new Date().toISOString() });
+  if (error) throw error;
+}
+/** Each lead, with the messages already sent to it (by template id); one he chose not to send counts as dealt with. */
+export async function sentByLead(): Promise<Map<string, Set<string>>> {
+  const { data, error } = await supabase.from('outbox').select('lead_id, template_id').in('status', ['sent', 'cancelled']);
+  if (error) throw error;
+  const out = new Map<string, Set<string>>();
+  for (const r of data ?? []) if (r.lead_id && r.template_id) (out.get(r.lead_id) ?? out.set(r.lead_id, new Set()).get(r.lead_id)!).add(r.template_id);
+  return out;
+}
+/** A message he chose not to send to this visitor (the thank-you to someone he will call anyway). */
+export async function recordSkip(exhibitorId: string, leadId: string, templateId: string): Promise<void> {
+  const { error } = await supabase.from('outbox').insert({ exhibitor_id: exhibitorId, lead_id: leadId, channel: 'whatsapp', template_id: templateId, body: '', status: 'cancelled' });
+  if (error) throw error;
+}
+/** The details his messages are signed with. */
+export async function updateMe(exhibitorId: string, me: { name: string; business: string; phone: string | null; email: string | null }): Promise<void> {
+  const { error } = await supabase.from('exhibitors').update(me).eq('id', exhibitorId);
   if (error) throw error;
 }
