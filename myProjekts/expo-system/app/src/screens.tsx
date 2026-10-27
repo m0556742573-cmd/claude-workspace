@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { nextTask, pathAhead, type Action, type Lead, type Next, type Path, type Setup } from '@expo/engine';
+import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Path, type Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
 import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
@@ -205,6 +205,52 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ---------- "מה עוד אפשר להוציא" (model, section 12): no report of success, only what is still in the fair.
+// Each line is a group of leads with a reason and what can be done; the names open under it.
+
+/** The next holiday from today, for "worth reminding before ...". */
+function nextHoliday(): { name: string; on: string } {
+  const all = (Object.keys(text.HOLIDAY) as Holiday[]).map((h) => ({ name: text.HOLIDAY[h]!, on: nextOccurrence({ holiday: h }, today()) }));
+  return all.sort((a, b) => a.on.localeCompare(b.on))[0]!;
+}
+
+function Harvest({ items }: { items: Item[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const t = today();
+  const lastTouch = (i: Item) => i.lead.history.reduce((d, h) => (h.doneOn > d ? h.doneOn : d), i.lead.capturedOn);
+  const ended = (r: string) => items.filter((i) => i.next.kind === 'end' && i.next.reason === r);
+  const holiday = nextHoliday();
+  const groups: { key: string; label: string; hint: string; of: Item[] }[] = [
+    { key: 'untouched', label: 'שעוד לא יצרת איתם קשר', hint: 'נרשמו אצלך, ועוד לא סומן מולם אף צעד. הם מחכים במשימות.',
+      of: items.filter((i) => i.next.kind !== 'end' && !i.lead.history.length && i.lead.capturedOn < t) },
+    { key: 'stuck', label: 'שמחכים לך יותר משבוע', hint: 'הצעד שלהם עבר את הזמן, ומאז לא קרה כלום. ככל שעובר זמן, הם זוכרים פחות את הדוכן.',
+      of: items.filter((i) => i.next.kind === 'task' && i.next.late && lastTouch(i) <= addDays(t, -7)) },
+    { key: 'date', label: 'שהתאריך שלהם בחודשיים הקרובים', hint: 'החתונה או האירוע שלהם מתקרבים. זה הזמן שבו הם מחליטים.',
+      of: items.filter((i) => i.next.kind !== 'end' && i.row.customer_date && i.row.customer_date >= t && i.row.customer_date <= addDays(t, 60)) },
+    { key: 'engaged', label: 'שדיברת איתם, ועוד לא נסגרה עסקה', hint: 'הם כבר מכירים אותך. שיחה קצרה לבדוק איפה הם עומדים, או לסמן עסקה אם נסגרה.', of: ended('engaged') },
+    { key: 'stop', label: 'שלא ענו, והמעקב אחריהם נגמר', hint: 'לא הגיע מהם מענה בזמן. בעונה הבאה שלהם אפשר לנסות שוב.', of: ended('stop') },
+    { key: 'list', label: 'ברשימת התפוצה', hint: `כדאי להזכיר להם לפני ${holiday.name} (${dayLabel(holiday.on)}): הודעה כללית אחת, בלי לחץ.`, of: ended('list') },
+  ].filter((g) => g.of.length);
+  return (
+    <section className="stack">
+      <div className="sec">מה עוד אפשר להוציא</div>
+      {groups.length ? (
+        <ul className="list">
+          {groups.map((g) => (
+            <li key={g.key} className="list-row harvest">
+              <button type="button" className="harvest-head" aria-expanded={open === g.key} onClick={() => setOpen(open === g.key ? null : g.key)}>
+                <span className="harvest-n">{g.of.length}</span>
+                <span><span className="row-name">{g.label}</span><span className="row-step">{g.hint}</span></span>
+              </button>
+              {open === g.key && <p className="harvest-names">{g.of.slice(0, 40).map((i) => i.name).join(' · ')}{g.of.length > 40 ? ` ועוד ${g.of.length - 40}` : ''}</p>}
+            </li>
+          ))}
+        </ul>
+      ) : <div className="empty"><p className="muted">כרגע אין. אחרי התערוכה יופיעו כאן מי שעוד לא דיברת איתם, מי שהתאריך שלו מתקרב, ומי שכדאי להזכיר לו לפני החג.</p></div>}
+    </section>
   );
 }
 
@@ -727,6 +773,7 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           </div>
         </section>
       </div>
+      <Harvest items={items} />
     </div>
   );
 }

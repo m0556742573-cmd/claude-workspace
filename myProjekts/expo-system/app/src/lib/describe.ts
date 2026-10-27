@@ -2,7 +2,7 @@
 import type { CalendarAnchor, NeedPath, Path, PathEnd, Step, Timing } from '@expo/engine';
 
 const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'להכין', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'לחכות ללקוח' };
-const HOLIDAY: Record<string, string> = { roshHashana: 'ראש השנה', sukkot: 'סוכות', chanukah: 'חנוכה', purim: 'פורים', pesach: 'פסח', lagBaomer: 'ל"ג בעומר', shavuot: 'שבועות' };
+export const HOLIDAY: Record<string, string> = { roshHashana: 'ראש השנה', sukkot: 'סוכות', chanukah: 'חנוכה', purim: 'פורים', pesach: 'פסח', lagBaomer: 'ל"ג בעומר', shavuot: 'שבועות' };
 const MONTH: Record<string, string> = { tishrei: 'תשרי', cheshvan: 'חשוון', kislev: 'כסלו', tevet: 'טבת', shvat: 'שבט', adar: 'אדר', nisan: 'ניסן', iyyar: 'אייר', sivan: 'סיוון', tamuz: 'תמוז', av: 'אב', elul: 'אלול' };
 const WEEKDAY = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
