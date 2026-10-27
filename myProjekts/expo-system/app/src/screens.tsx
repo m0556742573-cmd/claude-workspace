@@ -10,6 +10,7 @@ import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
+import { Qr, joinUrl } from './join.tsx';
 import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
@@ -856,6 +857,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
           <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="להציג הסבר ליד כל מסך" onClick={() => { setTips(!tips); setTipsOn(!tips); }} />
         </div>
       </section>
+      <SelfSign ctx={ctx} />
       <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>
       <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
       <Signature ctx={ctx} />
@@ -868,6 +870,40 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * Self-registration: the link and its code, and a sign to print for the booth. A visitor who scans it registers
+ * himself and taps what interests him; within half a minute he is in the booth's list, marked "נרשם לבד".
+ */
+function SelfSign({ ctx }: { ctx: Ctx }) {
+  const url = joinUrl(ctx.exhibitor.join_code);
+  const biz = ctx.setup.sensitive || ctx.exhibitor.sensitive ? ctx.exhibitor.name : ctx.exhibitor.business || ctx.exhibitor.name;
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="panel-w">
+      <h2>הרשמה עצמית בדוכן</h2>
+      <p className="muted">כשיש תור, מבקר סורק את הקוד ונרשם לבד מהטלפון שלו: שם, טלפון, ומה מעניין אותו, מאותם כפתורים של הכרטיס שלך. תוך חצי דקה הוא ברשימה של הדוכן.</p>
+      <div className="sign-row">
+        <Qr text={url} size={148} />
+        <div className="stack">
+          <a className="link-line" href={url} target="_blank" rel="noreferrer" dir="ltr">{url.replace(/^https?:\/\//, '')}</a>
+          <div className="row">
+            <button type="button" className="btn primary" onClick={() => print()}>הדפסת שלט לדוכן</button>
+            <button type="button" className="btn" onClick={() => { navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); }).catch(() => {}); }}>{copied ? 'הועתק' : 'העתקת הקישור'}</button>
+          </div>
+          <p className="faint small">אפשר לנסות בעצמך: מי שתירשם דרכו יופיע בדוכן, ואפשר לבטל אותו משם.</p>
+        </div>
+      </div>
+      <div className="print-sign" aria-hidden="true">
+        <div className="ps-biz">{biz}</div>
+        <div className="ps-call">סורקים ונרשמים</div>
+        <Qr text={url} size={380} />
+        <div className="ps-how">שם, טלפון, ומה מעניין אותך. נחזור אליך עם בדיוק מה שמתאים.</div>
+        <div className="ps-url" dir="ltr">{url.replace(/^https?:\/\//, '')}</div>
+      </div>
+    </section>
   );
 }
 

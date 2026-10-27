@@ -298,3 +298,28 @@ button.list-row:hover { background: var(--surface-2); }
 /* A form inside a gate reads from the right, like any form; only the gate's own words are centred. */
 .gate-box .stack { text-align: start; justify-self: stretch; }
 .gate-box .stack .chips { justify-content: flex-start; }
+
+/* Self-registration: the code in the settings, the visitor's page, and the sign printed for the booth. */
+.sign-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.sign-row .stack { flex: 1 1 220px; }
+.qr { display: block; border-radius: 6px; background: #fff; }
+.link-line { font-size: 14.5px; color: var(--ink-2); word-break: break-all; text-align: right; }
+.gate-box.join { width: min(480px, 100%); }
+.gate-box.join .btn.wide { justify-self: stretch; }
+.print-sign { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 14mm; }
+  body { background: #fff !important; }
+  body * { visibility: hidden; }
+  .print-sign, .print-sign * { visibility: visible; }
+  .print-sign { display: flex; position: fixed; inset: 0; flex-direction: column; align-items: center; justify-content: center; gap: 10mm; color: #000; text-align: center; }
+  .print-sign .qr { width: 110mm; height: 110mm; }
+  .ps-biz { font-size: 34pt; font-weight: 700; }
+  .ps-call { font-size: 26pt; font-weight: 700; }
+  .ps-how { font-size: 16pt; max-width: 150mm; }
+  .ps-url { font-size: 12pt; color: #444; }
+}
+.code-screen { position: fixed; inset: 0; z-index: 60; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px; text-align: center; }
+.code-screen .qr { width: min(72vw, 52vh); height: auto; }
+.cs-call { font-size: 30px; font-weight: 700; }
+.cs-how { font-size: 18px; color: var(--muted); max-width: 420px; }

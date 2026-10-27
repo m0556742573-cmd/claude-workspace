@@ -7,6 +7,7 @@ import type { Person } from '../demo/people.ts';
 import type { LocalLead, LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
 import { Icon } from '../ui.tsx';
+import { Qr, joinUrl } from '../join.tsx';
 
 export interface BoothProps {
   setup: Setup;
@@ -24,11 +25,14 @@ export interface BoothProps {
   notes: LocalNote[];
   waiting: number;
   online: boolean;
+  /** The booth's self-registration code: in a rush, the tablet turns around and shows it. */
+  joinCode?: string;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode }: BoothProps) {
+  const [showCode, setShowCode] = useState(false);
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState<{ name: string; phone: string } | null>(null);
   const [current, setCurrent] = useState<LocalLead | null>(null);
@@ -204,7 +208,10 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           )}
           {query.trim().length >= 2 && !results.length && <p className="muted" style={{ textAlign: 'center' }}>לא נמצא ברשימה.</p>}
           {!current && <p className="promise">נגיעה בשם — הוא נשמר. כל השאר רשות.</p>}
-          <button type="button" className="text-btn" style={{ alignSelf: 'center' }} onClick={newOne}>לא ברשימה? להקליד שם וטלפון</button>
+          <div className="row" style={{ justifyContent: 'center' }}>
+            <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד שם וטלפון</button>
+            {joinCode && <button type="button" className="text-btn" onClick={() => setShowCode(true)}>תור? קוד להרשמה עצמית</button>}
+          </div>
         </>
       )}
 
@@ -260,6 +267,14 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       )}
 
       {toast && <div className="toast" role="status">{toast}</div>}
+      {showCode && joinCode && (
+        <div className="code-screen" role="dialog" aria-label="קוד להרשמה עצמית">
+          <div className="cs-call">סורקים ונרשמים</div>
+          <Qr text={joinUrl(joinCode)} size={300} />
+          <div className="cs-how">שם, טלפון, ומה מעניין אותך. תוך רגע זה אצלנו.</div>
+          <button type="button" className="btn tall" onClick={() => setShowCode(false)}>חזרה לדוכן</button>
+        </div>
+      )}
 
       <section className="stack" aria-label="נרשמו היום">
         <div className="sec">נרשמו היום · {todays.length}</div>
@@ -272,7 +287,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               return (
                 <li key={l.id}>
                   <button type="button" className="list-row" aria-current={current?.id === l.id ? 'true' : undefined} onClick={() => open(l)}>
-                    <div className="row-name">{l.name}{!l.synced && <span className="tag">ממתין לעלות</span>}</div>
+                    <div className="row-name">{l.name}{l.self && <span className="tag">נרשם לבד</span>}{!l.synced && <span className="tag">ממתין לעלות</span>}</div>
                     <div className="row-step">{[...l.taps, count ? `${count} הערות` : ''].filter(Boolean).join(' · ') || 'בלי סימון'}</div>
                     <div className="row-id">{describe(nextTask(setup, l, today()))}</div>
                   </button>

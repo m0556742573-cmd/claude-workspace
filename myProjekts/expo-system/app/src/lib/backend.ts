@@ -12,6 +12,8 @@ export interface Exhibitor {
   id: string; name: string; business: string; approved: boolean; phone: string | null; email: string | null; sensitive: boolean;
   /** The number his WhatsApp runs on; null = no WhatsApp (when onboarded) or not asked yet. */
   whatsapp: string | null; whatsapp_kind: 'personal' | 'business' | null; onboarded: boolean;
+  /** The code in his self-registration link: expo-booth.pages.dev/#join/<code>. */
+  join_code: string;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -20,7 +22,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -178,6 +180,72 @@ async function recompute(row: LeadRow, exhibitorId: string, setup: Setup, busine
   const lead = engineLead(row, { steps: steps.data ?? [], manual: manual.data ?? [] }, businessOwner);
   const { error } = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setup, lead, onDay));
   if (error) throw error;
+}
+
+// ---------- self-registration: the visitor registers himself from the code on the booth's sign
+
+export interface JoinInfo { name: string; business: string; sensitive: boolean; needs: string[]; when: string[]; who: string[] }
+
+export async function joinInfo(code: string): Promise<JoinInfo | null> {
+  const { data, error } = await supabase.rpc('join_info', { code });
+  if (error) throw error;
+  return (data as JoinInfo) ?? null;
+}
+
+export async function joinBooth(code: string, v: { name: string; phone: string; email: string; taps: string[]; consent: boolean; date: string | null }): Promise<{ again: boolean }> {
+  const { data, error } = await supabase.rpc('join_booth', {
+    code, name: v.name.trim(), phone: v.phone, email: v.email.trim() || null, taps: v.taps, consent: v.consent, on_date: v.date,
+  });
+  if (error) throw error;
+  return { again: !!(data as { again?: boolean })?.again };
+}
+
+/**
+ * Brings in what visitors registered themselves: today's go into the booth's list on this tablet (and what one tapped
+ * on his own phone is added to a card already open here), and every lead the server holds without a task gets its
+ * task from the engine. Returns whether anything changed here.
+ */
+export async function pullSelf(exhibitorId: string, setup: Setup, directory: Person[], onDay: string): Promise<boolean> {
+  const [mine, tasks] = await Promise.all([
+    supabase.from('leads').select('id, person_id, typed_name, typed_phone, taps, customer_date, note, captured_on, captured_at, source').eq('captured_on', onDay),
+    supabase.from('tasks').select('lead_id'),
+  ]);
+  if (mine.error) throw mine.error;
+  if (tasks.error) throw tasks.error;
+  let changed = false;
+  const local = new Map((await allLeads()).map((l) => [l.id, l]));
+  const person = (id: string | null) => (id ? directory.find((p) => p.id === id) : undefined);
+  for (const r of mine.data ?? []) {
+    const here = local.get(r.id);
+    if (!here) {
+      if (r.source !== 'self') continue;
+      const p = person(r.person_id);
+      await putLead({
+        id: r.id, capturedOn: r.captured_on, capturedAt: r.captured_at, taps: r.taps, customerDate: r.customer_date ?? undefined,
+        businessOwner: p?.businessOwner ?? false, history: [], name: p?.fullName ?? r.typed_name ?? '', city: p?.city,
+        personId: r.person_id ?? undefined, typedPhone: r.typed_phone ?? undefined, note: r.note ?? '', synced: true, self: true,
+      });
+      changed = true;
+    } else if (here.synced) {
+      const taps = [...new Set([...here.taps, ...r.taps])];
+      if (taps.length !== here.taps.length || (!here.customerDate && r.customer_date)) {
+        await putLead({ ...here, taps, customerDate: here.customerDate ?? r.customer_date ?? undefined, self: true });
+        changed = true;
+      }
+    }
+  }
+  const tasked = new Set((tasks.data ?? []).map((t) => t.lead_id));
+  const { data: all, error } = await supabase.from('leads').select('id');
+  if (error) throw error;
+  if ((all ?? []).some((l) => !tasked.has(l.id))) {
+    const book = await loadBook();
+    for (const row of book.leads.filter((l) => !tasked.has(l.id))) {
+      const lead = engineLead(row, book, person(row.person_id)?.businessOwner ?? false);
+      const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setup, lead, onDay));
+      if (t.error) throw t.error;
+    }
+  }
+  return changed;
 }
 
 /** He did the step: how it ended. The engine sets the next one at once. */

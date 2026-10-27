@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { MeForm } from './me.tsx';
+import { Join } from './join.tsx';
 import { Booth } from './booth/Booth.tsx';
 import { Admin, Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
@@ -14,7 +15,7 @@ import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLea
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
-  activeSetup, flush, isAdmin, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, flush, isAdmin, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 
@@ -56,6 +57,8 @@ function useToday() {
 }
 
 export function App() {
+  const join = /^#join\/([a-z0-9]+)/i.exec(location.hash);
+  if (join) return <Join code={join[1]!} />;
   return new URLSearchParams(location.search).has('demo') ? <Demo /> : <Live />;
 }
 
@@ -126,12 +129,15 @@ function Live() {
 
   useEffect(() => {
     if (!exhibitor || !setup) return;
-    const tick = () => flush(exhibitor.id, setup).then(refresh).catch(() => {});
+    // What waits on the phone goes up; what visitors registered on their own phones comes down.
+    const tick = () => flush(exhibitor.id, setup)
+      .then(() => pullSelf(exhibitor.id, setup, directory, today()).catch(() => false))
+      .then(refresh).catch(() => {});
     tick();
     const t = setInterval(tick, 30000);
     addEventListener('online', tick);
     return () => { clearInterval(t); removeEventListener('online', tick); };
-  }, [exhibitor, setup, refresh]);
+  }, [exhibitor, setup, directory, refresh]);
 
   const search = useCallback((q: string) => searchIn(directory, q), [directory]);
 
@@ -248,6 +254,7 @@ function Live() {
             notes={notes}
             waiting={waiting}
             online={online}
+            joinCode={exhibitor.join_code}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onThanks={() => go('home')} />}

@@ -10,6 +10,8 @@ export interface LocalLead extends Lead {
   note: string;
   capturedAt: string;
   synced: boolean;
+  /** He registered himself, from the code on the booth's sign. */
+  self?: boolean;
 }
 
 export interface LocalNote {
