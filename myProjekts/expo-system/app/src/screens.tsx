@@ -243,7 +243,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
   const [busy, setBusy] = useState(false);
   const [talk, setTalk] = useState(false);
   const [more, setMore] = useState(false);
-  const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null>(null);
+  const [contact, setContact] = useState<{ phone: string | null; email: string | null; opted_out?: boolean } | null>(null);
   useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
   if (next.kind === 'end') return null;
   const stepId = next.stepId;
@@ -356,7 +356,7 @@ function Thanks({ ctx, items }: { ctx: Ctx; items: Item[] }) {
 }
 
 function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => void }) {
-  const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null | undefined>(undefined);
+  const [contact, setContact] = useState<{ phone: string | null; email: string | null; opted_out?: boolean } | null | undefined>(undefined);
   const texts = useTexts();
   const me = useMe(ctx);
   useEffect(() => { leadContact(item.row.id).then(setContact).catch(() => setContact(null)); }, [item.row.id]);
@@ -366,7 +366,9 @@ function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => 
   return (
     <li className="list-row">
       <div className="row-name">{item.name}{item.city && <span className="muted"> · {item.city}</span>}</div>
-      {missing.length ? (
+      {contact?.opted_out ? (
+        <div className="row"><span className="muted">ביקש לא לקבל הודעות</span><button type="button" className="text-btn" onClick={() => { recordSkip(ctx.exhibitor.id, item.row.id, THANKS).catch(() => {}); onDone(); }}>להוריד מהרשימה</button></div>
+      ) : missing.length ? (
         <div className="row-step">בתודה עוד חסר {missing.join(' · ')}. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים</button></div>
       ) : (
         <div className="row">
@@ -382,7 +384,7 @@ function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => 
 
 /** A step that carries a message: the text, filled for this visitor, goes out with one tap in WhatsApp or mail.
  *  A text with a hole left in it does not go out; it sends him to fill it first. */
-export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; contact: { phone: string | null; email: string | null } | null; onSent?: () => void }) {
+export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; contact: { phone: string | null; email: string | null; opted_out?: boolean } | null; onSent?: () => void }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [shown, setShown] = useState(false);
@@ -393,7 +395,9 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
     <div className="stack">
       <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
       {shown && <div className="note preview">{body}</div>}
-      {missing.length ? (
+      {contact?.opted_out ? (
+        <p className="note">הוא ביקש לא לקבל הודעות. אפשר להתקשר, אם סיכמתם.</p>
+      ) : missing.length ? (
         <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>
       ) : (
         <div className="row">

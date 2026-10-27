@@ -184,13 +184,17 @@ async function recompute(row: LeadRow, exhibitorId: string, setup: Setup, busine
 export async function markStep(row: LeadRow, stepId: string, outcome: StepRecord['outcome'], exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
   const { error } = await supabase.from('lead_steps').upsert({ lead_id: row.id, step_id: stepId, done_on: onDay, outcome }, { onConflict: 'lead_id,step_id' });
   if (error) throw error;
+  // "ביקש להסיר": his phone and mail go on the do-not-send list.
+  if (outcome === 'optOut') await supabase.rpc('opt_out_lead', { lead: row.id, asked: true });
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
 
-/** "ביטול": the mark goes, and the task returns to what it was. */
+/** "ביטול": the mark goes, and the task returns to what it was; a "remove me" taken back takes him off the list. */
 export async function unmarkStep(row: LeadRow, stepId: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { data: was } = await supabase.from('lead_steps').select('outcome').eq('lead_id', row.id).eq('step_id', stepId).maybeSingle();
   const { error } = await supabase.from('lead_steps').delete().eq('lead_id', row.id).eq('step_id', stepId);
   if (error) throw error;
+  if (was?.outcome === 'optOut') await supabase.rpc('opt_out_lead', { lead: row.id, asked: false });
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
 
@@ -220,7 +224,7 @@ export async function addFollowNote(leadId: string, body: string, exhibitorId: s
 }
 
 /** The visitor's phone and mail: only for a lead of his own (the community list stays closed). */
-export async function leadContact(leadId: string): Promise<{ phone: string | null; email: string | null; has_whatsapp: boolean | null } | null> {
+export async function leadContact(leadId: string): Promise<{ phone: string | null; email: string | null; has_whatsapp: boolean | null; opted_out: boolean } | null> {
   const { data } = await supabase.rpc('lead_contact', { lead: leadId });
   return data?.[0] ?? null;
 }
