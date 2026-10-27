@@ -51,11 +51,34 @@ export async function changeTemplate(exhibitorId: string, setup: Setup): Promise
 
 // ---------- the community names (no phone, no mail), kept in memory for a search that does not wait
 
+/** The whole community list, in pages: the server gives at most 1000 rows to one request. */
 export async function loadDirectory(): Promise<Person[]> {
-  const { data, error } = await supabase.rpc('people_directory');
-  if (error) throw error;
-  return (data ?? []).map((p: { id: string; full_name: string; city: string | null; business_owner: boolean }) =>
-    ({ id: p.id, fullName: p.full_name, city: p.city ?? '', businessOwner: p.business_owner }));
+  const out: Person[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.rpc('people_directory').order('id').range(from, from + 999);
+    if (error) throw error;
+    for (const p of (data ?? []) as { id: string; full_name: string; city: string | null; business_owner: boolean }[]) {
+      out.push({ id: p.id, fullName: p.full_name, city: p.city ?? '', businessOwner: p.business_owner });
+    }
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+/**
+ * The session kept on this device, when the server cannot be asked: an expired sign-in is renewed only over the
+ * network, and without one the booth must still open. It is used only to know whose copy to open.
+ */
+export function keptSession(): Session | null {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)!;
+      if (k.startsWith('sb-') && k.endsWith('-auth-token')) {
+        const s = JSON.parse(localStorage.getItem(k)!);
+        if (s?.user?.id) return s as Session;
+      }
+    }
+  } catch { /* nothing kept */ }
+  return null;
 }
 
 export function searchIn(directory: Person[], q: string, max = 8): Person[] {

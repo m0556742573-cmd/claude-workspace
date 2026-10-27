@@ -12,11 +12,12 @@ import { SetupSteps } from './setup.tsx';
 import { Booth } from './booth/Booth.tsx';
 import { Admin, Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
+import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
-  activeSetup, flush, isAdmin, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, flush, isAdmin, keptSession, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 
@@ -86,6 +87,8 @@ const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['le
 const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings', 'admin'));
 const partOf = (v: View): Part | null => (DAY.some(([d]) => d === v) ? 'day' : CRM.some(([c]) => c === v) ? 'crm' : null);
 
+interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[] }
+
 function Live() {
   const online = useOnline();
   const desk = useDesk();
@@ -115,21 +118,34 @@ function Live() {
   }, [panel]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    // Without a network an expired sign-in cannot be renewed; the booth still opens on what this tablet keeps.
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? (navigator.onLine ? null : keptSession())))
+      .catch(() => setSession(keptSession()));
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ?? (navigator.onLine ? null : keptSession())));
     return () => data.subscription.unsubscribe();
   }, []);
 
+  const userId = session?.user.id;
   useEffect(() => {
-    if (!session) return;
+    if (!userId) return;
     myExhibitor().then(async (ex) => {
       setExhibitor(ex);
       if (!ex || !ex.approved) return;
       setSetup(await activeSetup(ex.id));
       setDirectory(await loadDirectory());
       setAdmin(await isAdmin());
-    }).catch((e) => setError(String(e.message ?? e)));
-  }, [session]);
+    }).catch(async (e) => {
+      // No server: the booth opens from the copy kept on this tablet at the last load.
+      const k = await kept<Boot>('boot:' + userId).catch(() => undefined);
+      if (k) { setExhibitor(k.exhibitor); setSetup(k.setup); setDirectory(k.directory); }
+      else setError(navigator.onLine ? String(e.message ?? e) : 'אין רשת, ועוד אין בטאבלט הזה עותק של הדוכן. צריך להיכנס פעם אחת עם רשת.');
+    });
+  }, [userId]);
+  // What the booth needs to open without a network is kept after every change.
+  useEffect(() => {
+    if (!userId || !exhibitor || !setup) return;
+    keep('boot:' + userId, { exhibitor, setup, directory } satisfies Boot).catch(() => {});
+  }, [userId, exhibitor, setup, directory]);
 
   useEffect(() => {
     if (!exhibitor || !setup) return;
