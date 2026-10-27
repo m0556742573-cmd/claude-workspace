@@ -292,3 +292,10 @@ export async function updateMe(exhibitorId: string, me: { name: string; business
   const { error } = await supabase.from('exhibitors').update(me).eq('id', exhibitorId);
   if (error) throw error;
 }
+
+/** The phone and mail of all his leads, for the export. */
+export async function allContacts(): Promise<Map<string, { phone: string | null; email: string | null }>> {
+  const { data, error } = await supabase.rpc('my_lead_contacts');
+  if (error) throw error;
+  return new Map(((data ?? []) as { lead_id: string; phone: string | null; email: string | null }[]).map((r) => [r.lead_id, { phone: r.phone, email: r.email }]));
+}

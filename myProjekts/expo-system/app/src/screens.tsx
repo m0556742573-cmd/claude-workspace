@@ -11,7 +11,7 @@ import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, 
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  addFollowNote, addManual, allContacts, removeLead, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
   loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, updateMe, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
@@ -491,17 +491,46 @@ export function Leads({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const items = useItems(ctx, book);
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [state, setState] = useState('all');
+  const [need, setNeed] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
-  const head = <PageHead title="לידים" eyebrow={eyebrowOf(desk)} sub={book ? `${items.length} מבקרים` : undefined} tip="כל מי שנרשם, עם מה שקרה עד עכשיו ומה הצעד הבא. נגיעה בשם פותחת את הפרטים." />;
+  const head = (
+    <PageHead title="לידים" eyebrow={eyebrowOf(desk)} sub={book ? `${items.length} מבקרים` : undefined}
+      tip="כל מי שנרשם, עם מה שקרה עד עכשיו ומה הצעד הבא. נגיעה בשם פותחת את הפרטים."
+      actions={book && <>
+        <button type="button" className="btn" onClick={() => setAdding(!adding)}><Icon name="plus" />ליד חדש</button>
+        {items.length > 0 && <button type="button" className="btn" disabled={exporting} onClick={async () => { setExporting(true); await exportLeads(items, ctx).catch(() => {}); setExporting(false); }}>{exporting ? 'מכין…' : 'ייצוא לאקסל'}</button>}
+      </>} />
+  );
   if (error) return <div className="page narrow">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page narrow">{head}<p className="muted">טוען…</p></div>;
-  const shown = items.filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()));
+  const states = STATES.map(([key, label, test]) => ({ key, label, count: items.filter(test).length })).filter((x) => x.key === 'all' || x.count);
+  const needs = ctx.setup.needs.map((n) => n.label).filter((l) => items.some((i) => i.row.taps.includes(l)));
+  const test = STATES.find(([k]) => k === state)?.[2] ?? (() => true);
+  const shown = items
+    .filter(test)
+    .filter((i) => !need || i.row.taps.includes(need))
+    .filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()));
   return (
     <div className="page narrow">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
+      {adding && <NewLead ctx={ctx} onClose={() => setAdding(false)} onSaved={(id, n) => { setAdding(false); reload(); setUndo({ label: `${n} נוסף ללידים`, run: async () => { await removeLead(id, ctx.exhibitor.id).catch(() => {}); reload(); } }); }} />}
       {items.length > 6 && <label className="searchbox"><Icon name="search" /><input type="search" aria-label="חיפוש לפי שם או עיר" placeholder="חיפוש לפי שם או עיר" value={q} onChange={(e) => setQ(e.target.value)} /></label>}
+      {items.length > 0 && (
+        <div className="chips" role="group" aria-label="סינון לפי מצב">
+          {states.map((x) => <button key={x.key} type="button" className="chip" aria-pressed={state === x.key} onClick={() => setState(x.key)}>{x.label} · {x.count}</button>)}
+        </div>
+      )}
+      {needs.length > 1 && (
+        <div className="chips" role="group" aria-label="סינון לפי מה שביקש">
+          {needs.map((l) => <button key={l} type="button" className="chip" aria-pressed={need === l} onClick={() => setNeed(need === l ? '' : l)}>{l}</button>)}
+        </div>
+      )}
+      {items.length > 0 && !shown.length && <p className="muted">אין לידים שמתאימים לסינון.</p>}
       {!items.length ? (
         <div className="empty"><b>עוד אין לידים</b><p className="muted">הם יופיעו כאן מהרגע שתיגע בשמם בדוכן.</p></div>
       ) : (
@@ -518,8 +547,87 @@ export function Leads({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           ))}
         </ul>
       )}
-      <Soon title="עוד בלידים">סינון לפי מצב, ייצוא לאקסל, ותשובות שהגיעו מהלקוח בוואטסאפ, בציר הזמן של כל אחד.</Soon>
+      <Soon title="תשובות מהלקוח">תשובות שהגיעו בוואטסאפ יופיעו בציר הזמן של כל אחד, כשהחיבור לוואטסאפ יעבוד.</Soon>
     </div>
+  );
+}
+
+/** The states a lead can be in, as the filter shows them. */
+const STATES: [string, string, (i: Item) => boolean][] = [
+  ['all', 'הכל', () => true],
+  ['now', 'להיום', (i) => i.next.kind !== 'end' && i.next.dueOn <= today()],
+  ['later', 'בהמשך', (i) => i.next.kind !== 'end' && i.next.dueOn > today()],
+  ['engaged', 'בטיפול שלך', (i) => i.next.kind === 'end' && i.next.reason === 'engaged'],
+  ['closed', 'נסגרה עסקה', (i) => i.next.kind === 'end' && i.next.reason === 'closed'],
+  ['list', 'ברשימת התפוצה', (i) => i.next.kind === 'end' && i.next.reason === 'list'],
+  ['ended', 'הסתיים', (i) => i.next.kind === 'end' && ['stop', 'notRelevant', 'optOut'].includes(i.next.reason)],
+];
+
+/** Excel opens a CSV with a BOM in Hebrew; one row per lead, with what he needs to call and what was tapped. */
+async function exportLeads(items: Item[], ctx: Ctx) {
+  const contacts = await allContacts().catch(() => new Map<string, { phone: string | null; email: string | null }>());
+  const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const rows = [
+    ['שם', 'עיר', 'טלפון', 'מייל', 'בעל עסק', 'נרשם', 'מה ביקש', 'התאריך שלו', 'הערה', 'הצעד הבא', 'מתי'],
+    ...items.map((i) => {
+      const c = contacts.get(i.row.id);
+      return [
+        i.name, i.city, c?.phone ?? '', c?.email ?? '', i.owner ? 'כן' : '', i.row.captured_on.split('-').reverse().join('/'),
+        i.row.taps.join(' · '), i.row.customer_date?.split('-').reverse().join('/') ?? '', i.row.note ?? '',
+        short(i.next), i.next.kind === 'end' ? '' : i.next.dueOn.split('-').reverse().join('/'),
+      ];
+    }),
+  ];
+  const csv = '\ufeff' + rows.map((r) => r.map((v) => cell(String(v))).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `לידים - ${ctx.exhibitor.business || ctx.exhibitor.name} - ${today()}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** A lead that did not come through the booth: someone who called after the fair, a card left at the stand. */
+function NewLead({ ctx, onClose, onSaved }: { ctx: Ctx; onClose: () => void; onSaved: (id: string, name: string) => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [taps, setTaps] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const toggle = (l: string) => setTaps(taps.includes(l) ? taps.filter((t) => t !== l) : [...taps, l]);
+  async function save() {
+    setBusy(true); setErr('');
+    const id = crypto.randomUUID();
+    const r = await saveLead({
+      id, capturedOn: today(), capturedAt: new Date().toISOString(), taps, businessOwner: false, history: [],
+      name: name.trim(), typedPhone: phone.trim() || undefined, note: note.trim(), synced: false,
+    }, ctx.exhibitor.id, ctx.setup).catch(() => 'waiting' as const);
+    setBusy(false);
+    if (r === 'saved') onSaved(id, name.trim()); else setErr('נשמר בטלפון, ויעלה כשתהיה רשת.');
+  }
+  return (
+    <section className="held" aria-label="ליד חדש">
+      <div className="card-top">
+        <div className="who"><b>ליד חדש</b><span className="ctx">מי שלא נרשם בדוכן</span></div>
+        <button type="button" className="sq" aria-label="סגירה" onClick={onClose}><Icon name="close" /></button>
+      </div>
+      <div className="typed">
+        <label className="field" htmlFor="nl-name">שם<input id="nl-name" className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="field" htmlFor="nl-phone">טלפון<input id="nl-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+      </div>
+      {ctx.setup.needs.length > 0 && (
+        <div className="q-block">
+          <span className="sec">מה הוא צריך</span>
+          <div className="chips">{ctx.setup.needs.map((n) => <button key={n.label} type="button" className="chip" aria-pressed={taps.includes(n.label)} onClick={() => toggle(n.label)}>{n.label}</button>)}</div>
+        </div>
+      )}
+      <label className="field" htmlFor="nl-note">הערה<textarea id="nl-note" className="area" rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></label>
+      {err && <p className="note">{err}</p>}
+      <div className="row">
+        <button type="button" className="btn primary" disabled={busy || !name.trim()} onClick={save}>שמירה</button>
+        <button type="button" className="btn" onClick={onClose}>ביטול</button>
+      </div>
+    </section>
   );
 }
 
