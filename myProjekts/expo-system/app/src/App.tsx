@@ -250,7 +250,7 @@ function Live() {
             online={online}
           />
         )}
-        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} />}
+        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onThanks={() => go('home')} />}
         {view === 'home' && <Home ctx={ctx} desk={desk} />}
         {view === 'tasks' && <Tasks ctx={ctx} desk={desk} />}
         {view === 'leads' && <Leads ctx={ctx} desk={desk} />}

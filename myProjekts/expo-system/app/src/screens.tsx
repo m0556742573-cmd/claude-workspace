@@ -84,7 +84,7 @@ function Meters({ rows }: { rows: { label: ReactNode; count: number; key: string
 
 // ---------- תמונת מצב: the day of the fair, calmly, from this phone
 
-export function Snapshot({ setup, todays, notes, waiting, eyebrow }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string }) {
+export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string; onThanks?: () => void }) {
   const owners = todays.filter((l) => l.businessOwner).length;
   const ids = new Set(todays.map((l) => l.id));
   const mine = notes.filter((n) => ids.has(n.leadId));
@@ -100,6 +100,13 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow }: { setup: Se
       <PageHead title="תמונת מצב" eyebrow={eyebrow} sub={longDate()} tip="מה נאסף היום בדוכן, ומה מחכה לך בימים שאחרי. הכל מהטלפון הזה." />
       <Tiles items={[[todays.length, 'נרשמו היום'], [owners, 'בעלי עסק'], [mine.filter((n) => n.body).length, 'הערות'], [mine.filter((n) => !n.body).length, 'הקלטות']]} />
       {waiting > 0 && <p className="note">{waiting} עוד ממתינים לעלות לשרת. הם יעלו לבד כשתהיה רשת.</p>}
+      {todays.length > 0 && onThanks && (
+        <section className="panel-w">
+          <h2>בערב: תודה שביקרת</h2>
+          <p className="muted">כל מי שנרשם היום מחכה לתודה קצרה. היא מוכנה בדף הבית, נגיעה אחת לכל מבקר.</p>
+          <button type="button" className="btn" style={{ alignSelf: 'start' }} onClick={onThanks}>לשליחת התודות</button>
+        </section>
+      )}
       {byNeed.length > 0 && (
         <section className="stack">
           <div className="sec">מה ביקשו</div>
