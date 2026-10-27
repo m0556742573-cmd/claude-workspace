@@ -8,7 +8,11 @@ import type { Person } from '../demo/people.ts';
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
 export type { Session };
 
-export interface Exhibitor { id: string; name: string; business: string; approved: boolean; phone: string | null; email: string | null; sensitive: boolean }
+export interface Exhibitor {
+  id: string; name: string; business: string; approved: boolean; phone: string | null; email: string | null; sensitive: boolean;
+  /** The number his WhatsApp runs on; null = no WhatsApp (when onboarded) or not asked yet. */
+  whatsapp: string | null; whatsapp_kind: 'personal' | 'business' | null; onboarded: boolean;
+}
 
 export async function signInWithGoogle(): Promise<void> {
   await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } });
@@ -16,7 +20,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -288,7 +292,7 @@ export async function recordSkip(exhibitorId: string, leadId: string, templateId
   if (error) throw error;
 }
 /** The details his messages are signed with. */
-export async function updateMe(exhibitorId: string, me: { name: string; business: string; phone: string | null; email: string | null }): Promise<void> {
+export async function updateMe(exhibitorId: string, me: Partial<Omit<Exhibitor, 'id' | 'approved'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(me).eq('id', exhibitorId);
   if (error) throw error;
 }
@@ -329,4 +333,18 @@ export async function renameTaps(from: string, to: string): Promise<void> {
     const u = await supabase.from('leads').update({ taps: (l.taps as string[]).map((t) => (t === from ? to : t)) }).eq('id', l.id);
     if (u.error) throw u.error;
   }
+}
+
+// ---------- the versions of the setup: every save is kept; going back makes an old one active again
+export interface SetupVersion { version: number; created_at: string; active: boolean; data: Setup }
+export async function setupVersions(exhibitorId: string): Promise<SetupVersion[]> {
+  const { data, error } = await supabase.from('setups').select('version, created_at, active, data').eq('exhibitor_id', exhibitorId).order('version', { ascending: false }).limit(8);
+  if (error) throw error;
+  return (data ?? []) as SetupVersion[];
+}
+export async function restoreVersion(exhibitorId: string, version: number): Promise<void> {
+  const off = await supabase.from('setups').update({ active: false }).eq('exhibitor_id', exhibitorId).eq('active', true);
+  if (off.error) throw off.error;
+  const on = await supabase.from('setups').update({ active: true }).eq('exhibitor_id', exhibitorId).eq('version', version);
+  if (on.error) throw on.error;
 }

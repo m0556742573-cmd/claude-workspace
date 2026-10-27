@@ -9,12 +9,13 @@ import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts
 import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
+import { MeForm } from './me.tsx';
 import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, updateMe, setGreeting, unmarkStep, voiceUrl,
+  addFollowNote, addManual, restoreVersion, setupVersions, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -53,6 +54,8 @@ function waNumber(phone: string): string {
   return d.startsWith('0') ? '972' + d.slice(1) : d;
 }
 const eyebrowOf = (desk: boolean) => (desk ? 'CRM' : undefined);
+/** He answered "no WhatsApp": no WhatsApp button anywhere. Not asked yet counts as yes. */
+const hasWa = (ctx: Ctx) => !ctx.exhibitor.onboarded || !!ctx.exhibitor.whatsapp;
 
 // ---------- the undo line: one-tap actions can be taken back for ten seconds
 
@@ -340,7 +343,7 @@ function Thanks({ ctx, items }: { ctx: Ctx; items: Item[] }) {
     <section className="stack">
       <div className="sec">תודה שביקרת · {left.length}</div>
       <div className="panel-w">
-        <p>{left.length === 1 ? 'מבקר אחד עוד לא קיבל' : `${left.length} מבקרים עוד לא קיבלו`} תודה על הביקור. נגיעה פותחת וואטסאפ עם התודה מוכנה, ואתה לוחץ שלח.</p>
+        <p>{left.length === 1 ? 'מבקר אחד עוד לא קיבל' : `${left.length} מבקרים עוד לא קיבלו`} תודה על הביקור. {hasWa(ctx) ? 'נגיעה פותחת וואטסאפ עם התודה מוכנה, ואתה לוחץ שלח.' : 'נגיעה פותחת מייל עם התודה מוכנה, ואתה לוחץ שלח.'}</p>
         <button type="button" className="btn" style={{ alignSelf: 'start' }} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'סגירה' : 'לשלוח עכשיו'}</button>
       </div>
       {open && (
@@ -367,7 +370,7 @@ function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => 
         <div className="row-step">בתודה עוד חסר {missing.join(' · ')}. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים</button></div>
       ) : (
         <div className="row">
-          {contact?.phone && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => send('whatsapp')}>וואטסאפ</a>}
+          {contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => send('whatsapp')}>וואטסאפ</a>}
           {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent('תודה שביקרת')}&body=${encodeURIComponent(body)}`} onClick={() => send('email')}><Icon name="mail" />מייל</a>}
           {contact === null || (contact && !contact.phone && !contact.email) ? <span className="muted">אין טלפון או מייל</span> : null}
           <button type="button" className="text-btn" onClick={() => { recordSkip(ctx.exhibitor.id, item.row.id, THANKS).catch(() => {}); onDone(); }}>בלי תודה</button>
@@ -394,7 +397,7 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
         <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>
       ) : (
         <div className="row">
-          {contact?.phone && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
+          {contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
           {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל</a>}
           {contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>}
           {contact && !contact.phone && !contact.email && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
@@ -857,36 +860,13 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   );
 }
 
-/** The details at the foot of every message: [שם המציג], [העסק] · [טלפון]. */
+/** The details at the foot of every message: [שם המציג], [העסק] · [טלפון]; and whether he has WhatsApp. */
 function Signature({ ctx }: { ctx: Ctx }) {
-  const e = ctx.exhibitor;
-  const [f, setF] = useState({ name: e.name, business: e.business, phone: e.phone ?? '', email: e.email ?? '' });
-  const [state, setState] = useState('');
-  const changed = f.name !== e.name || f.business !== e.business || f.phone !== (e.phone ?? '') || f.email !== (e.email ?? '');
-  async function save() {
-    setState('busy');
-    const next = { name: f.name.trim(), business: f.business.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null };
-    try { await updateMe(e.id, next); ctx.setExhibitor({ ...e, ...next }); setState('saved'); }
-    catch (err) { setState(String((err as Error).message ?? err)); }
-  }
-  const field = (k: keyof typeof f, label: string, more: object = {}) => (
-    <label className="field" htmlFor={'me-' + k}>{label}<input id={'me-' + k} className="input" value={f[k]} onChange={(ev) => { setF({ ...f, [k]: ev.target.value }); setState(''); }} {...more} /></label>
-  );
   return (
     <section className="panel-w">
-      <h2>הפרטים שבחתימה</h2>
-      <p className="muted">כל הודעה נחתמת בהם: השם, העסק והטלפון.{ctx.setup.sensitive || e.sensitive ? ' בעסק שלך החתימה בלי שם העסק.' : ''}</p>
-      <div className="typed">
-        {field('name', 'השם שלך')}
-        {field('business', 'שם העסק')}
-        {field('phone', 'טלפון', { inputMode: 'tel', dir: 'ltr', style: { textAlign: 'right' } })}
-        {field('email', 'מייל', { inputMode: 'email', dir: 'ltr', style: { textAlign: 'right' } })}
-      </div>
-      <div className="row">
-        <button type="button" className="btn primary" disabled={!changed || !f.name.trim() || state === 'busy'} onClick={save}>שמירה</button>
-        {state === 'saved' && <span className="muted">נשמר.</span>}
-        {state && state !== 'busy' && state !== 'saved' && <span className="err">{state}</span>}
-      </div>
+      <h2>הפרטים שלך</h2>
+      <p className="muted">כל הודעה נחתמת בשם, בעסק ובטלפון.{ctx.setup.sensitive || ctx.exhibitor.sensitive ? ' בעסק שלך החתימה בלי שם העסק.' : ''}</p>
+      <MeForm exhibitor={ctx.exhibitor} onSaved={ctx.setExhibitor} submit="שמירה" />
     </section>
   );
 }
@@ -922,6 +902,8 @@ function Custom({ ctx }: { ctx: Ctx }) {
           <div className="chips">{fixtures.map((f) => <button key={f.id} type="button" className="chip" onClick={async () => { await changeTemplate(ctx.exhibitor.id, f.setup); ctx.setSetup(f.setup); setPicking(false); }}>{f.name}</button>)}</div>
         )}
       </section>
+
+      {!draft && <Versions ctx={ctx} key={saved} />}
 
       {(s.anchor.goal || s.anchor.success) && (
         <section className="panel-w"><h2>מה תהיה הצלחה בתערוכה</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
@@ -983,6 +965,36 @@ function Custom({ ctx }: { ctx: Ctx }) {
       )}
       {saved && <p className="note">{saved}</p>}
     </>
+  );
+}
+
+/** The earlier versions of the setup, newest first; one tap makes one of them the setup again. */
+function Versions({ ctx }: { ctx: Ctx }) {
+  const [list, setList] = useState<import('./lib/backend.ts').SetupVersion[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setupVersions(ctx.exhibitor.id).then(setList).catch(() => setList([])); }, [ctx.exhibitor.id, ctx.setup]);
+  const old = (list ?? []).filter((v) => !v.active);
+  if (!old.length) return null;
+  const when = (iso: string) => { const d = new Date(iso); return `${dayLabel(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  return (
+    <section className="panel-w">
+      <div className="card-top">
+        <h2>גרסאות קודמות</h2>
+        <button type="button" className="text-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'להסתיר' : `${old.length} שמורות`}</button>
+      </div>
+      {open && (
+        <ul className="list">
+          {old.map((v) => (
+            <li key={v.version} className="list-row">
+              <div className="row-name">גרסה {v.version}<span className="muted small"> · {when(v.created_at)}</span></div>
+              <div className="row-step">{v.data.needs.map((n) => n.label).join(' · ') || 'כרטיס של שם בלבד'}</div>
+              <div className="row"><button type="button" className="btn" disabled={busy} onClick={async () => { setBusy(true); try { await restoreVersion(ctx.exhibitor.id, v.version); ctx.setSetup(v.data); } finally { setBusy(false); } }}>לחזור לגרסה הזאת</button></div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

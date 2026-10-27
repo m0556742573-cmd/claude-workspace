@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
+import { MeForm } from './me.tsx';
 import { Booth } from './booth/Booth.tsx';
 import { Admin, Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
@@ -159,6 +160,14 @@ function Live() {
       <Gate title="הדוכן שלך ממתין לאישור">
         <p>נכנסת בתור <strong>{session.user.email}</strong>. המייל הזה לא ברשימת המציגים של התערוכה, אז הדוכן ייפתח אחרי אישור של מנהל התערוכה.</p>
         <button type="button" className="btn" onClick={signOut}>יציאה</button>
+      </Gate>
+    );
+  }
+  if (!exhibitor.onboarded) {
+    return (
+      <Gate title="ברוכים הבאים">
+        <p className="muted">לפני הכל, כמה פרטים שלך. הם נכנסים לחתימה של כל הודעה שתצא למבקרים, ואפשר לשנות אותם אחר כך בהגדרות.</p>
+        <MeForm exhibitor={exhibitor} onSaved={setExhibitor} submit="נתחיל" welcome />
       </Gate>
     );
   }

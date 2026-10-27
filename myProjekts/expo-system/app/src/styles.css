@@ -295,3 +295,6 @@ button.list-row:hover { background: var(--surface-2); }
 .chip-edit { display: inline-flex; gap: 6px; align-items: center; }
 .chip-edit .input { width: 200px; }
 .input.days { width: 72px; min-height: 36px; text-align: center; display: inline-block; padding: 0 6px; }
+/* A form inside a gate reads from the right, like any form; only the gate's own words are centred. */
+.gate-box .stack { text-align: start; justify-self: stretch; }
+.gate-box .stack .chips { justify-content: flex-start; }
