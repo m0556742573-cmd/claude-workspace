@@ -17,7 +17,7 @@ import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, 
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, restoreVersion, setupVersions, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
   loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
@@ -130,7 +130,7 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks }: {
 
 // ---------- the follow-up: everything computed by the engine on the phone, from the server's records
 
-interface Item { row: LeadRow; lead: Lead; next: Next; name: string; city: string; owner: boolean }
+interface Item { row: LeadRow; lead: Lead; next: Next; name: string; city: string; owner: boolean; setup: Setup }
 
 function useItems(ctx: Ctx, book: Book | undefined): Item[] {
   return useMemo(() => {
@@ -138,7 +138,8 @@ function useItems(ctx: Ctx, book: Book | undefined): Item[] {
     return book.leads.map((row) => {
       const owner = ownerOf(row, ctx.directory);
       const lead = engineLead(row, book, owner);
-      return { row, lead, next: nextTask(ctx.setup, lead, today()), name: nameOf(row, ctx.directory), city: cityOf(row, ctx.directory), owner };
+      const setup = setupOf(row, book, ctx.setup);
+      return { row, lead, next: nextTask(setup, lead, today()), name: nameOf(row, ctx.directory), city: cityOf(row, ctx.directory), owner, setup };
     });
   }, [book, ctx.setup, ctx.directory]);
 }
@@ -303,7 +304,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
   useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
   if (next.kind === 'end') return null;
   const stepId = next.stepId;
-  const args = [ctx.exhibitor.id, ctx.setup, owner, today()] as const;
+  const args = [ctx.exhibitor.id, item.setup, owner, today()] as const;
 
   async function mark(outcome: 'noAnswer' | 'closed' | 'notRelevant' | 'optOut', label: string) {
     setBusy(true);
@@ -477,17 +478,17 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
   // What the path would do after this talk: the step after the current one, as if he had answered.
   const suggested = useMemo(() => {
     const after: Lead = stepId ? { ...lead, history: [...lead.history, { stepId, doneOn: today(), outcome: 'noAnswer' }] } : lead;
-    const s = pathAhead(ctx.setup, after);
+    const s = pathAhead(item.setup, after);
     const fits = !!s && s.who === 'me' && NEXT_ACTIONS.includes(s.action);
     const action: Action = fits ? s.action : 'talk';
     const days = s && s.timing.kind === 'after' && s.timing.days > 0 ? s.timing.days : 7;
     return { action, days: fits ? days : 7, fromPath: fits };
-  }, [ctx.setup, lead, stepId]);
+  }, [item.setup, lead, stepId]);
   const [action, setAction] = useState<Action>(suggested.action);
   const [due, setDue] = useState(inDays(suggested.days));
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const args = [ctx.exhibitor.id, ctx.setup, owner, today()] as const;
+  const args = [ctx.exhibitor.id, item.setup, owner, today()] as const;
 
   async function finish(outcome: 'engaged' | 'closed' | 'notRelevant', withNext: boolean) {
     setBusy(true);
@@ -975,29 +976,44 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const s = draft ?? ctx.setup;
   const [picking, setPicking] = useState(false);
   const [steps, setSteps] = useState(false);
-  async function save() {
-    if (!draft) return;
+  const [ask, setAsk] = useState<{ count: number; setup: Setup; renames: [string, string][] } | null>(null);
+
+  /** A change with leads already registered asks whether it applies to them too (model, section 13). */
+  async function apply(next: Setup, names: [string, string][], scope?: 'all' | 'new') {
     setBusy(true); setSaved('');
     try {
-      await changeTemplate(ctx.exhibitor.id, draft);
-      for (const [from, to] of renames) await renameTaps(from, to);
-      ctx.setSetup(draft); setDraft(null); setRenames([]);
-      setSaved('נשמר. השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.');
+      if (!scope) {
+        const count = await leadCount();
+        if (count > 0) { setAsk({ count, setup: next, renames: names }); return; }
+      }
+      if (scope === 'new') await pinLeads(ctx.exhibitor.id);
+      await changeTemplate(ctx.exhibitor.id, next);
+      // A lead left on the old version keeps the old names of the buttons, as its old setup knows them.
+      if (scope !== 'new') for (const [from, to] of names) await renameTaps(from, to);
+      ctx.setSetup(next); setDraft(null); setRenames([]); setAsk(null); setSteps(false);
+      setSaved(scope === 'new'
+        ? 'נשמר. השינוי חל רק על מבקרים שיירשמו מעכשיו; מי שכבר נרשם ממשיך במסלול שהיה לו. הגרסה הקודמת שמורה.'
+        : 'נשמר. השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.');
     } catch (e) { setSaved('לא נשמר: ' + String((e as Error).message ?? e)); }
     finally { setBusy(false); }
   }
+  const save = () => { if (draft) apply(draft, renames); };
+  const question = ask && (
+    <section className="held" aria-label="על מי חל השינוי">
+      <h2>כבר נרשמו אצלך {ask.count} מבקרים. על מי יחול השינוי?</h2>
+      <div className="choices">
+        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, 'all')}><b>גם עליהם</b><small>מהצעד הבא של כל אחד</small></button>
+        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, 'new')}><b>רק על החדשים</b><small>מי שכבר נרשם ממשיך במסלול שהיה לו</small></button>
+      </div>
+      <button type="button" className="text-btn" disabled={busy} onClick={() => setAsk(null)}>חזרה, בלי לשמור</button>
+    </section>
+  );
   if (steps) {
-    return (
-      <SetupSteps start={ctx.setup} onCancel={() => setSteps(false)} onSave={async (next, names) => {
-        await changeTemplate(ctx.exhibitor.id, next);
-        for (const [from, to] of names) await renameTaps(from, to);
-        ctx.setSetup(next); setSteps(false);
-        setSaved('ההקמה נשמרה. הגרסה הקודמת שמורה למטה, ואפשר לחזור אליה.');
-      }} />
-    );
+    return <>{question}<SetupSteps start={ctx.setup} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
   }
   return (
     <>
+      {question}
       <section className="panel-w">
         <h2>איך מקימים</h2>
         <ul className="list" style={{ background: 'var(--surface-2)' }}>
@@ -1010,7 +1026,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
         )}
       </section>
 
-      {!draft && <Versions ctx={ctx} key={saved} />}
+      {!draft && <Versions ctx={ctx} key={saved} onRestore={(old) => apply(old, [])} />}
 
       {(s.anchor.goal || s.anchor.success) && (
         <section className="panel-w"><h2>מה תהיה הצלחה בתערוכה</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
@@ -1076,7 +1092,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
 }
 
 /** The earlier versions of the setup, newest first; one tap makes one of them the setup again. */
-function Versions({ ctx }: { ctx: Ctx }) {
+function Versions({ ctx, onRestore }: { ctx: Ctx; onRestore: (s: Setup) => Promise<void> }) {
   const [list, setList] = useState<import('./lib/backend.ts').SetupVersion[] | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1096,7 +1112,7 @@ function Versions({ ctx }: { ctx: Ctx }) {
             <li key={v.version} className="list-row">
               <div className="row-name">גרסה {v.version}<span className="muted small"> · {when(v.created_at)}</span></div>
               <div className="row-step">{v.data.needs.map((n) => n.label).join(' · ') || 'כרטיס של שם בלבד'}</div>
-              <div className="row"><button type="button" className="btn" disabled={busy} onClick={async () => { setBusy(true); try { await restoreVersion(ctx.exhibitor.id, v.version); ctx.setSetup(v.data); } finally { setBusy(false); } }}>לחזור לגרסה הזאת</button></div>
+              <div className="row"><button type="button" className="btn" disabled={busy} onClick={async () => { setBusy(true); try { await onRestore(v.data); } finally { setBusy(false); } }}>לחזור לגרסה הזאת</button></div>
             </li>
           ))}
         </ul>

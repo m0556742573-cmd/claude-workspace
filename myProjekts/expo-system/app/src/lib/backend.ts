@@ -138,6 +138,8 @@ export async function flush(exhibitorId: string, setup: Setup): Promise<number> 
 export interface LeadRow {
   id: string; person_id: string | null; typed_name: string | null; typed_phone: string | null; taps: string[];
   customer_date: string | null; note: string | null; captured_on: string; captured_at: string;
+  /** null = the active setup; a number = the version he stays on (a change mid-fair applied to new visitors only). */
+  setup_version: number | null;
 }
 export interface TaskRow {
   lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
@@ -147,18 +149,43 @@ export interface StepRow { lead_id: string; step_id: string; done_on: string; ou
 export interface ManualRow { id: string; lead_id: string; action: Action; who: Who; due_on: string; message: string | null }
 export interface NoteRow { id: string; lead_id: string; body: string | null; audio_path: string | null; transcript: string | null; created_at: string }
 
-export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[] }
+export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup> }
 
 export async function loadBook(): Promise<Book> {
-  const [leads, tasks, steps, manual, notes] = await Promise.all([
+  const [leads, tasks, steps, manual, notes, versions] = await Promise.all([
     supabase.from('leads').select('*').order('captured_at', { ascending: false }),
     supabase.from('tasks').select('*'),
     supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').order('created_at'),
     supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message'),
     supabase.from('lead_notes').select('id, lead_id, body, audio_path, transcript, created_at').order('created_at'),
+    supabase.from('setups').select('version, data'),
   ]);
-  for (const r of [leads, tasks, steps, manual, notes]) if (r.error) throw r.error;
-  return { leads: leads.data ?? [], tasks: tasks.data ?? [], steps: steps.data ?? [], manual: manual.data ?? [], notes: notes.data ?? [] };
+  for (const r of [leads, tasks, steps, manual, notes, versions]) if (r.error) throw r.error;
+  return {
+    leads: leads.data ?? [], tasks: tasks.data ?? [], steps: steps.data ?? [], manual: manual.data ?? [], notes: notes.data ?? [],
+    versions: Object.fromEntries((versions.data ?? []).map((v) => [v.version, v.data as Setup])),
+  };
+}
+
+/** The setup a lead follows: the active one, or the version he was left on when a change was applied to new visitors only. */
+export function setupOf(row: Pick<LeadRow, 'setup_version'>, book: Pick<Book, 'versions'>, active: Setup): Setup {
+  return row.setup_version != null ? book.versions[row.setup_version] ?? active : active;
+}
+
+/** How many leads he has: a change to the setup asks about them only when there are any. */
+export async function leadCount(): Promise<number> {
+  const { count, error } = await supabase.from('leads').select('id', { count: 'exact', head: true });
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** "רק על החדשים": every lead that follows the active setup stays on the version active now. Call before the change. */
+export async function pinLeads(exhibitorId: string): Promise<void> {
+  const { data, error } = await supabase.from('setups').select('version').eq('exhibitor_id', exhibitorId).eq('active', true).maybeSingle();
+  if (error) throw error;
+  if (!data) return;
+  const up = await supabase.from('leads').update({ setup_version: data.version }).is('setup_version', null);
+  if (up.error) throw up.error;
 }
 
 export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'>, businessOwner: boolean): Lead {
@@ -241,7 +268,7 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
     const book = await loadBook();
     for (const row of book.leads.filter((l) => !tasked.has(l.id))) {
       const lead = engineLead(row, book, person(row.person_id)?.businessOwner ?? false);
-      const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setup, lead, onDay));
+      const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setupOf(row, book, setup), lead, onDay));
       if (t.error) throw t.error;
     }
   }
@@ -407,16 +434,10 @@ export async function renameTaps(from: string, to: string): Promise<void> {
   }
 }
 
-// ---------- the versions of the setup: every save is kept; going back makes an old one active again
+// ---------- the versions of the setup: every save is kept; going back saves an old one again as the newest
 export interface SetupVersion { version: number; created_at: string; active: boolean; data: Setup }
 export async function setupVersions(exhibitorId: string): Promise<SetupVersion[]> {
   const { data, error } = await supabase.from('setups').select('version, created_at, active, data').eq('exhibitor_id', exhibitorId).order('version', { ascending: false }).limit(8);
   if (error) throw error;
   return (data ?? []) as SetupVersion[];
-}
-export async function restoreVersion(exhibitorId: string, version: number): Promise<void> {
-  const off = await supabase.from('setups').update({ active: false }).eq('exhibitor_id', exhibitorId).eq('active', true);
-  if (off.error) throw off.error;
-  const on = await supabase.from('setups').update({ active: true }).eq('exhibitor_id', exhibitorId).eq('version', version);
-  if (on.error) throw on.error;
 }
