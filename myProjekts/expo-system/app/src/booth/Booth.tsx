@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { nextTask, type Setup } from '@expo/engine';
+import { CONSENT, nextTask, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import type { LocalLead, LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -152,6 +152,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     ['מה הוא צריך?', setup.needs.map((n) => n.label)],
     ['מתי?', setup.when.map((b) => b.label)],
     ['מי הוא?', setup.who.map((b) => b.label)],
+    // A sensitive business asks before the mailing list.
+    ['רשימת התפוצה', setup.sensitive ? [CONSENT] : []],
   ];
   const recordingHere = !!rec && rec.leadId === current?.id;
 

@@ -43,6 +43,9 @@ function pickVariant(need: NeedPath, taps: string[]): Path | undefined {
   return need.variants.find((v) => matches(v.if, taps))?.path;
 }
 
+/** The booth card's consent button in a sensitive business: "send me updates". */
+export const CONSENT = 'מסכים לקבל עדכונים';
+
 export type Next =
   | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean }
   /** A step needs the visitor's date and he gave none: the exhibitor is asked to find out when. */
@@ -75,6 +78,8 @@ export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
   if (step) return schedule(step, base, lead, today);
 
   const end = path.end;
+  // A sensitive business puts on the mailing list only whoever said yes at the booth (round 9).
+  if (end.kind === 'list' && setup.sensitive && !lead.taps.includes(CONSENT)) return { kind: 'end', reason: 'stop' };
   if (end.kind !== 'repeat') return { kind: 'end', reason: end.kind };
   const repeats = lead.history.filter((h) => h.stepId.startsWith('repeat:')).length;
   if (end.times !== undefined && repeats >= end.times) return { kind: 'end', reason: 'stop' };

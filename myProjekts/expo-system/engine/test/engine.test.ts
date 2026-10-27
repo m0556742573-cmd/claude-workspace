@@ -182,3 +182,13 @@ test('a manual step that is overdue goes out today and says so', () => {
   assert.equal(n.dueOn, '2026-11-23');
   assert.equal(n.late, true);
 });
+
+// ---- a sensitive business: the mailing list only with consent
+
+test('a sensitive business ends on the mailing list only for whoever consented at the booth', async () => {
+  const { CONSENT } = await import('../src/index.ts');
+  const s = setup({ sensitive: true });
+  assert.deepEqual(nextTask(s, lead([]), EXPO), { kind: 'end', reason: 'stop' });
+  assert.deepEqual(nextTask(s, lead([CONSENT]), EXPO), { kind: 'end', reason: 'list' });
+  assert.deepEqual(nextTask(setup({}), lead([]), EXPO), { kind: 'end', reason: 'list' });
+});

@@ -26,27 +26,56 @@ export interface LocalNote {
 
 // A new name rather than a new version of the first one: an upgrade waits until every old tab of the site is
 // closed, and the booth must never wait. What the first version held is copied over once.
-const DB = 'expo-booth-2';
+// The demo (?demo) keeps its own copy: a visitor tried in the demo must never show up in the real booth on the same tablet.
+const DEMO = new URLSearchParams(location.search).has('demo');
+const DB = DEMO ? 'expo-booth-demo' : 'expo-booth-2';
 const FIRST = 'expo-booth';
 let conn: Promise<IDBDatabase> | null = null;
 
 function open(): Promise<IDBDatabase> {
   conn ??= new Promise<{ db: IDBDatabase; fresh: boolean }>((resolve, reject) => {
     let fresh = false;
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => {
-      fresh = true;
-      req.result.createObjectStore('leads', { keyPath: 'id' });
-      req.result.createObjectStore('notes', { keyPath: 'id' });
+    const attempt = (version?: number) => {
+      const req = version ? indexedDB.open(DB, version) : indexedDB.open(DB);
+      req.onupgradeneeded = () => {
+        fresh = true;
+        for (const s of ['leads', 'notes']) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: 'id' });
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        // A copy that exists without its stores (opened elsewhere, half made): one version up, and they are made.
+        if (!db.objectStoreNames.contains('leads') || !db.objectStoreNames.contains('notes')) { const v = db.version + 1; db.close(); attempt(v); return; }
+        db.onversionchange = () => { db.close(); conn = null; };
+        resolve({ db, fresh });
+      };
+      req.onerror = () => { conn = null; reject(req.error); };
     };
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => { db.close(); conn = null; };
-      resolve({ db, fresh });
-    };
-    req.onerror = () => { conn = null; reject(req.error); };
-  }).then(({ db, fresh }) => { if (fresh) copyFirst(db).catch(() => {}); return db; });
+    attempt();
+  }).then(({ db, fresh }) => {
+    if (fresh && !DEMO) copyFirst(db).catch(() => {});
+    if (!DEMO) dropDemo(db).catch(() => {});
+    return db;
+  });
   return conn;
+}
+
+/** Until the demo had its own copy it wrote into this one: its visitors (ids "demo-…") are taken out. */
+async function dropDemo(db: IDBDatabase): Promise<void> {
+  const leads = await new Promise<LocalLead[]>((resolve) => {
+    const q = db.transaction('leads', 'readonly').objectStore('leads').getAll();
+    q.onsuccess = () => resolve(q.result as LocalLead[]);
+    q.onerror = () => resolve([]);
+  });
+  const demo = new Set(leads.filter((l) => l.personId?.startsWith('demo-')).map((l) => l.id));
+  if (!demo.size) return;
+  const notes = await new Promise<LocalNote[]>((resolve) => {
+    const q = db.transaction('notes', 'readonly').objectStore('notes').getAll();
+    q.onsuccess = () => resolve(q.result as LocalNote[]);
+    q.onerror = () => resolve([]);
+  });
+  const tx = db.transaction(['leads', 'notes'], 'readwrite');
+  for (const id of demo) tx.objectStore('leads').delete(id);
+  for (const n of notes) if (demo.has(n.leadId)) tx.objectStore('notes').delete(n.id);
 }
 
 /** The leads of the first version, if this phone has any (opened at its own version, so nothing waits). */
