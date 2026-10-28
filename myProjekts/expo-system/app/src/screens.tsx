@@ -390,7 +390,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>}
       <div className="nc-now">
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
-        {isAuto && <div className="faint small">אמור לצאת לבד. השליחה מתחברת בקרוב, בינתיים אפשר לשלוח ביד.</div>}
+        {isAuto && <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />}
       </div>
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
@@ -442,6 +442,16 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     </Frame>
   );
 }
+/** An automatic step: with his WhatsApp linked it goes out by itself (at a person's pace and hours); otherwise by hand. */
+function AutoLine({ blocked }: { blocked: boolean }) {
+  const [linked, setLinked] = useState<boolean | null>(null);
+  useEffect(() => { waOpen().then(setLinked); }, []);
+  if (linked === null) return null;
+  if (blocked) return <div className="faint small">החיבור לוואטסאפ נעצר, אז הוא לא יוצא לבד. אפשר לשלוח ביד.</div>;
+  if (!linked) return <div className="faint small">אמור לצאת לבד כשהוואטסאפ שלך מחובר (הגדרות › חיבורים). בינתיים אפשר לשלוח ביד.</div>;
+  return <div className="faint small">יוצא לבד מהוואטסאפ שלך היום, בקצב של אדם ובשעות 9–20 (תקרה יומית למי שעוד לא ענה).</div>;
+}
+
 /** A task card is an item of a list, a card of its own, or (inside the lead's page) only its contents. */
 function Frame({ bare, className, children }: { bare?: boolean; className: string; children: ReactNode }) {
   if (bare) return <div className="rec-now">{children}</div>;

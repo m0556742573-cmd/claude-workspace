@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node server.ts"
   },
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
+    "@hebcal/core": "5.10.1",
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "pino": "9.14.0"
   }

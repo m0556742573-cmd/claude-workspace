@@ -15,6 +15,8 @@ import path from 'node:path';
 import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { firstLeft, gapMs, sendingHours, typingMs } from './limits.ts';
+import { due, israelDay, type Plan } from './planner.ts';
+import type { Approved } from '../engine/src/index.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
@@ -174,6 +176,21 @@ async function sendOne(s: Session, q: Queued): Promise<void> {
   }
 }
 
+// ---------- planning (step 2b): the path's own messages, due today, for every linked number; they join the same queue
+
+const approved: Approved[] = JSON.parse(await fs.readFile(new URL('../consultant-rounds/messages-approved.json', import.meta.url), 'utf8'));
+async function plan(): Promise<void> {
+  if (!WA_KEY || !sendingHours(new Date())) return;
+  const today = israelDay(new Date());
+  for (const [exhibitorId, s] of sessions) {
+    if (s.status !== 'open') continue;
+    const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
+    for (const d of due(p, today, approved)) {
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body });
+    }
+  }
+}
+
 // ---------- replies: only from his leads' numbers, only if he switched it on
 
 let leadPhones = new Map<string, Set<string>>();
@@ -271,4 +288,5 @@ await restore();
 await refreshPhones().catch((e) => logger.error(e));
 setInterval(() => { tick().catch((e) => logger.error(e)); }, 20_000);
 setInterval(() => { refreshPhones().catch((e) => logger.error(e)); }, 5 * 60_000);
+setInterval(() => { plan().catch((e) => logger.error(e)); }, 2 * 60_000);
 server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, ${sessions.size} accounts restored, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}`));
