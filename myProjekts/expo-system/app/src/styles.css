@@ -338,10 +338,15 @@ button.list-row:hover { background: var(--surface-2); }
 }
 
 /* before the system: sign-in, waiting for approval */
-.gate { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
-.gate-box { width: min(440px, 100%); background: var(--surface); border-radius: var(--r); padding: 28px 24px; display: grid; gap: 14px; text-align: center; justify-items: center; }
+/* as in "דוגמית 3": a thin bar with the brand, and a white card near the top of the page */
+.gate { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; gap: 48px; padding: 0 16px 48px; }
+.gate-top { align-self: stretch; display: flex; align-items: center; min-height: 56px; padding: 0 24px; margin: 0 -16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.gate-top .mark { width: 24px; height: 24px; }
+.gate-box { width: min(520px, 100%); background: var(--surface); border-radius: var(--r); padding: 28px 24px; display: grid; gap: 14px; text-align: center; justify-items: center; }
 .gate-box h1 { font-size: 26px; font-weight: 700; }
-.gate-box .brand { justify-content: center; }
+.opt { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(360px, 100%); min-height: 52px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); font-weight: 700; font-size: 15px; color: var(--ink); }
+.opt:hover { background: var(--surface-2); }
+.g-mark { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
 
 /* A message as the visitor gets it: its own lines, its own breaks. */
 .note.preview { white-space: pre-wrap; line-height: 1.6; color: var(--ink-2); }
@@ -537,3 +542,16 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .list.in-card { border: 1px solid var(--line); }
 .msgs .held { border-radius: 0; box-shadow: none; border: 0; border-top: 1px solid var(--ink-2); border-bottom: 1px solid var(--ink-2); padding: 16px; }
 .is-desk .msgs { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+
+/* the settings: the two parts beside the title, a line on what the part is, its sub-tabs as chips */
+.settings { max-width: 860px; }
+.set-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.set-head .seg { flex: none; }
+.set-intro { margin-top: -10px; font-size: 15px; }
+.set-intro b { color: var(--ink); }
+.subtabs { margin-top: -8px; }
+.subtabs .chip { min-height: 36px; padding: 0 14px; font-size: 14px; font-weight: 600; }
+.subview { display: flex; flex-direction: column; gap: 16px; }
+.gate > .gate-box:first-child { margin-top: 24px; }
+/* the brand book's forms: a field is as wide as what goes in it */
+.subview .panel-w .input, .subview .panel-w select.input { max-width: 460px; }

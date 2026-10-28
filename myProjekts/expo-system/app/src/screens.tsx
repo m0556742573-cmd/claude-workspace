@@ -1039,49 +1039,76 @@ function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me:
 export function Settings({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   const [tab, setTab] = useState<'details' | 'custom'>('details');
   return (
-    <div className="page narrow">
-      <PageHead title="הגדרות" tip="פרטים וחיבורים: איך ההודעות שלך פונות ויוצאות. התאמה אישית: הכרטיס בדוכן ומה קורה אחרי התערוכה." />
-      <div className="seg" role="group" aria-label="חלק בהגדרות">
-        <button type="button" aria-pressed={tab === 'details'} onClick={() => setTab('details')}>פרטים וחיבורים</button>
-        <button type="button" aria-pressed={tab === 'custom'} onClick={() => setTab('custom')}>התאמה אישית</button>
+    <div className="page settings">
+      <div className="set-head">
+        <PageHead title="הגדרות" tip="פרטים וחיבורים: איך ההודעות שלך פונות ויוצאות, וההרשמה העצמית. התאמה אישית: הכרטיס בדוכן ומה קורה אחרי התערוכה." />
+        <div className="seg" role="group" aria-label="חלק בהגדרות">
+          <button type="button" aria-pressed={tab === 'details'} onClick={() => setTab('details')}>פרטים וחיבורים</button>
+          <button type="button" aria-pressed={tab === 'custom'} onClick={() => setTab('custom')}>התאמה אישית</button>
+        </div>
       </div>
       {tab === 'details' ? <Details ctx={ctx} onSignOut={onSignOut} /> : <Custom ctx={ctx} />}
     </div>
   );
 }
 
+/** A part's sub-tabs, as chips under its intro. */
+function SubTabs<K extends string>({ label, tabs, on, set }: { label: string; tabs: [K, string][]; on: K; set: (k: K) => void }) {
+  return (
+    <nav className="subtabs chips" aria-label={label}>
+      {tabs.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={on === k} onClick={() => set(k)}>{l}</button>)}
+    </nav>
+  );
+}
+
 function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   const [greeting, setG] = useState<'shalom' | 'kavod' | null>(null);
   const [tips, setTips] = useState(tipsOn);
+  const [sub, setSub] = useState<'msgs' | 'self' | 'links' | 'account'>('msgs');
   useEffect(() => { myGreeting().then(setG).catch(() => setG('shalom')); }, []);
   async function choose(g: 'shalom' | 'kavod') { setG(g); await setGreeting(ctx.exhibitor.id, g).catch(() => {}); dispatchEvent(new Event('expo-greeting')); }
   return (
     <>
-      <section className="panel-w">
-        <h2>איך ההודעות שלך פונות לאנשים</h2>
-        <div className="chips">
-          <button type="button" className="chip" aria-pressed={greeting === 'shalom'} onClick={() => choose('shalom')}>שלום [שם]</button>
-          <button type="button" className="chip" aria-pressed={greeting === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
-        </div>
-      </section>
-      <section className="panel-w">
-        <div className="switchrow">
-          <span>להציג הסבר ליד כל מסך</span>
-          <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="להציג הסבר ליד כל מסך" onClick={() => { setTips(!tips); setTipsOn(!tips); }} />
-        </div>
-      </section>
-      <SelfSign ctx={ctx} />
-      <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>
-      <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
-      <Signature ctx={ctx} />
-      <section className="panel-w">
-        <h2>החשבון</h2>
-        <p>{ctx.exhibitor.name}{ctx.exhibitor.business ? ` · ${ctx.exhibitor.business}` : ''}</p>
-        <div className="row">
-          <button type="button" className="btn" onClick={onSignOut}>יציאה</button>
-          {ctx.admin && <button type="button" className="text-btn" onClick={() => ctx.go('admin')}>ניהול התערוכה</button>}
-        </div>
-      </section>
+      <p className="muted set-intro"><b>הפרטים שלך, ואיך ההודעות יוצאות.</b> כל שינוי כאן חל על כל ההודעות.</p>
+      <SubTabs label="פרטים וחיבורים" on={sub} set={setSub} tabs={[['msgs', 'הודעות'], ['self', 'הרשמה עצמית'], ['links', 'חיבורים'], ['account', 'החשבון']]} />
+      <div className="subview">
+        {sub === 'msgs' && <>
+          <section className="panel-w">
+            <h2>איך ההודעות שלך פונות לאנשים</h2>
+            <div className="chips">
+              <button type="button" className="chip" aria-pressed={greeting === 'shalom'} onClick={() => choose('shalom')}>שלום [שם]</button>
+              <button type="button" className="chip" aria-pressed={greeting === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
+            </div>
+          </section>
+          <Signature ctx={ctx} />
+          <section className="panel-w">
+            <h2>הנוסח של כל הודעה</h2>
+            <p className="muted">ההודעות עצמן, כמו שהמבקר יקבל אותן, נערכות במסך ההודעות.</p>
+            <button type="button" className="btn start-sm" onClick={() => ctx.go('messages')}><Icon name="mail" size={18} />להודעות</button>
+          </section>
+        </>}
+        {sub === 'self' && <SelfSign ctx={ctx} />}
+        {sub === 'links' && <>
+          <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>
+          <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
+        </>}
+        {sub === 'account' && <>
+          <section className="panel-w">
+            <div className="switchrow">
+              <span>להציג הסבר ליד כל מסך</span>
+              <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="להציג הסבר ליד כל מסך" onClick={() => { setTips(!tips); setTipsOn(!tips); }} />
+            </div>
+          </section>
+          <section className="panel-w">
+            <h2>החשבון</h2>
+            <p>{ctx.exhibitor.name}{ctx.exhibitor.business ? ` · ${ctx.exhibitor.business}` : ''}</p>
+            <div className="row">
+              <button type="button" className="btn" onClick={onSignOut}>יציאה</button>
+              {ctx.admin && <button type="button" className="text-btn" onClick={() => ctx.go('admin')}>ניהול התערוכה</button>}
+            </div>
+          </section>
+        </>}
+      </div>
     </>
   );
 }
@@ -1140,6 +1167,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const [picking, setPicking] = useState(false);
   const [steps, setSteps] = useState(false);
   const [ask, setAsk] = useState<{ count: number; setup: Setup; renames: [string, string][] } | null>(null);
+  const [sub, setSub] = useState<'card' | 'after' | 'build'>('card');
 
   /** A change with leads already registered asks whether it applies to them too (model, section 13). */
   async function apply(next: Setup, names: [string, string][], scope?: 'all' | 'new') {
@@ -1171,12 +1199,17 @@ function Custom({ ctx }: { ctx: Ctx }) {
       <button type="button" className="text-btn" disabled={busy} onClick={() => setAsk(null)}>חזרה, בלי לשמור</button>
     </section>
   );
+  const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי התערוכה עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
   if (steps) {
-    return <>{question}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
+    return <>{intro}{question}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
   }
   return (
     <>
+      {intro}
+      <SubTabs label="התאמה אישית" on={sub} set={setSub} tabs={[['card', 'הכרטיס בדוכן'], ['after', 'מה קורה אחרי'], ['build', 'הקמה וגרסאות']]} />
+      <div className="subview">
       {question}
+      {sub === 'build' && <>
       <section className="panel-w">
         <h2>איך מקימים</h2>
         <ul className="list" style={{ background: 'var(--surface-2)' }}>
@@ -1189,13 +1222,13 @@ function Custom({ ctx }: { ctx: Ctx }) {
         )}
       </section>
 
-      {!draft && <Versions ctx={ctx} key={saved} onRestore={(old) => apply(old, [])} />}
-
       {(s.anchor.goal || s.anchor.success) && (
         <section className="panel-w"><h2>מה תהיה הצלחה בתערוכה</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
       )}
+      {!draft && <Versions ctx={ctx} key={saved} onRestore={(old) => apply(old, [])} />}
+      </>}
 
-      <section className={draft ? 'held' : 'panel-w'}>
+      {sub === 'card' && <section className={draft ? 'held' : 'panel-w'}>
         <div className="card-top">
           <h2>הכרטיס בדוכן</h2>
           {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
@@ -1221,10 +1254,13 @@ function Custom({ ctx }: { ctx: Ctx }) {
           );
         })}
         {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
-      </section>
+      </section>}
 
-      <section className="panel-w">
-        <h2>מה קורה אחרי התערוכה</h2>
+      {sub === 'after' && <section className={draft ? 'held' : 'panel-w'}>
+        <div className="card-top">
+          <h2>מה קורה אחרי התערוכה</h2>
+          {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
+        </div>
         {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי התערוכה.</p>}
         {s.needs.map((n, ni) => (
           <div key={n.label} className="q-block">
@@ -1241,7 +1277,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
           <div><span className="muted small">בעל עסק:</span><PathLines path={s.defaults.business} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'business' }, i, d)) : undefined} /></div>
           <div><span className="muted small">פרטי:</span><PathLines path={s.defaults.private} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'private' }, i, d)) : undefined} /></div>
         </div>
-      </section>
+      </section>}
 
       {draft && (
         <div className="row">
@@ -1250,6 +1286,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
         </div>
       )}
       {saved && <p className="note">{saved}</p>}
+      </div>
     </>
   );
 }

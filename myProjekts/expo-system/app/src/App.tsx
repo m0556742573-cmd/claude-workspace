@@ -70,8 +70,8 @@ export function App() {
 function Gate({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="gate">
+      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">דוכן חכם</span></div></header>
       <section className="gate-box">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">דוכן חכם</span></div>
         <h1>{title}</h1>
         {children}
       </section>
@@ -164,10 +164,10 @@ function Live() {
   if (session === undefined) return <Gate title="רגע…" />;
   if (!session) {
     return (
-      <Gate title="כניסה למציגים">
-        <p className="muted">המערכת של המציגים בתערוכה: הדוכן ביום עצמו, והמעקב אחריו.</p>
-        <button type="button" className="btn primary tall wide" onClick={signInWithGoogle}>כניסה עם Google</button>
-        <p className="faint small">כניסה עם קוד למייל תתווסף בקרוב.</p>
+      <Gate title="דוכן חכם">
+        <p className="muted">לבעלי דוכנים בתערוכת העסקים. נכנסים פעם אחת, וממשיכים מכל מכשיר.</p>
+        <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
+        <p className="faint small">כניסה עם קוד למייל, בלי חשבון Google, תתווסף בקרוב.</p>
       </Gate>
     );
   }
