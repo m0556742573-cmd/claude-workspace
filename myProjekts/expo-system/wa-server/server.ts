@@ -186,7 +186,7 @@ async function plan(): Promise<void> {
     if (s.status !== 'open') continue;
     const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
     for (const d of due(p, today, approved)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body });
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, to_phone: d.to ?? null });
     }
   }
 }

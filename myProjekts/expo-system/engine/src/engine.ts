@@ -1,7 +1,7 @@
 // The engine: given an exhibitor's setup and one lead, which path applies and what the next task is.
 // It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
 import { addDays, isRestDay, nextOccurrence, weekday } from './calendar.ts';
-import { manualId, replyId } from './model.ts';
+import { BOOTH_STEP, manualId, replyId } from './model.ts';
 import type { Action, Condition, Lead, LocalDate, NeedPath, Path, Setup, Step, Timing, Who } from './model.ts';
 
 /** What the path would do next if he had not answered — the likely next step to offer after a talk. */
@@ -65,6 +65,11 @@ export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
     const late = lead.repliedOn < today;
     return { kind: 'task', stepId: replyId(lead.repliedOn), action: 'talk', who: 'me', dueOn: settle(late ? today : lead.repliedOn, 'talk', 'me'), late, reply: true };
   }
+  // The message he chose at the booth goes out on the day of the visit, before anything else of the path.
+  if (lead.booth?.message && !recorded.has(BOOTH_STEP)) {
+    const late = lead.capturedOn < today;
+    return { kind: 'task', stepId: BOOTH_STEP, action: 'send', who: 'auto', message: lead.booth.message, dueOn: settle(late ? today : lead.capturedOn, 'send', 'auto'), late };
+  }
   // A step he set by hand comes next: it is what was agreed with the visitor.
   const manual = (lead.manual ?? []).filter((m) => !recorded.has(manualId(m.id))).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
   const m = manual[0];
@@ -76,7 +81,8 @@ export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
   if (last && last.outcome === 'engaged') return { kind: 'end', reason: 'engaged' };
 
   const { path } = choosePath(setup, lead);
-  const steps = path.steps.filter((s) => matches(s.onlyIf, lead.taps));
+  // A choice at the booth (a message, or none now) takes the place of the path's own immediate messages.
+  const steps = withoutImmediate(path.steps.filter((s) => matches(s.onlyIf, lead.taps)), !!lead.booth);
   const done = new Set(lead.history.map((h) => h.stepId));
   const base = last ? last.doneOn : lead.capturedOn;
 
@@ -119,4 +125,22 @@ export function settle(d: LocalDate, action: Action, who: Who): LocalDate {
   const personal = who === 'me' && (action === 'talk' || action === 'meet');
   while (isRestDay(d) || (personal && weekday(d) === 5)) d = addDays(d, 1);
   return d;
+}
+
+/** A step the system sends on the day of the visit itself. */
+const immediate = (s: Step) => s.who === 'auto' && !!s.message && s.timing.kind === 'after' && s.timing.days === 0;
+
+/** The path's first steps that go out at once, dropped when the exhibitor chose at the booth instead. */
+function withoutImmediate(steps: Step[], chosen: boolean): Step[] {
+  if (!chosen) return steps;
+  let i = 0;
+  while (i < steps.length && immediate(steps[i]!)) i++;
+  return steps.slice(i);
+}
+
+/** What the path would send this visitor at once, as tapped so far: the booth card shows it. */
+export function immediateMessage(setup: Setup, lead: Lead): string | undefined {
+  const { path } = choosePath(setup, lead);
+  const first = path.steps.filter((s) => matches(s.onlyIf, lead.taps))[0];
+  return first && immediate(first) ? first.message : undefined;
 }

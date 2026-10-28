@@ -1,7 +1,7 @@
 // The engine against setups taken from the 109-business rounds. The expo is Monday 16/11/2026.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { choosePath, isRestDay, nextOccurrence, nextTask, settle } from '../src/index.ts';
+import { choosePath, immediateMessage, isRestDay, nextOccurrence, nextTask, settle } from '../src/index.ts';
 import type { Lead, Path, Setup, StepRecord } from '../src/index.ts';
 
 const EXPO = '2026-11-16';
@@ -214,4 +214,29 @@ test('a reply does not reopen a lead who closed or asked to be removed', () => {
   const s = setup({});
   const closed = lead([], { repliedOn: '2026-11-20', history: [rec('x', '2026-11-18', 'closed')] });
   assert.deepEqual(nextTask(s, closed, '2026-11-20'), { kind: 'end', reason: 'closed' });
+});
+
+// ---- a message chosen at the booth (יצחק, 28/10): it goes first, and it replaces the path's immediate message
+
+test('the booth choice goes out first and replaces the immediate message of the path', () => {
+  const s = setup({ needs: [{ label: 'משלוחים', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [
+    { id: 'how', action: 'send', who: 'auto', timing: { kind: 'after', days: 0 }, message: 'איך מזמינים' },
+    { id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 3 } },
+  ], end: { kind: 'list' } } }] }] });
+  const plain = lead(['משלוחים']);
+  assert.equal(immediateMessage(s, plain), 'איך מזמינים');
+  const n0 = nextTask(s, plain, EXPO);
+  assert.equal(n0.kind === 'task' && n0.message, 'איך מזמינים');
+  // He chose the price list at the booth: it goes, and "how to order" does not.
+  const chose = lead(['משלוחים'], { booth: { message: 'מחירון' } });
+  const n1 = nextTask(s, chose, EXPO);
+  assert.equal(n1.kind === 'task' && n1.stepId, 'booth');
+  assert.equal(n1.kind === 'task' && n1.message, 'מחירון');
+  const after = { ...chose, history: [rec('booth', EXPO)] };
+  const n2 = nextTask(s, after, EXPO);
+  assert.equal(n2.kind === 'task' && n2.stepId, 'call'); // straight to his own call; nothing else went out
+  // "None now": no immediate message at all.
+  const none = lead(['משלוחים'], { booth: {} });
+  const n3 = nextTask(s, none, EXPO);
+  assert.equal(n3.kind === 'task' && n3.stepId, 'call');
 });

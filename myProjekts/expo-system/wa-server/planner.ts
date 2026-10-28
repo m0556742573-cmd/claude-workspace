@@ -8,6 +8,8 @@ import { fill, holes, nextTask, textOf, type Approved, type Lead, type ManualSte
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
   name: string | null; has_phone: boolean; has_whatsapp: boolean | null; settled: boolean;
+  /** What he chose at the booth: a message, none now, another number for it. */
+  booth_message: string | null; booth_none: boolean; booth_to: string | null;
 }
 export interface Plan {
   me: Me & { blocked: boolean };
@@ -19,7 +21,7 @@ export interface Plan {
   replies: { lead_id: string; at: string; optout: boolean }[];
   planned: string[];
 }
-export interface Due { lead: string; step: string; template: string; body: string }
+export interface Due { lead: string; step: string; template: string; body: string; to?: string }
 
 export const israelDay = (at: Date | string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(at));
 
@@ -31,7 +33,7 @@ export function due(plan: Plan, today: string, approved: Approved[]): Due[] {
   const planned = new Set(plan.planned);
   const out: Due[] = [];
   for (const l of plan.leads) {
-    if (!l.settled || !l.has_phone || l.has_whatsapp === false) continue;
+    if (!l.settled || (!l.has_phone && !l.booth_to) || l.has_whatsapp === false) continue;
     const replies = plan.replies.filter((r) => r.lead_id === l.id);
     if (replies.some((r) => r.optout)) continue;
     const setup = (l.setup_version !== null && versions.get(l.setup_version)) || active;
@@ -41,13 +43,15 @@ export function due(plan: Plan, today: string, approved: Approved[]): Due[] {
       history: plan.steps.filter((s) => s.lead_id === l.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome })),
       manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
+      booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
     };
     const n = nextTask(setup, lead, today);
     if (n.kind !== 'task' || n.who !== 'auto' || !n.message || n.late || n.dueOn > today) continue;
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
     const body = fill(textOf(setup, plan.texts, n.message, approved), plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
-    out.push({ lead: l.id, step: n.stepId, template: n.message, body });
+    const to = n.stepId === 'booth' && l.booth_to ? l.booth_to : undefined;
+    out.push({ lead: l.id, step: n.stepId, template: n.message, body, ...(to ? { to } : {}) });
   }
   return out;
 }

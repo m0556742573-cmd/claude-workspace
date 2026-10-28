@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CONSENT, nextTask, type Setup } from '@expo/engine';
+import { CONSENT, immediateMessage, messagesOf, nextTask, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import type { LocalLead, LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -29,12 +29,16 @@ export interface BoothProps {
   joinCode?: string;
   /** The system's phase: practice (sample names, nothing sent), live, or after the fair (the booth is closed). */
   phase?: 'practice' | 'live' | 'after';
+  /** The booth's default message: one tap when the path sends nothing at once (17/10). */
+  boothDefault?: string | null;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live' }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault }: BoothProps) {
   const practice = phase === 'practice';
+  const [picking, setPicking] = useState(false);
+  const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
   const [showCode, setShowCode] = useState(false);
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState<{ name: string; phone: string } | null>(null);
@@ -70,7 +74,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   }
   function open(l: LocalLead) {
     stopRecording();
-    setCurrent(l); setNoteOpen(false); setNoteText(''); setAsking(false); setQuery(''); setTyping(null);
+    setCurrent(l); setNoteOpen(false); setNoteText(''); setAsking(false); setQuery(''); setTyping(null); setPicking(false);
   }
   /** Someone who is not on the list: a name and a phone, typed. */
   function newOne() {
@@ -273,6 +277,9 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </>
           )}
 
+          {messages.length > 0 && <SendLine lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} picking={picking}
+            onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }} />}
+
           <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
 
           {lastNote && <NotePeek note={lastNote} count={myNotes.length} />}
@@ -341,6 +348,40 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       )}
 
       <p className="foot">נרשמו היום: {todays.length} · {status}</p>
+    </div>
+  );
+}
+
+/**
+ * The card's message line (יצחק, 28/10). The path sends by itself; this line says what goes out at once, and lets him
+ * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
+ * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
+ */
+function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPick, onChoose }: {
+  lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; picking: boolean;
+  onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
+}) {
+  const auto = immediateMessage(setup, lead);
+  const chosen = lead.booth;
+  const def = boothDefault && messages.includes(boothDefault) ? boothDefault : null;
+  return (
+    <div className="send-line">
+      <div className="send-row">
+        <span className="faint">הודעה:</span>
+        {chosen ? (chosen.message ? <span>יוצא לו: <b>{chosen.message}</b></span> : <span>בלי הודעה עכשיו</span>)
+          : auto ? <span>יוצא לו מיד: <b>{auto}</b></span>
+          : def ? <button type="button" className="btn" onClick={() => onChoose({ message: def })}>לשלוח: {def}</button>
+          : !picking && <span className="faint">אין הודעה מיידית במסלול</span>}
+        <button type="button" className="text-btn" aria-expanded={picking} onClick={onPick}>{chosen || auto || def ? 'לשנות' : 'לבחור הודעה'}</button>
+        {practice && <span className="faint small">· בתרגול לא נשלח</span>}
+      </div>
+      {picking && (
+        <div className="chips">
+          {messages.map((m) => <button key={m} type="button" className="chip" aria-pressed={chosen?.message === m} onClick={() => onChoose({ message: m })}>{m}</button>)}
+          <button type="button" className="chip" aria-pressed={!!chosen && !chosen.message} onClick={() => onChoose({})}>בלי הודעה עכשיו</button>
+          {chosen && <button type="button" className="chip" onClick={() => onChoose(undefined)}>כמו במסלול</button>}
+        </div>
+      )}
     </div>
   );
 }

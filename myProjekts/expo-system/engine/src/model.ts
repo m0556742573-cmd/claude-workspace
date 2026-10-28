@@ -111,9 +111,14 @@ export interface Lead {
   manual?: ManualStep[];
   /** The day of his latest reply on WhatsApp (model §9): it stops the path until the exhibitor answers him. */
   repliedOn?: LocalDate;
+  /** What the exhibitor chose at the booth: a message to send him now, or none now. Either replaces the path's own
+   *  immediate message, so he never gets two at once (יצחק, 28/10). */
+  booth?: { message?: string };
 }
 
 /** A manual step is recorded in the history under this id, so the path's own steps never collide with it. */
 export const manualId = (id: string) => `m:${id}`;
+/** The message chosen at the booth is recorded under this id. */
+export const BOOTH_STEP = 'booth';
 /** Answering a reply is recorded under this id. */
 export const replyId = (day: LocalDate) => `reply:${day}`;

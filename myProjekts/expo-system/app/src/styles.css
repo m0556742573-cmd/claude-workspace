@@ -609,3 +609,8 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .opt-card { display: grid; gap: 4px; text-align: start; padding: 16px 20px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--surface); font: inherit; color: var(--ink); }
 .opt-card[aria-pressed="true"] { border-color: var(--ink-2); box-shadow: var(--shadow); background: var(--accent-soft); }
 .opt-card:disabled { cursor: default; opacity: 1; }
+
+/* the card's message line: what goes out at once, and the choice instead */
+.send-line { margin-top: 16px; display: grid; gap: 8px; }
+.send-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 15px; }
+.send-row .text-btn { min-height: 36px; }

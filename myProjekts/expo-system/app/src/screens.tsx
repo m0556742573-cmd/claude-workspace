@@ -1145,6 +1145,26 @@ function WaLink({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/** The booth's default message (17/10): when the path sends nothing at once, the card offers it in one tap. */
+function BoothDefault({ ctx }: { ctx: Ctx }) {
+  const list = messagesOf(ctx.setup).map((m) => m.id);
+  const value = ctx.exhibitor.booth_default ?? '';
+  const set = async (v: string) => { const next = { ...ctx.exhibitor, booth_default: v || null }; ctx.setExhibitor(next); await setWaOptions(ctx.exhibitor.id, { booth_default: v || null }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
+  if (!list.length) return null;
+  return (
+    <section className="panel-w">
+      <h2>הודעה בדוכן</h2>
+      <p className="muted">כשהמסלול של המבקר לא שולח לו כלום מיד, הכרטיס מציע את ההודעה הזאת בנגיעה אחת. תמיד אפשר לבחור אחרת, או בלי.</p>
+      <label className="field">ברירת המחדל
+        <select className="input" value={value} onChange={(e) => set(e.target.value)}>
+          <option value="">בלי (בוחרים בכל פעם)</option>
+          {list.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </label>
+    </section>
+  );
+}
+
 function WaSwitch({ ctx, field, label, hint }: { ctx: Ctx; field: 'wa_read_replies' | 'wa_save_contacts'; label: string; hint: string }) {
   const on = ctx.exhibitor[field];
   const flip = async () => { const next = { ...ctx.exhibitor, [field]: !on }; ctx.setExhibitor(next); await setWaOptions(ctx.exhibitor.id, { [field]: !on }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
@@ -1309,6 +1329,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
         })}
         {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
       </section>}
+      {sub === 'card' && !draft && <BoothDefault ctx={ctx} />}
 
       {sub === 'after' && <section className={draft ? 'held' : 'panel-w'}>
         <div className="card-top">

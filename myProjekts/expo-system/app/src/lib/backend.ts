@@ -18,6 +18,8 @@ export interface Exhibitor {
   wa_read_replies: boolean; wa_save_contacts: boolean;
   /** The server saw signs of a block: nothing goes out until he links again. */
   wa_blocked_at: string | null; wa_blocked_reason: string | null;
+  /** The booth's default message (17/10): one tap on the card when the path sends nothing at once. */
+  booth_default: string | null;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -26,7 +28,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -109,6 +111,7 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     typed_name: l.personId ? null : l.name, typed_phone: l.typedPhone ?? null,
     taps: l.taps, customer_date: l.customerDate ?? null, note: l.note || null,
     captured_at: l.capturedAt, captured_on: l.capturedOn,
+    booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
   });
   if (error) throw error;
   const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, l.id, setup, l, l.capturedOn));
@@ -167,6 +170,8 @@ export interface LeadRow {
   customer_date: string | null; note: string | null; captured_on: string; captured_at: string;
   /** null = the active setup; a number = the version he stays on (a change mid-fair applied to new visitors only). */
   setup_version: number | null;
+  /** What he chose at the booth: a message, or none now. */
+  booth_message: string | null; booth_none: boolean;
 }
 export interface TaskRow {
   lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
@@ -230,6 +235,7 @@ export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & 
   return {
     id: row.id, capturedOn: row.captured_on, taps: row.taps, customerDate: row.customer_date ?? undefined, businessOwner,
     repliedOn: replies.length ? israelDay(replies[replies.length - 1]!.at) : undefined,
+    booth: row.booth_message ? { message: row.booth_message } : row.booth_none ? {} : undefined,
     history,
     manual: book.manual.filter((m) => m.lead_id === row.id).map((m): ManualStep => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
   };
@@ -440,7 +446,7 @@ export async function queuedFor(leadId: string): Promise<{ status: string; error
   const { data } = await supabase.from('outbox').select('status, error, created_at').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
   return data ?? [];
 }
-export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason'>>): Promise<void> {
+export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }

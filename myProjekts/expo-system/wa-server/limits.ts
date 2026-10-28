@@ -18,6 +18,11 @@ export const LIMITS = {
   /** The same, in the first days after the number was linked. */
   firstPerDayNew: 10,
   newDays: 7,
+  /** The day of the fair, Israel time: no daily cap, only a short gap so cards closed together do not leave in one second
+   *  (יצחק, 28/10: "כל יום התערוכה אינו צריך הגבלה כי הכל נעשה באמת ידנית"). */
+  fairDay: process.env.EXPO_DAY ?? '2026-11-16',
+  fairGapMinSec: 8,
+  fairGapMaxSec: 20,
   /** "Typing…" before each send, by the length of the text. */
   typingMinMs: 2000,
   typingMaxMs: 7000,
@@ -45,8 +50,12 @@ export function sendingHours(at: Date): boolean {
   return t.hour >= LIMITS.startHour && t.hour < (eve ? LIMITS.eveEndHour : LIMITS.endHour);
 }
 
-export function gapMs(rand = Math.random): number {
-  return Math.round((LIMITS.gapMinSec + rand() * (LIMITS.gapMaxSec - LIMITS.gapMinSec)) * 1000);
+const israelDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' });
+export const isFairDay = (at: Date) => israelDate.format(at) === LIMITS.fairDay;
+
+export function gapMs(rand = Math.random, at = new Date()): number {
+  const [min, max] = isFairDay(at) ? [LIMITS.fairGapMinSec, LIMITS.fairGapMaxSec] : [LIMITS.gapMinSec, LIMITS.gapMaxSec];
+  return Math.round((min + rand() * (max - min)) * 1000);
 }
 
 export function typingMs(text: string, rand = Math.random): number {
@@ -56,6 +65,7 @@ export function typingMs(text: string, rand = Math.random): number {
 
 /** How many first messages this number may still send today. */
 export function firstLeft(sentFirstToday: number, linkedAt: number | undefined, now = Date.now()): number {
+  if (isFairDay(new Date(now))) return Infinity;
   const young = linkedAt !== undefined && now - linkedAt < LIMITS.newDays * 86_400_000;
   return Math.max(0, (young ? LIMITS.firstPerDayNew : LIMITS.firstPerDay) - sentFirstToday);
 }

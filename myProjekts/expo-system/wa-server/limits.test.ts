@@ -37,6 +37,14 @@ test('the gap and the typing stay in their ranges', () => {
   }
 });
 
+test('the day of the fair: no daily cap, a short gap', () => {
+  const fair = Date.parse('2026-11-16T11:00:00+02:00');
+  assert.equal(firstLeft(500, fair - 86_400_000, fair), Infinity);
+  const g = gapMs(() => 0.999, new Date(fair));
+  assert.ok(g >= LIMITS.fairGapMinSec * 1000 && g <= LIMITS.fairGapMaxSec * 1000);
+  assert.equal(firstLeft(500, fair - 30 * 86_400_000, fair + 86_400_000), 0); // the day after: the cap is back
+});
+
 test('first messages: fewer in the first week after linking, none past the cap', () => {
   const now = Date.parse('2026-11-17T10:00:00+02:00');
   assert.equal(firstLeft(0, now - 2 * 86_400_000, now), LIMITS.firstPerDayNew);

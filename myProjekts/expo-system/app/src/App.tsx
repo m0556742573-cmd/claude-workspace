@@ -276,6 +276,7 @@ function Live() {
             online={online}
             joinCode={exhibitor.join_code}
             phase={phase}
+            boothDefault={exhibitor.booth_default}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
