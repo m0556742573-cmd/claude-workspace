@@ -1,5 +1,11 @@
 # יומן פעולות
 
+## 2026-10-28
+
+- **ה-Supabase בשרת נעצר (לא נמחק), באישור יצחק.** נבדק לפני כן: הטבלאות ריקות (0 שורות, 16MB), ובשבוע האחרון אף קריאה מבחוץ לא הצליחה — רק סורקים שנדחו. הוא תפס כ-1.3GB זיכרון, שהתפנה לשרת הוואטסאפ של האקספו. **הנתונים וה-volumes נשארו** ב-`/opt/supabase/docker/volumes`. להפעלה מחדש: `docker start supabase-db` ואחריו שאר המכולות (`docker ps -a --filter name=supabase`), או `docker compose up -d` מ-`/opt/supabase/docker`.
+- הגיבוי הלילי (`/opt/backups/backup-db.sh`, 03:00) נשאר מתוזמן: כל עוד ה-DB עצור הוא ייכשל וירשום שגיאה ב-`backup.log`, וכשה-DB יחזור הוא יחזור לעבוד לבד. הגיבוי האחרון לפני העצירה: 28/10 03:00.
+- **לשרת נוסף swap של 4GB** (`/swapfile`, ב-`/etc/fstab`, `vm.swappiness=10`), באישור יצחק.
+
 ## 2026-09-17
 
 - **⭐ קבוצה ג' אופיינה — חמש ישויות, אפס SQL.** `document_types` (14) · `obligation_template_document_types` · `client_period_materials` (12) · `documents` (13) · `client_approvals` (15). לפי הכלל: **איפיון קודם לקוד תמיד.**
