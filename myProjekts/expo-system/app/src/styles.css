@@ -592,3 +592,4 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
   .adm-main { padding: 24px 16px 48px; }
   .adm-row { flex-wrap: wrap; padding-inline: 16px; }
 }
+.start-sm { align-self: flex-start; justify-self: start; }
