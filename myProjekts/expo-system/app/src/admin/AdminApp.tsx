@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { adminApprove, adminCounts, adminExhibitors, isAdmin, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { ListLoad } from './lists.tsx';
+import { waStats } from '../lib/wa.ts';
 
 const BOOTH_URL = 'https://expo-booth.pages.dev';
 
@@ -156,6 +157,7 @@ function Overview({ rows, go, reload }: { rows: AdminExhibitor[] | undefined; go
           </div>
         ) : <div className="empty"><p className="muted">אין מי שממתין. מי שהמייל שלו ברשימת המארגן נכנס בלי לחכות.</p></div>}
       </section>
+      <WaCard />
       <section className="card">
         <h2>רשימת המארגן</h2>
         <p className="muted">{counts ? `${counts.listed} מיילים של מציגים ברשימה. מי שנכנס עם אחד מהם מאושר מיד.` : 'טוען…'}</p>
@@ -229,5 +231,19 @@ function ExhibitorLine({ r, reload }: { r: AdminExhibitor; reload: () => void })
           : <button type="button" className="btn primary" disabled={busy} onClick={() => set(true)}>לאשר</button>}
       </td>
     </tr>
+  );
+}
+
+/** The WhatsApp server on the VPS: how many accounts it holds and how much memory they take (the pilot's measure). */
+function WaCard() {
+  const [st, setSt] = useState<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number } | null | undefined>(undefined);
+  useEffect(() => { waStats().then(setSt).catch(() => setSt(null)); }, []);
+  return (
+    <section className="card">
+      <h2>שרת הוואטסאפ</h2>
+      {st === undefined ? <p className="muted">בודק…</p>
+        : st === null ? <p className="muted">עוד לא פעיל.</p>
+        : <p className="muted"><b>{st.open}</b> חשבונות מחוברים (מתוך {st.sessions}). זיכרון: <b>{st.rssMb}MB</b>{st.open ? ` · כ-${Math.round(st.rssMb / st.open)}MB לחשבון, כולל הבסיס` : ''}. פועל {st.uptimeMin} דקות.</p>}
+    </section>
   );
 }

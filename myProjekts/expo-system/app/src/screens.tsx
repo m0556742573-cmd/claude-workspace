@@ -13,6 +13,7 @@ import { MeForm } from './me.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
+import { waLink, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
@@ -1099,6 +1100,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </>}
         {sub === 'self' && <SelfSign ctx={ctx} />}
         {sub === 'links' && <>
+          {ctx.admin && <WaLink />}
           <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>
           <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
         </>}
@@ -1120,6 +1122,48 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </>}
       </div>
     </>
+  );
+}
+
+/**
+ * His own WhatsApp, linked as a device by scanning a QR (WhatsApp › מכשירים מקושרים). For now only the admin sees it:
+ * the pilot measures how the server holds the accounts before exhibitors link theirs. Nothing is sent or read yet.
+ */
+function WaLink() {
+  const [st, setSt] = useState<WaState | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const refresh = useCallback(() => { waStatus().then((x) => { setSt(x); setErr(''); }).catch(() => setErr('שרת הוואטסאפ עוד לא פעיל.')); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+  // While a code is on the screen or the link is being made, ask again every two seconds.
+  useEffect(() => {
+    if (!st || (st.status !== 'qr' && st.status !== 'connecting')) return;
+    const t = setInterval(refresh, 2000); return () => clearInterval(t);
+  }, [st, refresh]);
+  const run = async (f: () => Promise<WaState>) => { setBusy(true); try { setSt(await f()); setErr(''); } catch { setErr('שרת הוואטסאפ עוד לא פעיל.'); } finally { setBusy(false); } };
+  return (
+    <section className="panel-w">
+      <h2>חיבור הוואטסאפ שלך <span className="tag">פיילוט</span></h2>
+      {err ? <p className="muted">{err}</p>
+        : !st ? <p className="muted">בודק…</p>
+        : st.status === 'open' ? <>
+          <p>מחובר: <b dir="ltr">{st.phone}</b>. בשלב הזה הוא רק מחובר; שליחה וקריאת תשובות יופעלו בשלב הבא.</p>
+          <button type="button" className="btn start-sm" disabled={busy} onClick={() => run(waUnlink)}>לנתק</button>
+        </>
+        : st.status === 'qr' && st.qr ? <div className="sign-row">
+          <Qr text={st.qr} size={220} />
+          <div className="stack">
+            <p><b>בטלפון:</b> וואטסאפ › הגדרות › מכשירים מקושרים › קישור מכשיר, ולסרוק את הקוד.</p>
+            <p className="faint small">הקוד מתחלף כל כמה שניות; הוא מתעדכן כאן לבד.</p>
+            <button type="button" className="btn ghost start-sm" disabled={busy} onClick={() => run(waUnlink)}>ביטול</button>
+          </div>
+        </div>
+        : st.status === 'connecting' ? <p className="muted">מתחבר…</p>
+        : <>
+          <p className="muted">סורקים קוד מהטלפון, כמו בוואטסאפ ווב. הטלפון ממשיך לעבוד כרגיל, ואפשר לנתק בכל רגע.</p>
+          <button type="button" className="btn primary start-sm" disabled={busy} onClick={() => run(waLink)}>לחבר את הוואטסאפ</button>
+        </>}
+    </section>
   );
 }
 
