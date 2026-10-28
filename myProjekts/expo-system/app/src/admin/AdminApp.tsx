@@ -3,7 +3,7 @@
 // for now it holds what the admin already had inside the booth: the exhibitors, their approval, and the two lists.
 // Same database and same pieces as the booth (lib/backend.ts, ui.tsx, styles.css); the server checks is_admin() on every call.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { adminApprove, adminCounts, adminExhibitors, isAdmin, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
+import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { ListLoad } from './lists.tsx';
 import { waStats } from '../lib/wa.ts';
@@ -111,17 +111,7 @@ function Shell({ email }: { email: string }) {
             <ListLoad kind="people" onDone={reload} />
           </div>
         )}
-        {view === 'state' && (
-          <div className="page narrow">
-            <PageHead title="מצב המערכת" />
-            <section className="card">
-              <h2>לפני התערוכה · אמיתי · אחרי התערוכה</h2>
-              <p className="muted">כאן יוחלף המצב של כל הדוכנים יחד: לפני התערוכה (מתאמנים, ושום דבר לא יוצא), אמיתי, ואחרי התערוכה (הדוכן נסגר ונשאר ה-CRM).</p>
-              <p className="muted">היום המערכת עוברת לפי התאריך: עד 16.11 נפתח הדוכן, ומאחריו נפתח ה-CRM.</p>
-              <span className="tag">בבנייה</span>
-            </section>
-          </div>
-        )}
+        {view === 'state' && <PhaseView />}
         {view === 'broadcast' && (
           <div className="page narrow">
             <PageHead title="הודעה למציגים" />
@@ -245,5 +235,64 @@ function WaCard() {
         : st === null ? <p className="muted">עוד לא פעיל.</p>
         : <p className="muted"><b>{st.open}</b> חשבונות מחוברים (מתוך {st.sessions}). זיכרון: <b>{st.rssMb}MB</b>{st.open ? ` · כ-${Math.round(st.rssMb / st.open)}MB לחשבון, כולל הבסיס` : ''}. פועל {st.uptimeMin} דקות.</p>}
     </section>
+  );
+}
+
+/** The system's phase, one for all booths (migration 0019). Moving to live can delete what was registered in practice:
+ *  that cannot be undone, so it is asked in so many words, with the numbers, before it is done. */
+const PHASES: [Phase, string, string][] = [
+  ['practice', 'תרגול · לפני התערוכה', 'הדוכן מחפש בשמות לדוגמה, ושום הודעה לא נשלחת. מה שנרשם נשמר כתרגול.'],
+  ['live', 'אמיתי', 'רשימת הקהילה האמיתית, וההודעות יוצאות. זה המצב לתערוכה ולימים שאחריה.'],
+  ['after', 'אחרי התערוכה · CRM בלבד', 'הדוכן נסגר אצל כולם, וה-CRM נשאר. ההודעות ממשיכות לצאת לפי המסלולים.'],
+];
+function PhaseView() {
+  const [st, setSt] = useState<Awaited<ReturnType<typeof adminPhase>> | null>(null);
+  const [asking, setAsking] = useState<Phase | null>(null);
+  const [drop, setDrop] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState('');
+  const load = useCallback(() => { adminPhase().then(setSt).catch(() => setSt(null)); }, []);
+  useEffect(() => { load(); }, [load]);
+  async function change(to: Phase) {
+    setBusy(true); setDone('');
+    try {
+      const r = await adminSetPhase(to, to === 'live' && drop);
+      setDone(`המערכת במצב "${PHASES.find(([p]) => p === to)![1]}".${r.dropped ? ` נמחקו ${r.dropped} רישומים מהתרגול.` : ''}`);
+      setAsking(null); load();
+    } catch (e) { setDone('לא הוחלף: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="page narrow">
+      <PageHead title="מצב המערכת" sub={st ? `מאז ${new Date(st.changed_at).toLocaleDateString('he-IL')}${st.changed_by ? ` · ${st.changed_by}` : ''}` : undefined}
+        tip="מצב אחד לכל הדוכנים. בתרגול אין שליחה ואין שמות אמיתיים; במעבר לאמיתי אפשר למחוק את מה שנרשם בתרגול." />
+      {!st ? <p className="muted">טוען…</p> : (
+        <div className="phase-list">
+          {PHASES.map(([p, title, about]) => (
+            <button key={p} type="button" className="opt-card" aria-pressed={st.phase === p} disabled={busy || st.phase === p} onClick={() => { setAsking(p); setDone(''); }}>
+              <b>{title}{st.phase === p ? ' · עכשיו' : ''}</b>
+              <span className="muted">{about}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {asking && st && (
+        <section className="held">
+          <h2>להעביר את כל הדוכנים ל"{PHASES.find(([p]) => p === asking)![1]}"?</h2>
+          {asking === 'live' && st.practice_leads > 0 && (
+            <div className="switchrow">
+              <span>למחוק את {st.practice_leads} הרישומים מהתרגול ({st.practice_booths} דוכנים), עם ההערות וההקלטות שלהם. <b>אי אפשר להחזיר.</b></span>
+              <button type="button" className="switch" role="switch" aria-checked={drop} aria-label="למחוק את רישומי התרגול" onClick={() => setDrop(!drop)} />
+            </div>
+          )}
+          {asking === 'practice' && <p className="muted">מעכשיו הדוכן יחפש בשמות לדוגמה, ושום הודעה לא תצא. מה שכבר נרשם במצב אמיתי נשאר.</p>}
+          <div className="row">
+            <button type="button" className="btn primary" disabled={busy} onClick={() => change(asking)}>{busy ? 'מעביר…' : 'כן, להעביר'}</button>
+            <button type="button" className="btn" disabled={busy} onClick={() => setAsking(null)}>לא</button>
+          </div>
+        </section>
+      )}
+      {done && <p className="note">{done}</p>}
+    </div>
   );
 }

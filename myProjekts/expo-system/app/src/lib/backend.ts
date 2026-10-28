@@ -379,6 +379,24 @@ export async function setGreeting(exhibitorId: string, greeting: 'shalom' | 'kav
   if (error) throw error;
 }
 
+/** The system's phase, one for all booths (migration 0019): practice before the fair, live, after the fair. */
+export type Phase = 'practice' | 'live' | 'after';
+export async function loadPhase(): Promise<Phase> {
+  const { data, error } = await supabase.from('system_state').select('phase').maybeSingle();
+  if (error) throw error;
+  return (data?.phase as Phase) ?? 'practice';
+}
+export async function adminPhase(): Promise<{ phase: Phase; changed_at: string; changed_by: string | null; practice_leads: number; practice_booths: number }> {
+  const { data, error } = await supabase.rpc('admin_phase');
+  if (error) throw error;
+  return data;
+}
+export async function adminSetPhase(to: Phase, dropPractice: boolean): Promise<{ phase: Phase; dropped: number }> {
+  const { data, error } = await supabase.rpc('admin_set_phase', { to_phase: to, drop_practice: dropPractice });
+  if (error) throw error;
+  return data;
+}
+
 export async function isAdmin(): Promise<boolean> {
   const { data } = await supabase.rpc('is_admin');
   return !!data;

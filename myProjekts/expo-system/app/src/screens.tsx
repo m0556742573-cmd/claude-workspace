@@ -31,6 +31,8 @@ const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
 export interface Ctx {
   exhibitor: Exhibitor; setup: Setup; directory: Person[]; setSetup: (s: Setup) => void; setExhibitor: (e: Exhibitor) => void;
   admin: boolean; go: (view: string) => void;
+  /** practice: sample names and nothing is sent; live; after the fair. */
+  phase: 'practice' | 'live' | 'after';
 }
 
 function nameOf(l: LeadRow, directory: Person[]): string {
@@ -390,13 +392,13 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>}
       <div className="nc-now">
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
-        {isAuto && <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />}
+        {isAuto && (ctx.phase === 'practice' ? <div className="faint small">בתרגול לא יוצא כלום. במצב אמיתי היא תצא לבד.</div> : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />)}
       </div>
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
         ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} contact={contact} />
-        : contact?.phone && (
+        : contact?.phone && ctx.phase !== 'practice' && (
           <div className="row">
             <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>
             <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
@@ -479,7 +481,9 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
     <div className="stack">
       <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
       {shown && <div className="note preview">{body}</div>}
-      {contact?.opted_out ? (
+      {ctx.phase === 'practice' ? (
+        <p className="note">בתרגול לא נשלחת שום הודעה. כך היא תיראה כשהמערכת תהיה במצב אמיתי.</p>
+      ) : contact?.opted_out ? (
         <p className="note">הוא ביקש לא לקבל הודעות. אפשר להתקשר, אם סיכמתם.</p>
       ) : missing.length ? (
         <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>

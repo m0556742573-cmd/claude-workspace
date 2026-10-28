@@ -27,11 +27,14 @@ export interface BoothProps {
   online: boolean;
   /** The booth's self-registration code: in a rush, the tablet turns around and shows it. */
   joinCode?: string;
+  /** The system's phase: practice (sample names, nothing sent), live, or after the fair (the booth is closed). */
+  phase?: 'practice' | 'live' | 'after';
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live' }: BoothProps) {
+  const practice = phase === 'practice';
   const [showCode, setShowCode] = useState(false);
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState<{ name: string; phone: string } | null>(null);
@@ -87,7 +90,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       history: [],
       name: who.person?.fullName ?? who.name!.trim(),
       city: who.person?.city,
-      personId: who.person?.id,
+      personId: practice ? undefined : who.person?.id,
       typedPhone: who.phone?.trim() || undefined,
       note: '',
       synced: false,
@@ -167,9 +170,22 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
 
   // The screens of "דוגמית 3" (יצחק, 28/10): one search field, the largest thing on the screen, with "＋ מבקר חדש" beside it;
   // results as one list with hairlines; the open card as the one outlined object, its actions in a row at the foot.
+  if (phase === 'after') {
+    return (
+      <div className="booth">
+        <div className="empty"><b>התערוכה הסתיימה, והדוכן נסגר.</b><br />כל מי שנרשם נמצא ב-CRM, עם הצעד הבא שלו.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="booth">
       {eyebrow && <div className="sec eyebrow">{eyebrow}</div>}
+      {practice && (
+        <div className="practice-banner">
+          <b>דוכן לתרגול.</b> השמות כאן לדוגמה, ושום הודעה לא נשלחת. מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני התערוכה.
+        </div>
+      )}
       {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}
 
       {typing ? (

@@ -599,3 +599,13 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .wa-switch b { font-weight: 600; }
 .reply-peek { background: var(--good-soft); color: var(--ink); }
 .timeline li.tl-reply { color: var(--ink); }
+
+/* practice before the fair: said at the top of the booth, calmly */
+.practice-banner { background: var(--accent-soft); border-radius: var(--r-sm); padding: 10px 14px; font-size: 14.5px; color: var(--ink-2); }
+.practice-banner b { color: var(--ink); }
+
+/* the admin's phase: three cards, the current one pressed */
+.phase-list { display: grid; gap: 10px; }
+.opt-card { display: grid; gap: 4px; text-align: start; padding: 16px 20px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--surface); font: inherit; color: var(--ink); }
+.opt-card[aria-pressed="true"] { border-color: var(--ink-2); box-shadow: var(--shadow); background: var(--accent-soft); }
+.opt-card:disabled { cursor: default; opacity: 1; }

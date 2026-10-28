@@ -11,13 +11,13 @@ import { Join } from './join.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Booth } from './booth/Booth.tsx';
 import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
-import { searchPeople, type Person } from './demo/people.ts';
+import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
-  activeSetup, flush, isAdmin, keptSession, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, flush, isAdmin, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 
@@ -87,7 +87,7 @@ const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['le
 const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings'));
 const partOf = (v: View): Part | null => (DAY.some(([d]) => d === v) ? 'day' : CRM.some(([c]) => c === v) ? 'crm' : null);
 
-interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[] }
+interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[]; phase?: Phase }
 
 function Live() {
   const online = useOnline();
@@ -107,6 +107,7 @@ function Live() {
   const [folded, setFolded] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [newVisitor, setNewVisitor] = useState(0);
+  const [phase, setPhase] = useState<Phase>('practice');
 
   const go = useCallback((v: View) => { setView(v); setPanel(null); const p = partOf(v); if (p) setPart(p); scrollTo(0, 0); }, []);
   useEffect(() => { history.replaceState(null, '', location.search + '#' + view); }, [view]);
@@ -132,20 +133,23 @@ function Live() {
       setExhibitor(ex);
       if (!ex || !ex.approved) return;
       setSetup(await activeSetup(ex.id));
-      setDirectory(await loadDirectory());
+      // In practice the booth searches sample names only: the real list is not even loaded (יצחק, 28/10).
+      const ph = await loadPhase().catch(() => 'practice' as const);
+      setPhase(ph);
+      setDirectory(ph === 'practice' ? demoPeople : await loadDirectory());
       setAdmin(await isAdmin());
     }).catch(async (e) => {
       // No server: the booth opens from the copy kept on this tablet at the last load.
       const k = await kept<Boot>('boot:' + userId).catch(() => undefined);
-      if (k) { setExhibitor(k.exhibitor); setSetup(k.setup); setDirectory(k.directory); }
+      if (k) { setExhibitor(k.exhibitor); setSetup(k.setup); setDirectory(k.directory); setPhase(k.phase ?? 'practice'); }
       else setError(navigator.onLine ? String(e.message ?? e) : 'אין רשת, ועוד אין בטאבלט הזה עותק של הדוכן. צריך להיכנס פעם אחת עם רשת.');
     });
   }, [userId]);
   // What the booth needs to open without a network is kept after every change.
   useEffect(() => {
     if (!userId || !exhibitor || !setup) return;
-    keep('boot:' + userId, { exhibitor, setup, directory } satisfies Boot).catch(() => {});
-  }, [userId, exhibitor, setup, directory]);
+    keep('boot:' + userId, { exhibitor, setup, directory, phase } satisfies Boot).catch(() => {});
+  }, [userId, exhibitor, setup, directory, phase]);
 
   useEffect(() => {
     if (!exhibitor || !setup) return;
@@ -207,7 +211,7 @@ function Live() {
     );
   }
 
-  const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, go: (v) => go(v as View) };
+  const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
   const items = part === 'day' ? DAY : CRM;
   const slim = desk && (folded || !!panel);
@@ -271,6 +275,7 @@ function Live() {
             waiting={waiting}
             online={online}
             joinCode={exhibitor.join_code}
+            phase={phase}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
