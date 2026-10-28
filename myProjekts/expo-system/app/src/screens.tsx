@@ -93,7 +93,7 @@ function Meters({ rows }: { rows: { label: ReactNode; count: number; key: string
 
 // ---------- תמונת מצב: the day of the fair, calmly, from this phone
 
-export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string; onThanks?: () => void }) {
+export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks, onBooth }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string; onThanks?: () => void; onBooth?: () => void }) {
   const owners = todays.filter((l) => l.businessOwner).length;
   const ids = new Set(todays.map((l) => l.id));
   const mine = notes.filter((n) => ids.has(n.leadId));
@@ -104,30 +104,40 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks }: {
   const myWeek = ahead.filter((n) => n.who === 'me' && n.dueOn <= week).length;
   const autoWeek = ahead.filter((n) => n.who === 'auto' && n.dueOn <= week).length;
   const firstDay = ahead.map((n) => n.dueOn).sort()[0];
+  const asks = [
+    nothing > 0 && onBooth && { key: 'tag', text: <>{nothing === 1 ? 'מבקר אחד לא סומן' : <><b>{nothing}</b> לא סומנו</>} בכלל. כדאי עכשיו, כשעוד זוכרים — בערך דקה.</>, act: 'להשלים', primary: true, run: onBooth },
+    waiting > 0 && { key: 'wait', text: <><b>{waiting}</b> עוד ממתינים לעלות לשרת. הם יעלו לבד כשתהיה רשת.</> },
+    todays.length > 0 && onThanks && { key: 'thanks', text: <>בערב: כל מי שנרשם היום מחכה לתודה קצרה. נגיעה אחת לכל מבקר.</>, act: 'לשליחת התודות', run: onThanks },
+  ].filter(Boolean) as { key: string; text: ReactNode; act?: string; primary?: boolean; run?: () => void }[];
+  // As the prototype's evening screen: the title counts the day, the tiles split it, then what is worth completing and what waits.
   return (
     <div className="page">
-      <PageHead title="תמונת מצב" eyebrow={eyebrow} sub={longDate()} tip="מה נאסף היום בדוכן, ומה מחכה לך בימים שאחרי. הכל מהטלפון הזה." />
+      <PageHead title={todays.length ? `בדוכן: ${todays.length === 1 ? 'מבקר אחד' : `${todays.length} מבקרים`}` : 'תמונת מצב'} eyebrow={eyebrow} sub={longDate()} tip="מה נאסף היום בדוכן, ומה מחכה לך בימים שאחרי. הכל מהטלפון הזה." />
       <Tiles items={[[todays.length, 'נרשמו היום'], [owners, 'בעלי עסק'], [mine.filter((n) => n.body).length, 'הערות'], [mine.filter((n) => !n.body).length, 'הקלטות']]} />
-      {waiting > 0 && <p className="note">{waiting} עוד ממתינים לעלות לשרת. הם יעלו לבד כשתהיה רשת.</p>}
-      {todays.length > 0 && onThanks && (
-        <section className="panel-w">
-          <h2>בערב: תודה שביקרת</h2>
-          <p className="muted">כל מי שנרשם היום מחכה לתודה קצרה. היא מוכנה בדף הבית, נגיעה אחת לכל מבקר.</p>
-          <button type="button" className="btn" style={{ alignSelf: 'start' }} onClick={onThanks}>לשליחת התודות</button>
+      {asks.length > 0 && (
+        <section className="snap-sec">
+          <h2>מה כדאי להשלים</h2>
+          {asks.map((x) => (
+            <div key={x.key} className="ask-card">
+              <p>{x.text}</p>
+              {x.act && x.run && <button type="button" className={'btn' + (x.primary ? ' primary' : '')} onClick={x.run}>{x.act}</button>}
+            </div>
+          ))}
         </section>
       )}
-      {byNeed.length > 0 && (
-        <section className="stack">
-          <div className="sec">מה ביקשו</div>
-          <div className="panel-w"><Meters rows={[...byNeed, ...(nothing ? [{ key: '-', label: <span className="muted">בלי סימון</span>, count: nothing }] : [])]} /></div>
+      {byNeed.length > 0 && todays.length > 0 && (
+        <section className="snap-sec">
+          <h2>מה ביקשו</h2>
+          <div className="card"><Meters rows={[...byNeed, ...(nothing ? [{ key: '-', label: <span className="muted">בלי סימון</span>, count: nothing }] : [])]} /></div>
         </section>
       )}
-      <section className="stack">
-        <div className="sec">מה מחכה אחרי התערוכה</div>
-        <div className="panel-w">
+      <section className="snap-sec">
+        <h2>מה מחכה</h2>
+        <div className="ask-card">
           {ahead.length ? (
             <p>בשבוע הקרוב: <b>{myWeek}</b> שיחות ופגישות שלך, ו־<b>{autoWeek}</b> הודעות שיוצאות לבד.{firstDay ? ` הראשונה ${dayLabel(firstDay)}.` : ''}</p>
           ) : <p className="muted">כשתרשום מבקרים, יופיע כאן מה מחכה לך בימים שאחרי.</p>}
+          {ahead.length > 0 && onThanks && <button type="button" className="btn" onClick={onThanks}>למעקב ←</button>}
         </div>
       </section>
     </div>
