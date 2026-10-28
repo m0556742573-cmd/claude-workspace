@@ -75,10 +75,12 @@ export function PageHead({ title, eyebrow, sub, tip, actions }: { title: string;
   );
 }
 
-export function Tiles({ items }: { items: [number | string, string, boolean?][] }) {
+export function Tiles({ items, onPick }: { items: [number | string, string, boolean?][]; onPick?: (label: string) => void }) {
   return (
     <div className="tiles">
-      {items.map(([n, k, late]) => (
+      {items.map(([n, k, late]) => onPick ? (
+        <button key={k} type="button" className="tile" onClick={() => onPick(k)}><div className={'num' + (late ? ' late' : '')}>{n}</div><div className="tile-k">{k}</div></button>
+      ) : (
         <div key={k} className="tile"><div className={'num' + (late ? ' late' : '')}>{n}</div><div className="tile-k">{k}</div></div>
       ))}
     </div>

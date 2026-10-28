@@ -6,7 +6,7 @@ import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
 import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
-import { ACT, END, dayLabel, describe, inDays, today } from './lib/words.ts';
+import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
@@ -59,6 +59,12 @@ function waNumber(phone: string): string {
 const eyebrowOf = (desk: boolean) => (desk ? 'CRM' : undefined);
 /** He answered "no WhatsApp": no WhatsApp button anywhere. Not asked yet counts as yes. */
 const hasWa = (ctx: Ctx) => !ctx.exhibitor.onboarded || !!ctx.exhibitor.whatsapp;
+
+// ---------- the home page sends him to the leads with something to do there: a new lead, the export, or one lead open
+
+type LeadsIntent = { kind: 'new' } | { kind: 'export' } | { kind: 'open'; id: string } | null;
+let leadsIntent: LeadsIntent = null;
+function toLeads(ctx: Ctx, intent: LeadsIntent) { leadsIntent = intent; ctx.go('leads'); }
 
 // ---------- the undo line: one-tap actions can be taken back for ten seconds
 
@@ -165,7 +171,13 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const items = useItems(ctx, book);
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
-  const head = <PageHead title={`${greeting()}, ${ctx.exhibitor.name}`} eyebrow={eyebrowOf(desk)} sub={longDate()} tip="מה מחכה היום, ומי הבא בתור, עם מה שצריך כדי לטפל בו." />;
+  const head = (
+    <PageHead title={`${greeting()}, ${ctx.exhibitor.name}`} eyebrow={eyebrowOf(desk)} sub={longDate()} tip="מה מחכה היום, ומי הבא בתור, עם מה שצריך כדי לטפל בו."
+      actions={book && <>
+        <button type="button" className="btn primary" onClick={() => toLeads(ctx, { kind: 'new' })}><Icon name="plus" size={18} />ליד חדש</button>
+        {items.length > 0 && <button type="button" className="btn ghost" onClick={() => toLeads(ctx, { kind: 'export' })}>להוריד לאקסל</button>}
+      </>} />
+  );
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const { now, later, open } = split(items);
@@ -178,13 +190,13 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
-      <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} />
+      <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
       <Thanks ctx={ctx} items={items} />
-      <div className="home-grid">
-        <section className="stack">
-          <div className="sec">הבא בתור</div>
+      <div className="ov-grid">
+        <section>
+          <div className="group-head">הבא בתור</div>
           {first ? (
-            <ul className="task-list"><TaskCard item={first} held ctx={ctx} notes={book.notes.filter((x) => x.lead_id === first.row.id)} onChange={reload} onUndo={setUndo} /></ul>
+            <TaskCard item={first} held ctx={ctx} notes={book.notes.filter((x) => x.lead_id === first.row.id)} onChange={reload} onUndo={setUndo} onOpen={() => toLeads(ctx, { kind: 'open', id: first.row.id })} />
           ) : (
             <div className="empty">
               <b>אין מה לעשות היום</b>
@@ -192,18 +204,20 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
             </div>
           )}
         </section>
-        {after.length > 0 && (
-          <aside className="stack">
-            <div className="sec">אחריו בתור</div>
-            <ul className="list">
-              {after.map((i) => (
-                <li key={i.row.id} className="list-row">
-                  <div className="row-name">{i.name}</div>
-                  <div className="row-step">{short(i.next)} · {dayLabel(dueOf(i))}</div>
-                </li>
-              ))}
-            </ul>
-            <button type="button" className="text-btn" onClick={() => ctx.go('tasks')}>לכל המשימות</button>
+        {desk && (
+          <aside className="ov-side">
+            <div className="group-head">אחריו בתור</div>
+            {after.length ? (
+              <div className="rows">
+                {after.map((i) => (
+                  <button key={i.row.id} type="button" className="row-btn" onClick={() => toLeads(ctx, { kind: 'open', id: i.row.id })}>
+                    <b>{i.name}</b>
+                    <span className="muted">{short(i.next)} · {dayLabel(dueOf(i))}</span>
+                  </button>
+                ))}
+              </div>
+            ) : <p className="faint side-empty">אין עוד אף אחד היום.</p>}
+            <button type="button" className="btn ghost side-more" onClick={() => ctx.go('tasks')}>לכל המשימות ←</button>
           </aside>
         )}
       </div>
@@ -238,8 +252,8 @@ function Harvest({ items }: { items: Item[] }) {
     { key: 'list', label: 'ברשימת התפוצה', hint: `כדאי להזכיר להם לפני ${holiday.name} (${dayLabel(holiday.on)}): הודעה כללית אחת, בלי לחץ.`, of: ended('list') },
   ].filter((g) => g.of.length);
   return (
-    <section className="stack">
-      <div className="sec">מה עוד אפשר להוציא</div>
+    <section>
+      <div className="group-head">מה עוד אפשר להוציא</div>
       {groups.length ? (
         <ul className="list">
           {groups.map((g) => (
@@ -264,38 +278,71 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const items = useItems(ctx, book);
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
-  const head = <PageHead title="משימות" eyebrow={eyebrowOf(desk)} tip="כל מה שעליך לעשות, לפי התאריך. אחרי כל פעולה אפשר לבטל אותה בתוך 10 שניות." />;
-  if (error) return <div className="page narrow">{head}<p className="err">{error}</p></div>;
-  if (!book) return <div className="page narrow">{head}<p className="muted">טוען…</p></div>;
-  const { now, later } = split(items);
-  const days = [...new Set(later.map(dueOf))];
+  const [tab, setTab] = useState<'today' | 'week' | 'all'>('today');
+  const [q, setQ] = useState('');
+  const [out, setOut] = useState<string | null>(null);
+  const head = <PageHead title="משימות" eyebrow={eyebrowOf(desk)} tip="כל מה שעליך לעשות, לפי התאריך. הטלפון בסוף השורה פותח את הפעולות; נגיעה בשם פותחת את הדף שלו. אחרי כל פעולה אפשר לבטל אותה בתוך 10 שניות." />;
+  if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
+  if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
+  const { open } = split(items);
+  const t = today();
+  const counts = { today: open.filter((i) => dueOf(i) <= t).length, week: open.filter((i) => dueOf(i) <= inDays(7)).length, all: open.length };
+  const shown = open
+    .filter((i) => (tab === 'today' ? dueOf(i) <= t : tab === 'week' ? dueOf(i) <= inDays(7) : true))
+    .filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()) || (i.row.note ?? '').includes(q.trim()));
+  // A group heading carries the date, so the rows under it do not have to.
+  const groups: { key: string; label: string; late?: boolean; of: Item[] }[] = [];
+  const isLate = (i: Item) => dueOf(i) < t || (i.next.kind === 'task' && i.next.late);
+  const late = shown.filter(isLate);
+  if (late.length) groups.push({ key: 'late', label: 'באיחור', late: true, of: late });
+  const onTime = shown.filter((i) => !isLate(i));
+  for (const d of [...new Set(onTime.map(dueOf))]) groups.push({ key: d, label: d === t ? 'היום' : dayLabel(d), of: onTime.filter((i) => dueOf(i) === d) });
   return (
-    <div className="page narrow">
+    <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
       <Thanks ctx={ctx} items={items} />
-      <section className="stack">
-        <div className="sec">להיום · {now.length}</div>
-        {now.length ? (
-          <ul className="task-list">
-            {now.map((i, n) => <TaskCard key={i.row.id} item={i} held={n === 0} ctx={ctx} notes={book.notes.filter((x) => x.lead_id === i.row.id)} onChange={reload} onUndo={setUndo} />)}
-          </ul>
-        ) : <div className="empty"><b>אין מה לעשות היום</b><p className="muted">כל מבקר שתרשום בדוכן יקבל כאן את הצעד הבא שלו.</p></div>}
-      </section>
-      {days.map((d) => (
-        <section key={d} className="stack">
-          <div className="sec">{dayLabel(d)}</div>
-          <ul className="list">
-            {later.filter((i) => dueOf(i) === d).map((i) => <li key={i.row.id} className="list-row"><div className="row-name">{i.name}</div><div className="row-step">{short(i.next)}</div></li>)}
-          </ul>
+      <div className="tasks-bar">
+        <nav className="tabs" aria-label="סינון">
+          {([['today', 'היום'], ['week', 'השבוע'], ['all', 'הכל']] as const).map(([k, l]) => (
+            <button key={k} type="button" className="tab" aria-pressed={tab === k} onClick={() => setTab(k)}>{l} <span className="n">{counts[k]}</span></button>
+          ))}
+        </nav>
+      </div>
+      {open.length > 6 && <input className="input" type="search" aria-label="חיפוש במשימות" placeholder="חיפוש: שם, עיר, הערה…" value={q} onChange={(e) => setQ(e.target.value)} />}
+      {groups.length ? groups.map((g) => (
+        <section key={g.key} className="group">
+          <div className={'group-head' + (g.late ? ' late' : '')}><span>{g.label}</span><span className="c">{g.of.length}</span></div>
+          <div className="rows">
+            {g.of.map((i) => (
+              <div key={i.row.id} className={'row-wrap' + (out === i.row.id ? ' open' : '')}>
+                <button type="button" className="lrow" onClick={() => toLeads(ctx, { kind: 'open', id: i.row.id })}>
+                  <span><span className="nm">{i.name}</span> <span className="muted">{i.city}</span></span>
+                  <span className="due"><b>{short(i.next)}</b>{i.next.kind === 'task' && i.next.late && <span className="late-w"> · באיחור</span>}</span>
+                  <span className="why">{i.row.taps.join(' · ') || 'בלי סימון'}</span>
+                  {i.row.note && <span className="note-peek">{i.row.note.slice(0, 90)}</span>}
+                </button>
+                <button type="button" className="row-call" aria-label={`הפעולות: ${i.name}`} aria-expanded={out === i.row.id} onClick={() => setOut(out === i.row.id ? null : i.row.id)}><Icon name="phone" /></button>
+                {out === i.row.id && (
+                  <div className="row-out">
+                    <TaskCard item={i} held={false} bare ctx={ctx} notes={book.notes.filter((x) => x.lead_id === i.row.id)} onChange={() => { setOut(null); reload(); }} onUndo={setUndo} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
-      ))}
+      )) : (
+        <div className="empty"><b>{tab === 'today' ? 'אין מה לעשות היום' : 'אין משימות'}</b><p className="muted">{open.length ? 'אפשר לראות את מה שבהמשך ב"הכל".' : 'כל מבקר שתרשום בדוכן יקבל כאן את הצעד הבא שלו.'}</p></div>
+      )}
       <Soon title="הודעת בוקר">כל בוקר תגיע אליך בוואטסאפ רשימת המשימות של היום, עם קישור ישר לכאן.</Soon>
     </div>
   );
 }
 
-function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; held: boolean; ctx: Ctx; notes: NoteRow[]; onChange: () => void; onUndo: (u: Undo) => void }) {
+function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { item: Item; held: boolean; ctx: Ctx; notes: NoteRow[]; onChange: () => void; onUndo: (u: Undo) => void;
+  /** "כל הפרטים ←": the lead's own page. */ onOpen?: () => void;
+  /** Inside the lead's page: no frame and no name, the page has both. */ bare?: boolean }) {
   const { row, next, name, owner } = item;
   const [busy, setBusy] = useState(false);
   const [talk, setTalk] = useState(false);
@@ -328,13 +375,13 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
   const tall = held ? ' tall' : '';
 
   return (
-    <li className={held ? 'held' : 'task'}>
-      <div className="who"><b>{name}</b><span className="ctx">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>
-      <div>
-        <span className="now-w">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
+    <Frame bare={bare} className={held ? 'held next-card' : 'task'}>
+      {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>}
+      <div className="nc-now">
+        <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
         {isAuto && <div className="faint small">אמור לצאת לבד. השליחה מתחברת בקרוב, בינתיים אפשר לשלוח ביד.</div>}
       </div>
-      {(row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
+      {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
         ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} contact={contact} />
         : contact?.phone && (
@@ -379,8 +426,14 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo }: { item: Item; he
           <button type="button" className="btn" disabled={busy} onClick={() => mark('optOut', 'ביקש להסיר')}>ביקש להסיר אותו</button>
         </div>
       )}
-    </li>
+      {onOpen && !talk && <div className="nc-foot"><button type="button" className="btn ghost" onClick={onOpen}>כל הפרטים ←</button></div>}
+    </Frame>
   );
+}
+/** A task card is an item of a list, a card of its own, or (inside the lead's page) only its contents. */
+function Frame({ bare, className, children }: { bare?: boolean; className: string; children: ReactNode }) {
+  if (bare) return <div className="rec-now">{children}</div>;
+  return <div className={className}>{children}</div>;
 }
 
 /** The thank-you, on the evening of the fair: everyone registered in the last two weeks who has not had it yet.
@@ -535,15 +588,15 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
 function Notes({ note, notes }: { note: string | null; notes: NoteRow[] }) {
   return (
     <ul className="notes">
-      {note && <li className="note">{note}</li>}
-      {notes.map((n) => (n.audio_path ? <Voice key={n.id} path={n.audio_path} when={n.created_at} /> : <li key={n.id} className="note">{n.body}</li>))}
+      {note && <li className="note-peek">{note}</li>}
+      {notes.map((n) => (n.audio_path ? <Voice key={n.id} path={n.audio_path} when={n.created_at} /> : <li key={n.id} className="note-peek">{n.body}</li>))}
     </ul>
   );
 }
 function Voice({ path, when }: { path: string; when: string }) {
   const [url, setUrl] = useState<string | null>(null);
   return (
-    <li className="note voice">
+    <li className="note-peek voice">
       <span>הקלטה · {dayLabel(when.slice(0, 10))}</span>
       {url ? <audio controls autoPlay src={url} /> : <button type="button" className="text-btn" onClick={() => voiceUrl(path).then(setUrl)}>להשמיע</button>}
     </li>
@@ -555,63 +608,104 @@ function Voice({ path, when }: { path: string; when: string }) {
 export function Leads({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const [book, reload, error] = useData(loadBook);
   const items = useItems(ctx, book);
-  const [open, setOpen] = useState<string | null>(null);
+  // What the home page sent him here to do, taken once.
+  const [intent] = useState(() => { const x = leadsIntent; leadsIntent = null; return x; });
+  const [open, setOpen] = useState<string | null>(intent?.kind === 'open' ? intent.id : null);
   const [q, setQ] = useState('');
   const [state, setState] = useState('all');
   const [need, setNeed] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [city, setCity] = useState('');
+  const [adding, setAdding] = useState(intent?.kind === 'new');
   const [exporting, setExporting] = useState(false);
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
+  const doExport = useCallback(async () => { setExporting(true); await exportLeads(items, ctx).catch(() => {}); setExporting(false); }, [items, ctx]);
+  const [exported, setExported] = useState(false);
+  useEffect(() => { if (intent?.kind === 'export' && book && items.length && !exported) { setExported(true); doExport(); } }, [intent, book, items, exported, doExport]);
+  useEffect(() => { window.scrollTo(0, 0); }, [open]);
+
+  const item = open ? items.find((i) => i.row.id === open) : undefined;
+  if (book && item) {
+    return (
+      <div className="page">
+        <UndoBar undo={undo} onDone={clearUndo} />
+        <LeadPage item={item} ctx={ctx} book={book} onBack={() => setOpen(null)} onChange={reload} onUndo={setUndo} />
+      </div>
+    );
+  }
+
   const head = (
     <PageHead title="לידים" eyebrow={eyebrowOf(desk)} sub={book ? `${items.length} מבקרים` : undefined}
-      tip="כל מי שנרשם, עם מה שקרה עד עכשיו ומה הצעד הבא. נגיעה בשם פותחת את הפרטים."
+      tip="כל מי שנרשם, עם מה שקרה עד עכשיו ומה הצעד הבא. נגיעה בשם פותחת את הדף שלו."
       actions={book && <>
-        <button type="button" className="btn" onClick={() => setAdding(!adding)}><Icon name="plus" />ליד חדש</button>
-        {items.length > 0 && <button type="button" className="btn" disabled={exporting} onClick={async () => { setExporting(true); await exportLeads(items, ctx).catch(() => {}); setExporting(false); }}>{exporting ? 'מכין…' : 'ייצוא לאקסל'}</button>}
+        <button type="button" className="btn" onClick={() => setAdding(!adding)}><Icon name="plus" size={18} />ליד</button>
+        {items.length > 0 && <button type="button" className="btn ghost" disabled={exporting} onClick={doExport}>{exporting ? 'מכין…' : 'להוריד לאקסל'}</button>}
       </>} />
   );
-  if (error) return <div className="page narrow">{head}<p className="err">{error}</p></div>;
-  if (!book) return <div className="page narrow">{head}<p className="muted">טוען…</p></div>;
+  if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
+  if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const states = STATES.map(([key, label, test]) => ({ key, label, count: items.filter(test).length })).filter((x) => x.key === 'all' || x.count);
   const needs = ctx.setup.needs.map((n) => n.label).filter((l) => items.some((i) => i.row.taps.includes(l)));
+  const cities = [...new Set(items.map((i) => i.city).filter(Boolean))].sort();
   const test = STATES.find(([k]) => k === state)?.[2] ?? (() => true);
   const shown = items
     .filter(test)
     .filter((i) => !need || i.row.taps.includes(need))
+    .filter((i) => !city || i.city === city)
     .filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()));
+  const stateOf = (i: Item) => STATES.slice(1).find(([, , t]) => t(i))?.[1] ?? '';
   return (
-    <div className="page narrow">
+    <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
       {adding && <NewLead ctx={ctx} onClose={() => setAdding(false)} onSaved={(id, n) => { setAdding(false); reload(); setUndo({ label: `${n} נוסף ללידים`, run: async () => { await removeLead(id, ctx.exhibitor.id).catch(() => {}); reload(); } }); }} />}
-      {items.length > 6 && <label className="searchbox"><Icon name="search" /><input type="search" aria-label="חיפוש לפי שם או עיר" placeholder="חיפוש לפי שם או עיר" value={q} onChange={(e) => setQ(e.target.value)} /></label>}
-      {items.length > 0 && (
-        <div className="chips" role="group" aria-label="סינון לפי מצב">
-          {states.map((x) => <button key={x.key} type="button" className="chip" aria-pressed={state === x.key} onClick={() => setState(x.key)}>{x.label} · {x.count}</button>)}
-        </div>
-      )}
-      {needs.length > 1 && (
-        <div className="chips" role="group" aria-label="סינון לפי מה שביקש">
-          {needs.map((l) => <button key={l} type="button" className="chip" aria-pressed={need === l} onClick={() => setNeed(need === l ? '' : l)}>{l}</button>)}
-        </div>
-      )}
-      {items.length > 0 && !shown.length && <p className="muted">אין לידים שמתאימים לסינון.</p>}
       {!items.length ? (
         <div className="empty"><b>עוד אין לידים</b><p className="muted">הם יופיעו כאן מהרגע שתיגע בשמם בדוכן.</p></div>
       ) : (
-        <ul className="list">
-          {shown.map((i) => (
-            <li key={i.row.id}>
-              <button type="button" className="list-row" aria-expanded={open === i.row.id} onClick={() => setOpen(open === i.row.id ? null : i.row.id)}>
-                <span className="row-name">{i.name}</span> <span className="muted small">{i.city}</span>
-                <div className="row-step">{i.row.taps.join(' · ') || 'בלי סימון'}</div>
-                <div className="row-id">{describe(i.next)}</div>
-              </button>
-              {open === i.row.id && <LeadDetail item={i} ctx={ctx} book={book} onChange={reload} onUndo={setUndo} />}
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="tb-bar">
+            <input className="input tb-q" type="search" aria-label="חיפוש בטבלה" placeholder="חיפוש בטבלה" value={q} onChange={(e) => setQ(e.target.value)} />
+            <span className="chips" role="group" aria-label="סינון לפי מצב">
+              {states.map((x) => <button key={x.key} type="button" className="chip" aria-pressed={state === x.key} onClick={() => setState(x.key)}>{x.label} · {x.count}</button>)}
+            </span>
+          </div>
+          {(needs.length > 1 || cities.length > 1) && (
+            <details className="more-filters">
+              <summary>עוד: סינון</summary>
+              <div className="tb-bar">
+                {needs.length > 1 && (
+                  <label className="tb-filter"><span>מה ביקש</span>
+                    <select value={need} onChange={(e) => setNeed(e.target.value)}><option value="">הכל</option>{needs.map((l) => <option key={l} value={l}>{l}</option>)}</select>
+                  </label>
+                )}
+                {cities.length > 1 && (
+                  <label className="tb-filter"><span>עיר</span>
+                    <select value={city} onChange={(e) => setCity(e.target.value)}><option value="">הכל</option>{cities.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+                  </label>
+                )}
+              </div>
+            </details>
+          )}
+          <div className="tb-state"><b>{shown.length} לידים</b></div>
+          {shown.length ? (
+            <div className="tb-wrap">
+              <table className="tb">
+                <thead><tr><th>שם</th><th>מה ביקש</th><th>מה הלאה</th><th>מתי</th><th>מצב</th></tr></thead>
+                <tbody>
+                  {shown.map((i) => (
+                    <tr key={i.row.id} onClick={() => setOpen(i.row.id)}>
+                      <td className="stick"><button type="button" className="link" onClick={(e) => { e.stopPropagation(); setOpen(i.row.id); }}><b>{i.name}</b></button> <span className="faint">{i.city}</span></td>
+                      <td>{i.row.taps.join(' · ') || '—'}</td>
+                      <td>{short(i.next) || '—'}</td>
+                      <td className={'tnum' + (i.next.kind === 'task' && i.next.late ? ' late-c' : '')}>{i.next.kind === 'end' ? '—' : i.next.dueOn.split('-').slice(1).reverse().map(Number).join('/')}</td>
+                      <td>{stateOf(i)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="muted">אין לידים שמתאימים לסינון.</p>}
+        </>
       )}
       <Soon title="תשובות מהלקוח">תשובות שהגיעו בוואטסאפ יופיעו בציר הזמן של כל אחד, כשהחיבור לוואטסאפ יעבוד.</Soon>
     </div>
@@ -697,9 +791,11 @@ function NewLead({ ctx, onClose, onSaved }: { ctx: Ctx; onClose: () => void; onS
   );
 }
 
-function LeadDetail({ item, ctx, book, onChange, onUndo }: { item: Item; ctx: Ctx; book: Book; onChange: () => void; onUndo: (u: Undo) => void }) {
-  const { row, next } = item;
+function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; ctx: Ctx; book: Book; onBack: () => void; onChange: () => void; onUndo: (u: Undo) => void }) {
+  const { row, next, name, city, owner } = item;
   const [talk, setTalk] = useState(false);
+  const [noting, setNoting] = useState(false);
+  const [noteText, setNoteText] = useState('');
   const [contact, setContact] = useState<{ phone: string | null; email: string | null } | null>(null);
   useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
   const steps = book.steps.filter((s) => s.lead_id === row.id);
@@ -707,29 +803,72 @@ function LeadDetail({ item, ctx, book, onChange, onUndo }: { item: Item; ctx: Ct
   const notes = book.notes.filter((n) => n.lead_id === row.id);
   const stepId = next.kind === 'end' ? null : next.stepId;
   const finished = next.kind === 'end' && next.reason !== 'engaged' && next.reason !== 'list' && next.reason !== 'stop';
+  const lastTouch = steps.reduce((d, x) => (x.done_on > d ? x.done_on : d), '');
+  const stateWord = STATES.slice(1).find(([, , t]) => t(item))?.[1] ?? '';
+  const ddmm = (d: string) => d.split('-').reverse().join('.');
+  async function saveNote() {
+    if (!noteText.trim()) return;
+    await addFollowNote(row.id, noteText.trim(), ctx.exhibitor.id).catch(() => {});
+    setNoteText(''); setNoting(false); onChange();
+  }
   return (
-    <div className="detail">
-      <p className="muted small">
-        נרשם {dayLabel(row.captured_on)}{row.customer_date ? ` · התאריך שלו: ${row.customer_date.split('-').reverse().join('.')}` : ''}
-        {contact?.email ? ` · ${contact.email}` : ''}
-      </p>
-      {contact?.phone && (
-        <div className="row">
-          <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>
-          <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
+    <div className="rec">
+      <div className="rec-top">
+        <div className="rec-bar"><button type="button" className="btn ghost" onClick={onBack}>→ חזרה ללידים</button></div>
+        <div className="rec-title"><h1>{name}</h1><div className="muted">{[city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</div></div>
+        <div className="rec-keys">
+          <span className="key"><span className="faint">מצב</span><b>{stateWord || '—'}</b></span>
+          <span className="key"><span className="faint">נרשם</span><b>{dayLabel(row.captured_on)}</b></span>
+          {row.customer_date && <span className="key"><span className="faint">התאריך שלו</span><b>{ddmm(row.customer_date)}</b></span>}
+          <span className="key"><span className="faint">קשר אחרון</span><b>{lastTouch ? dayLabel(lastTouch) : 'עוד לא היה קשר'}</b></span>
         </div>
-      )}
-      {(row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
-      <div className="sec">מה קרה עד עכשיו</div>
-      {steps.length || manual.length ? (
-        <ul className="history">
-          {steps.map((s) => <li key={s.step_id}>{dayLabel(s.done_on)} · {(s.step_id.startsWith('m:') || s.step_id.startsWith('talk:') ? OUTCOME : DONE)[s.outcome] ?? s.outcome}</li>)}
-          {manual.filter((m) => !steps.some((s) => s.step_id === `m:${m.id}`)).map((m) => <li key={m.id}>נקבע: {ACT[m.action]} · {dayLabel(m.due_on)}</li>)}
-        </ul>
-      ) : <p className="muted small">עוד לא היה צעד.</p>}
-      {!finished && (talk
-        ? <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
-        : <div className="row"><button type="button" className="btn" onClick={() => setTalk(true)}>דיברנו איתו</button></div>)}
+        {next.kind !== 'end' ? (
+          <TaskCard item={item} held={false} bare ctx={ctx} notes={notes} onChange={onChange} onUndo={onUndo} />
+        ) : (
+          <div className="rec-now">
+            <div className="nc-now"><span className="faint">עכשיו</span> <b>{END[next.reason] ?? ''}</b></div>
+            {!finished && (talk
+              ? <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
+              : <div className="actions"><button type="button" className="btn" onClick={() => setTalk(true)}>דיברנו — מה הלאה</button></div>)}
+          </div>
+        )}
+        <div className="actions rec-acts">
+          <button type="button" className="btn" aria-expanded={noting} onClick={() => setNoting(!noting)}><Icon name="pen" size={18} />הערה</button>
+          {next.kind === 'end' && contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" size={18} />{contact.phone}</a>}
+          {next.kind === 'end' && contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>}
+        </div>
+        {noting && (
+          <div className="note-box">
+            <textarea className="area" rows={3} autoFocus aria-label="הערה" placeholder="מה חשוב לזכור עליו" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+            <div className="row"><button type="button" className="btn primary" disabled={!noteText.trim()} onClick={saveNote}>שמירת ההערה</button><button type="button" className="btn ghost" onClick={() => setNoting(false)}>בלי</button></div>
+          </div>
+        )}
+      </div>
+
+      <div className="rec-grid">
+        <div className="rec-main">
+          <section className="card">
+            <h2>הערות {(row.note ? 1 : 0) + notes.length > 0 && <span className="faint">({(row.note ? 1 : 0) + notes.length})</span>}</h2>
+            {row.note || notes.length ? <Notes note={row.note} notes={notes} /> : <p className="muted small">עוד אין הערות.</p>}
+          </section>
+          <section className="card">
+            <h2>מה היה עד עכשיו</h2>
+            <ul className="log timeline">
+              <li><span className="when">{dayLabel(row.captured_on)}</span>ביקר בדוכן</li>
+              {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{(x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
+              {manual.filter((m) => !steps.some((x) => x.step_id === `m:${m.id}`)).map((m) => <li key={m.id}><span className="when">{dayLabel(m.due_on)}</span>נקבע: {ACT[m.action]}</li>)}
+            </ul>
+          </section>
+        </div>
+        <section className="card rec-fields">
+          <h2>פרטים</h2>
+          <div className="field-row"><span className="faint">טלפון</span><span dir="ltr">{contact?.phone ?? '—'}</span></div>
+          <div className="field-row"><span className="faint">מייל</span><span dir="ltr">{contact?.email ?? '—'}</span></div>
+          <div className="field-row"><span className="faint">מה סימנו</span><span>{row.taps.join(' · ') || '—'}</span></div>
+          <div className="field-row"><span className="faint">ביקר בדוכן</span><span>{dayLabel(row.captured_on)}</span></div>
+          {row.customer_date && <div className="field-row"><span className="faint">התאריך שלו</span><span>{ddmm(row.customer_date)}</span></div>}
+        </section>
+      </div>
     </div>
   );
 }
@@ -739,41 +878,55 @@ function LeadDetail({ item, ctx, book, onChange, onUndo }: { item: Item; ctx: Ct
 export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const [book, , error] = useData(loadBook);
   const items = useItems(ctx, book);
-  const head = <PageHead title="דשבורד" eyebrow={eyebrowOf(desk)} tip="איפה כל הלידים עומדים, ומה ביקשו בדוכן." />;
+  const head = <PageHead title="דשבורד" eyebrow={eyebrowOf(desk)} tip="איפה כל הלידים עומדים, מה ביקשו בדוכן, ומה עוד אפשר להוציא מהתערוכה." />;
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const { now, later } = split(items);
   const ended = (r: string) => items.filter((i) => i.next.kind === 'end' && i.next.reason === r).length;
   const late = now.filter((i) => i.next.kind === 'task' && i.next.late).length;
+  // The 14 days after the fair: the window in which a visitor still remembers the booth.
+  const t = today();
+  const dayN = Math.floor((Date.parse(t) - Date.parse(EXPO_DAY)) / 86400000);
+  const touched = items.filter((i) => i.lead.history.length).length;
+  const untouched = items.length - touched;
   return (
     <div className="page">
       {head}
-      <Tiles items={[[items.length, 'כל הלידים'], [now.length + later.length, 'במעקב'], [late, 'באיחור', late > 0], [ended('closed'), 'עסקאות שנסגרו']]} />
-      <div className="home-grid" style={{ gridTemplateColumns: desk ? 'minmax(0,1fr) minmax(0,1fr)' : undefined }}>
-        <section className="stack">
-          <div className="sec">איפה הם עומדים</div>
-          <div className="panel-w">
-            <Meters rows={[
-              { key: 'now', label: 'משימה להיום', count: now.length },
-              { key: 'later', label: 'משימה בהמשך', count: later.length },
-              { key: 'engaged', label: END.engaged!, count: ended('engaged') },
-              { key: 'list', label: END.list!, count: ended('list') },
-              { key: 'closed', label: END.closed!, count: ended('closed') },
-              { key: 'notRelevant', label: END.notRelevant!, count: ended('notRelevant') },
-              { key: 'optOut', label: END.optOut!, count: ended('optOut') },
-              { key: 'stop', label: END.stop!, count: ended('stop') },
-            ].filter((r) => r.count)} />
-            {!items.length && <p className="muted">עוד אין לידים.</p>}
-          </div>
+      <Tiles items={[[now.length, 'לטיפול היום'], [late, 'באיחור', late > 0], [now.length + later.length, 'במעקב'], [ended('closed'), 'עסקאות שנסגרו']]} onPick={(k) => ctx.go(k === 'עסקאות שנסגרו' ? 'leads' : 'tasks')} />
+      {now.length > 0 && <button type="button" className="btn primary big start-btn" onClick={() => ctx.go('tasks')}>להתחיל: {now.length} לטיפול ←</button>}
+      <section className="card">
+        <h2>14 הימים שאחרי התערוכה</h2>
+        <div className="days14" aria-hidden="true">
+          {Array.from({ length: 14 }, (_, n) => <span key={n} className={n + 1 < dayN ? 'past' : n + 1 === dayN ? 'now' : ''} />)}
+        </div>
+        <p className="muted">
+          {dayN < 1
+            ? `התערוכה ב-${dayLabel(EXPO_DAY)}. מהיום שאחריה נספרים כאן 14 הימים שבהם המבקרים עוד זוכרים את הדוכן.`
+            : <>{dayN <= 14 ? <>יום <b>{dayN}</b> מתוך 14. </> : 'עברו 14 הימים. '}מתוך {items.length} לידים: <b>{touched}</b> כבר בקשר, <b>{untouched}</b> עוד לא היה קשר, <b>{ended('closed')}</b> עסקאות.</>}
+        </p>
+        {dayN >= 1 && untouched > 0 && <button type="button" className="btn start-sm" onClick={() => ctx.go('tasks')}>לראות את {untouched} שעוד לא היה איתם קשר</button>}
+      </section>
+      <div className="two-col">
+        <section className="card">
+          <h2>איפה כולם עומדים</h2>
+          <Meters rows={[
+            { key: 'now', label: 'משימה להיום', count: now.length },
+            { key: 'later', label: 'משימה בהמשך', count: later.length },
+            { key: 'engaged', label: END.engaged!, count: ended('engaged') },
+            { key: 'list', label: END.list!, count: ended('list') },
+            { key: 'closed', label: END.closed!, count: ended('closed') },
+            { key: 'notRelevant', label: END.notRelevant!, count: ended('notRelevant') },
+            { key: 'optOut', label: END.optOut!, count: ended('optOut') },
+            { key: 'stop', label: END.stop!, count: ended('stop') },
+          ].filter((r) => r.count)} />
+          {!items.length && <p className="muted">עוד אין לידים.</p>}
         </section>
-        <section className="stack">
-          <div className="sec">מה ביקשו בדוכן</div>
-          <div className="panel-w">
-            <Meters rows={[
-              ...ctx.setup.needs.map((n) => ({ key: n.label, label: n.label, count: items.filter((i) => i.row.taps.includes(n.label)).length })),
-              { key: '-', label: 'בלי סימון', count: items.filter((i) => !i.row.taps.length).length },
-            ]} />
-          </div>
+        <section className="card">
+          <h2>מה סומן הכי הרבה</h2>
+          <Meters rows={[
+            ...ctx.setup.needs.map((n) => ({ key: n.label, label: n.label, count: items.filter((i) => i.row.taps.includes(n.label)).length })),
+            { key: '-', label: 'בלי סימון', count: items.filter((i) => !i.row.taps.length).length },
+          ].sort((a, b) => b.count - a.count)} />
         </section>
       </div>
       <Harvest items={items} />
@@ -803,11 +956,15 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const list = messagesOf(ctx.setup);
   const toFill = !texts ? 0 : list.filter((m) => holes(fill(textOf(ctx.setup, texts, m.id), me, SAMPLE)).length).length;
   return (
-    <div className="page narrow">
+    <div className="page">
       <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
         tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. מה שבסוגריים מרובעים צריך להשלים, והודעה כזאת לא יוצאת עד שמשלימים." />
+      <div className="two-col msgs">
+      <section className="card">
+      <h2>ההודעות</h2>
+      <p className="muted">{list.length} הודעות. נגיעה בהודעה פותחת את הנוסח שלה.</p>
       {!texts ? <p className="muted">טוען…</p> : (
-        <ul className="list">
+        <ul className="list in-card">
           {list.map((m) => {
             const body = textOf(ctx.setup, texts, m.id);
             const missing = holes(fill(body, me, SAMPLE));
@@ -824,7 +981,13 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           })}
         </ul>
       )}
-      <Soon title="איך הן יוצאות">היום: בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח. בהמשך: חיבור הוואטסאפ שלך בסריקת קוד, ומייל שיוצא לבד. הודעה לכמה אנשים יחד תצא במייל, כדי לא לסכן את המספר שלך.</Soon>
+      </section>
+      <section className="card">
+        <h2>איך הן יוצאות</h2>
+        <p className="muted">היום: בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
+        <Soon title="בהמשך">חיבור הוואטסאפ שלך בסריקת קוד, ומייל שיוצא לבד. הודעה לכמה אנשים יחד תצא במייל, כדי לא לסכן את המספר שלך.</Soon>
+      </section>
+      </div>
     </div>
   );
 }
