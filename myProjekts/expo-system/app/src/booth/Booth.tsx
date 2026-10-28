@@ -162,83 +162,87 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const recordingHere = !!rec && rec.leadId === current?.id;
 
 
+  const status = !online ? 'בלי רשת · נשמר בטלפון' : waiting ? `${waiting} ממתינים לעלות` : 'הכל נשמר';
+  const lastNote = myNotes[myNotes.length - 1];
+
+  // The screens of "דוגמית 3" (יצחק, 28/10): one search field, the largest thing on the screen, with "＋ מבקר חדש" beside it;
+  // results as one list with hairlines; the open card as the one outlined object, its actions in a row at the foot.
   return (
     <div className="booth">
-      <div className="booth-line">
-        <span>{eyebrow ? <span className="sec">{eyebrow} · </span> : null}נרשמו היום: <b>{todays.length}</b></span>
-        {!online ? <span className="off">בלי רשת · נשמר בטלפון</span> : waiting ? <span>{waiting} ממתינים לעלות</span> : <span>הכל נשמר</span>}
-      </div>
+      {eyebrow && <div className="sec eyebrow">{eyebrow}</div>}
+      {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}
 
       {typing ? (
-        <section className="held" aria-label="מבקר שלא ברשימה">
-          <div className="card-top">
-            <div className="who"><b>מבקר חדש</b><span className="ctx">מי שלא נמצא ברשימה</span></div>
-            <button type="button" className="sq" aria-label="חזרה לחיפוש" onClick={() => { setTyping(null); searchRef.current?.focus(); }}><Icon name="close" /></button>
+        <section className="lead" aria-label="מבקר שלא ברשימה">
+          <div className="lead-head">
+            <div><span className="nm">מבקר חדש</span> <span className="muted">מי שלא נמצא ברשימה</span></div>
+            <div className="head-acts"><button type="button" className="btn" onClick={() => { setTyping(null); searchRef.current?.focus(); }}>חזרה לחיפוש</button></div>
           </div>
-          <div className="typed">
-            <label className="field" htmlFor="typed-name">שם<input id="typed-name" className="input" autoFocus value={typing.name} onChange={(e) => setTyping({ ...typing, name: e.target.value })} /></label>
-            <label className="field" htmlFor="typed-phone">טלפון<input id="typed-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={typing.phone} onChange={(e) => setTyping({ ...typing, phone: e.target.value })} /></label>
-          </div>
-          <div className="row">
-            <button type="button" className="btn primary tall" disabled={!typing.name.trim()} onClick={() => capture({ name: typing.name, phone: typing.phone })}>שמירה</button>
-            <button type="button" className="btn tall" onClick={() => { setTyping(null); searchRef.current?.focus(); }}>חזרה לחיפוש</button>
+          <label className="label" htmlFor="typed-name">שם</label>
+          <input id="typed-name" className="input" autoFocus value={typing.name} onChange={(e) => setTyping({ ...typing, name: e.target.value })} />
+          <label className="label" htmlFor="typed-phone">טלפון</label>
+          <input id="typed-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={typing.phone} onChange={(e) => setTyping({ ...typing, phone: e.target.value })} />
+          <div className="actions">
+            <button type="button" className="btn primary" disabled={!typing.name.trim()} onClick={() => capture({ name: typing.name, phone: typing.phone })}>✓ שמירה</button>
           </div>
         </section>
       ) : (
         <>
-          <div className="find">
-            <input ref={searchRef} id="search" type="search" autoFocus={!current} autoComplete="off" aria-label="חיפוש מבקר" placeholder="שם המבקר" value={query} onChange={(e) => setQuery(e.target.value)} />
-            {desk && <button type="button" className="btn" onClick={newOne}><Icon name="plus" />מבקר חדש</button>}
+          <div className="search-row">
+            <input ref={searchRef} id="search" className="search" type="search" autoFocus={!current} autoComplete="off" aria-label="חיפוש מבקר" placeholder="שם המבקר…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            {desk && <button type="button" className="btn new-btn" onClick={newOne}><Icon name="plus" size={18} />מבקר חדש</button>}
+            <HelpDot />
           </div>
           {results.length > 0 && (
-            <ul className="list" aria-label="תוצאות">
+            <div className="results" role="list" aria-label="תוצאות">
               {results.map((p) => {
                 const done = byPerson.get(p.id);
                 return (
-                  <li key={p.id}>
-                    <button type="button" className="list-row" onClick={() => capture({ person: p })}>
-                      <span className="row-big">{p.fullName}</span> <span className="muted">{p.city || 'בלי עיר'}</span>
-                      {done && <span className="tag">כבר נרשם</span>}
-                      {p.businessOwner && <div className="row-id">בעל עסק</div>}
-                    </button>
-                  </li>
+                  <button key={p.id} type="button" role="listitem" className="result" onClick={() => capture({ person: p })}>
+                    <span>
+                      <span className="nm">{p.fullName}</span><span className="city">{p.city || 'בלי עיר'}</span>
+                      {(p.businessOwner || done) && <span className="mt">{[p.businessOwner ? 'בעל עסק' : '', done ? 'כבר נרשם היום' : ''].filter(Boolean).join(' · ')}</span>}
+                    </span>
+                    {done && <span className="tag">כבר נרשם</span>}
+                  </button>
                 );
               })}
-            </ul>
+              <button type="button" className="result add-row" onClick={newOne}><span className="muted">לא מי שחיפשת? <b>＋ מבקר חדש</b></span></button>
+            </div>
           )}
-          {query.trim().length >= 2 && !results.length && <p className="muted" style={{ textAlign: 'center' }}>לא נמצא ברשימה.</p>}
-          {!current && <p className="promise">נגיעה בשם — הוא נשמר. כל השאר רשות.</p>}
-          <div className="row" style={{ justifyContent: 'center' }}>
-            <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד שם וטלפון</button>
-            {joinCode && <button type="button" className="text-btn" onClick={() => setShowCode(true)}>תור? קוד להרשמה עצמית</button>}
-          </div>
+          {query.trim().length >= 2 && !results.length && (
+            <div className="results"><button type="button" className="result add-row" onClick={newOne}><span className="muted">לא נמצא ברשימה. <b>＋ מבקר חדש</b></span></button></div>
+          )}
+          {!current && !query.trim() && (
+            <div className="empty">
+              כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br />כל השאר רשות.
+              <div className="empty-acts">
+                {!desk && <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד שם וטלפון</button>}
+                {joinCode && <button type="button" className="text-btn" onClick={() => setShowCode(true)}>תור? קוד להרשמה עצמית</button>}
+              </div>
+            </div>
+          )}
         </>
       )}
 
       {current && !typing && (
-        <section className="held" aria-label={`הכרטיס של ${current.name}`}>
-          <div className="card-top">
-            <div className="who"><b>{current.name}</b><span className="ctx">{[current.city ?? current.typedPhone, current.businessOwner ? 'בעל עסק' : ''].filter(Boolean).join(' · ')}</span></div>
-            <button type="button" className="sq" aria-label="סגירת הכרטיס" onClick={() => { stopRecording(); setCurrent(null); searchRef.current?.focus(); }}><Icon name="close" /></button>
-          </div>
-
-          <div className="tools">
-            <button type="button" className="tool" aria-pressed={recordingHere} onClick={recordingHere ? stopRecording : startRecording}>
-              {recordingHere ? <><span className="rec-dot" aria-hidden="true" />עצירה ושמירה · {clock(seconds)}</> : <><Icon name="mic" size={22} />הקלטה</>}
-            </button>
-            <button type="button" className="tool" aria-expanded={noteOpen} onClick={() => setNoteOpen(!noteOpen)}><Icon name="pen" size={22} />הערה</button>
-          </div>
-          {noteOpen && (
-            <div className="typed">
-              <textarea id="note" className="area" autoFocus rows={3} aria-label="הערה" placeholder="מה חשוב לזכור עליו. אפשר גם להכתיב במיקרופון של המקלדת." value={noteText} onChange={(e) => setNoteText(e.target.value)} />
-              <div className="row"><button type="button" className="btn primary" disabled={!noteText.trim()} onClick={addNote}>שמירת ההערה</button></div>
+        <section className="lead" aria-label={`הכרטיס של ${current.name}`}>
+          <div className="lead-head">
+            <div>
+              <span className="nm">{current.name}</span> <span className="muted">{current.city ?? ''}</span>
+              {(current.businessOwner || current.typedPhone || current.self) && (
+                <div className="faint">{[current.businessOwner ? 'בעל עסק' : '', current.typedPhone ?? '', current.self ? 'נרשם לבד' : ''].filter(Boolean).join(' · ')}</div>
+              )}
             </div>
-          )}
-          {myNotes.length > 0 && <ul className="notes">{myNotes.map((n) => <NoteLine key={n.id} note={n} />)}</ul>}
+            <div className="head-acts">
+              <span className="saved-tag">{current.synced || online ? '✓ נשמר' : '✓ נשמר בטלפון'}</span>
+              <button type="button" className="btn primary" onClick={() => { stopRecording(); setCurrent(null); searchRef.current?.focus(); }}>✓ סיום</button>
+            </div>
+          </div>
 
           {questions.filter(([, items]) => items.length).map(([q, items]) => (
-            <div className="q-block" key={q}>
-              <span className="sec">{q}</span>
+            <div key={q}>
+              <div className="label">{q}</div>
               <div className="chips">
                 {items.map((label) => (
                   <button key={label} type="button" className="chip" aria-pressed={current.taps.includes(label)} onClick={() => toggle(label)}>{label}</button>
@@ -247,10 +251,24 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </div>
           ))}
           {wantsDate && (
-            <label className="field" htmlFor="customer-date">התאריך שלו<input id="customer-date" type="date" value={current.customerDate ?? ''} onChange={(e) => change({ customerDate: e.target.value || undefined })} style={{ justifySelf: 'start' }} /></label>
+            <>
+              <label className="label" htmlFor="customer-date">התאריך שלו</label>
+              <input id="customer-date" className="input date-in" type="date" value={current.customerDate ?? ''} onChange={(e) => change({ customerDate: e.target.value || undefined })} />
+            </>
           )}
 
-          <p className="next-line">הצעד הבא: <b>{describe(nextTask(setup, current, today()))}</b></p>
+          <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
+
+          {lastNote && <NotePeek note={lastNote} count={myNotes.length} />}
+          {noteOpen && (
+            <div className="note-box">
+              <textarea id="note" className="area" autoFocus rows={3} aria-label="הערה" placeholder="מה חשוב לזכור עליו. אפשר גם להכתיב במיקרופון של המקלדת." value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+              <div className="row">
+                <button type="button" className="btn primary" disabled={!noteText.trim()} onClick={addNote}>שמירת ההערה</button>
+                <button type="button" className="btn ghost" onClick={() => { setNoteOpen(false); setNoteText(''); }}>בלי</button>
+              </div>
+            </div>
+          )}
 
           {asking ? (
             <div className="confirm">
@@ -261,7 +279,13 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               </div>
             </div>
           ) : (
-            <button type="button" className="text-btn quiet" onClick={() => setAsking(true)}>ביטול הרישום</button>
+            <div className="actions">
+              <button type="button" className="btn" aria-expanded={noteOpen} onClick={() => setNoteOpen(!noteOpen)}><Icon name="pen" size={18} />הערה</button>
+              <button type="button" className="btn" aria-pressed={recordingHere} onClick={recordingHere ? stopRecording : startRecording}>
+                {recordingHere ? <><span className="rec-dot" aria-hidden="true" />עצירה ושמירה · {clock(seconds)}</> : <><Icon name="mic" size={18} />הקלטה</>}
+              </button>
+              <button type="button" className="btn danger far" onClick={() => setAsking(true)}>ביטול הרישום</button>
+            </div>
           )}
         </section>
       )}
@@ -276,39 +300,62 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
         </div>
       )}
 
-      <section className="stack" aria-label="נרשמו היום">
-        <div className="sec">נרשמו היום · {todays.length}</div>
-        {todays.length === 0 ? (
-          <div className="empty"><p className="muted">עוד אין. מי שתיגע בשמו יופיע כאן, עם הצעד הבא שלו.</p></div>
-        ) : (
-          <ul className="list">
+      {todays.length > 0 && (
+        <section aria-label="נרשמו היום">
+          <div className="label">נרשמו היום · {todays.length}</div>
+          <div className="results" role="list">
             {todays.map((l) => {
               const count = notes.filter((n) => n.leadId === l.id).length;
               return (
-                <li key={l.id}>
-                  <button type="button" className="list-row" aria-current={current?.id === l.id ? 'true' : undefined} onClick={() => open(l)}>
-                    <div className="row-name">{l.name}{l.self && <span className="tag">נרשם לבד</span>}{!l.synced && <span className="tag">ממתין לעלות</span>}</div>
-                    <div className="row-step">{[...l.taps, count ? `${count} הערות` : ''].filter(Boolean).join(' · ') || 'בלי סימון'}</div>
-                    <div className="row-id">{describe(nextTask(setup, l, today()))}</div>
-                  </button>
-                </li>
+                <button key={l.id} type="button" role="listitem" className="result" aria-current={current?.id === l.id ? 'true' : undefined} onClick={() => open(l)}>
+                  <span>
+                    <span className="nm">{l.name}</span><span className="city">{l.city ?? ''}</span>
+                    <span className="mt">{[...l.taps, count ? `${count} הערות` : ''].filter(Boolean).join(' · ') || 'בלי סימון'}</span>
+                  </span>
+                  <span className="r-side">
+                    {l.self && <span className="tag">נרשם לבד</span>}
+                    {!l.synced && <span className="tag">ממתין לעלות</span>}
+                    <span className="r-next">{describe(nextTask(setup, l, today()))}</span>
+                  </span>
+                </button>
               );
             })}
-          </ul>
-        )}
-      </section>
+          </div>
+        </section>
+      )}
+
+      <p className="foot">נרשמו היום: {todays.length} · {status}</p>
     </div>
   );
 }
 
-function NoteLine({ note }: { note: LocalNote }) {
+/** The "?" beside the search, as beside every title: a few words, and a video once there is one. */
+function HelpDot() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="help-wrap">
+      <button type="button" className="help" aria-expanded={open} aria-label="הסבר: הדוכן" onClick={() => setOpen(!open)}>?</button>
+      {open && (
+        <div className="tip" role="dialog" aria-label="הסבר: הדוכן">
+          <p>מקלידים כמה אותיות מהשם ונוגעים בשם. המבקר נשמר מיד, וכל השאר רשות: מה הוא צריך, מתי, הערה או הקלטה.</p>
+          <p className="faint small">סרטון הסבר קצר יופיע כאן בקרוב.</p>
+          <button type="button" className="text-btn" onClick={() => setOpen(false)}>סגירה</button>
+        </div>
+      )}
+    </span>
+  );
+}
+
+/** The last note on the open card, in a grey strip; a recording can be heard from it. */
+function NotePeek({ note, count }: { note: LocalNote; count: number }) {
   const url = useMemo(() => (note.audio ? URL.createObjectURL(note.audio) : null), [note.audio]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
-  if (note.body) return <li className="note">{note.body}</li>;
+  const more = count > 1 ? <span className="faint"> ({count} הערות)</span> : null;
+  if (note.body) return <div className="note-peek">{note.body.slice(0, 120)}{more}</div>;
   return (
-    <li className="note voice">
-      <span>הקלטה {note.seconds ? clock(note.seconds) : ''}{!note.synced ? ' · ממתינה לעלות' : ''}</span>
+    <div className="note-peek voice">
+      <span>הקלטה {note.seconds ? clock(note.seconds) : ''}{!note.synced ? ' · ממתינה לעלות' : ''}{more}</span>
       {url ? <audio controls src={url} preload="metadata" /> : <span className="faint small">נשמרה בשרת</span>}
-    </li>
+    </div>
   );
 }
