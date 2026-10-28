@@ -14,12 +14,12 @@ import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { waLink, waStatus, waUnlink, type WaState } from './lib/wa.ts';
-import { THANKS, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
+import { draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, recordSent, recordSkip, removeManual, sentByLead, resetText, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, recordSent, removeManual, resetText, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -94,7 +94,7 @@ function Meters({ rows }: { rows: { label: ReactNode; count: number; key: string
 
 // ---------- תמונת מצב: the day of the fair, calmly, from this phone
 
-export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks, onBooth }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string; onThanks?: () => void; onBooth?: () => void }) {
+export function Snapshot({ setup, todays, notes, waiting, eyebrow, onCrm, onBooth }: { setup: Setup; todays: LocalLead[]; notes: LocalNote[]; waiting: number; eyebrow?: string; onCrm?: () => void; onBooth?: () => void }) {
   const owners = todays.filter((l) => l.businessOwner).length;
   const ids = new Set(todays.map((l) => l.id));
   const mine = notes.filter((n) => ids.has(n.leadId));
@@ -108,7 +108,6 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks, onB
   const asks = [
     nothing > 0 && onBooth && { key: 'tag', text: <>{nothing === 1 ? 'מבקר אחד לא סומן' : <><b>{nothing}</b> לא סומנו</>} בכלל. כדאי עכשיו, כשעוד זוכרים — בערך דקה.</>, act: 'להשלים', primary: true, run: onBooth },
     waiting > 0 && { key: 'wait', text: <><b>{waiting}</b> עוד ממתינים לעלות לשרת. הם יעלו לבד כשתהיה רשת.</> },
-    todays.length > 0 && onThanks && { key: 'thanks', text: <>בערב: כל מי שנרשם היום מחכה לתודה קצרה. נגיעה אחת לכל מבקר.</>, act: 'לשליחת התודות', run: onThanks },
   ].filter(Boolean) as { key: string; text: ReactNode; act?: string; primary?: boolean; run?: () => void }[];
   // As the prototype's evening screen: the title counts the day, the tiles split it, then what is worth completing and what waits.
   return (
@@ -138,7 +137,7 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow, onThanks, onB
           {ahead.length ? (
             <p>בשבוע הקרוב: <b>{myWeek}</b> שיחות ופגישות שלך, ו־<b>{autoWeek}</b> הודעות שיוצאות לבד.{firstDay ? ` הראשונה ${dayLabel(firstDay)}.` : ''}</p>
           ) : <p className="muted">כשתרשום מבקרים, יופיע כאן מה מחכה לך בימים שאחרי.</p>}
-          {ahead.length > 0 && onThanks && <button type="button" className="btn" onClick={onThanks}>למעקב ←</button>}
+          {ahead.length > 0 && onCrm && <button type="button" className="btn" onClick={onCrm}>למעקב ←</button>}
         </div>
       </section>
     </div>
@@ -202,7 +201,6 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
-      <Thanks ctx={ctx} items={items} />
       <div className="ov-grid">
         <section>
           <div className="group-head">הבא בתור</div>
@@ -312,7 +310,6 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
-      <Thanks ctx={ctx} items={items} />
       <div className="tasks-bar">
         <nav className="tabs" aria-label="סינון">
           {([['today', 'היום'], ['week', 'השבוע'], ['all', 'הכל']] as const).map(([k, l]) => (
@@ -445,62 +442,6 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
 function Frame({ bare, className, children }: { bare?: boolean; className: string; children: ReactNode }) {
   if (bare) return <div className="rec-now">{children}</div>;
   return <div className={className}>{children}</div>;
-}
-
-/** The thank-you, on the evening of the fair: everyone registered in the last two weeks who has not had it yet.
- *  One tap per visitor opens WhatsApp with his thank-you ready; "בלי תודה" takes him off the list. */
-function Thanks({ ctx, items }: { ctx: Ctx; items: Item[] }) {
-  const [done, setDone] = useState<Map<string, Set<string>> | null>(null);
-  const [open, setOpen] = useState(false);
-  const [gone, setGone] = useState<Set<string>>(new Set());
-  useEffect(() => { sentByLead().then(setDone).catch(() => setDone(new Map())); }, []);
-  if (!done) return null;
-  const from = inDays(-14);
-  const left = items.filter((i) => i.row.captured_on >= from && !done.get(i.row.id)?.has(THANKS) && !gone.has(i.row.id))
-    .filter((i) => i.next.kind !== 'end' || i.next.reason !== 'optOut');
-  if (!left.length) return null;
-  const off = (id: string) => setGone(new Set([...gone, id]));
-  return (
-    <section className="stack">
-      <div className="sec">תודה שביקרת · {left.length}</div>
-      <div className="panel-w">
-        <p>{left.length === 1 ? 'מבקר אחד עוד לא קיבל' : `${left.length} מבקרים עוד לא קיבלו`} תודה על הביקור. {hasWa(ctx) ? 'נגיעה פותחת וואטסאפ עם התודה מוכנה, ואתה לוחץ שלח.' : 'נגיעה פותחת מייל עם התודה מוכנה, ואתה לוחץ שלח.'}</p>
-        <button type="button" className="btn" style={{ alignSelf: 'start' }} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'סגירה' : 'לשלוח עכשיו'}</button>
-      </div>
-      {open && (
-        <ul className="list">
-          {left.map((i) => <ThanksRow key={i.row.id} ctx={ctx} item={i} onDone={() => off(i.row.id)} />)}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function ThanksRow({ ctx, item, onDone }: { ctx: Ctx; item: Item; onDone: () => void }) {
-  const [contact, setContact] = useState<{ phone: string | null; email: string | null; opted_out?: boolean } | null | undefined>(undefined);
-  const texts = useTexts();
-  const me = useMe(ctx);
-  useEffect(() => { leadContact(item.row.id).then(setContact).catch(() => setContact(null)); }, [item.row.id]);
-  const body = fill(textOf(ctx.setup, texts, THANKS), me, item.name);
-  const missing = holes(body);
-  const send = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, item.row.id, channel, THANKS, body).catch(() => {}); setTimeout(onDone, 400); };
-  return (
-    <li className="list-row">
-      <div className="row-name">{item.name}{item.city && <span className="muted"> · {item.city}</span>}</div>
-      {contact?.opted_out ? (
-        <div className="row"><span className="muted">ביקש לא לקבל הודעות</span><button type="button" className="text-btn" onClick={() => { recordSkip(ctx.exhibitor.id, item.row.id, THANKS).catch(() => {}); onDone(); }}>להוריד מהרשימה</button></div>
-      ) : missing.length ? (
-        <div className="row-step">בתודה עוד חסר {missing.join(' · ')}. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים</button></div>
-      ) : (
-        <div className="row">
-          {contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => send('whatsapp')}>וואטסאפ</a>}
-          {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent('תודה שביקרת')}&body=${encodeURIComponent(body)}`} onClick={() => send('email')}><Icon name="mail" />מייל</a>}
-          {contact === null || (contact && !contact.phone && !contact.email) ? <span className="muted">אין טלפון או מייל</span> : null}
-          <button type="button" className="text-btn" onClick={() => { recordSkip(ctx.exhibitor.id, item.row.id, THANKS).catch(() => {}); onDone(); }}>בלי תודה</button>
-        </div>
-      )}
-    </li>
-  );
 }
 
 /** A step that carries a message: the text, filled for this visitor, goes out with one tap in WhatsApp or mail.
@@ -984,7 +925,7 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
               <li key={m.id}>
                 <button type="button" className="list-row" onClick={() => setOpen(m.id)}>
                   <div className="row-name">{m.id}{missing.length > 0 && <span className="tag">להשלים: {missing.length}</span>}{m.id in texts && <span className="tag">הנוסח שלך</span>}</div>
-                  <div className="row-step">{m.id === THANKS ? 'בערב של יום התערוכה, לכל מי שנרשם' : `אחרי: ${m.after.join(' · ')}`}</div>
+                  <div className="row-step">אחרי: {m.after.join(' · ')}</div>
                   <div className="row-id">{fill(body, me, SAMPLE).split('\n').find((l, n) => n > 0 && l.trim() && !l.startsWith('לכבוד')) ?? ''}</div>
                 </button>
               </li>
@@ -1019,7 +960,7 @@ function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me:
   return (
     <li className="held">
       <div className="card-top">
-        <div className="who"><b>{id}</b><span className="ctx">{id === THANKS ? 'בערב של יום התערוכה, לכל מי שנרשם' : `אחרי: ${after.join(' · ')}`}</span></div>
+        <div className="who"><b>{id}</b><span className="ctx">אחרי: {after.join(' · ')}</span></div>
         <button type="button" className="sq" aria-label="סגירה" onClick={onClose}><Icon name="close" /></button>
       </div>
       <label className="field" htmlFor="msg-body">הנוסח

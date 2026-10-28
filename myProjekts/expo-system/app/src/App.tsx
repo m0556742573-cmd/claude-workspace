@@ -273,7 +273,7 @@ function Live() {
             joinCode={exhibitor.join_code}
           />
         )}
-        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onThanks={() => go('home')} onBooth={() => go('booth')} />}
+        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
         {view === 'home' && <Home ctx={ctx} desk={desk} />}
         {view === 'tasks' && <Tasks ctx={ctx} desk={desk} />}
         {view === 'leads' && <Leads ctx={ctx} desk={desk} />}

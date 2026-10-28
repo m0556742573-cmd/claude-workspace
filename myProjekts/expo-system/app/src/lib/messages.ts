@@ -8,7 +8,6 @@ import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import approved from '../../../consultant-rounds/messages-approved.json';
 import { loadTexts } from './backend.ts';
 
-export const THANKS = 'תודה שביקרת';
 const SIGN = '[שם המציג], [העסק] · [טלפון]';
 
 export interface Me { name: string; business: string; phone: string | null; greeting: 'shalom' | 'kavod'; sensitive: boolean }
@@ -19,9 +18,9 @@ function fixtureOf(setup: Setup) {
   return fixtures.find((f) => key(f.setup) === key(setup));
 }
 
-/** Every message the setup sends, in path order, with the buttons it goes out after. The thank-you first. */
+/** Every message the setup sends, in path order, with the buttons it goes out after. */
 export function messagesOf(setup: Setup): { id: string; after: string[] }[] {
-  const out = new Map<string, Set<string>>([[THANKS, new Set(['כל מי שנרשם'])]]);
+  const out = new Map<string, Set<string>>();
   const add = (p: Path, after: string) => {
     for (const st of p.steps) if (st.message) (out.get(st.message) ?? out.set(st.message, new Set()).get(st.message)!).add(after);
     if (p.end.kind === 'repeat' && p.end.message) (out.get(p.end.message) ?? out.set(p.end.message, new Set()).get(p.end.message)!).add(after);
@@ -38,7 +37,6 @@ export function draftFor(setup: Setup, id: string): string {
   const mine = f ? (approved as { id: number; label: string; text: string }[]).filter((a) => a.id === f.id) : [];
   const hit = mine.find((a) => a.label === id) ?? mine.find((a) => id.startsWith(a.label));
   if (hit) return hit.text;
-  if (id === THANKS) return `שלום [שם],\nתודה שעצרת אצלנו בתערוכה. אשמח לשמור על קשר.\n${SIGN}`;
   return `שלום [שם],\n[${id}]\n${SIGN}`;
 }
 
