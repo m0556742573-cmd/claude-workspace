@@ -14,11 +14,13 @@ set -a; . ../app/.env; set +a
 ssh_run() { ssh -i "$KEY" -o ConnectTimeout=20 -o BatchMode=yes "$HOST" "$@"; }
 
 ssh_run 'mkdir -p /opt/expo-wa/data && chmod 700 /opt/expo-wa/data'
-scp -i "$KEY" -q package.json package-lock.json server.ts Dockerfile "$HOST:/opt/expo-wa/"
+scp -i "$KEY" -q package.json package-lock.json server.ts limits.ts Dockerfile .dockerignore "$HOST:/opt/expo-wa/"
 printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\nSESSIONS_DIR=/data/sessions\n' "$VITE_SUPABASE_URL" "$VITE_SUPABASE_KEY" | ssh_run 'umask 077; cat > /opt/expo-wa/.env'
+# The server's own key for the send queue: made once on the server, never copied out; only its hash goes to the database.
+ssh_run '[ -s /opt/expo-wa/wa_key ] || (umask 077; openssl rand -hex 32 | tr -d "\n" > /opt/expo-wa/wa_key); echo "wa_key sha256: $(sha256sum < /opt/expo-wa/wa_key | cut -d" " -f1)"'
 printf '# Written by expo-system/wa-server/deploy.sh\nhttp:\n  routers:\n    expo-wa:\n      rule: "Host(`%s`)"\n      entryPoints: [https]\n      service: expo-wa\n      tls:\n        certResolver: letsencrypt\n  services:\n    expo-wa:\n      loadBalancer:\n        servers:\n          - url: "http://expo-wa:8080"\n' "$DOMAIN" \
   | ssh_run 'cat > /etc/easypanel/traefik/config/expo-wa.yml'
 ssh_run 'cd /opt/expo-wa && docker build -q -t expo-wa . >/dev/null && (docker rm -f expo-wa >/dev/null 2>&1 || true) &&
-  docker run -d --name expo-wa --restart unless-stopped --network easypanel --memory 1500m --env-file .env -v /opt/expo-wa/data:/data expo-wa >/dev/null &&
+  docker run -d --name expo-wa --restart unless-stopped --network easypanel --memory 1500m --env-file .env -e WA_KEY="$(cat wa_key)" -v /opt/expo-wa/data:/data expo-wa >/dev/null &&
   docker ps --filter name=expo-wa --format "{{.Names}} {{.Status}}"'
 echo "https://$DOMAIN/health"

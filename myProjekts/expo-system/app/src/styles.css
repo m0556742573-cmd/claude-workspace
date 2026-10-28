@@ -593,3 +593,9 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
   .adm-row { flex-wrap: wrap; padding-inline: 16px; }
 }
 .start-sm { align-self: flex-start; justify-self: start; }
+
+/* WhatsApp through the server: the two switches, his reply on the task card and in the history */
+.wa-switch > span { display: grid; gap: 2px; }
+.wa-switch b { font-weight: 600; }
+.reply-peek { background: var(--good-soft); color: var(--ink); }
+.timeline li.tl-reply { color: var(--ink); }

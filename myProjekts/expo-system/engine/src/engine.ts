@@ -1,7 +1,7 @@
 // The engine: given an exhibitor's setup and one lead, which path applies and what the next task is.
 // It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
 import { addDays, isRestDay, nextOccurrence, weekday } from './calendar.ts';
-import { manualId } from './model.ts';
+import { manualId, replyId } from './model.ts';
 import type { Action, Condition, Lead, LocalDate, NeedPath, Path, Setup, Step, Timing, Who } from './model.ts';
 
 /** What the path would do next if he had not answered — the likely next step to offer after a talk. */
@@ -47,7 +47,7 @@ function pickVariant(need: NeedPath, taps: string[]): Path | undefined {
 export const CONSENT = 'מסכים לקבל עדכונים';
 
 export type Next =
-  | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean }
+  | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean; reply?: boolean }
   /** A step needs the visitor's date and he gave none: the exhibitor is asked to find out when. */
   | { kind: 'askDate'; stepId: string; dueOn: LocalDate }
   | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' };
@@ -58,8 +58,14 @@ export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
   // A deal, "not relevant" or "remove me" ends everything, manual steps included.
   if (last && (last.outcome === 'closed' || last.outcome === 'notRelevant' || last.outcome === 'optOut')) return { kind: 'end', reason: last.outcome };
 
-  // A step he set by hand comes first: it is what was agreed with the visitor.
   const recorded = new Set(lead.history.map((h) => h.stepId));
+  // He wrote back (model §9): the path stops and the exhibitor answers him first, before anything else.
+  // Answering is recorded under reply:<day>, so a later reply opens a new task.
+  if (lead.repliedOn && !recorded.has(replyId(lead.repliedOn))) {
+    const late = lead.repliedOn < today;
+    return { kind: 'task', stepId: replyId(lead.repliedOn), action: 'talk', who: 'me', dueOn: settle(late ? today : lead.repliedOn, 'talk', 'me'), late, reply: true };
+  }
+  // A step he set by hand comes next: it is what was agreed with the visitor.
   const manual = (lead.manual ?? []).filter((m) => !recorded.has(manualId(m.id))).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
   const m = manual[0];
   if (m) {

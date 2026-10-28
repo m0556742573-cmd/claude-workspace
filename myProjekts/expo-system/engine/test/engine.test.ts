@@ -192,3 +192,26 @@ test('a sensitive business ends on the mailing list only for whoever consented a
   assert.deepEqual(nextTask(s, lead([CONSENT]), EXPO), { kind: 'end', reason: 'list' });
   assert.deepEqual(nextTask(setup({}), lead([]), EXPO), { kind: 'end', reason: 'list' });
 });
+
+// ---- a reply on WhatsApp (model §9): the path stops, he answers first; answering closes it
+
+test('a reply stops the path and opens a talk for the exhibitor first', () => {
+  const s = setup({ needs: [{ label: 'מחירון', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [{ id: 'send', action: 'send', who: 'auto', timing: { kind: 'after', days: 3 } }], end: { kind: 'list' } } }] }] });
+  const replied = lead(['מחירון'], { repliedOn: '2026-11-17' });
+  const n = nextTask(s, replied, '2026-11-18');
+  assert.equal(n.kind, 'task');
+  if (n.kind === 'task') { assert.equal(n.reply, true); assert.equal(n.action, 'talk'); assert.equal(n.who, 'me'); assert.equal(n.late, true); assert.equal(n.dueOn, '2026-11-18'); }
+  // Answered (engaged): the reply task is done and he is in the exhibitor's hands.
+  const answered = { ...replied, history: [rec('reply:2026-11-17', '2026-11-18', 'engaged')] };
+  assert.deepEqual(nextTask(s, answered, '2026-11-18'), { kind: 'end', reason: 'engaged' });
+  // A new reply later opens a new task, even after engaged.
+  const again = { ...answered, repliedOn: '2026-11-25' };
+  const n2 = nextTask(s, again, '2026-11-25');
+  assert.equal(n2.kind === 'task' && n2.stepId, 'reply:2026-11-25');
+});
+
+test('a reply does not reopen a lead who closed or asked to be removed', () => {
+  const s = setup({});
+  const closed = lead([], { repliedOn: '2026-11-20', history: [rec('x', '2026-11-18', 'closed')] });
+  assert.deepEqual(nextTask(s, closed, '2026-11-20'), { kind: 'end', reason: 'closed' });
+});

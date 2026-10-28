@@ -109,7 +109,11 @@ export interface Lead {
   businessOwner: boolean;
   history: StepRecord[];
   manual?: ManualStep[];
+  /** The day of his latest reply on WhatsApp (model §9): it stops the path until the exhibitor answers him. */
+  repliedOn?: LocalDate;
 }
 
 /** A manual step is recorded in the history under this id, so the path's own steps never collide with it. */
 export const manualId = (id: string) => `m:${id}`;
+/** Answering a reply is recorded under this id. */
+export const replyId = (day: LocalDate) => `reply:${day}`;

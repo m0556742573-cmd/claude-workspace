@@ -14,6 +14,10 @@ export interface Exhibitor {
   whatsapp: string | null; whatsapp_kind: 'personal' | 'business' | null; onboarded: boolean;
   /** The code in his self-registration link: expo-booth.pages.dev/#join/<code>. */
   join_code: string;
+  /** WhatsApp through the server (step 2a): replies read only if he switched it on; visitors saved as contacts if he chose. */
+  wa_read_replies: boolean; wa_save_contacts: boolean;
+  /** The server saw signs of a block: nothing goes out until he links again. */
+  wa_blocked_at: string | null; wa_blocked_reason: string | null;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -22,7 +26,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -172,21 +176,24 @@ export interface StepRow { lead_id: string; step_id: string; done_on: string; ou
 export interface ManualRow { id: string; lead_id: string; action: Action; who: Who; due_on: string; message: string | null }
 export interface NoteRow { id: string; lead_id: string; body: string | null; audio_path: string | null; transcript: string | null; created_at: string }
 
-export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup> }
+export interface ReplyRow { lead_id: string; body: string; at: string; optout: boolean }
+export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup>; replies: ReplyRow[] }
 
 export async function loadBook(): Promise<Book> {
-  const [leads, tasks, steps, manual, notes, versions] = await Promise.all([
+  const [leads, tasks, steps, manual, notes, versions, replies] = await Promise.all([
     supabase.from('leads').select('*').order('captured_at', { ascending: false }),
     supabase.from('tasks').select('*'),
     supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').order('created_at'),
     supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message'),
     supabase.from('lead_notes').select('id, lead_id, body, audio_path, transcript, created_at').order('created_at'),
     supabase.from('setups').select('version, data'),
+    supabase.from('lead_replies').select('lead_id, body, at, optout').order('at'),
   ]);
-  for (const r of [leads, tasks, steps, manual, notes, versions]) if (r.error) throw r.error;
+  for (const r of [leads, tasks, steps, manual, notes, versions, replies]) if (r.error) throw r.error;
   return {
     leads: leads.data ?? [], tasks: tasks.data ?? [], steps: steps.data ?? [], manual: manual.data ?? [], notes: notes.data ?? [],
     versions: Object.fromEntries((versions.data ?? []).map((v) => [v.version, v.data as Setup])),
+    replies: replies.data ?? [],
   };
 }
 
@@ -211,10 +218,19 @@ export async function pinLeads(exhibitorId: string): Promise<void> {
   if (up.error) throw up.error;
 }
 
-export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'>, businessOwner: boolean): Lead {
+/** The day in Israel of a moment the server recorded. */
+const israelDay = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(iso));
+
+export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & { replies?: ReplyRow[] }, businessOwner: boolean): Lead {
+  const replies = (book.replies ?? []).filter((r) => r.lead_id === row.id && !r.optout);
+  const history = book.steps.filter((s) => s.lead_id === row.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome }));
+  // "הסר" in his reply ends everything, as "ביקש להסיר" does (model §9).
+  const out = (book.replies ?? []).find((r) => r.lead_id === row.id && r.optout);
+  if (out) history.push({ stepId: 'reply-optout', doneOn: israelDay(out.at), outcome: 'optOut' });
   return {
     id: row.id, capturedOn: row.captured_on, taps: row.taps, customerDate: row.customer_date ?? undefined, businessOwner,
-    history: book.steps.filter((s) => s.lead_id === row.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome })),
+    repliedOn: replies.length ? israelDay(replies[replies.length - 1]!.at) : undefined,
+    history,
     manual: book.manual.filter((m) => m.lead_id === row.id).map((m): ManualStep => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
   };
 }
@@ -396,6 +412,21 @@ export async function resetText(exhibitorId: string, id: string): Promise<void> 
 }
 
 // ---------- what was sent by hand (a tap opened WhatsApp or mail with the text ready): kept in the outbox as sent
+/** A message for the WhatsApp server to send from his own number, at a person's pace and hours (wa-server/limits.ts). */
+export async function queueSend(exhibitorId: string, leadId: string, templateId: string, body: string): Promise<void> {
+  const { error } = await supabase.from('outbox').insert({ exhibitor_id: exhibitorId, lead_id: leadId, channel: 'whatsapp', template_id: templateId, body, status: 'queued' });
+  if (error) throw error;
+}
+/** What waits in the queue for a lead, and what went wrong with it. */
+export async function queuedFor(leadId: string): Promise<{ status: string; error: string | null; created_at: string }[]> {
+  const { data } = await supabase.from('outbox').select('status, error, created_at').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
+  return data ?? [];
+}
+export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason'>>): Promise<void> {
+  const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
+  if (error) throw error;
+}
+
 export async function recordSent(exhibitorId: string, leadId: string, channel: 'whatsapp' | 'email', templateId: string, body: string): Promise<void> {
   const { error } = await supabase.from('outbox').insert({ exhibitor_id: exhibitorId, lead_id: leadId, channel, template_id: templateId, body, status: 'sent', sent_at: new Date().toISOString() });
   if (error) throw error;

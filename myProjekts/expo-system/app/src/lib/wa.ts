@@ -14,4 +14,11 @@ async function call<T>(path: string, method: 'GET' | 'POST' = 'GET'): Promise<T>
 export const waStatus = () => call<WaState>('/wa/status');
 export const waLink = () => call<WaState>('/wa/link', 'POST');
 export const waUnlink = () => call<WaState>('/wa/unlink', 'POST');
+let known: { at: number; open: Promise<boolean> } | null = null;
+/** Is his own WhatsApp linked to the server (so a message can go from his number)? */
+export function waOpen(): Promise<boolean> {
+  if (!known || Date.now() - known.at > 60_000) known = { at: Date.now(), open: waStatus().then((s) => s.status === 'open').catch(() => false) };
+  return known.open;
+}
+export const forgetWa = () => { known = null; };
 export const waStats = () => call<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number }>('/wa/stats');

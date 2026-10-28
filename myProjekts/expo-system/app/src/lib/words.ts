@@ -25,6 +25,7 @@ export function dayLabel(d: string): string {
 export function describe(n: Next): string {
   if (n.kind === 'end') return END[n.reason] ?? n.reason;
   if (n.kind === 'askDate') return `לברר את התאריך שלו · ${dayLabel(n.dueOn)}`;
+  if (n.reply) return `ענה לך · לחזור אליו · ${dayLabel(n.dueOn)}${n.late ? ' (באיחור)' : ''}`;
   const who = n.who === 'me' ? 'ממך' : 'אוטומטית';
   return `${ACT[n.action] ?? n.action} ${who} · ${dayLabel(n.dueOn)}${n.late ? ' (באיחור)' : ''}`;
 }

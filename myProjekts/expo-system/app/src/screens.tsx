@@ -13,13 +13,13 @@ import { MeForm } from './me.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
-import { waLink, waStatus, waUnlink, type WaState } from './lib/wa.ts';
+import { forgetWa, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, recordSent, removeManual, resetText, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -146,7 +146,7 @@ export function Snapshot({ setup, todays, notes, waiting, eyebrow, onCrm, onBoot
 
 // ---------- the follow-up: everything computed by the engine on the phone, from the server's records
 
-interface Item { row: LeadRow; lead: Lead; next: Next; name: string; city: string; owner: boolean; setup: Setup }
+interface Item { row: LeadRow; lead: Lead; next: Next; name: string; city: string; owner: boolean; setup: Setup; reply?: string }
 
 function useItems(ctx: Ctx, book: Book | undefined): Item[] {
   return useMemo(() => {
@@ -155,7 +155,8 @@ function useItems(ctx: Ctx, book: Book | undefined): Item[] {
       const owner = ownerOf(row, ctx.directory);
       const lead = engineLead(row, book, owner);
       const setup = setupOf(row, book, ctx.setup);
-      return { row, lead, next: nextTask(setup, lead, today()), name: nameOf(row, ctx.directory), city: cityOf(row, ctx.directory), owner, setup };
+      const replies = book.replies.filter((r) => r.lead_id === row.id && !r.optout);
+      return { row, lead, next: nextTask(setup, lead, today()), name: nameOf(row, ctx.directory), city: cityOf(row, ctx.directory), owner, setup, reply: replies[replies.length - 1]?.body };
     });
   }, [book, ctx.setup, ctx.directory]);
 }
@@ -167,6 +168,7 @@ function split(items: Item[]) {
 function short(n: Next): string {
   if (n.kind === 'end') return END[n.reason] ?? '';
   if (n.kind === 'askDate') return 'לברר את התאריך שלו';
+  if (n.reply) return 'ענה לך · לחזור אליו';
   return `${ACT[n.action] ?? n.action} ${n.who === 'me' ? 'ממך' : 'אוטומטית'}`;
 }
 function greeting(): string {
@@ -200,6 +202,7 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
+      {ctx.exhibitor.wa_blocked_at && <p className="offline-line">החיבור לוואטסאפ שלך נעצר ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}), ושום הודעה לא יוצאת ממנו. <button type="button" className="text-btn" onClick={() => ctx.go('settings')}>להגדרות</button></p>}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
       <div className="ov-grid">
         <section>
@@ -379,7 +382,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
   const isWait = next.kind === 'task' && next.action === 'wait';
   const isAuto = next.kind === 'task' && next.who === 'auto';
   const late = next.kind === 'task' && next.late;
-  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
+  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : next.reply ? 'ענה לך בוואטסאפ — לחזור אליו' : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
   const tall = held ? ' tall' : '';
 
   return (
@@ -389,6 +392,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
         {isAuto && <div className="faint small">אמור לצאת לבד. השליחה מתחברת בקרוב, בינתיים אפשר לשלוח ביד.</div>}
       </div>
+      {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
         ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} contact={contact} />
@@ -453,6 +457,14 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
   const body = fill(textOf(ctx.setup, texts, messageId), me, name);
   const missing = holes(body);
   const sent = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, leadId, channel, messageId, body).then(onSent).catch(() => {}); };
+  const [linked, setLinked] = useState(false);
+  const [queued, setQueued] = useState<'no' | 'busy' | 'yes' | 'err'>('no');
+  useEffect(() => { if (!ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at]);
+  useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued')) setQueued('yes'); }).catch(() => {}); }, [leadId]);
+  async function viaServer() {
+    setQueued('busy');
+    try { await queueSend(ctx.exhibitor.id, leadId, messageId, body); setQueued('yes'); onSent?.(); } catch { setQueued('err'); }
+  }
   return (
     <div className="stack">
       <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
@@ -463,7 +475,10 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
         <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>
       ) : (
         <div className="row">
-          {contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
+          {queued === 'yes' && <span className="note">בתור. יוצא מהוואטסאפ שלך בקרוב, בקצב של אדם ובשעות 9–20.</span>}
+          {queued === 'err' && <span className="err">לא נכנס לתור. אפשר לשלוח בנגיעה.</span>}
+          {contact?.phone && linked && queued !== 'yes' && <button type="button" className="btn primary" disabled={queued === 'busy'} onClick={viaServer}>לשלוח מהוואטסאפ שלי</button>}
+          {contact?.phone && hasWa(ctx) && !linked && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
           {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל</a>}
           {contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>}
           {contact && !contact.phone && !contact.email && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
@@ -807,6 +822,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
             <h2>מה היה עד עכשיו</h2>
             <ul className="log timeline">
               <li><span className="when">{dayLabel(row.captured_on)}</span>ביקר בדוכן</li>
+              {book.replies.filter((r) => r.lead_id === row.id).map((r) => <li key={r.at} className="tl-reply"><span className="when">{dayLabel(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(r.at)))}</span>{r.optout ? 'ביקש להסיר (בוואטסאפ)' : <>ענה בוואטסאפ: <b>{r.body}</b></>}</li>)}
               {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{(x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
               {manual.filter((m) => !steps.some((x) => x.step_id === `m:${m.id}`)).map((m) => <li key={m.id}><span className="when">{dayLabel(m.due_on)}</span>נקבע: {ACT[m.action]}</li>)}
             </ul>
@@ -1041,7 +1057,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </>}
         {sub === 'self' && <SelfSign ctx={ctx} />}
         {sub === 'links' && <>
-          {ctx.admin && <WaLink />}
+          {ctx.admin && <WaLink ctx={ctx} />}
           {!ctx.admin && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
           <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
         </>}
@@ -1070,7 +1086,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
  * His own WhatsApp, linked as a device by scanning a QR (WhatsApp › מכשירים מקושרים). For now only the admin sees it:
  * the pilot measures how the server holds the accounts before exhibitors link theirs. Nothing is sent or read yet.
  */
-function WaLink() {
+function WaLink({ ctx }: { ctx: Ctx }) {
   const [st, setSt] = useState<WaState | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1088,8 +1104,13 @@ function WaLink() {
       {err ? <p className="muted">{err}</p>
         : !st ? <p className="muted">בודק…</p>
         : st.status === 'open' ? <>
-          <p>מחובר: <b dir="ltr">{st.phone}</b>. בשלב הזה הוא רק מחובר; שליחה וקריאת תשובות יופעלו בשלב הבא.</p>
-          <button type="button" className="btn start-sm" disabled={busy} onClick={() => run(waUnlink)}>לנתק</button>
+          <p>מחובר: <b dir="ltr">{st.phone}</b>. הודעות שתשלח מכאן יוצאות מהמספר הזה, אחת אחת, בקצב של אדם ובשעות 9–20 (לא בשבת ובחג).</p>
+          {ctx.exhibitor.wa_blocked_at && <WaBlocked ctx={ctx} />}
+          <WaSwitch ctx={ctx} field="wa_read_replies" label="לקרוא תשובות של מבקרים"
+            hint="רק ממספרים של מבקרים שנרשמו אצלך. כל שיחה אחרת לא נקראת ולא נשמרת. תשובה עוצרת את המסלול ומקפיצה אותו ל'היום'; 'הסר' מוריד אותו מהרשימה." />
+          <WaSwitch ctx={ctx} field="wa_save_contacts" label="לשמור כל מבקר באנשי הקשר שלי"
+            hint="לפני ההודעה הראשונה אליו, בשם כמו 'יעקב גרינברג · תערוכה'. כך תראה את השם שלו כשהוא עונה." />
+          <button type="button" className="btn start-sm" disabled={busy} onClick={() => { forgetWa(); run(waUnlink); }}>לנתק</button>
         </>
         : st.status === 'qr' && st.qr ? <div className="sign-row">
           <Qr text={st.qr} size={220} />
@@ -1105,6 +1126,28 @@ function WaLink() {
           <button type="button" className="btn primary start-sm" disabled={busy} onClick={() => run(waLink)}>לחבר את הוואטסאפ</button>
         </>}
     </section>
+  );
+}
+
+function WaSwitch({ ctx, field, label, hint }: { ctx: Ctx; field: 'wa_read_replies' | 'wa_save_contacts'; label: string; hint: string }) {
+  const on = ctx.exhibitor[field];
+  const flip = async () => { const next = { ...ctx.exhibitor, [field]: !on }; ctx.setExhibitor(next); await setWaOptions(ctx.exhibitor.id, { [field]: !on }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
+  return (
+    <div className="switchrow wa-switch">
+      <span><b>{label}</b><span className="faint small">{hint}</span></span>
+      <button type="button" className="switch" role="switch" aria-checked={on} aria-label={label} onClick={flip} />
+    </div>
+  );
+}
+
+/** The server saw signs of a block: nothing went out since. After linking again, he says so and sending resumes. */
+function WaBlocked({ ctx }: { ctx: Ctx }) {
+  const clear = async () => { await setWaOptions(ctx.exhibitor.id, { wa_blocked_at: null, wa_blocked_reason: null }).catch(() => {}); ctx.setExhibitor({ ...ctx.exhibitor, wa_blocked_at: null, wa_blocked_reason: null }); forgetWa(); };
+  return (
+    <div className="offline-line">
+      <p>וואטסאפ ניתק את החיבור ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}). מאז לא יצאה שום הודעה. כדאי לבדוק בטלפון שהוואטסאפ פעיל, ולחבר מחדש.</p>
+      <button type="button" className="btn" onClick={clear}>חיברתי מחדש, אפשר לשלוח</button>
+    </div>
   );
 }
 
