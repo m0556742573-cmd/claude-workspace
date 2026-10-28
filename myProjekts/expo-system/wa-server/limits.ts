@@ -12,7 +12,8 @@ export const LIMITS = {
   /** Seconds between two sends from the same number, picked at random in this range. */
   gapMinSec: 45,
   gapMaxSec: 120,
-  /** First messages to someone with no conversation with this number yet, per number per day. The rest wait for tomorrow. */
+  /** Messages to someone who has not written back (first or follow-up), per number per day. The rest wait for tomorrow.
+   *  A conversation where he answered is outside this cap and keeps only the gap. */
   firstPerDay: 25,
   /** The same, in the first days after the number was linked. */
   firstPerDayNew: 10,
