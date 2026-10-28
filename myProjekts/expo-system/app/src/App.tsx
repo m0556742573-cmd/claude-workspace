@@ -10,7 +10,7 @@ import { MeForm } from './me.tsx';
 import { Join } from './join.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Booth } from './booth/Booth.tsx';
-import { Admin, Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
+import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
@@ -79,12 +79,12 @@ function Gate({ title, children }: { title: string; children?: ReactNode }) {
   );
 }
 
-type View = 'booth' | 'snapshot' | 'home' | 'tasks' | 'leads' | 'dash' | 'messages' | 'settings' | 'admin';
+type View = 'booth' | 'snapshot' | 'home' | 'tasks' | 'leads' | 'dash' | 'messages' | 'settings';
 type Part = 'day' | 'crm';
 type Panel = 'menu' | 'help' | 'support' | null;
 const DAY: [View, string, IconName][] = [['booth', 'הדוכן', 'search'], ['snapshot', 'תמונת מצב', 'check']];
 const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['leads', 'לידים', 'leads'], ['tasks', 'משימות', 'tasks'], ['dash', 'דשבורד', 'bars'], ['messages', 'הודעות', 'mail']];
-const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings', 'admin'));
+const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings'));
 const partOf = (v: View): Part | null => (DAY.some(([d]) => d === v) ? 'day' : CRM.some(([c]) => c === v) ? 'crm' : null);
 
 interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[] }
@@ -280,7 +280,7 @@ function Live() {
         {view === 'dash' && <Dashboard ctx={ctx} desk={desk} />}
         {view === 'messages' && <Messages ctx={ctx} desk={desk} />}
         {view === 'settings' && <Settings ctx={ctx} onSignOut={signOut} />}
-        {view === 'admin' && (admin ? <Admin /> : <p className="muted">העמוד הזה למנהל התערוכה.</p>)}
+        
       </main>
 
       {!desk && (

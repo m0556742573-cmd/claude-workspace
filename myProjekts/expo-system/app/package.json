@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --port 5174",
     "build": "vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build:admin": "vite build --config vite.admin.config.ts"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

@@ -562,3 +562,33 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ask-card { background: var(--surface); border-radius: var(--r); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .ask-card .btn { flex: none; }
 @media (max-width: 600px) { .ask-card { flex-direction: column; align-items: flex-start; } }
+
+/* ---------------- the admin platform (28/10): its own shell, the same pieces ---------------- */
+.adm { min-height: 100dvh; }
+.adm-side { position: fixed; z-index: 30; top: 0; bottom: 0; inset-inline-start: 0; width: var(--nav-w); background: var(--surface); border-inline-end: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 4px; padding: 24px 16px 16px; overflow-y: auto; }
+.adm-side .brand { padding: 0 12px 20px; }
+.adm-nav { display: flex; flex-direction: column; gap: 4px; }
+.adm-side a.nv { text-decoration: none; }
+.adm-who { padding: 0 12px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.adm-main { padding: 36px 52px 64px; padding-inline-start: calc(var(--nav-w) + 52px); }
+.adm-row { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-top: 1px solid var(--line); }
+.adm-row:first-child { border-top: 0; }
+.adm-id { flex: 1; min-width: 0; }
+.adm-mail { display: block; }
+.adm-n { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.adm-act { text-align: end; }
+.adm-act .btn { min-height: 36px; padding: 0 12px; }
+.adm .tb td { cursor: default; }
+@media (max-width: 900px) {
+  .adm-side { position: static; width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; border-inline-end: 0; border-bottom: 1px solid var(--line); }
+  .adm-side .brand { padding: 0 8px 0 0; }
+  .adm-nav { flex-direction: row; flex-wrap: wrap; }
+  .adm-side .nv { width: auto; min-height: 40px; }
+  .adm-side .nv .ic { display: none; }
+  .adm-side .side-gap { display: none; }
+  .adm-side .side-foot { flex-direction: row; border-top: 0; padding-top: 0; margin-inline-start: auto; }
+  .adm-who { display: none; }
+  .adm-main { padding: 24px 16px 48px; }
+  .adm-row { flex-wrap: wrap; padding-inline: 16px; }
+}
