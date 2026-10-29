@@ -17,6 +17,7 @@ import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, us
 import pino from 'pino';
 import { firstLeft, gapMs, sendingHours, typingMs } from './limits.ts';
 import { due, israelDay, type Plan } from './planner.ts';
+import { buildMail, providerFrom, type MailRow } from './mail.ts';
 import type { Approved } from '../engine/src/index.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -25,6 +26,9 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY ?? ''; // the publishable key: the
 const WA_KEY = process.env.WA_KEY ?? '';             // this server's own key for the queue; without it nothing is sent
 const DIR = process.env.SESSIONS_DIR ?? '/data/sessions';
 const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://expo-booth.pages.dev,https://expo-admin.pages.dev').split(',');
+/** This server's own address: the removal link in every mail points here. */
+const PUBLIC_URL = process.env.PUBLIC_URL ?? 'https://expo-wa.paydfb.easypanel.host';
+const MAIL_FROM = process.env.MAIL_FROM ?? 'expo@expo.y-h-m.com';
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_URL and SUPABASE_KEY are required');
 
 const logger = pino({ level: 'warn' });
@@ -181,19 +185,91 @@ async function sendOne(s: Session, q: Queued): Promise<void> {
   }
 }
 
-// ---------- planning (step 2b): the path's own messages, due today, for every linked number; they join the same queue
+// ---------- keys (29/10): pasted once in the admin platform, kept only here, on this server's disk, never sent back
+// (a secret shows only its last four characters). Which names exist, and whether each is a secret:
+const KEY_SLOTS: Record<string, boolean> = {
+  mail_provider: false, ses_region: false, ses_key_id: true, ses_secret: true, cf_account: false, cf_token: true,
+  meta_phone_id: false, meta_token: true, anthropic_key: true,
+};
+const KEYS_FILE = path.join(path.dirname(DIR), 'keys.json');
+let keys: Record<string, string> = JSON.parse(await fs.readFile(KEYS_FILE, 'utf8').catch(() => '{}'));
+async function setKey(name: string, value: string): Promise<void> {
+  const next = { ...keys };
+  if (value) next[name] = value; else delete next[name];
+  const tmp = KEYS_FILE + '.tmp';
+  await fs.writeFile(tmp, JSON.stringify(next), { mode: 0o600 });
+  await fs.rename(tmp, KEYS_FILE);
+  keys = next;
+}
+const keyView = () => Object.fromEntries(Object.keys(KEY_SLOTS).map((n) => [n, keys[n] ? (KEY_SLOTS[n] ? '…' + keys[n]!.slice(-4) : keys[n]) : null]));
+const mailProvider = () => providerFrom(keys);
+
+// ---------- planning (step 2b): the path's own messages, due today, for every booth that can send (its WhatsApp
+// linked, or mail set on this server); they join the same queues
 
 const approved: Approved[] = JSON.parse(await fs.readFile(new URL('../consultant-rounds/messages-approved.json', import.meta.url), 'utf8'));
 async function plan(): Promise<void> {
   if (!WA_KEY || !sendingHours(new Date())) return;
   const today = israelDay(new Date());
-  for (const [exhibitorId, s] of sessions) {
-    if (s.status !== 'open') continue;
+  const mail = !!mailProvider();
+  const booths = (await rpc<{ id: string }[]>('plan_exhibitors', {})) ?? [];
+  for (const { id: exhibitorId } of booths) {
+    const wa = sessions.get(exhibitorId)?.status === 'open';
+    if (!wa && !mail) continue;
     const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
-    for (const d of due(p, today, approved)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body });
+    const ch = { wa: wa && !p.me.blocked, mail };
+    for (const d of due(p, today, approved, ch)) {
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail });
     }
   }
+}
+
+// ---------- mail (29/10): the queue, through the provider set here, within the same hours as WhatsApp; a short pause
+// between mails, and on a "slow down" from the provider the rest waits for the next round.
+let mailing = false;
+async function mailTick(): Promise<void> {
+  const provider = mailProvider();
+  if (mailing || !provider || !WA_KEY || !sendingHours(new Date())) return;
+  mailing = true;
+  try {
+    for (const r of (await rpc<MailRow[]>('mail_queue', { max_rows: 60 })) ?? []) {
+      try {
+        await provider.send(buildMail(r, PUBLIC_URL, MAIL_FROM));
+        await rpc('mail_result', { item: r.id, ok: true });
+      } catch (e) {
+        const msg = String((e as Error).message ?? e);
+        if (/throttl|rate|429|too many|maximum sending/i.test(msg)) { logger.warn({ msg }, 'mail: slowed down'); break; }
+        await rpc('mail_result', { item: r.id, ok: false, err: msg.slice(0, 200) });
+      }
+      await sleep(400);
+    }
+  } finally { mailing = false; }
+}
+
+// ---------- the removal link in every mail: a page that asks once; mail services that offer "unsubscribe" post here
+// directly (one click, RFC 8058). It removes him from that exhibitor's messages altogether.
+const page = (body: string) => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>הסרה מההודעות</title>
+<style>body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f6f7f9;color:#1a1a1a}main{max-width:420px;margin:12vh auto;padding:24px;background:#fff;border-radius:12px;box-shadow:0 1px 3px #0002;line-height:1.6}button{font:inherit;padding:10px 20px;border-radius:8px;border:0;background:#1a1a1a;color:#fff;cursor:pointer}</style>
+</head><body><main>${body}</main></body></html>`;
+const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+async function unsubscribe(req: http.IncomingMessage, res: http.ServerResponse, item: string): Promise<void> {
+  const html = (code: number, body: string) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(page(body)); };
+  const [info] = (await rpc<{ email: string; booth: string; removed: boolean }[]>('mail_unsub_info', { item })) ?? [];
+  if (!info) return html(404, '<p>הקישור הזה לא מוכר.</p>');
+  if (req.method === 'POST') {
+    await rpc('mail_unsubscribe', { item });
+    return html(200, `<h1>הוסרת</h1><p>לא יגיעו אליך עוד הודעות מהדוכן של ${escHtml(info.booth)}.</p>`);
+  }
+  if (info.removed) return html(200, `<h1>כבר הוסרת</h1><p>לא יגיעו אליך עוד הודעות מהדוכן של ${escHtml(info.booth)}.</p>`);
+  return html(200, `<h1>הסרה מההודעות</h1><p>להפסיק את ההודעות מהדוכן של ${escHtml(info.booth)} אל <span dir="ltr">${escHtml(info.email)}</span>?</p><form method="post"><button type="submit">כן, להסיר</button></form>`);
+}
+
+async function readJson(req: http.IncomingMessage, limit = 8192): Promise<Record<string, unknown>> {
+  let size = 0;
+  const parts: Buffer[] = [];
+  for await (const c of req) { size += (c as Buffer).length; if (size > limit) throw new Error('too big'); parts.push(c as Buffer); }
+  const t = Buffer.concat(parts).toString('utf8');
+  return t ? JSON.parse(t) : {};
 }
 
 // ---------- the check at the visit (model §10): do this visitor's numbers have WhatsApp? Each number once — a name on
@@ -281,10 +357,37 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/health') return send(200, { ok: true });
+  const unsub = /^\/u\/([0-9a-f-]{36})$/i.exec(url.pathname);
+  if (unsub && (req.method === 'GET' || req.method === 'POST')) {
+    try { return await unsubscribe(req, res, unsub[1]!); } catch (e) { logger.error(e); return send(500, { error: 'server error' }); }
+  }
 
   const token = (req.headers.authorization ?? '').replace(/^Bearer /, '');
   if (!token) return send(401, { error: 'sign in' });
   try {
+    if (url.pathname.startsWith('/admin/')) {
+      if (!(await isAdmin(token))) return send(403, { error: 'admin only' });
+      if (url.pathname === '/admin/keys' && req.method === 'GET') return send(200, { keys: keyView(), mail: mailProvider()?.name ?? null });
+      if (url.pathname === '/admin/keys' && req.method === 'POST') {
+        const b = await readJson(req);
+        const name = String(b.name ?? ''), value = String(b.value ?? '').trim();
+        if (!(name in KEY_SLOTS) || value.length > 4096) return send(400, { error: 'name' });
+        await setKey(name, value);
+        return send(200, { keys: keyView(), mail: mailProvider()?.name ?? null });
+      }
+      if (url.pathname === '/admin/mail-test' && req.method === 'POST') {
+        const p = mailProvider();
+        if (!p) return send(409, { error: 'mail is not set' });
+        const to = String((await readJson(req)).to ?? '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return send(400, { error: 'to' });
+        try {
+          await p.send(buildMail({ id: '00000000-0000-0000-0000-000000000000', to_email: to, from_name: 'מערכת התערוכה', reply_to: null, subject: 'בדיקת מייל',
+            body: 'שלום,\nזו בדיקה של שליחת המיילים של מערכת התערוכה. אם הגיע לתיבה ולא לספאם, הכל בסדר.' }, PUBLIC_URL, MAIL_FROM));
+          return send(200, { ok: true });
+        } catch (e) { return send(502, { error: String((e as Error).message ?? e).slice(0, 300) }); }
+      }
+      return send(404, { error: 'not found' });
+    }
     if (url.pathname === '/wa/stats' && req.method === 'GET') {
       if (!(await isAdmin(token))) return send(403, { error: 'admin only' });
       const m = process.memoryUsage();
@@ -322,4 +425,5 @@ await refreshPhones().catch((e) => logger.error(e));
 setInterval(() => { tick().catch((e) => logger.error(e)); }, 20_000);
 setInterval(() => { refreshPhones().catch((e) => logger.error(e)); }, 5 * 60_000);
 setInterval(() => { plan().catch((e) => logger.error(e)); }, 2 * 60_000);
-server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, ${sessions.size} accounts restored, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}`));
+setInterval(() => { mailTick().catch((e) => logger.error(e)); }, 30_000);
+server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, ${sessions.size} accounts restored, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}, mail ${mailProvider()?.name ?? 'not set'}`));

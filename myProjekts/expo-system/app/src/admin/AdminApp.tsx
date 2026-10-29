@@ -6,16 +6,18 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { ListLoad } from './lists.tsx';
+import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
 
 const BOOTH_URL = 'https://expo-booth.pages.dev';
 
-type View = 'overview' | 'exhibitors' | 'lists' | 'state' | 'broadcast';
+type View = 'overview' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
 const MENU: [View, string, IconName][] = [
   ['overview', 'סקירה', 'home'],
   ['exhibitors', 'מציגים', 'leads'],
   ['lists', 'רשימות', 'tasks'],
   ['state', 'מצב המערכת', 'gear'],
+  ['keys', 'מפתחות', 'key'],
   ['broadcast', 'הודעה למציגים', 'mail'],
 ];
 const isView = (h: string): h is View => MENU.some(([v]) => v === h);
@@ -112,6 +114,7 @@ function Shell({ email }: { email: string }) {
           </div>
         )}
         {view === 'state' && <PhaseView />}
+        {view === 'keys' && <KeysView />}
         {view === 'broadcast' && (
           <div className="page narrow">
             <PageHead title="הודעה למציגים" />

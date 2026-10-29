@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 const PATHS = {
   search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z M16 16l5 5',
   check: 'M4 12l5 5L20 6',
+  key: 'M15 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z M12.2 11.8 4 20 M6 18l2 2 M8.5 15.5l2 2',
   home: 'M4 11l8-7 8 7v10H4Z M10 21v-6h4v6',
   leads: 'M4 20v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2 M9 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6 M16 20v-2a5 5 0 0 0-2-4 M15 4a3 3 0 0 1 0 6',
   tasks: 'M5 5h14v14H5Z M8 12l3 3 5-6',

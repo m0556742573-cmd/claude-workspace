@@ -16,7 +16,7 @@ const setup: Setup = {
   defaults: { business: list, private: list },
 };
 const me = { name: 'יצחק', business: 'מכולת', phone: '050-0000000', greeting: 'shalom' as const, sensitive: false, blocked: false };
-const lead = { id: 'a', captured_on: FAIR, taps: ['משלוחים'], customer_date: null, business_owner: false, setup_version: null, name: 'יעקב', settled: true, targets: 1, booth_message: null, booth_none: false };
+const lead = { id: 'a', captured_on: FAIR, taps: ['משלוחים'], customer_date: null, business_owner: false, setup_version: null, name: 'יעקב', settled: true, targets: 1, mails: 0, booth_message: null, booth_none: false };
 const plan = (over: Partial<Plan> = {}): Plan => ({
   me, setups: [{ version: 1, active: true, data: setup }], texts: { 'איך מזמינים': 'שלום [שם], מזמינים בטלפון [טלפון].\n[שם המציג], [העסק] · [טלפון]' },
   leads: [lead], steps: [], manual: [], replies: [], planned: [], ...over,
@@ -59,6 +59,14 @@ test('a hole in the text: nothing goes out; a detail written once fills it', () 
 test('overdue is left to the exhibitor; the next step is his own call, not a message', () => {
   assert.equal(due(plan(), '2026-11-18', []).length, 0); // the message was due on the 16th
   assert.equal(due(plan({ steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] }), '2026-11-19', []).length, 0);
+});
+
+test('mail carries the path where WhatsApp cannot: no WhatsApp, not linked, or stopped', () => {
+  const noWa = { ...lead, targets: 0, mails: 1 };
+  assert.equal(due(plan({ leads: [noWa] }), FAIR, []).length, 0);                                  // mail not set: nothing
+  assert.equal(due(plan({ leads: [noWa] }), FAIR, [], { wa: false, mail: true }).length, 1);       // mail set, WhatsApp not linked
+  assert.equal(due(plan({ me: { ...me, blocked: true } }), FAIR, [], { wa: true, mail: true }).length, 0); // stopped, and he has no mail
+  assert.equal(due(plan({ me: { ...me, blocked: true }, leads: [{ ...lead, mails: 1 }] }), FAIR, [], { wa: true, mail: true }).length, 1);
 });
 
 test('a reply or "הסר" stops it; a blocked number plans nothing', () => {

@@ -5,10 +5,12 @@ import { supabase } from './backend.ts';
 export const WA_URL: string = import.meta.env.VITE_WA_URL ?? 'https://expo-wa.paydfb.easypanel.host';
 export interface WaState { status: 'none' | 'connecting' | 'qr' | 'open' | 'closed'; qr?: string; phone?: string }
 
-async function call<T>(path: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
+async function call<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: object): Promise<T> {
   const { data } = await supabase.auth.getSession();
-  const r = await fetch(WA_URL + path, { method, headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } });
-  if (!r.ok) throw new Error(`wa ${r.status}`);
+  const headers: Record<string, string> = { Authorization: `Bearer ${data.session?.access_token ?? ''}` };
+  if (body) headers['Content-Type'] = 'application/json';
+  const r = await fetch(WA_URL + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `wa ${r.status}`);
   return r.json() as Promise<T>;
 }
 export const waStatus = () => call<WaState>('/wa/status');
@@ -29,4 +31,9 @@ export async function waCheck(lead: string): Promise<Checked[] | null> {
   const r = await call<{ linked: boolean; numbers: Checked[] }>(`/wa/check?lead=${lead}`, 'POST');
   return r.linked ? r.numbers : null;
 }
+/** The keys page (admin only): what is set on the server, never the secret itself. */
+export interface AdminKeys { keys: Record<string, string | null>; mail: string | null }
+export const adminKeys = () => call<AdminKeys>('/admin/keys');
+export const adminSetKey = (name: string, value: string) => call<AdminKeys>('/admin/keys', 'POST', { name, value });
+export const adminMailTest = (to: string) => call<{ ok: true }>('/admin/mail-test', 'POST', { to });
 export const waStats = () => call<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number }>('/wa/stats');
