@@ -5,7 +5,8 @@
 // removal link, also as the one-click header mail services look for.
 import crypto from 'node:crypto';
 
-export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string; files?: string[] | null }
+export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string; files?: string[] | null;
+  /** A trial mail before the fair, to the exhibitor himself or a mail he added. */ trial?: boolean }
 export interface Attachment { name: string; type: string; data: Buffer }
 export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string; attachments?: Attachment[] }
 

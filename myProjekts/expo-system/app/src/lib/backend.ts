@@ -26,6 +26,9 @@ export interface Exhibitor {
   mail_always: boolean;
   /** Details for messages, written once: [כתובת], [שעות] … (29/10). */
   fills: Record<string, string>;
+  /** Trying the booth before the fair (29/10): every message to himself instead of nowhere; a day of the path in a
+   *  minute; more numbers or mails that get the trial messages too. */
+  trial_send: boolean; trial_fast: boolean; trial_to: string[];
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -34,7 +37,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -503,7 +506,7 @@ export async function queuedFor(leadId: string): Promise<{ status: string; error
   const { data } = await supabase.from('outbox').select('status, error, created_at').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
   return data ?? [];
 }
-export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always'>>): Promise<void> {
+export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always' | 'trial_send' | 'trial_fast' | 'trial_to'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }

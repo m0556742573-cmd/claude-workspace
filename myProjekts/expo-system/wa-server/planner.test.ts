@@ -46,6 +46,28 @@ test('a file written once goes with the message, and its line leaves the text', 
   assert.deepEqual(d[0]!.files, ['ex/1.pdf#' + encodeURIComponent('תפריט.pdf')]);
 });
 
+test('the trial fast clock: a day goes by in a minute from his registration, and a step a little late still goes', () => {
+  const two: Setup = { ...setup, needs: [{ ...setup.needs[0]!, variants: [{ path: { steps: [
+    { id: 'how', action: 'send', who: 'auto', timing: { kind: 'after', days: 0 }, message: 'איך מזמינים' },
+    { id: 'again', action: 'send', who: 'auto', timing: { kind: 'after', days: 2 }, message: 'איך מזמינים' },
+  ], end: { kind: 'list' } } }] }] };
+  const at = Date.parse('2026-11-16T10:00:00Z');
+  const setups = [{ version: 1, active: true, data: two }];
+  const trial = (over: Partial<Plan> = {}) => plan({ setups, leads: [{ ...lead, captured_at: new Date(at).toISOString() }], ...over });
+  const fast = (min: number) => ({ now: at + min * 60_000, minutesPerDay: 1 });
+  const first = due(trial(), FAIR, [], undefined, fast(0));
+  assert.equal(first[0]?.step, 'how');
+  assert.equal(first[0]!.virtual, FAIR);
+  // It went out on fast day 1; the next comes two fast days later, and the fast day is what the step keeps.
+  const steps = [{ lead_id: 'a', step_id: 'how', done_on: FAIR, virtual_on: '2026-11-17', outcome: 'noAnswer' as const }];
+  assert.equal(due(trial({ steps, planned: ['a|how'] }), FAIR, [], undefined, fast(2)).length, 0);
+  const next = due(trial({ steps, planned: ['a|how'] }), FAIR, [], undefined, fast(3));
+  assert.equal(next[0]?.step, 'again');
+  assert.equal(next[0]!.virtual, '2026-11-19');
+  // The real clock ignores the fast one.
+  assert.equal(due(plan({ setups, steps, planned: ['a|how'] }), FAIR, []).length, 0);
+});
+
 test('once only: what is planned is not planned again', () => {
   assert.equal(due(plan({ planned: ['a|how'] }), FAIR, []).length, 0);
 });

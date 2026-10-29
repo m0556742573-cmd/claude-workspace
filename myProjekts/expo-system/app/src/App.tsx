@@ -134,11 +134,13 @@ function Live() {
       setExhibitor(ex);
       if (!ex || !ex.approved) return;
       setSetup(await activeSetup(ex.id));
-      // In practice the booth searches sample names only: the real list is not even loaded (יצחק, 28/10).
+      // In practice the booth searches sample names only: the real list is not even loaded (יצחק, 28/10); the server
+      // gives it only from the fair on. The admin may try the real list before (29/10).
       const ph = await loadPhase().catch(() => 'practice' as const);
+      const adm = await isAdmin();
       setPhase(ph);
-      setDirectory(ph === 'practice' ? demoPeople : await loadDirectory());
-      setAdmin(await isAdmin());
+      setDirectory(ph === 'practice' && !adm ? demoPeople : await loadDirectory());
+      setAdmin(adm);
     }).catch(async (e) => {
       // No server: the booth opens from the copy kept on this tablet at the last load.
       const k = await kept<Boot>('boot:' + userId).catch(() => undefined);
@@ -279,6 +281,7 @@ function Live() {
             phase={phase}
             boothDefault={exhibitor.booth_default}
             checkWa={phase === 'live' ? waCheck : undefined}
+            trialSend={exhibitor.trial_send}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}

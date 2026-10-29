@@ -135,7 +135,14 @@ async function restore(): Promise<void> {
 
 interface Queued { id: string; exhibitor_id: string; lead_id: string; body: string; phone: string | null; name: string | null; first_contact: boolean; save_contact: boolean; first_today: number;
   /** Already known to have WhatsApp (checked at the visit): not asked again. */ known: boolean;
-  /** The files that go with it: "path#name" in the public bucket. */ files: string[] | null }
+  /** The files that go with it: "path#name" in the public bucket. */ files: string[] | null;
+  /** A trial message before the fair: it goes to the exhibitor himself or to a number he added, never to the visitor. */ trial: boolean }
+
+/** The number this WhatsApp is linked to, as 05…: a trial message to it is a note to himself. */
+function ownNumber(s: Session): string | null {
+  const m = s.sock?.user?.id?.match(/^(\d+)[:@]/);
+  return m ? (m[1]!.startsWith('972') ? '0' + m[1]!.slice(3) : m[1]!) : null;
+}
 
 /** A file of a message, from storage (the bucket is public by unguessable path). */
 async function fileOf(ref: string): Promise<{ data: Buffer; name: string; type: string }> {
@@ -146,23 +153,30 @@ async function fileOf(ref: string): Promise<{ data: Buffer; name: string; type: 
 }
 
 async function tick(): Promise<void> {
-  if (!WA_KEY || !sendingHours(new Date())) return;
+  if (!WA_KEY) return;
+  const hours = sendingHours(new Date());
   const rows = await rpc<Queued[]>('wa_queue', { max_rows: 200 });
   const byExhibitor = new Map<string, Queued[]>();
   for (const r of rows ?? []) (byExhibitor.get(r.exhibitor_id) ?? byExhibitor.set(r.exhibitor_id, []).get(r.exhibitor_id)!).push(r);
-  for (const [exhibitorId, queue] of byExhibitor) {
+  for (const [exhibitorId, all] of byExhibitor) {
     const s = sessions.get(exhibitorId);
     if (!s || s.status !== 'open' || s.busy || Date.now() < s.nextAt || Date.now() < s.pausedUntil) continue;
+    // A trial message to his own number (29/10) is a note to himself: any hour, outside the daily cap, a short gap.
+    // A trial message to a number he added goes to another person, so it keeps every limit.
+    const own = ownNumber(s);
+    const self = (q: Queued) => q.trial && !!own && q.phone === own;
+    const queue = hours ? all : all.filter(self);
     // A conversation that already exists goes first; a first message only while today's cap allows.
-    const left = firstLeft(queue[0]!.first_today, s.linkedAt);
-    const next = queue.find((q) => !q.first_contact) ?? (left > 0 ? queue.find((q) => q.first_contact) : undefined);
+    const left = firstLeft(all[0]!.first_today, s.linkedAt);
+    const next = queue.find(self) ?? queue.find((q) => !q.first_contact) ?? (left > 0 ? queue.find((q) => q.first_contact) : undefined);
     if (!next) continue;
+    const mine = self(next);
     s.busy = true;
-    sendOne(s, next).catch((e) => logger.error(e)).finally(() => { s.busy = false; s.nextAt = Date.now() + gapMs(); });
+    sendOne(s, next, mine).catch((e) => logger.error(e)).finally(() => { s.busy = false; s.nextAt = Date.now() + (mine ? 5000 + Math.random() * 5000 : gapMs()); });
   }
 }
 
-async function sendOne(s: Session, q: Queued): Promise<void> {
+async function sendOne(s: Session, q: Queued, self = false): Promise<void> {
   const sock = s.sock!;
   if (!q.phone || !/^0\d{8,9}$/.test(q.phone)) return rpc('wa_result', { item: q.id, ok: false, err: 'no_phone' });
   const jid = `972${q.phone.slice(1)}@s.whatsapp.net`;
@@ -187,7 +201,7 @@ async function sendOne(s: Session, q: Queued): Promise<void> {
       const caption = i === 0 ? q.body : undefined;
       await sock.sendMessage(to, f.type.startsWith('image/') ? { image: f.data, mimetype: f.type, caption } : { document: f.data, mimetype: f.type, fileName: f.name, caption });
     }
-    await rpc('wa_result', { item: q.id, ok: true, first: q.first_contact });
+    await rpc('wa_result', { item: q.id, ok: true, first: q.first_contact && !self });
   } catch (e) {
     const msg = String((e as Error).message ?? e);
     if (/rate-overlimit|429|too many/i.test(msg)) {
@@ -223,18 +237,29 @@ const mailProvider = () => providerFrom(keys);
 // linked, or mail set on this server); they join the same queues
 
 const approved: Approved[] = JSON.parse(await fs.readFile(new URL('../consultant-rounds/messages-approved.json', import.meta.url), 'utf8'));
-async function plan(): Promise<void> {
-  if (!WA_KEY || !sendingHours(new Date())) return;
-  const today = israelDay(new Date());
+// Before the fair (29/10) the database hands over only the booths that try with sending, their trial leads, and whether
+// they run the fast clock (a day of the path in a minute); those are planned every half minute, at any hour.
+let planning = false;
+async function plan(onlyFast = false): Promise<void> {
+  if (!WA_KEY || planning) return;
+  planning = true;
+  try { await planOnce(onlyFast); } finally { planning = false; }
+}
+async function planOnce(onlyFast: boolean): Promise<void> {
+  const now = new Date();
+  const hours = sendingHours(now);
+  const today = israelDay(now);
   const mail = !!mailProvider();
-  const booths = (await rpc<{ id: string }[]>('plan_exhibitors', {})) ?? [];
-  for (const { id: exhibitorId } of booths) {
-    const wa = sessions.get(exhibitorId)?.status === 'open';
+  const booths = (await rpc<{ id: string; trial: boolean; fast: boolean }[]>('plan_exhibitors', {})) ?? [];
+  for (const b of booths) {
+    if ((onlyFast && !b.fast) || (!hours && !b.trial)) continue;
+    const wa = sessions.get(b.id)?.status === 'open';
     if (!wa && !mail) continue;
-    const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
+    const p = await rpc<Plan>('wa_plan', { exhibitor: b.id });
     const ch = { wa: wa && !p.me.blocked, mail };
-    for (const d of due(p, today, approved, ch)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail, files: d.files.length ? d.files : null });
+    for (const d of due(p, today, approved, ch, b.fast ? { now: now.getTime(), minutesPerDay: 1 } : undefined)) {
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail,
+        files: d.files.length ? d.files : null, fast_day: d.virtual ?? null });
     }
   }
 }
@@ -244,10 +269,13 @@ async function plan(): Promise<void> {
 let mailing = false;
 async function mailTick(): Promise<void> {
   const provider = mailProvider();
-  if (mailing || !provider || !WA_KEY || !sendingHours(new Date())) return;
+  if (mailing || !provider || !WA_KEY) return;
+  // A trial mail goes to the exhibitor himself (or a mail he added), so it may go at any hour.
+  const hours = sendingHours(new Date());
   mailing = true;
   try {
     for (const r of (await rpc<MailRow[]>('mail_queue', { max_rows: 60 })) ?? []) {
+      if (!hours && !r.trial) continue;
       try {
         const attachments = await Promise.all((r.files ?? []).map(fileOf));
         await provider.send({ ...buildMail(r, PUBLIC_URL, MAIL_FROM), attachments });
@@ -441,5 +469,6 @@ await refreshPhones().catch((e) => logger.error(e));
 setInterval(() => { tick().catch((e) => logger.error(e)); }, 20_000);
 setInterval(() => { refreshPhones().catch((e) => logger.error(e)); }, 5 * 60_000);
 setInterval(() => { plan().catch((e) => logger.error(e)); }, 2 * 60_000);
+setInterval(() => { plan(true).catch((e) => logger.error(e)); }, 30_000);
 setInterval(() => { mailTick().catch((e) => logger.error(e)); }, 30_000);
 server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, ${sessions.size} accounts restored, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}, mail ${mailProvider()?.name ?? 'not set'}`));

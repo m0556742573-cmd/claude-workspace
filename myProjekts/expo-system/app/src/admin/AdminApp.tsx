@@ -244,7 +244,7 @@ function WaCard() {
 /** The system's phase, one for all booths (migration 0019). Moving to live can delete what was registered in practice:
  *  that cannot be undone, so it is asked in so many words, with the numbers, before it is done. */
 const PHASES: [Phase, string, string][] = [
-  ['practice', 'תרגול · לפני התערוכה', 'הדוכן מחפש בשמות לדוגמה, ושום הודעה לא נשלחת. מה שנרשם נשמר כתרגול.'],
+  ['practice', 'ניסיון · לפני התערוכה', 'הדוכן מחפש בשמות לדוגמה, ואף מבקר לא מקבל הודעה. כל מציג בוחר אם לנסות בלי שליחה, או לקבל את ההודעות בעצמו. מה שנרשם נשמר כניסיון.'],
   ['live', 'אמיתי', 'רשימת הקהילה האמיתית, וההודעות יוצאות. זה המצב לתערוכה ולימים שאחריה.'],
   ['after', 'אחרי התערוכה · CRM בלבד', 'הדוכן נסגר אצל כולם, וה-CRM נשאר. ההודעות ממשיכות לצאת לפי המסלולים.'],
 ];
@@ -260,7 +260,7 @@ function PhaseView() {
     setBusy(true); setDone('');
     try {
       const r = await adminSetPhase(to, to === 'live' && drop);
-      setDone(`המערכת במצב "${PHASES.find(([p]) => p === to)![1]}".${r.dropped ? ` נמחקו ${r.dropped} רישומים מהתרגול.` : ''}`);
+      setDone(`המערכת במצב "${PHASES.find(([p]) => p === to)![1]}".${r.dropped ? ` נמחקו ${r.dropped} רישומים מהניסיון.` : ''}`);
       setAsking(null); load();
     } catch (e) { setDone('לא הוחלף: ' + String((e as Error).message ?? e)); }
     finally { setBusy(false); }
@@ -268,7 +268,7 @@ function PhaseView() {
   return (
     <div className="page narrow">
       <PageHead title="מצב המערכת" sub={st ? `מאז ${new Date(st.changed_at).toLocaleDateString('he-IL')}${st.changed_by ? ` · ${st.changed_by}` : ''}` : undefined}
-        tip="מצב אחד לכל הדוכנים. בתרגול אין שליחה ואין שמות אמיתיים; במעבר לאמיתי אפשר למחוק את מה שנרשם בתרגול." />
+        tip="מצב אחד לכל הדוכנים. בניסיון אין שמות אמיתיים, ואף מבקר לא מקבל הודעה; במעבר לאמיתי אפשר למחוק את מה שנרשם בניסיון." />
       {!st ? <p className="muted">טוען…</p> : (
         <div className="phase-list">
           {PHASES.map(([p, title, about]) => (
@@ -284,8 +284,8 @@ function PhaseView() {
           <h2>להעביר את כל הדוכנים ל"{PHASES.find(([p]) => p === asking)![1]}"?</h2>
           {asking === 'live' && st.practice_leads > 0 && (
             <div className="switchrow">
-              <span>למחוק את {st.practice_leads} הרישומים מהתרגול ({st.practice_booths} דוכנים), עם ההערות וההקלטות שלהם. <b>אי אפשר להחזיר.</b></span>
-              <button type="button" className="switch" role="switch" aria-checked={drop} aria-label="למחוק את רישומי התרגול" onClick={() => setDrop(!drop)} />
+              <span>למחוק את {st.practice_leads} הרישומים מהניסיון ({st.practice_booths} דוכנים), עם ההערות וההקלטות שלהם. <b>אי אפשר להחזיר.</b></span>
+              <button type="button" className="switch" role="switch" aria-checked={drop} aria-label="למחוק את רישומי הניסיון" onClick={() => setDrop(!drop)} />
             </div>
           )}
           {asking === 'practice' && <p className="muted">מעכשיו הדוכן יחפש בשמות לדוגמה, ושום הודעה לא תצא. מה שכבר נרשם במצב אמיתי נשאר.</p>}

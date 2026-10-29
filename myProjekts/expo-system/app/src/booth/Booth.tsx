@@ -36,11 +36,13 @@ export interface BoothProps {
   boothDefault?: string | null;
   /** The check at the visit (§10): whether the visitor's numbers have WhatsApp. Live only, with his WhatsApp linked. */
   checkWa?: (leadId: string) => Promise<Checked[] | null>;
+  /** Before the fair: he chose to get every message himself instead of nowhere (29/10). */
+  trialSend?: boolean;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -206,7 +208,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       {eyebrow && <div className="sec eyebrow">{eyebrow}</div>}
       {practice && (
         <div className="practice-banner">
-          <b>דוכן לתרגול.</b> השמות כאן לדוגמה, ושום הודעה לא נשלחת. מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני התערוכה.
+          <b>דוכן לניסיון.</b> השמות כאן לדוגמה{trialSend ? ', וההודעות מגיעות אליך ולא למבקר.' : ', ושום הודעה לא נשלחת.'} מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני התערוכה.
         </div>
       )}
       {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}
@@ -296,7 +298,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </>
           )}
 
-          {messages.length > 0 && <SendLine lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} picking={picking}
+          {messages.length > 0 && <SendLine lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
             checked={checked[current.id]} onExtra={setExtra} />}
 
@@ -377,8 +379,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
  * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
  * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
  */
-function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPick, onChoose, checked, onExtra }: {
-  lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; picking: boolean;
+function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked, onExtra }: {
+  lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; trialSend: boolean; picking: boolean;
   onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
   /** What the check at the visit found, when it ran. */ checked?: Checked[]; onExtra: (extra: string[]) => void;
 }) {
@@ -405,7 +407,7 @@ function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPi
           : !picking && <span className="faint">אין הודעה מיידית במסלול</span>}
         <button type="button" className="text-btn" aria-expanded={picking} onClick={onPick}>{chosen || auto || def ? 'לשנות' : 'לבחור הודעה'}</button>
         {noWa && <span className="faint small">· אין לו וואטסאפ</span>}
-        {practice && <span className="faint small">· בתרגול לא נשלח</span>}
+        {practice && <span className="faint small">{trialSend ? '· בניסיון יוצא אליך' : '· בניסיון לא נשלח'}</span>}
       </div>
       {extra.length > 0 && (
         <div className="send-row">

@@ -394,7 +394,9 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>}
       <div className="nc-now">
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
-        {isAuto && (ctx.phase === 'practice' ? <div className="faint small">בתרגול לא יוצא כלום. במצב אמיתי היא תצא לבד.</div> : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />)}
+        {isAuto && (ctx.phase === 'practice'
+          ? <div className="faint small">{ctx.exhibitor.trial_send ? 'בניסיון היא יוצאת אליך, לא למבקר.' : 'בניסיון לא יוצא כלום. במצב אמיתי היא תצא לבד.'}</div>
+          : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />)}
       </div>
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
@@ -495,7 +497,9 @@ export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: 
       <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
       {shown && <div className="note preview">{body}{files.map((f) => <div key={f.path} className="faint small">📎 {f.name}</div>)}</div>}
       {ctx.phase === 'practice' ? (
-        <p className="note">בתרגול לא נשלחת שום הודעה. כך היא תיראה כשהמערכת תהיה במצב אמיתי.</p>
+        <p className="note">{ctx.exhibitor.trial_send
+          ? 'בניסיון ההודעות שיוצאות לבד מגיעות אליך. כך ההודעה תיראה למבקר.'
+          : 'בניסיון לא נשלחת שום הודעה. כך היא תיראה כשהמערכת תהיה במצב אמיתי.'}</p>
       ) : optedOut ? (
         <p className="note">הוא ביקש לא לקבל הודעות. אפשר להתקשר, אם סיכמתם.</p>
       ) : missing.length ? (
@@ -1200,6 +1204,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
       <SubTabs label="פרטים וחיבורים" on={sub} set={setSub} tabs={[['msgs', 'הודעות'], ['self', 'הרשמה עצמית'], ['links', 'חיבורים'], ['account', 'החשבון']]} />
       <div className="subview">
         {sub === 'msgs' && <>
+          {ctx.phase === 'practice' && <Trial ctx={ctx} />}
           <section className="panel-w">
             <h2>איך ההודעות שלך פונות לאנשים</h2>
             <div className="chips">
@@ -1290,6 +1295,57 @@ function WaLink({ ctx }: { ctx: Ctx }) {
 }
 
 /** When the visitor's own mail gets messages: his choice (יצחק, 29/10). Only when his phone gets no WhatsApp (§10), or always. */
+/** Trying the booth before the fair (יצחק, 29/10): with sample names, without sending, or with every message sent to him
+ *  instead of the visitor, opening with whom it would have gone to. The first 10 trial visitors get messages. */
+function Trial({ ctx }: { ctx: Ctx }) {
+  const e = ctx.exhibitor;
+  const [typed, setTyped] = useState('');
+  const [bad, setBad] = useState(false);
+  const set = async (patch: Partial<Pick<Exhibitor, 'trial_send' | 'trial_fast' | 'trial_to'>>) => {
+    ctx.setExhibitor({ ...e, ...patch });
+    await setWaOptions(e.id, patch).catch(() => ctx.setExhibitor(e));
+  };
+  function add() {
+    const d = destinationOf(typed);
+    if (!d) { setBad(true); return; }
+    if (!e.trial_to.includes(d.value)) set({ trial_to: [...e.trial_to, d.value] });
+    setTyped(''); setBad(false);
+  }
+  return (
+    <section className="panel-w">
+      <h2>ניסיון לפני התערוכה</h2>
+      <p className="muted">עד התערוכה הדוכן עובד עם שמות לדוגמה, ואף מבקר לא מקבל הודעה. אפשר לנסות בלי שליחה, או לקבל כל הודעה בעצמך, כדי לראות בדיוק מה המבקר יקבל.</p>
+      <div className="chips">
+        <button type="button" className="chip" aria-pressed={!e.trial_send} onClick={() => set({ trial_send: false })}>בלי שליחה</button>
+        <button type="button" className="chip" aria-pressed={e.trial_send} onClick={() => set({ trial_send: true })}>ההודעות אליי</button>
+      </div>
+      {e.trial_send && <>
+        <div className="faint small">ההודעות מגיעות אל:</div>
+        <div className="dests">
+          {e.whatsapp && <span className="dest">הוואטסאפ שלך · <span dir="ltr">{showDestination(e.whatsapp)}</span></span>}
+          {e.email && <span className="dest">המייל שלך · <span dir="ltr">{e.email}</span></span>}
+          {e.trial_to.map((v) => (
+            <span key={v} className="dest"><span dir="ltr">{showDestination(v)}</span>
+              <button type="button" className="text-btn" aria-label={`להסיר את ${showDestination(v)}`} onClick={() => set({ trial_to: e.trial_to.filter((x) => x !== v) })}>✕</button>
+            </span>
+          ))}
+        </div>
+        <div className="row">
+          <input className="input" dir="auto" aria-label="עוד מספר או מייל לניסיון" placeholder="עוד מספר או מייל" value={typed}
+            onChange={(ev) => { setTyped(ev.target.value); setBad(false); }} onKeyDown={(ev) => { if (ev.key === 'Enter') add(); }} />
+          <button type="button" className="btn" disabled={!typed.trim()} onClick={add}>להוסיף</button>
+        </div>
+        {bad && <p className="err small">זה לא נראה כמו מספר טלפון או מייל.</p>}
+        <div className="switchrow">
+          <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה</span></span>
+          <button type="button" className="switch" role="switch" aria-checked={e.trial_fast} aria-label="יום עובר בדקה" onClick={() => set({ trial_fast: !e.trial_fast })} />
+        </div>
+        <p className="muted small">עשרת מבקרי הניסיון הראשונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת. בוואטסאפ זה יוצא רק כשהוא מחובר.</p>
+      </>}
+    </section>
+  );
+}
+
 function MailChoice({ ctx }: { ctx: Ctx }) {
   const on = ctx.exhibitor.mail_always;
   const set = async (v: boolean) => { if (v === on) return; ctx.setExhibitor({ ...ctx.exhibitor, mail_always: v }); await setWaOptions(ctx.exhibitor.id, { mail_always: v }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
