@@ -1131,6 +1131,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
             </div>
           </section>
           <Signature ctx={ctx} />
+          <MailChoice ctx={ctx} />
           <section className="panel-w">
             <h2>הנוסח של כל הודעה</h2>
             <p className="muted">ההודעות עצמן, כמו שהמבקר יקבל אותן, נערכות במסך ההודעות.</p>
@@ -1207,6 +1208,22 @@ function WaLink({ ctx }: { ctx: Ctx }) {
           <p className="muted">סורקים קוד מהטלפון, כמו בוואטסאפ ווב. הטלפון ממשיך לעבוד כרגיל, ואפשר לנתק בכל רגע.</p>
           <button type="button" className="btn primary start-sm" disabled={busy} onClick={() => run(waLink)}>לחבר את הוואטסאפ</button>
         </>}
+    </section>
+  );
+}
+
+/** When the visitor's own mail gets messages: his choice (יצחק, 29/10). Only when his phone gets no WhatsApp (§10), or always. */
+function MailChoice({ ctx }: { ctx: Ctx }) {
+  const on = ctx.exhibitor.mail_always;
+  const set = async (v: boolean) => { if (v === on) return; ctx.setExhibitor({ ...ctx.exhibitor, mail_always: v }); await setWaOptions(ctx.exhibitor.id, { mail_always: v }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
+  return (
+    <section className="panel-w">
+      <h2>המייל של המבקר</h2>
+      <div className="chips">
+        <button type="button" className="chip" aria-pressed={!on} onClick={() => set(false)}>רק כשאין לו וואטסאפ</button>
+        <button type="button" className="chip" aria-pressed={on} onClick={() => set(true)}>תמיד, גם כשיש וואטסאפ</button>
+      </div>
+      <p className="muted small">אפשר לשנות לכל מבקר בדף שלו, בפרטים.</p>
     </section>
   );
 }

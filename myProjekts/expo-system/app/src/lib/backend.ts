@@ -21,6 +21,8 @@ export interface Exhibitor {
   wa_blocked_at: string | null; wa_blocked_reason: string | null;
   /** The booth's default message (17/10): one tap on the card when the path sends nothing at once. */
   booth_default: string | null;
+  /** The visitor's own mail gets messages always, or only when his phone gets no WhatsApp (his choice, 29/10). */
+  mail_always: boolean;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -29,7 +31,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -485,7 +487,7 @@ export async function queuedFor(leadId: string): Promise<{ status: string; error
   const { data } = await supabase.from('outbox').select('status, error, created_at').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
   return data ?? [];
 }
-export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default'>>): Promise<void> {
+export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }
