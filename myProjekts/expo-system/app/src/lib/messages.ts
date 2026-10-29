@@ -6,7 +6,7 @@ import { draftFor as draft, textOf as textFrom, type Approved, type Setup } from
 import approvedJson from '../../../consultant-rounds/messages-approved.json';
 import { loadTexts } from './backend.ts';
 
-export { fill, holes, messagesOf, type Me } from '@expo/engine';
+export { detailsIn, fill, holes, messagesOf, type Me } from '@expo/engine';
 const approved = approvedJson as Approved[];
 
 export const draftFor = (setup: Setup, id: string) => draft(setup, id, approved);

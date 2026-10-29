@@ -23,6 +23,8 @@ export interface Exhibitor {
   booth_default: string | null;
   /** The visitor's own mail gets messages always, or only when his phone gets no WhatsApp (his choice, 29/10). */
   mail_always: boolean;
+  /** Details for messages, written once: [כתובת], [שעות] … (29/10). */
+  fills: Record<string, string>;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -31,7 +33,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills').maybeSingle();
   if (error) throw error;
   return data;
 }

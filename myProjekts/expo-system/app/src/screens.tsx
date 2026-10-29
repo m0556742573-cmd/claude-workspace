@@ -15,12 +15,12 @@ import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { destinationOf, showDestination } from './lib/destination.ts';
-import { draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
+import { detailsIn, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -993,7 +993,7 @@ function useMe(ctx: Ctx): Me {
     return () => removeEventListener('expo-greeting', f);
   }, []);
   const e = ctx.exhibitor;
-  return { name: e.name, business: e.business, phone: e.phone, greeting, sensitive: e.sensitive || ctx.setup.sensitive };
+  return { name: e.name, business: e.business, phone: e.phone, greeting, sensitive: e.sensitive || ctx.setup.sensitive, fills: e.fills };
 }
 const SAMPLE = 'ישראל ישראלי';
 
@@ -1006,7 +1006,7 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   return (
     <div className="page">
       <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
-        tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. מה שבסוגריים מרובעים צריך להשלים, והודעה כזאת לא יוצאת עד שמשלימים." />
+        tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. פרט בסוגריים מרובעים (כתובת, שעות) ממלאים פעם אחת ב'פרטים להודעות', והוא נכנס לכל ההודעות. הודעה עם פרט ריק לא יוצאת." />
       <div className="two-col msgs">
       <section className="card">
       <h2>ההודעות</h2>
@@ -1030,15 +1030,62 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
         </ul>
       )}
       </section>
+      <div className="col">
+      {texts && <MessageDetails ctx={ctx} texts={texts} list={list} />}
       <section className="card">
         <h2>איך הן יוצאות</h2>
         <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › חיבורים): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
         <p className="muted"><b>בלי חיבור:</b> בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
-        <p className="muted">הודעה עם משהו בסוגריים מרובעים לא יוצאת עד שמשלימים אותה.</p>
+        <p className="muted">הודעה עם פרט ריק בסוגריים מרובעים לא יוצאת עד שממלאים אותו.</p>
         <Soon title="בהמשך">מייל שיוצא לבד, למי שאין לו וואטסאפ.</Soon>
       </section>
       </div>
+      </div>
     </div>
+  );
+}
+
+/**
+ * פרטים להודעות (יצחק, 29/10): every detail in square brackets across his messages, besides what the system fills by
+ * itself, written once and filled into all of them. A new one (his own edit; later the consultant's) shows up here by
+ * itself. While one is empty, the messages that use it do not go out.
+ */
+function MessageDetails({ ctx, texts, list }: { ctx: Ctx; texts: Record<string, string>; list: { id: string }[] }) {
+  const uses = new Map<string, string[]>();
+  for (const m of list) for (const k of detailsIn(textOf(ctx.setup, texts, m.id))) (uses.get(k) ?? uses.set(k, []).get(k)!).push(m.id);
+  const fills = ctx.exhibitor.fills ?? {};
+  const [vals, setVals] = useState<Record<string, string>>(fills);
+  const [err, setErr] = useState('');
+  async function save(k: string) {
+    const v = (vals[k] ?? '').trim();
+    if (v === (fills[k] ?? '')) return;
+    const next = { ...fills };
+    if (v) next[k] = v; else delete next[k];
+    ctx.setExhibitor({ ...ctx.exhibitor, fills: next });
+    try { await updateMe(ctx.exhibitor.id, { fills: next }); setErr(''); } catch { ctx.setExhibitor(ctx.exhibitor); setErr('לא נשמר. אפשר לנסות שוב.'); }
+  }
+  if (!uses.size) return null;
+  const empty = [...uses.keys()].filter((k) => !fills[k]).length;
+  return (
+    <section className="card">
+      <h2>פרטים להודעות {empty > 0 && <span className="tag">חסרים {empty}</span>}</h2>
+      <p className="muted">ממלאים פעם אחת, וזה נכנס לכל ההודעות שבהן הפרט מופיע. כל עוד פרט ריק, ההודעות שלו לא יוצאות.</p>
+      <div className="fills">
+        {[...uses].map(([k, ids]) => {
+          const file = k.startsWith('קובץ');
+          const whole = ids.length === 1 && ids[0] === k;
+          return (
+            <label className="field" key={k}>
+              <span>{file ? `${k.replace(/^קובץ:?\s*/, '') || 'קובץ'} (קובץ)` : k}{!fills[k] && <span className="faint small"> · חסר</span>}</span>
+              <input className="input" dir="auto" value={vals[k] ?? ''} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} onBlur={() => save(k)}
+                placeholder={file ? 'בינתיים: קישור לקובץ' : whole ? 'מה ההודעה אומרת' : ''} />
+              <span className="faint small">{whole ? 'זו ההודעה עצמה. אפשר גם לכתוב אותה במלואה בנגיעה בה.' : `בהודעות: ${ids.join(' · ')}`}</span>
+            </label>
+          );
+        })}
+      </div>
+      {err && <p className="err small">{err}</p>}
+    </section>
   );
 }
 
@@ -1064,7 +1111,7 @@ function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me:
       <label className="field" htmlFor="msg-body">הנוסח
         <textarea id="msg-body" className="area" rows={Math.max(5, draft.split('\n').length + 1)} value={draft} onChange={(e) => setDraft(e.target.value)} />
       </label>
-      <p className="faint small">[שם] יוחלף בשם המבקר, ו־[שם המציג], [העסק] ו־[טלפון] בפרטים שלך. הפנייה ("שלום" או "לכבוד") נקבעת בהגדרות.</p>
+      <p className="faint small">[שם] יוחלף בשם המבקר, ו־[שם המציג], [העסק] ו־[טלפון] בפרטים שלך. כל פרט אחר בסוגריים (למשל [כתובת]) ממלאים פעם אחת ב"פרטים להודעות", וגם פרט חדש שתכתוב יופיע שם. הפנייה ("שלום" או "לכבוד") נקבעת בהגדרות.</p>
       <div className="stack">
         <span className="sec">כך {SAMPLE} יקבל אותה</span>
         <div className="note preview">{shown}</div>

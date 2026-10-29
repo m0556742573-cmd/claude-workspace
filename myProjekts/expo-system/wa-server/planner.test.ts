@@ -48,8 +48,12 @@ test('not before the card settled, not with nowhere to send it by WhatsApp', () 
   assert.equal(due(plan({ leads: [{ ...lead, targets: 2 }] }), FAIR, []).length, 1);  // his and his wife's: one step, queued to both
 });
 
-test('a hole in the text: nothing goes out', () => {
-  assert.equal(due(plan({ texts: { 'איך מזמינים': 'שלום [שם], הכתובת: [כתובת]' } }), FAIR, []).length, 0);
+test('a hole in the text: nothing goes out; a detail written once fills it', () => {
+  const texts = { 'איך מזמינים': 'שלום [שם], הכתובת: [כתובת]' };
+  assert.equal(due(plan({ texts }), FAIR, []).length, 0);
+  const d = due(plan({ texts, me: { ...me, fills: { 'כתובת': 'רחוב השומר 5' } } }), FAIR, []);
+  assert.equal(d.length, 1);
+  assert.match(d[0]!.body, /הכתובת: רחוב השומר 5/);
 });
 
 test('overdue is left to the exhibitor; the next step is his own call, not a message', () => {

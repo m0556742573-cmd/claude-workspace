@@ -1,7 +1,7 @@
 // The engine against setups taken from the 109-business rounds. The expo is Monday 16/11/2026.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { choosePath, immediateMessage, isRestDay, nextOccurrence, nextTask, settle } from '../src/index.ts';
+import { choosePath, detailsIn, fill, holes, immediateMessage, isRestDay, nextOccurrence, nextTask, settle } from '../src/index.ts';
 import type { Lead, Path, Setup, StepRecord } from '../src/index.ts';
 
 const EXPO = '2026-11-16';
@@ -239,4 +239,13 @@ test('the booth choice goes out first and replaces the immediate message of the 
   const none = lead(['משלוחים'], { booth: {} });
   const n3 = nextTask(s, none, EXPO);
   assert.equal(n3.kind === 'task' && n3.stepId, 'call');
+});
+
+test('a detail written once fills every message; what is still empty stays a hole', () => {
+  const me = { name: 'יצחק', business: 'שטריימלך', phone: '050-0000000', greeting: 'shalom' as const, sensitive: false, fills: { 'כתובת': 'רחוב השומר 5', 'שעות': ' ' } };
+  const body = 'שלום [שם], אנחנו ב[כתובת], [שעות].\n[שם המציג], [העסק] · [טלפון]';
+  assert.deepEqual(detailsIn(body), ['כתובת', 'שעות']); // [שם], [שם המציג], [העסק], [טלפון] are filled by the system
+  const out = fill(body, me, 'יעקב');
+  assert.ok(out.includes('אנחנו ברחוב השומר 5, [שעות].'));
+  assert.deepEqual(holes(out), ['[שעות]']); // blank counts as empty
 });

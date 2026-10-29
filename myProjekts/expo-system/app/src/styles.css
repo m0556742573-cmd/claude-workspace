@@ -625,3 +625,8 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .dest { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dest .field-row { min-width: 0; overflow-wrap: anywhere; }
 .dest-acts { display: flex; align-items: center; gap: 6px; flex: none; }
+
+/* details for messages, written once */
+.msgs .col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.fills { display: grid; gap: 12px; }
+.fills .field { display: grid; gap: 4px; }
