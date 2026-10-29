@@ -1,5 +1,6 @@
 // Mail (29/10): one message as the visitor gets it, and the provider that carries it. The provider is set on this server
-// (the admin platform's keys page): Amazon SES, or Cloudflare once he chooses it (26/10 compared both; not decided).
+// (the admin platform's keys page): Amazon SES or Cloudflare Email Service (26/10 compared both; on 29/10 he set up
+// expo.y-h-m.com for sending in Cloudflare).
 // Each mail goes in the exhibitor's name from expo.y-h-m.com, replies go to his own mail, and every mail carries a
 // removal link, also as the one-click header mail services look for.
 import crypto from 'node:crypto';
@@ -131,9 +132,38 @@ function ses(region: string, keyId: string, secret: string): Provider {
   };
 }
 
+/** Cloudflare Email Service takes the mail as fields, not as MIME (REST API, docs of 29/10): the removal link goes in
+ *  its allowed List-Unsubscribe headers, the files as base64 attachments (5 MiB for the whole mail). */
+export function cloudflareBody(m: Mail) {
+  return {
+    from: { address: m.from, name: m.fromName },
+    to: [m.to],
+    ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+    subject: m.subject,
+    text: m.text,
+    html: m.html,
+    headers: { 'List-Unsubscribe': `<${m.unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({ content: a.data.toString('base64'), filename: a.name, type: a.type, disposition: 'attachment' })) } : {}),
+  };
+}
+
+function cloudflare(account: string, token: string): Provider {
+  const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/email/sending/send`;
+  return {
+    name: 'cloudflare',
+    async send(m) {
+      const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(cloudflareBody(m)) });
+      const j = (await r.json().catch(() => null)) as { success?: boolean; errors?: { code: number; message: string }[]; result?: { permanent_bounces?: string[] } } | null;
+      // A "slow down" (429) keeps its number in the message, so the mail loop waits for the next round.
+      if (!r.ok || !j?.success) throw new Error(`cloudflare ${r.status} ${(j?.errors ?? []).map((e) => `${e.code} ${e.message}`).join('; ')}`.trim());
+      if (j.result?.permanent_bounces?.length) throw new Error('cloudflare: the address bounced');
+    },
+  };
+}
+
 /** The provider set on this server, or none (then mail waits in the queue). */
 export function providerFrom(keys: Record<string, string>): Provider | null {
   if (keys.mail_provider === 'ses' && keys.ses_region && keys.ses_key_id && keys.ses_secret) return ses(keys.ses_region, keys.ses_key_id, keys.ses_secret);
-  // Cloudflare Email Service: wired once he chooses it, against its documentation of that day.
+  if (keys.mail_provider === 'cloudflare' && keys.cf_account && keys.cf_token) return cloudflare(keys.cf_account, keys.cf_token);
   return null;
 }

@@ -9,7 +9,7 @@ type Field = [name: string, label: string, secret: boolean, hint?: string];
 const GROUPS: { title: string; about: string; fields: Field[]; when?: (k: AdminKeys['keys']) => boolean }[] = [
   { title: 'מייל · Amazon SES', about: 'אם בחרת באמזון. מפתח של משתמש IAM עם הרשאת שליחה בלבד.', when: (k) => k.mail_provider === 'ses',
     fields: [['ses_region', 'אזור (Region)', false, 'למשל eu-central-1'], ['ses_key_id', 'Access key ID', true], ['ses_secret', 'Secret access key', true]] },
-  { title: 'מייל · Cloudflare', about: 'אם בחרת ב-Cloudflare. החיבור עצמו ייבנה אחרי הבחירה.', when: (k) => k.mail_provider === 'cloudflare',
+  { title: 'מייל · Cloudflare', about: 'ה-Account ID מופיע בדף הבית של Cloudflare. ה-API token: מפתח חדש עם ההרשאה Email Sending: Edit. צריך גם את Workers Paid, אחרת אפשר לשלוח רק לכתובות שאומתו.', when: (k) => k.mail_provider === 'cloudflare',
     fields: [['cf_account', 'Account ID', false], ['cf_token', 'API token', true]] },
   { title: 'וואטסאפ רשמי · הודעת הבוקר', about: 'מ-Meta, אחרי ההקמה שם.', fields: [['meta_phone_id', 'Phone number ID', false], ['meta_token', 'Access token (System User)', true]] },
   { title: 'Anthropic · היועץ', about: 'מ-console.anthropic.com.', fields: [['anthropic_key', 'API key', true]] },

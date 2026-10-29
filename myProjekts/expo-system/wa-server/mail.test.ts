@@ -1,7 +1,7 @@
 // Mail: the visitor's mail (removal link, Hebrew headers) and the AWS signature, against AWS's own published example.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMail, mime, sigv4 } from './mail.ts';
+import { buildMail, cloudflareBody, mime, providerFrom, sigv4 } from './mail.ts';
 
 const row = { id: '11111111-2222-3333-4444-555555555555', to_email: 'visitor@example.com', body: 'שלום יעקב,\nהמחירון: https://example.com/p\nיצחק, שטריימלך', from_name: 'יצחק', reply_to: 'itzhak@example.com', subject: 'שטריימלך' };
 
@@ -25,6 +25,23 @@ test('a file goes attached, its Hebrew name encoded', () => {
   assert.match(raw, /Content-Disposition: attachment; filename\*=UTF-8''%D7%9E/);
   assert.ok(raw.includes(Buffer.from('%PDF-1.4 x').toString('base64')));
   assert.ok(!/[^\x00-\x7f]/.test(raw));
+});
+
+test('Cloudflare gets the mail as fields: his name, his reply address, the one-click removal headers and the files', () => {
+  const m = { ...buildMail(row, 'https://expo-wa.example', 'expo@expo.y-h-m.com'), attachments: [{ name: 'מחירון.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 x') }] };
+  const b = cloudflareBody(m);
+  assert.deepEqual(b.from, { address: 'expo@expo.y-h-m.com', name: 'יצחק' });
+  assert.deepEqual(b.to, ['visitor@example.com']);
+  assert.equal(b.reply_to, 'itzhak@example.com');
+  assert.deepEqual(b.headers, { 'List-Unsubscribe': '<https://expo-wa.example/u/11111111-2222-3333-4444-555555555555>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' });
+  assert.deepEqual(b.attachments, [{ content: Buffer.from('%PDF-1.4 x').toString('base64'), filename: 'מחירון.pdf', type: 'application/pdf', disposition: 'attachment' }]);
+  assert.ok(!('attachments' in cloudflareBody(buildMail(row, 'https://e', 'a@b.c')))); // no files, no empty list
+});
+
+test('a provider only once its keys are all there', () => {
+  assert.equal(providerFrom({ mail_provider: 'cloudflare', cf_account: 'abc' }), null);
+  assert.equal(providerFrom({ mail_provider: 'cloudflare', cf_account: 'abc', cf_token: 't' })?.name, 'cloudflare');
+  assert.equal(providerFrom({ mail_provider: '' }), null);
 });
 
 test('a script in a message stays text in the HTML', () => {
