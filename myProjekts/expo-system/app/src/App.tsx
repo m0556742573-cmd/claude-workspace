@@ -20,6 +20,7 @@ import {
   activeSetup, flush, isAdmin, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
+import { waCheck } from './lib/wa.ts';
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine);
@@ -277,6 +278,7 @@ function Live() {
             joinCode={exhibitor.join_code}
             phase={phase}
             boothDefault={exhibitor.booth_default}
+            checkWa={phase === 'live' ? waCheck : undefined}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}

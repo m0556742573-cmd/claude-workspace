@@ -21,4 +21,12 @@ export function waOpen(): Promise<boolean> {
   return known.open;
 }
 export const forgetWa = () => { known = null; };
+export interface Checked { num: string; own: boolean; wa: boolean | null }
+/** The check at the visit (model §10): whether each of a visitor's numbers has WhatsApp, each number once. Null when his
+ *  WhatsApp is not linked (then a number is checked right before the first message to it). */
+export async function waCheck(lead: string): Promise<Checked[] | null> {
+  if (!(await waOpen())) return null;
+  const r = await call<{ linked: boolean; numbers: Checked[] }>(`/wa/check?lead=${lead}`, 'POST');
+  return r.linked ? r.numbers : null;
+}
 export const waStats = () => call<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number }>('/wa/stats');

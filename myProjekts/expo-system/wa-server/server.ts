@@ -3,8 +3,9 @@
 //
 // Step 1 (28/10): link by QR from the booth's settings, stay connected.
 // Step 2a (28/10): send from his number what he queued in the app, through the limits in limits.ts — a person's
-// pace and hours, a daily cap on first messages, "typing…" before each, one number checked right before sending it,
-// and a full stop on signs of a block. Replies are read only for an exhibitor who switched it on, and only from his
+// pace and hours, a daily cap on first messages, "typing…" before each, and a full stop on signs of a block.
+// Whether a number has WhatsApp is checked once, at the visit (29/10, /wa/check); a number not known by the time a
+// message goes is checked right before it. Replies are read only for an exhibitor who switched it on, and only from his
 // leads' numbers; every other chat is dropped here and never leaves this server (model §9).
 //
 // Calls from the app carry the exhibitor's own sign-in, checked with Supabase. The queue is reached with this
@@ -128,7 +129,8 @@ async function restore(): Promise<void> {
 
 // ---------- sending: what he queued, one at a time per number, within the limits
 
-interface Queued { id: string; exhibitor_id: string; lead_id: string; body: string; phone: string | null; name: string | null; first_contact: boolean; save_contact: boolean; first_today: number }
+interface Queued { id: string; exhibitor_id: string; lead_id: string; body: string; phone: string | null; name: string | null; first_contact: boolean; save_contact: boolean; first_today: number;
+  /** Already known to have WhatsApp (checked at the visit): not asked again. */ known: boolean }
 
 async function tick(): Promise<void> {
   if (!WA_KEY || !sendingHours(new Date())) return;
@@ -152,10 +154,13 @@ async function sendOne(s: Session, q: Queued): Promise<void> {
   if (!q.phone || !/^0\d{8,9}$/.test(q.phone)) return rpc('wa_result', { item: q.id, ok: false, err: 'no_phone' });
   const jid = `972${q.phone.slice(1)}@s.whatsapp.net`;
   try {
-    // One number, right before sending to it — as a person starting a chat would (model §10). Never a list.
-    const [hit] = (await sock.onWhatsApp(jid)) ?? [];
-    if (!hit?.exists) return rpc('wa_result', { item: q.id, ok: false, err: 'no_whatsapp' });
-    const to = hit.jid ?? jid;
+    // A number not checked at the visit: one number, right before sending to it, as a person starting a chat would. Never a list.
+    let to = jid;
+    if (!q.known) {
+      const [hit] = (await sock.onWhatsApp(jid)) ?? [];
+      if (!hit?.exists) return rpc('wa_result', { item: q.id, ok: false, err: 'no_whatsapp' });
+      to = hit.jid ?? jid;
+    }
     if (q.first_contact && q.save_contact && q.name) {
       await sock.addOrEditContact(to, { fullName: `${q.name} · תערוכה`, saveOnPrimaryAddressbook: true }).catch(() => {});
     }
@@ -186,9 +191,31 @@ async function plan(): Promise<void> {
     if (s.status !== 'open') continue;
     const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
     for (const d of due(p, today, approved)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, to_phone: d.to ?? null });
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body });
     }
   }
+}
+
+// ---------- the check at the visit (model §10): do this visitor's numbers have WhatsApp? Each number once — a name on
+// the list is checked once for every exhibitor — never in practice, and one number at a time on each account.
+
+interface Checked { num: string; own: boolean; wa: boolean | null }
+const checking = new Map<string, Promise<unknown>>();
+async function check(exhibitorId: string, lead: string): Promise<Checked[] | null> {
+  const s = sessions.get(exhibitorId);
+  if (!s || s.status !== 'open' || !s.sock || !WA_KEY) return null;
+  const run = (checking.get(exhibitorId) ?? Promise.resolve()).then(async () => {
+    const rows = (await rpc<Checked[]>('wa_to_check', { exhibitor: exhibitorId, lead })) ?? [];
+    for (const r of rows) {
+      if (r.wa !== null || !/^0\d{8,9}$/.test(r.num)) continue;
+      const [hit] = (await s.sock!.onWhatsApp(`972${r.num.slice(1)}@s.whatsapp.net`)) ?? [];
+      r.wa = !!hit?.exists;
+      await rpc('wa_checked', { exhibitor: exhibitorId, lead, num: r.num, ok: r.wa });
+    }
+    return rows;
+  });
+  checking.set(exhibitorId, run.catch(() => {}));
+  return run;
 }
 
 // ---------- replies: only from his leads' numbers, only if he switched it on
@@ -277,6 +304,12 @@ const server = http.createServer(async (req, res) => {
       return send(200, view(sessions.get(id)));
     }
     if (url.pathname === '/wa/unlink' && req.method === 'POST') { await stop(id); return send(200, view(undefined)); }
+    if (url.pathname === '/wa/check' && req.method === 'POST') {
+      const lead = url.searchParams.get('lead') ?? '';
+      if (!/^[0-9a-f-]{36}$/i.test(lead)) return send(400, { error: 'lead' });
+      const numbers = await check(id, lead);
+      return send(200, { linked: numbers !== null, numbers: numbers ?? [] });
+    }
     return send(404, { error: 'not found' });
   } catch (e) {
     logger.error(e);

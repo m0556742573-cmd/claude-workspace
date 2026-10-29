@@ -3,6 +3,7 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { nextTask, type Action, type Lead, type ManualStep, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
+import { destinationOf, type Typed } from './destination.ts';
 import type { Person } from '../demo/people.ts';
 
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
@@ -114,6 +115,19 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
   });
   if (error) throw error;
+  // What was added on the card ("לשנות" › another number or mail): the card keeps its own list; what the CRM added stays.
+  if (l.extra) {
+    const keep = l.extra.map(destinationOf).filter((d): d is Typed => !!d);
+    let drop = supabase.from('lead_contacts').delete().eq('lead_id', l.id).eq('from_booth', true);
+    if (keep.length) drop = drop.not('value', 'in', `(${keep.map((d) => `"${d.value}"`).join(',')})`);
+    const gone = await drop;
+    if (gone.error) throw gone.error;
+    if (keep.length) {
+      const up = await supabase.from('lead_contacts').upsert(keep.map((d) => ({ lead_id: l.id, exhibitor_id: exhibitorId, kind: d.kind, value: d.value, from_booth: true })),
+        { onConflict: 'lead_id,kind,value', ignoreDuplicates: true });
+      if (up.error) throw up.error;
+    }
+  }
   const t = await supabase.from('tasks').upsert(taskRow(exhibitorId, l.id, setup, l, l.capturedOn));
   if (t.error) throw t.error;
 }
@@ -436,9 +450,34 @@ export async function resetText(exhibitorId: string, id: string): Promise<void> 
 }
 
 // ---------- what was sent by hand (a tap opened WhatsApp or mail with the text ready): kept in the outbox as sent
-/** A message for the WhatsApp server to send from his own number, at a person's pace and hours (wa-server/limits.ts). */
-export async function queueSend(exhibitorId: string, leadId: string, templateId: string, body: string): Promise<void> {
-  const { error } = await supabase.from('outbox').insert({ exhibitor_id: exhibitorId, lead_id: leadId, channel: 'whatsapp', template_id: templateId, body, status: 'queued' });
+/** A message for the WhatsApp server to send from his own number, at a person's pace and hours (wa-server/limits.ts),
+ *  to every destination of the lead that gets WhatsApp. How many it went to. */
+export async function queueSend(leadId: string, templateId: string, body: string): Promise<number> {
+  const { data, error } = await supabase.rpc('queue_send', { lead: leadId, template: templateId, body });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+// ---------- where a lead receives (יצחק, 29/10): his own phone and mail, and what was added; each one receives or not,
+// and every one that receives gets every message. A reply or "הסר" from any of them counts as his.
+export interface Destination { id: string | null; kind: 'phone' | 'email'; value: string; label: string | null; own: boolean; receives: boolean; wa: boolean | null; removed: boolean }
+export async function leadDestinations(leadId: string): Promise<Destination[]> {
+  const { data, error } = await supabase.rpc('lead_destinations', { lead: leadId });
+  if (error) throw error;
+  return (data ?? []) as Destination[];
+}
+export async function addDestination(exhibitorId: string, leadId: string, d: Typed, label: string): Promise<void> {
+  const { error } = await supabase.from('lead_contacts').insert({ lead_id: leadId, exhibitor_id: exhibitorId, kind: d.kind, value: d.value, label: label.trim() || null });
+  if (error) throw error;
+}
+export async function setReceives(leadId: string, d: Destination, on: boolean): Promise<void> {
+  const { error } = d.id
+    ? await supabase.from('lead_contacts').update({ receives: on }).eq('id', d.id)
+    : await supabase.from('leads').update(d.kind === 'phone' ? { own_phone_on: on } : { own_email_on: on }).eq('id', leadId);
+  if (error) throw error;
+}
+export async function removeDestination(id: string): Promise<void> {
+  const { error } = await supabase.from('lead_contacts').delete().eq('id', id);
   if (error) throw error;
 }
 /** What waits in the queue for a lead, and what went wrong with it. */

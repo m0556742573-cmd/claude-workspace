@@ -13,13 +13,14 @@ import { MeForm } from './me.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
-import { forgetWa, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
+import { forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
+import { destinationOf, showDestination } from './lib/destination.ts';
 import { draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -360,8 +361,9 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
   const [busy, setBusy] = useState(false);
   const [talk, setTalk] = useState(false);
   const [more, setMore] = useState(false);
-  const [contact, setContact] = useState<{ phone: string | null; email: string | null; opted_out?: boolean } | null>(null);
-  useEffect(() => { leadContact(row.id).then(setContact).catch(() => setContact(null)); }, [row.id]);
+  const [dests, setDests] = useState<Destination[] | null>(null);
+  useEffect(() => { leadDestinations(row.id).then(setDests).catch(() => setDests(null)); }, [row.id]);
+  const ownPhone = dests?.find((d) => d.own && d.kind === 'phone')?.value ?? null;
   if (next.kind === 'end') return null;
   const stepId = next.stepId;
   const args = [ctx.exhibitor.id, item.setup, owner, today()] as const;
@@ -397,11 +399,11 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
-        ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} contact={contact} />
-        : contact?.phone && ctx.phase !== 'practice' && (
+        ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} dests={dests} />
+        : ownPhone && ctx.phase !== 'practice' && (
           <div className="row">
-            <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>
-            <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
+            <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{showDestination(ownPhone)}</a>
+            <a className="btn" href={`https://wa.me/${waNumber(ownPhone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
           </div>
         )}
 
@@ -462,7 +464,7 @@ function Frame({ bare, className, children }: { bare?: boolean; className: strin
 
 /** A step that carries a message: the text, filled for this visitor, goes out with one tap in WhatsApp or mail.
  *  A text with a hole left in it does not go out; it sends him to fill it first. */
-export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; contact: { phone: string | null; email: string | null; opted_out?: boolean } | null; onSent?: () => void }) {
+export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; dests: Destination[] | null; onSent?: () => void }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [shown, setShown] = useState(false);
@@ -470,12 +472,19 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
   const missing = holes(body);
   const sent = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, leadId, channel, messageId, body).then(onSent).catch(() => {}); };
   const [linked, setLinked] = useState(false);
-  const [queued, setQueued] = useState<'no' | 'busy' | 'yes' | 'err'>('no');
+  const [queued, setQueued] = useState<'no' | 'busy' | 'yes' | 'err' | 'none'>('no');
+  // Where it goes: every destination that receives (his own, his wife's, the office), not one that asked to be removed.
+  const live = (dests ?? []).filter((d) => d.receives && !d.removed);
+  const waTo = live.filter((d) => d.kind === 'phone' && d.wa !== false);
+  const mailTo = live.filter((d) => d.kind === 'email');
+  const ownPhone = dests?.find((d) => d.own && d.kind === 'phone');
+  const optedOut = !!dests?.some((d) => d.own && d.removed);
+  const who = (d: Destination, all: Destination[]) => (all.length < 2 ? '' : ` · ${d.own ? 'אליו' : d.label || showDestination(d.value)}`);
   useEffect(() => { if (!ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at]);
   useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued')) setQueued('yes'); }).catch(() => {}); }, [leadId]);
   async function viaServer() {
     setQueued('busy');
-    try { await queueSend(ctx.exhibitor.id, leadId, messageId, body); setQueued('yes'); onSent?.(); } catch { setQueued('err'); }
+    try { const n = await queueSend(leadId, messageId, body); setQueued(n ? 'yes' : 'none'); if (n) onSent?.(); } catch { setQueued('err'); }
   }
   return (
     <div className="stack">
@@ -483,7 +492,7 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
       {shown && <div className="note preview">{body}</div>}
       {ctx.phase === 'practice' ? (
         <p className="note">בתרגול לא נשלחת שום הודעה. כך היא תיראה כשהמערכת תהיה במצב אמיתי.</p>
-      ) : contact?.opted_out ? (
+      ) : optedOut ? (
         <p className="note">הוא ביקש לא לקבל הודעות. אפשר להתקשר, אם סיכמתם.</p>
       ) : missing.length ? (
         <p className="note">בהודעה עוד חסר: <b>{missing.join(' · ')}</b>. <button type="button" className="text-btn" onClick={() => ctx.go('messages')}>להשלים בהודעות</button></p>
@@ -491,11 +500,12 @@ export function SendRow({ ctx, leadId, name, messageId, contact, onSent }: { ctx
         <div className="row">
           {queued === 'yes' && <span className="note">בתור. יוצא מהוואטסאפ שלך בקרוב, בקצב של אדם ובשעות 9–20.</span>}
           {queued === 'err' && <span className="err">לא נכנס לתור. אפשר לשלוח בנגיעה.</span>}
-          {contact?.phone && linked && queued !== 'yes' && <button type="button" className="btn primary" disabled={queued === 'busy'} onClick={viaServer}>לשלוח מהוואטסאפ שלי</button>}
-          {contact?.phone && hasWa(ctx) && !linked && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>וואטסאפ עם ההודעה</a>}
-          {contact?.email && <a className="btn" href={`mailto:${contact.email}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל</a>}
-          {contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" />{contact.phone}</a>}
-          {contact && !contact.phone && !contact.email && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
+          {queued === 'none' && <span className="err">אין לו מספר עם וואטסאפ שמקבל הודעות. אפשר במייל, או להוסיף מספר בדף שלו.</span>}
+          {waTo.length > 0 && linked && queued !== 'yes' && <button type="button" className="btn primary" disabled={queued === 'busy'} onClick={viaServer}>לשלוח מהוואטסאפ שלי{waTo.length > 1 ? ` · ל-${waTo.length}` : ''}</button>}
+          {hasWa(ctx) && !linked && waTo.map((d) => <a key={d.value} className="btn" href={`https://wa.me/${waNumber(d.value)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>{waTo.length > 1 ? 'וואטסאפ' : 'וואטסאפ עם ההודעה'}{who(d, waTo)}</a>)}
+          {mailTo.map((d) => <a key={d.value} className="btn" href={`mailto:${d.value}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל{who(d, mailTo)}</a>)}
+          {ownPhone && <a className="btn" href={`tel:${ownPhone.value}`}><Icon name="phone" />{showDestination(ownPhone.value)}</a>}
+          {dests && !dests.length && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
         </div>
       )}
     </div>
@@ -844,13 +854,69 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
         </div>
         <section className="card rec-fields">
           <h2>פרטים</h2>
-          <div className="field-row"><span className="faint">טלפון</span><span dir="ltr">{contact?.phone ?? '—'}</span></div>
-          <div className="field-row"><span className="faint">מייל</span><span dir="ltr">{contact?.email ?? '—'}</span></div>
+          <Destinations ctx={ctx} leadId={row.id} onChange={onChange} />
           <div className="field-row"><span className="faint">מה סימנו</span><span>{row.taps.join(' · ') || '—'}</span></div>
           <div className="field-row"><span className="faint">ביקר בדוכן</span><span>{dayLabel(row.captured_on)}</span></div>
           {row.customer_date && <div className="field-row"><span className="faint">התאריך שלו</span><span>{ddmm(row.customer_date)}</span></div>}
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Where he receives (יצחק, 29/10): his own phone and mail, and numbers or mails added (his wife's, the office). Every
+ * one that is on gets every message; a reply or "הסר" from any of them counts as his. Which message to which was left
+ * out on purpose: "זה יסבך את המשתמש".
+ */
+function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onChange: () => void }) {
+  const [list, setList] = useState<Destination[] | null>(null);
+  const [typed, setTyped] = useState('');
+  const [whose, setWhose] = useState('');
+  const [err, setErr] = useState('');
+  const load = useCallback(() => { leadDestinations(leadId).then(setList).catch(() => setList([])); }, [leadId]);
+  useEffect(load, [load]);
+  async function flip(d: Destination) {
+    setList((l) => l?.map((x) => (x === d ? { ...x, receives: !d.receives } : x)) ?? l);
+    await setReceives(leadId, d, !d.receives).catch(load);
+    onChange();
+  }
+  async function add() {
+    const d = destinationOf(typed);
+    if (!d) { setErr('זה לא נראה כמו טלפון או מייל'); return; }
+    if (list?.some((x) => x.kind === d.kind && x.value === d.value)) { setErr('כבר ברשימה'); return; }
+    try {
+      await addDestination(ctx.exhibitor.id, leadId, d, whose);
+      setTyped(''); setWhose(''); setErr(''); load(); onChange();
+      if (d.kind === 'phone' && ctx.phase === 'live') waCheck(leadId).then(load).catch(() => {});
+    } catch { setErr('לא נשמר. אפשר לנסות שוב.'); }
+  }
+  async function drop(d: Destination) { await removeDestination(d.id!).catch(() => {}); load(); onChange(); }
+  const title = (d: Destination) => (d.own ? (d.kind === 'phone' ? 'טלפון' : 'מייל') : d.label || (d.kind === 'phone' ? 'טלפון נוסף' : 'מייל נוסף'));
+  const state = (d: Destination) => (d.removed ? 'ביקש להסיר' : d.kind !== 'phone' ? '' : d.wa === true ? 'וואטסאפ' : d.wa === false ? 'אין וואטסאפ' : '');
+  return (
+    <div className="dests">
+      {list === null ? <p className="muted small">טוען…</p> : !list.length ? (
+        <div className="field-row"><span className="faint">טלפון ומייל</span><span>—</span></div>
+      ) : list.map((d) => (
+        <div className="dest" key={d.id ?? d.kind}>
+          <div className="field-row">
+            <span className="faint">{title(d)}</span>
+            <span><span dir="ltr">{showDestination(d.value)}</span>{state(d) && <span className="faint small"> · {state(d)}</span>}</span>
+          </div>
+          <span className="dest-acts">
+            <button type="button" className="switch" role="switch" aria-checked={d.receives && !d.removed} aria-label={`${title(d)}: מקבל הודעות`} disabled={d.removed} onClick={() => flip(d)} />
+            {!d.own && <button type="button" className="text-btn" onClick={() => drop(d)}>להסיר</button>}
+          </span>
+        </div>
+      ))}
+      {!!list?.length && <p className="faint small">מי שהמתג שלו דלוק מקבל את כל ההודעות. תשובה או "הסר" מכל אחד מהם נחשבים שלו.</p>}
+      <form className="dest-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
+        <input className="input" dir="auto" aria-label="טלפון או מייל נוסף" placeholder="טלפון או מייל נוסף" value={typed} onChange={(e) => { setTyped(e.target.value); setErr(''); }} />
+        <input className="input" aria-label="של מי (לא חובה)" placeholder="של מי? (לא חובה)" value={whose} onChange={(e) => setWhose(e.target.value)} />
+        <button type="submit" className="btn" disabled={!typed.trim()}>להוסיף</button>
+      </form>
+      {err && <p className="err small">{err}</p>}
     </div>
   );
 }

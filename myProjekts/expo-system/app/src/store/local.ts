@@ -12,6 +12,8 @@ export interface LocalLead extends Lead {
   synced: boolean;
   /** He registered himself, from the code on the booth's sign. */
   self?: boolean;
+  /** Numbers or mails added on the card ("לשנות"), as kept: the phone's digits from 0, the mail in lower case. */
+  extra?: string[];
 }
 
 export interface LocalNote {

@@ -8,6 +8,9 @@ import type { LocalLead, LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
 import { Icon } from '../ui.tsx';
 import { Qr, joinUrl } from '../join.tsx';
+import { destinationOf, showDestination } from '../lib/destination.ts';
+
+type Checked = { num: string; own: boolean; wa: boolean | null };
 
 export interface BoothProps {
   setup: Setup;
@@ -31,11 +34,13 @@ export interface BoothProps {
   phase?: 'practice' | 'live' | 'after';
   /** The booth's default message: one tap when the path sends nothing at once (17/10). */
   boothDefault?: string | null;
+  /** The check at the visit (§10): whether the visitor's numbers have WhatsApp. Live only, with his WhatsApp linked. */
+  checkWa?: (leadId: string) => Promise<Checked[] | null>;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -49,6 +54,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [seconds, setSeconds] = useState(0);
   const [asking, setAsking] = useState(false);
   const [toast, setToast] = useState('');
+  const [checked, setChecked] = useState<Record<string, Checked[]>>({});
   const searchRef = useRef<HTMLInputElement>(null);
   // Saves go one after the other, so a quick second tap never lands before the first.
   const chain = useRef<Promise<unknown>>(Promise.resolve());
@@ -66,6 +72,11 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const myNotes = current ? notes.filter((n) => n.leadId === current.id) : [];
   const wantsDate = !!current && current.taps.some((t) => t.includes('מתי?'));
 
+  /** At the visit: do his numbers have WhatsApp? Once the card is up; the answer stays with the number. */
+  function verify(id: string) {
+    if (!checkWa || practice) return;
+    checkWa(id).then((r) => { if (r) setChecked((m) => ({ ...m, [id]: r })); }).catch(() => {});
+  }
   function say(text: string) { setToast(text); setTimeout(() => setToast((t) => (t === text ? '' : t)), 4500); }
   function store(l: LocalLead): Promise<'saved' | 'waiting'> {
     const p = chain.current.then(() => saveLead(l));
@@ -102,6 +113,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     open(lead);
     const where = await store(lead);
     say(where === 'saved' ? `נשמר: ${lead.name}` : `נשמר בטלפון: ${lead.name} · יעלה כשתחזור הרשת`);
+    if (where === 'saved') verify(lead.id);
   }
 
   function change(patch: Partial<LocalLead>) {
@@ -109,6 +121,13 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     const next = { ...current, ...patch, synced: false };
     setCurrent(next);
     store(next);
+  }
+  /** Another number or mail for this visitor (his wife's, the office): it gets every message, as his own does. */
+  function setExtra(extra: string[]) {
+    if (!current) return;
+    const next = { ...current, extra, synced: false };
+    setCurrent(next);
+    store(next).then((w) => { if (w === 'saved') verify(next.id); });
   }
   function toggle(label: string) {
     if (!current) return;
@@ -278,7 +297,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           )}
 
           {messages.length > 0 && <SendLine lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} picking={picking}
-            onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }} />}
+            onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
+            checked={checked[current.id]} onExtra={setExtra} />}
 
           <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
 
@@ -357,13 +377,24 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
  * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
  * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
  */
-function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPick, onChoose }: {
+function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPick, onChoose, checked, onExtra }: {
   lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; picking: boolean;
   onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
+  /** What the check at the visit found, when it ran. */ checked?: Checked[]; onExtra: (extra: string[]) => void;
 }) {
   const auto = immediateMessage(setup, lead);
   const chosen = lead.booth;
   const def = boothDefault && messages.includes(boothDefault) ? boothDefault : null;
+  const extra = lead.extra ?? [];
+  const noWa = checked?.find((c) => c.own)?.wa === false;
+  const [typed, setTyped] = useState('');
+  const [bad, setBad] = useState(false);
+  function add() {
+    const d = destinationOf(typed);
+    if (!d) { setBad(true); return; }
+    if (!extra.includes(d.value)) onExtra([...extra, d.value]);
+    setTyped(''); setBad(false);
+  }
   return (
     <div className="send-line">
       <div className="send-row">
@@ -373,14 +404,37 @@ function SendLine({ lead, setup, messages, boothDefault, practice, picking, onPi
           : def ? <button type="button" className="btn" onClick={() => onChoose({ message: def })}>לשלוח: {def}</button>
           : !picking && <span className="faint">אין הודעה מיידית במסלול</span>}
         <button type="button" className="text-btn" aria-expanded={picking} onClick={onPick}>{chosen || auto || def ? 'לשנות' : 'לבחור הודעה'}</button>
+        {noWa && <span className="faint small">· אין לו וואטסאפ</span>}
         {practice && <span className="faint small">· בתרגול לא נשלח</span>}
       </div>
+      {extra.length > 0 && (
+        <div className="send-row">
+          <span className="faint">גם ל:</span>
+          {extra.map((v) => {
+            const wa = checked?.find((c) => c.num === v)?.wa;
+            return (
+              <span key={v} className="extra-chip">
+                <span dir="ltr">{showDestination(v)}</span>{wa === false && <span className="faint small"> · אין וואטסאפ</span>}
+                <button type="button" className="text-btn" aria-label={`להסיר את ${showDestination(v)}`} onClick={() => onExtra(extra.filter((x) => x !== v))}>✕</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
       {picking && (
         <div className="chips">
           {messages.map((m) => <button key={m} type="button" className="chip" aria-pressed={chosen?.message === m} onClick={() => onChoose({ message: m })}>{m}</button>)}
           <button type="button" className="chip" aria-pressed={!!chosen && !chosen.message} onClick={() => onChoose({})}>בלי הודעה עכשיו</button>
           {chosen && <button type="button" className="chip" onClick={() => onChoose(undefined)}>כמו במסלול</button>}
         </div>
+      )}
+      {picking && (
+        <form className="extra-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
+          <input className="input" dir="auto" inputMode="tel" aria-label="גם למספר או מייל נוסף, למשל של אשתו" placeholder="גם למספר או מייל נוסף"
+            value={typed} onChange={(e) => { setTyped(e.target.value); setBad(false); }} />
+          <button type="submit" className="btn" disabled={!typed.trim()}>להוסיף</button>
+          {bad && <span className="err small">זה לא נראה כמו טלפון או מייל</span>}
+        </form>
       )}
     </div>
   );

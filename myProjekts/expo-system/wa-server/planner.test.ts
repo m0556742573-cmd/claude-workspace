@@ -1,5 +1,5 @@
 // The planner: an automatic message is queued on its day, once; never with a hole, never overdue, never before the
-// card settled, never to someone without WhatsApp, after a reply, or after "הסר".
+// card settled, never with nowhere to send it by WhatsApp, after a reply, or after "הסר".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Setup } from '../engine/src/index.ts';
@@ -16,7 +16,7 @@ const setup: Setup = {
   defaults: { business: list, private: list },
 };
 const me = { name: 'יצחק', business: 'מכולת', phone: '050-0000000', greeting: 'shalom' as const, sensitive: false, blocked: false };
-const lead = { id: 'a', captured_on: FAIR, taps: ['משלוחים'], customer_date: null, business_owner: false, setup_version: null, name: 'יעקב', has_phone: true, has_whatsapp: null, settled: true, booth_message: null, booth_none: false, booth_to: null };
+const lead = { id: 'a', captured_on: FAIR, taps: ['משלוחים'], customer_date: null, business_owner: false, setup_version: null, name: 'יעקב', settled: true, targets: 1, booth_message: null, booth_none: false };
 const plan = (over: Partial<Plan> = {}): Plan => ({
   me, setups: [{ version: 1, active: true, data: setup }], texts: { 'איך מזמינים': 'שלום [שם], מזמינים בטלפון [טלפון].\n[שם המציג], [העסק] · [טלפון]' },
   leads: [lead], steps: [], manual: [], replies: [], planned: [], ...over,
@@ -29,12 +29,11 @@ test('the first message goes on the day of the visit, filled', () => {
   assert.match(d[0]!.body, /^שלום יעקב, מזמינים בטלפון 050-0000000/);
 });
 
-test('the booth choice replaces the immediate message, to another number if asked', () => {
+test('the booth choice replaces the immediate message', () => {
   const texts = { 'איך מזמינים': 'שלום [שם], איך מזמינים', 'מחירון': 'שלום [שם], המחירון' };
-  const d = due(plan({ texts, leads: [{ ...lead, booth_message: 'מחירון', booth_to: '0521234567' }] }), FAIR, []);
+  const d = due(plan({ texts, leads: [{ ...lead, booth_message: 'מחירון' }] }), FAIR, []);
   assert.equal(d.length, 1);
   assert.equal(d[0]!.step, 'booth');
-  assert.equal(d[0]!.to, '0521234567');
   assert.match(d[0]!.body, /המחירון/);
   assert.equal(due(plan({ texts, leads: [{ ...lead, booth_none: true }] }), FAIR, []).length, 0); // none now
 });
@@ -43,10 +42,10 @@ test('once only: what is planned is not planned again', () => {
   assert.equal(due(plan({ planned: ['a|how'] }), FAIR, []).length, 0);
 });
 
-test('not before the card settled, not without a phone, not when he has no WhatsApp', () => {
+test('not before the card settled, not with nowhere to send it by WhatsApp', () => {
   assert.equal(due(plan({ leads: [{ ...lead, settled: false }] }), FAIR, []).length, 0);
-  assert.equal(due(plan({ leads: [{ ...lead, has_phone: false }] }), FAIR, []).length, 0);
-  assert.equal(due(plan({ leads: [{ ...lead, has_whatsapp: false }] }), FAIR, []).length, 0);
+  assert.equal(due(plan({ leads: [{ ...lead, targets: 0 }] }), FAIR, []).length, 0); // no number, none with WhatsApp, or all switched off
+  assert.equal(due(plan({ leads: [{ ...lead, targets: 2 }] }), FAIR, []).length, 1);  // his and his wife's: one step, queued to both
 });
 
 test('a hole in the text: nothing goes out', () => {

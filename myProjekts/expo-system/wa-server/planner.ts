@@ -1,15 +1,17 @@
 // The planner (step 2b): which automatic messages are due today, from the same engine and the same texts the app uses.
 // It only queues; every message then goes through the sender's limits (limits.ts). A message is planned when:
 // the path's next step is the system's own (who = auto) and carries a message; it is due today, not overdue (a message
-// days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; he has a
-// phone and is not known to be without WhatsApp; and the filled text has no hole left in it.
+// days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
+// one of his destinations gets WhatsApp; and the filled text has no hole left in it. The database queues it to each.
 import { fill, holes, nextTask, textOf, type Approved, type Lead, type ManualStep, type Me, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
-  name: string | null; has_phone: boolean; has_whatsapp: boolean | null; settled: boolean;
-  /** What he chose at the booth: a message, none now, another number for it. */
-  booth_message: string | null; booth_none: boolean; booth_to: string | null;
+  name: string | null; settled: boolean;
+  /** How many of his destinations get WhatsApp: his own number and the ones added, that receive and are not known to lack it. */
+  targets: number;
+  /** What he chose at the booth: a message, or none now. */
+  booth_message: string | null; booth_none: boolean;
 }
 export interface Plan {
   me: Me & { blocked: boolean };
@@ -21,7 +23,7 @@ export interface Plan {
   replies: { lead_id: string; at: string; optout: boolean }[];
   planned: string[];
 }
-export interface Due { lead: string; step: string; template: string; body: string; to?: string }
+export interface Due { lead: string; step: string; template: string; body: string }
 
 export const israelDay = (at: Date | string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(at));
 
@@ -33,7 +35,7 @@ export function due(plan: Plan, today: string, approved: Approved[]): Due[] {
   const planned = new Set(plan.planned);
   const out: Due[] = [];
   for (const l of plan.leads) {
-    if (!l.settled || (!l.has_phone && !l.booth_to) || l.has_whatsapp === false) continue;
+    if (!l.settled || !l.targets) continue;
     const replies = plan.replies.filter((r) => r.lead_id === l.id);
     if (replies.some((r) => r.optout)) continue;
     const setup = (l.setup_version !== null && versions.get(l.setup_version)) || active;
@@ -50,8 +52,7 @@ export function due(plan: Plan, today: string, approved: Approved[]): Due[] {
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
     const body = fill(textOf(setup, plan.texts, n.message, approved), plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
-    const to = n.stepId === 'booth' && l.booth_to ? l.booth_to : undefined;
-    out.push({ lead: l.id, step: n.stepId, template: n.message, body, ...(to ? { to } : {}) });
+    out.push({ lead: l.id, step: n.stepId, template: n.message, body });
   }
   return out;
 }
