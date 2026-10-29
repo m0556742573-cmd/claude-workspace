@@ -38,6 +38,14 @@ test('the booth choice replaces the immediate message', () => {
   assert.equal(due(plan({ texts, leads: [{ ...lead, booth_none: true }] }), FAIR, []).length, 0); // none now
 });
 
+test('a file written once goes with the message, and its line leaves the text', () => {
+  const texts = { 'איך מזמינים': 'שלום [שם], התפריט מצורף.\n[קובץ: תפריט]\n[שם המציג]' };
+  const d = due(plan({ texts, me: { ...me, fills: { 'קובץ: תפריט': 'file:ex/1.pdf#' + encodeURIComponent('תפריט.pdf') } } }), FAIR, []);
+  assert.equal(d.length, 1);
+  assert.equal(d[0]!.body, 'שלום יעקב, התפריט מצורף.\nיצחק');
+  assert.deepEqual(d[0]!.files, ['ex/1.pdf#' + encodeURIComponent('תפריט.pdf')]);
+});
+
 test('once only: what is planned is not planned again', () => {
   assert.equal(due(plan({ planned: ['a|how'] }), FAIR, []).length, 0);
 });

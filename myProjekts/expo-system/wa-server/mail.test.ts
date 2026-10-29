@@ -18,6 +18,15 @@ test('every mail says why he got it and carries the removal link, in the text, t
   assert.ok(!/[^\x00-\x7f]/.test(raw)); // nothing but ASCII on the wire: Hebrew goes encoded
 });
 
+test('a file goes attached, its Hebrew name encoded', () => {
+  const m = { ...buildMail(row, 'https://e', 'a@b.c'), attachments: [{ name: 'מחירון.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 x') }] };
+  const raw = mime(m, new Date('2026-11-16T10:00:00Z'), 'x');
+  assert.match(raw, /Content-Type: multipart\/mixed; boundary="m-x"/);
+  assert.match(raw, /Content-Disposition: attachment; filename\*=UTF-8''%D7%9E/);
+  assert.ok(raw.includes(Buffer.from('%PDF-1.4 x').toString('base64')));
+  assert.ok(!/[^\x00-\x7f]/.test(raw));
+});
+
 test('a script in a message stays text in the HTML', () => {
   const m = buildMail({ ...row, body: '<script>x</script>' }, 'https://e', 'a@b.c');
   assert.ok(!m.html.includes('<script>'));

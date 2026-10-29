@@ -4,8 +4,9 @@
 // removal link, also as the one-click header mail services look for.
 import crypto from 'node:crypto';
 
-export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string }
-export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string }
+export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string; files?: string[] | null }
+export interface Attachment { name: string; type: string; data: Buffer }
+export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string; attachments?: Attachment[] }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const linked = (s: string) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`).replace(/\n/g, '<br>');
@@ -38,22 +39,13 @@ function word(s: string): string {
 }
 const b64 = (s: string) => Buffer.from(s).toString('base64').replace(/.{76}/g, '$&\r\n');
 
-/** The whole mail as MIME: plain text and HTML, with the removal headers. */
+/** The whole mail as MIME: plain text and HTML, the files attached, and the removal headers. */
 export function mime(m: Mail, now = new Date(), id: string = crypto.randomUUID()): string {
   const boundary = `b-${id}`;
+  const mixed = `m-${id}`;
   const domain = m.from.split('@')[1] ?? 'localhost';
-  return [
-    `From: ${word(m.fromName)} <${m.from}>`,
-    `To: <${m.to}>`,
-    ...(m.replyTo ? [`Reply-To: <${m.replyTo}>`] : []),
-    `Subject: ${word(m.subject)}`,
-    `Date: ${now.toUTCString().replace('GMT', '+0000')}`,
-    `Message-ID: <${id}@${domain}>`,
-    'MIME-Version: 1.0',
-    `List-Unsubscribe: <${m.unsubscribe}>`,
-    'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
+  const files = m.attachments ?? [];
+  const body = [
     `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
@@ -65,6 +57,35 @@ export function mime(m: Mail, now = new Date(), id: string = crypto.randomUUID()
     '',
     b64(m.html),
     `--${boundary}--`,
+  ];
+  const parts = !files.length ? [`Content-Type: multipart/alternative; boundary="${boundary}"`, '', ...body] : [
+    `Content-Type: multipart/mixed; boundary="${mixed}"`,
+    '',
+    `--${mixed}`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    ...body,
+    ...files.flatMap((f) => [
+      `--${mixed}`,
+      `Content-Type: ${f.type}; name="${word(f.name)}"`,
+      `Content-Disposition: attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      f.data.toString('base64').replace(/.{76}/g, '$&\r\n'),
+    ]),
+    `--${mixed}--`,
+  ];
+  return [
+    `From: ${word(m.fromName)} <${m.from}>`,
+    `To: <${m.to}>`,
+    ...(m.replyTo ? [`Reply-To: <${m.replyTo}>`] : []),
+    `Subject: ${word(m.subject)}`,
+    `Date: ${now.toUTCString().replace('GMT', '+0000')}`,
+    `Message-ID: <${id}@${domain}>`,
+    'MIME-Version: 1.0',
+    `List-Unsubscribe: <${m.unsubscribe}>`,
+    'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+    ...parts,
     '',
   ].join('\r\n');
 }

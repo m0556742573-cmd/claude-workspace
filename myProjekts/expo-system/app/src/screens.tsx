@@ -15,12 +15,12 @@ import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { destinationOf, showDestination } from './lib/destination.ts';
-import { detailsIn, draftFor, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
+import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -468,8 +468,12 @@ export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: 
   const texts = useTexts();
   const me = useMe(ctx);
   const [shown, setShown] = useState(false);
-  const body = fill(textOf(ctx.setup, texts, messageId), me, name);
+  const raw = textOf(ctx.setup, texts, messageId);
+  const body = fill(raw, me, name);
   const missing = holes(body);
+  // Files go with the message from his WhatsApp; a tap can carry text only, so there they go as links.
+  const files = filesIn(raw, me);
+  const tapBody = files.length ? `${body}\n${files.map((f) => fileUrl(f.path)).join('\n')}` : body;
   const sent = (channel: 'whatsapp' | 'email') => { recordSent(ctx.exhibitor.id, leadId, channel, messageId, body).then(onSent).catch(() => {}); };
   const [linked, setLinked] = useState(false);
   const [queued, setQueued] = useState<'no' | 'busy' | 'yes' | 'err' | 'none'>('no');
@@ -484,12 +488,12 @@ export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: 
   useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued')) setQueued('yes'); }).catch(() => {}); }, [leadId]);
   async function viaServer() {
     setQueued('busy');
-    try { const n = await queueSend(leadId, messageId, body); setQueued(n ? 'yes' : 'none'); if (n) onSent?.(); } catch { setQueued('err'); }
+    try { const n = await queueSend(leadId, messageId, body, files); setQueued(n ? 'yes' : 'none'); if (n) onSent?.(); } catch { setQueued('err'); }
   }
   return (
     <div className="stack">
       <button type="button" className="text-btn" style={{ alignSelf: 'start' }} aria-expanded={shown} onClick={() => setShown(!shown)}>{shown ? 'להסתיר את ההודעה' : 'לראות את ההודעה'}</button>
-      {shown && <div className="note preview">{body}</div>}
+      {shown && <div className="note preview">{body}{files.map((f) => <div key={f.path} className="faint small">📎 {f.name}</div>)}</div>}
       {ctx.phase === 'practice' ? (
         <p className="note">בתרגול לא נשלחת שום הודעה. כך היא תיראה כשהמערכת תהיה במצב אמיתי.</p>
       ) : optedOut ? (
@@ -502,8 +506,8 @@ export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: 
           {queued === 'err' && <span className="err">לא נכנס לתור. אפשר לשלוח בנגיעה.</span>}
           {queued === 'none' && <span className="err">אין לו מספר עם וואטסאפ שמקבל הודעות. אפשר במייל, או להוסיף מספר בדף שלו.</span>}
           {waTo.length > 0 && linked && queued !== 'yes' && <button type="button" className="btn primary" disabled={queued === 'busy'} onClick={viaServer}>לשלוח מהוואטסאפ שלי{waTo.length > 1 ? ` · ל-${waTo.length}` : ''}</button>}
-          {hasWa(ctx) && !linked && waTo.map((d) => <a key={d.value} className="btn" href={`https://wa.me/${waNumber(d.value)}?text=${encodeURIComponent(body)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>{waTo.length > 1 ? 'וואטסאפ' : 'וואטסאפ עם ההודעה'}{who(d, waTo)}</a>)}
-          {mailTo.map((d) => <a key={d.value} className="btn" href={`mailto:${d.value}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(body)}`} onClick={() => sent('email')}><Icon name="mail" />מייל{who(d, mailTo)}</a>)}
+          {hasWa(ctx) && !linked && waTo.map((d) => <a key={d.value} className="btn" href={`https://wa.me/${waNumber(d.value)}?text=${encodeURIComponent(tapBody)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>{waTo.length > 1 ? 'וואטסאפ' : 'וואטסאפ עם ההודעה'}{who(d, waTo)}</a>)}
+          {mailTo.map((d) => <a key={d.value} className="btn" href={`mailto:${d.value}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(tapBody)}`} onClick={() => sent('email')}><Icon name="mail" />מייל{who(d, mailTo)}</a>)}
           {ownPhone && <a className="btn" href={`tel:${ownPhone.value}`}><Icon name="phone" />{showDestination(ownPhone.value)}</a>}
           {dests && !dests.length && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
         </div>
@@ -1056,31 +1060,57 @@ function MessageDetails({ ctx, texts, list }: { ctx: Ctx; texts: Record<string, 
   const fills = ctx.exhibitor.fills ?? {};
   const [vals, setVals] = useState<Record<string, string>>(fills);
   const [err, setErr] = useState('');
-  async function save(k: string) {
-    const v = (vals[k] ?? '').trim();
+  const [busy, setBusy] = useState('');
+  async function put(k: string, v: string) {
     if (v === (fills[k] ?? '')) return;
     const next = { ...fills };
     if (v) next[k] = v; else delete next[k];
     ctx.setExhibitor({ ...ctx.exhibitor, fills: next });
+    setVals({ ...vals, [k]: asFile(v) ? '' : v });
     try { await updateMe(ctx.exhibitor.id, { fills: next }); setErr(''); } catch { ctx.setExhibitor(ctx.exhibitor); setErr('לא נשמר. אפשר לנסות שוב.'); }
+  }
+  const save = (k: string) => put(k, (vals[k] ?? '').trim());
+  /** A file instead of words: it goes with every message that names this detail (the old file stays for what was already queued). */
+  async function attach(k: string, file: File | undefined) {
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { setErr('הקובץ גדול מ-15MB.'); return; }
+    setBusy(k); setErr('');
+    try { await put(k, fileValue(await uploadFile(ctx.exhibitor.id, file))); }
+    catch (e) { setErr('הקובץ לא עלה: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(''); }
   }
   if (!uses.size) return null;
   const empty = [...uses.keys()].filter((k) => !fills[k]).length;
   return (
     <section className="card">
       <h2>פרטים להודעות {empty > 0 && <span className="tag">חסרים {empty}</span>}</h2>
-      <p className="muted">ממלאים פעם אחת, וזה נכנס לכל ההודעות שבהן הפרט מופיע. כל עוד פרט ריק, ההודעות שלו לא יוצאות.</p>
+      <p className="muted">ממלאים פעם אחת, וזה נכנס לכל ההודעות שבהן הפרט מופיע. כל פרט יכול להיות גם קובץ (מחירון, טופס): הוא יוצא עם ההודעה, בוואטסאפ כמסמך ובמייל כקובץ מצורף. כל עוד פרט ריק, ההודעות שלו לא יוצאות.</p>
       <div className="fills">
         {[...uses].map(([k, ids]) => {
           const file = k.startsWith('קובץ');
           const whole = ids.length === 1 && ids[0] === k;
+          const f = asFile(fills[k]);
+          const pick = (label: string, cls: string) => (
+            <label className={cls}>{busy === k ? 'מעלה…' : label}<input type="file" hidden disabled={!!busy} onChange={(e) => { attach(k, e.target.files?.[0]); e.target.value = ''; }} /></label>
+          );
           return (
-            <label className="field" key={k}>
+            <div className="field" key={k}>
               <span>{file ? `${k.replace(/^קובץ:?\s*/, '') || 'קובץ'} (קובץ)` : k}{!fills[k] && <span className="faint small"> · חסר</span>}</span>
-              <input className="input" dir="auto" value={vals[k] ?? ''} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} onBlur={() => save(k)}
-                placeholder={file ? 'בינתיים: קישור לקובץ' : whole ? 'מה ההודעה אומרת' : ''} />
+              {f ? (
+                <div className="row">
+                  <a className="file-chip" href={fileUrl(f.path)} target="_blank" rel="noreferrer">📎 {f.name}</a>
+                  {pick('להחליף', 'text-btn')}
+                  <button type="button" className="text-btn" onClick={() => put(k, '')}>להסיר</button>
+                </div>
+              ) : (
+                <div className="row">
+                  <input className="input" dir="auto" aria-label={k} value={vals[k] ?? ''} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} onBlur={() => save(k)}
+                    placeholder={file ? 'לצרף קובץ, או להדביק קישור' : whole ? 'מה ההודעה אומרת' : ''} />
+                  {pick('לצרף קובץ', file ? 'btn' : 'text-btn')}
+                </div>
+              )}
               <span className="faint small">{whole ? 'זו ההודעה עצמה. אפשר גם לכתוב אותה במלואה בנגיעה בה.' : `בהודעות: ${ids.join(' · ')}`}</span>
-            </label>
+            </div>
           );
         })}
       </div>
@@ -1114,7 +1144,7 @@ function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me:
       <p className="faint small">[שם] יוחלף בשם המבקר, ו־[שם המציג], [העסק] ו־[טלפון] בפרטים שלך. כל פרט אחר בסוגריים (למשל [כתובת]) ממלאים פעם אחת ב"פרטים להודעות", וגם פרט חדש שתכתוב יופיע שם. הפנייה ("שלום" או "לכבוד") נקבעת בהגדרות.</p>
       <div className="stack">
         <span className="sec">כך {SAMPLE} יקבל אותה</span>
-        <div className="note preview">{shown}</div>
+        <div className="note preview">{shown}{filesIn(draft, me).map((f) => <div key={f.path} className="faint small">📎 {f.name}</div>)}</div>
       </div>
       {missing.length > 0 && <p className="note">עוד להשלים: <b>{missing.join(' · ')}</b>. עד שמשלימים, ההודעה לא יוצאת.</p>}
       {err && <p className="err">{err}</p>}

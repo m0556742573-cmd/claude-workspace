@@ -13,6 +13,30 @@ export interface Me {
 }
 /** What the system fills by itself; any other [detail] is the exhibitor's, written once. */
 export const AUTO_FIELDS = ['שם', 'שם המציג', 'העסק', 'טלפון'];
+
+/**
+ * A detail written once may be a file instead of words (יצחק: every message may go with a file or without, 28/10):
+ * its value is "file:<path in storage>#<the file's own name>". Its line comes out of the text, and the file goes with
+ * the message: as a document on WhatsApp, attached to the mail, or as a link when it is sent by a tap.
+ */
+export interface FileRef { path: string; name: string }
+export const asFile = (v: string | undefined): FileRef | null => {
+  if (!v?.startsWith('file:')) return null;
+  const [path, name] = v.slice(5).split('#');
+  return path ? { path, name: name ? decodeURIComponent(name) : path.split('/').pop()! } : null;
+};
+export const fileValue = (f: FileRef) => `file:${f.path}#${encodeURIComponent(f.name)}`;
+const DETAIL = /\[([^\]\n]+)\]/g;
+
+/** The files a text carries: the details in it whose value is a file, in the order they appear. */
+export function filesIn(body: string, me: Pick<Me, 'fills'>): FileRef[] {
+  const out: FileRef[] = [];
+  for (const [, key] of body.matchAll(DETAIL)) {
+    const f = asFile(me.fills?.[key!]);
+    if (f && !out.some((x) => x.path === f.path)) out.push(f);
+  }
+  return out;
+}
 export interface Approved { id: number; label: string; text: string }
 
 const SIGN = '[שם המציג], [העסק] · [טלפון]';
@@ -54,7 +78,15 @@ export function fill(body: string, me: Me, visitor: string): string {
   t = t.replaceAll('[שם המציג]', me.name).replaceAll('[שם]', visitor);
   if (me.business) t = t.replaceAll('[העסק]', me.business);
   if (me.phone) t = t.replaceAll('[טלפון]', me.phone);
-  if (me.fills) t = t.replace(/\[([^\]\n]+)\]/g, (hole, key: string) => me.fills![key]?.trim() || hole);
+  if (me.fills) {
+    // A file's line comes out (it goes with the message); a line left with only a bullet goes too.
+    t = t.split('\n').flatMap((line) => {
+      if (!line.match(DETAIL)?.some((h) => asFile(me.fills![h.slice(1, -1)]))) return [line];
+      const rest = line.replace(DETAIL, (h, key: string) => (asFile(me.fills![key]) ? '' : h)).trim();
+      return /^[•\-–:\s]*$/.test(rest) ? [] : [rest];
+    }).join('\n');
+    t = t.replace(DETAIL, (hole, key: string) => me.fills![key]?.trim() || hole);
+  }
   return t;
 }
 

@@ -134,7 +134,16 @@ async function restore(): Promise<void> {
 // ---------- sending: what he queued, one at a time per number, within the limits
 
 interface Queued { id: string; exhibitor_id: string; lead_id: string; body: string; phone: string | null; name: string | null; first_contact: boolean; save_contact: boolean; first_today: number;
-  /** Already known to have WhatsApp (checked at the visit): not asked again. */ known: boolean }
+  /** Already known to have WhatsApp (checked at the visit): not asked again. */ known: boolean;
+  /** The files that go with it: "path#name" in the public bucket. */ files: string[] | null }
+
+/** A file of a message, from storage (the bucket is public by unguessable path). */
+async function fileOf(ref: string): Promise<{ data: Buffer; name: string; type: string }> {
+  const [p = '', n] = ref.split('#');
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/public/files/${p.split('/').map(encodeURIComponent).join('/')}`);
+  if (!r.ok) throw new Error(`file ${r.status}`);
+  return { data: Buffer.from(await r.arrayBuffer()), name: n ? decodeURIComponent(n) : p.split('/').pop() ?? 'file', type: r.headers.get('content-type') ?? 'application/octet-stream' };
+}
 
 async function tick(): Promise<void> {
   if (!WA_KEY || !sendingHours(new Date())) return;
@@ -171,7 +180,13 @@ async function sendOne(s: Session, q: Queued): Promise<void> {
     await sock.sendPresenceUpdate('composing', to).catch(() => {});
     await sleep(typingMs(q.body));
     await sock.sendPresenceUpdate('paused', to).catch(() => {});
-    await sock.sendMessage(to, { text: q.body });
+    // With files: the first carries the text as its caption, as a person sending a price list would.
+    const files = await Promise.all((q.files ?? []).map(fileOf));
+    if (!files.length) await sock.sendMessage(to, { text: q.body });
+    for (const [i, f] of files.entries()) {
+      const caption = i === 0 ? q.body : undefined;
+      await sock.sendMessage(to, f.type.startsWith('image/') ? { image: f.data, mimetype: f.type, caption } : { document: f.data, mimetype: f.type, fileName: f.name, caption });
+    }
     await rpc('wa_result', { item: q.id, ok: true, first: q.first_contact });
   } catch (e) {
     const msg = String((e as Error).message ?? e);
@@ -219,7 +234,7 @@ async function plan(): Promise<void> {
     const p = await rpc<Plan>('wa_plan', { exhibitor: exhibitorId });
     const ch = { wa: wa && !p.me.blocked, mail };
     for (const d of due(p, today, approved, ch)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail });
+      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail, files: d.files.length ? d.files : null });
     }
   }
 }
@@ -234,7 +249,8 @@ async function mailTick(): Promise<void> {
   try {
     for (const r of (await rpc<MailRow[]>('mail_queue', { max_rows: 60 })) ?? []) {
       try {
-        await provider.send(buildMail(r, PUBLIC_URL, MAIL_FROM));
+        const attachments = await Promise.all((r.files ?? []).map(fileOf));
+        await provider.send({ ...buildMail(r, PUBLIC_URL, MAIL_FROM), attachments });
         await rpc('mail_result', { item: r.id, ok: true });
       } catch (e) {
         const msg = String((e as Error).message ?? e);

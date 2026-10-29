@@ -4,7 +4,7 @@
 // days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
 // one of his destinations can get it (a number with WhatsApp when his WhatsApp is linked, a mail when mail is set on
 // the server); and the filled text has no hole left in it. The database queues it to each.
-import { fill, holes, nextTask, textOf, type Approved, type Lead, type ManualStep, type Me, type Setup } from '../engine/src/index.ts';
+import { filesIn, fill, holes, nextTask, textOf, type Approved, type Lead, type ManualStep, type Me, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
@@ -26,7 +26,8 @@ export interface Plan {
   replies: { lead_id: string; at: string; optout: boolean }[];
   planned: string[];
 }
-export interface Due { lead: string; step: string; template: string; body: string }
+/** files: "path#name" for each file the message carries (a detail written once as a file). */
+export interface Due { lead: string; step: string; template: string; body: string; files: string[] }
 
 export const israelDay = (at: Date | string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(at));
 
@@ -57,9 +58,11 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     const n = nextTask(setup, lead, today);
     if (n.kind !== 'task' || n.who !== 'auto' || !n.message || n.late || n.dueOn > today) continue;
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
-    const body = fill(textOf(setup, plan.texts, n.message, approved), plan.me, l.name ?? '');
+    const text = textOf(setup, plan.texts, n.message, approved);
+    const body = fill(text, plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
-    out.push({ lead: l.id, step: n.stepId, template: n.message, body });
+    const files = filesIn(text, plan.me).map((f) => `${f.path}#${encodeURIComponent(f.name)}`);
+    out.push({ lead: l.id, step: n.stepId, template: n.message, body, files });
   }
   return out;
 }

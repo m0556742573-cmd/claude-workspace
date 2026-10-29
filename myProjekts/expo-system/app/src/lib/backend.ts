@@ -4,6 +4,7 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import { nextTask, type Action, type Lead, type ManualStep, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import { destinationOf, type Typed } from './destination.ts';
+import type { FileRef } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
@@ -456,11 +457,24 @@ export async function resetText(exhibitorId: string, id: string): Promise<void> 
 // ---------- what was sent by hand (a tap opened WhatsApp or mail with the text ready): kept in the outbox as sent
 /** A message for the WhatsApp server to send from his own number, at a person's pace and hours (wa-server/limits.ts),
  *  to every destination of the lead that gets WhatsApp. How many it went to. */
-export async function queueSend(leadId: string, templateId: string, body: string): Promise<number> {
-  const { data, error } = await supabase.rpc('queue_send', { lead: leadId, template: templateId, body });
+export async function queueSend(leadId: string, templateId: string, body: string, files: FileRef[] = []): Promise<number> {
+  const { data, error } = await supabase.rpc('queue_send', { lead: leadId, template: templateId, body, files: files.length ? files.map(fileRefText) : null });
   if (error) throw error;
   return (data as number) ?? 0;
 }
+
+// ---------- files for messages (29/10): into his own folder in storage, by a random path; the file keeps its own name.
+// The bucket is public by unguessable path: these are price lists and forms meant for the visitors.
+export async function uploadFile(exhibitorId: string, file: File): Promise<FileRef> {
+  const ext = (file.name.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? '').toLowerCase();
+  const path = `${exhibitorId}/${crypto.randomUUID()}${ext}`;
+  const { error } = await supabase.storage.from('files').upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (error) throw error;
+  return { path, name: file.name };
+}
+export const fileUrl = (path: string) => supabase.storage.from('files').getPublicUrl(path).data.publicUrl;
+/** How a queued message names its file: "path#name". */
+export const fileRefText = (f: FileRef) => `${f.path}#${encodeURIComponent(f.name)}`;
 
 // ---------- where a lead receives (יצחק, 29/10): his own phone and mail, and what was added; each one receives or not,
 // and every one that receives gets every message. A reply or "הסר" from any of them counts as his.
