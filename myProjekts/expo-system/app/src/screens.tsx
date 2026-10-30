@@ -21,7 +21,7 @@ import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -1214,6 +1214,9 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   const [greeting, setG] = useState<'shalom' | 'kavod' | null>(null);
   const [tips, setTips] = useState(tipsOn);
   const [sub, setSub] = useState<'msgs' | 'self' | 'links' | 'account'>('msgs');
+  // WhatsApp linking is shown to every exhibitor once the admin opened it (30/10); until then, to the admin only.
+  const [waOpenNow, setWaOpenNow] = useState(false);
+  useEffect(() => { waOpenState().then((s) => setWaOpenNow(s.open)).catch(() => {}); }, []);
   useEffect(() => { myGreeting().then(setG).catch(() => setG('shalom')); }, []);
   async function choose(g: 'shalom' | 'kavod') { setG(g); await setGreeting(ctx.exhibitor.id, g).catch(() => {}); dispatchEvent(new Event('expo-greeting')); }
   return (
@@ -1241,8 +1244,8 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
         </>}
         {sub === 'self' && <SelfSign ctx={ctx} />}
         {sub === 'links' && <>
-          {ctx.admin && <WaLink ctx={ctx} />}
-          {!ctx.admin && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
+          {(ctx.admin || waOpenNow) && <WaLink ctx={ctx} />}
+          {!ctx.admin && !waOpenNow && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
           <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
         </>}
         {sub === 'account' && <>
@@ -1281,10 +1284,18 @@ function WaLink({ ctx }: { ctx: Ctx }) {
     if (!st || (st.status !== 'qr' && st.status !== 'connecting')) return;
     const t = setInterval(refresh, 2000); return () => clearInterval(t);
   }, [st, refresh]);
-  const run = async (f: () => Promise<WaState>) => { setBusy(true); try { setSt(await f()); setErr(''); } catch { setErr('שרת הוואטסאפ עוד לא פעיל.'); } finally { setBusy(false); } };
+  const run = async (f: () => Promise<WaState>) => {
+    setBusy(true);
+    try { setSt(await f()); setErr(''); }
+    catch (e) {
+      const m = String((e as Error).message ?? e);
+      setErr(m === 'full' ? 'השרת מלא כרגע. אפשר לנסות שוב מאוחר יותר, ועד אז ההודעות יוצאות במייל ובנגיעה.'
+        : m === 'closed' ? 'חיבור הוואטסאפ עוד לא נפתח למציגים.' : 'שרת הוואטסאפ עוד לא פעיל.');
+    } finally { setBusy(false); }
+  };
   return (
     <section className="panel-w">
-      <h2>חיבור הוואטסאפ שלך <span className="tag">פיילוט</span></h2>
+      <h2>חיבור הוואטסאפ שלך</h2>
       {err ? <p className="muted">{err}</p>
         : !st ? <p className="muted">בודק…</p>
         : st.status === 'open' ? <>

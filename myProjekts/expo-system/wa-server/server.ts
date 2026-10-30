@@ -519,7 +519,16 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/wa/status' && req.method === 'GET') return send(200, view(sessions.get(id)));
     if (url.pathname === '/wa/link' && req.method === 'POST') {
       const s = sessions.get(id);
-      if (!s || s.status === 'closed') await start(id);
+      if (!s || s.status === 'closed') {
+        // Open to every exhibitor only when the admin opened it, and up to the number of accounts he set (30/10).
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/system_state?select=wa_open,wa_max&id=eq.1`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+        const [st] = (r.ok ? await r.json() : []) as { wa_open: boolean; wa_max: number }[];
+        const admin = await isAdmin(token);
+        if (!admin && !st?.wa_open) return send(403, { error: 'closed' });
+        const live = [...sessions.values()].filter((x) => x.status !== 'closed').length;
+        if (!admin && live >= (st?.wa_max ?? 60)) return send(409, { error: 'full' });
+        await start(id);
+      }
       return send(200, view(sessions.get(id)));
     }
     if (url.pathname === '/wa/unlink' && req.method === 'POST') { await stop(id); return send(200, view(undefined)); }

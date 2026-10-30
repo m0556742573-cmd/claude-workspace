@@ -10,4 +10,5 @@ COPY consultant-rounds ./consultant-rounds
 COPY wa-server ./wa-server
 ENV NODE_ENV=production
 WORKDIR /app/wa-server
-CMD ["node", "--max-old-space-size=1200", "server.ts"]
+# Each linked account is a live connection in memory: room for the accounts the admin allows (system_state.wa_max).
+CMD ["node", "--max-old-space-size=3800", "server.ts"]

@@ -506,6 +506,17 @@ export async function setGreeting(exhibitorId: string, greeting: 'shalom' | 'kav
 
 /** The system's phase, one for all booths (migration 0019): practice before the fair, live, after the fair. */
 export type Phase = 'practice' | 'live' | 'after';
+/** Whether the admin opened WhatsApp linking to every exhibitor, and how many accounts the server holds at most (30/10). */
+export async function waOpenState(): Promise<{ open: boolean; max: number }> {
+  const { data, error } = await supabase.from('system_state').select('wa_open, wa_max').maybeSingle();
+  if (error) throw error;
+  return { open: !!data?.wa_open, max: data?.wa_max ?? 60 };
+}
+export async function adminSetWa(open: boolean, max?: number): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_wa', { open, max_accounts: max ?? null });
+  if (error) throw error;
+}
+
 export async function loadPhase(): Promise<Phase> {
   const { data, error } = await supabase.from('system_state').select('phase').maybeSingle();
   if (error) throw error;

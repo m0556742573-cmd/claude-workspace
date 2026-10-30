@@ -3,7 +3,7 @@
 // for now it holds what the admin already had inside the booth: the exhibitors, their approval, and the two lists.
 // Same database and same pieces as the booth (lib/backend.ts, ui.tsx, styles.css); the server checks is_admin() on every call.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
+import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, adminSetWa, waOpenState, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { MailCode } from '../signin.tsx';
 import { ListLoad } from './lists.tsx';
@@ -299,6 +299,39 @@ function PhaseView() {
         </section>
       )}
       {done && <p className="note">{done}</p>}
+      <WaOpen />
     </div>
+  );
+}
+
+/** WhatsApp for every exhibitor (30/10): open when the server is ready, up to a number of accounts it holds at most. */
+function WaOpen() {
+  const [st, setSt] = useState<{ open: boolean; max: number } | null>(null);
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof waStats>> | null>(null);
+  const [max, setMax] = useState('');
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    waOpenState().then((s) => { setSt(s); setMax(String(s.max)); }).catch(() => setMsg('לא נטען: אין חיבור כרגע.'));
+    waStats().then(setStats).catch(() => setStats(null));
+  }, []);
+  async function save(open: boolean) {
+    const n = Math.max(1, Math.min(500, Number(max) || 60));
+    try { await adminSetWa(open, n); setSt({ open, max: n }); setMsg(open ? `נפתח. עד ${n} חשבונות.` : 'נסגר. מי שכבר מחובר נשאר מחובר.'); }
+    catch (e) { setMsg('לא נשמר: ' + String((e as Error).message ?? e)); }
+  }
+  return (
+    <section className="panel-w">
+      <h2>וואטסאפ למציגים</h2>
+      <p className="muted">כשזה פתוח, כל מציג מאושר רואה בהגדרות › חיבורים את חיבור הוואטסאפ שלו. כל חשבון מחובר תופס זיכרון בשרת, ולכן יש תקרה.</p>
+      {stats && <p className="faint small">בשרת עכשיו: {stats.open} מחוברים מתוך {stats.sessions}, {stats.rssMb}MB זיכרון.</p>}
+      {st && (
+        <div className="row">
+          <label className="field" style={{ maxWidth: 160 }}>עד כמה חשבונות<input className="input" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} /></label>
+          <button type="button" className={'btn' + (st.open ? '' : ' primary')} onClick={() => save(!st.open)}>{st.open ? 'לסגור' : 'לפתוח לכל המציגים'}</button>
+          {st.open && <button type="button" className="btn" onClick={() => save(true)}>לשמור את התקרה</button>}
+        </div>
+      )}
+      {msg && <p className="muted small" role="status">{msg}</p>}
+    </section>
   );
 }

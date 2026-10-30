@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Puts the WhatsApp server on the VPS (the one with n8n), next to it, without touching anything else there:
-# /opt/expo-wa holds the code and the linked accounts (data/, never in git), the container is capped at 1.5GB,
+# /opt/expo-wa holds the code and the linked accounts (data/, never in git), the container is capped at 4.5GB (30/10: room for the linked accounts),
 # and Traefik (Easypanel's) gets one file of its own, the same pattern as site-y-h-m.yml and supabase.yml.
 # The old container is stopped, not killed: it gets 20 seconds to close each account's connection (SIGTERM in server.ts).
 # Needs: WA_SSH_HOST=root@<server-ip> in wa-server/.env.local, the key ~/.ssh/greenwald_vps, and ../app/.env for the Supabase address.
@@ -30,6 +30,6 @@ ssh_run '[ -s /opt/expo-wa/wa_key ] || (umask 077; openssl rand -hex 32 | tr -d 
 printf '# Written by expo-system/wa-server/deploy.sh\nhttp:\n  routers:\n    expo-wa:\n      rule: "Host(`%s`)"\n      entryPoints: [https]\n      service: expo-wa\n      tls:\n        certResolver: letsencrypt\n  services:\n    expo-wa:\n      loadBalancer:\n        servers:\n          - url: "http://expo-wa:8080"\n' "$DOMAIN" \
   | ssh_run 'cat > /etc/easypanel/traefik/config/expo-wa.yml'
 ssh_run 'cd /opt/expo-wa && docker build -q -t expo-wa . >/dev/null && (docker stop -t 20 expo-wa >/dev/null 2>&1; docker rm -f expo-wa >/dev/null 2>&1 || true) &&
-  docker run -d --name expo-wa --restart unless-stopped --network easypanel --memory 1500m --env-file .env -e WA_KEY="$(cat wa_key)" -v /opt/expo-wa/data:/data expo-wa >/dev/null &&
+  docker run -d --name expo-wa --restart unless-stopped --network easypanel --memory 4500m --env-file .env -e WA_KEY="$(cat wa_key)" -v /opt/expo-wa/data:/data expo-wa >/dev/null &&
   docker ps --filter name=expo-wa --format "{{.Names}} {{.Status}}"'
 echo "https://$DOMAIN/health"
