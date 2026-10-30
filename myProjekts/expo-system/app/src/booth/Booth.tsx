@@ -83,6 +83,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   }, [rec]);
 
   const results = useMemo(() => (typing ? [] : search(query)), [query, typing, search]);
+  const typedDigits = typing ? typing.phone.replace(/\D/g, '').replace(/^972/, '0') : '';
+  const typedPhoneBad = !!typing?.phone.trim() && !/^0\d{8,9}$/.test(typedDigits);
   const byPerson = useMemo(() => new Map(todays.filter((l) => l.personId).map((l) => [l.personId!, l])), [todays]);
   const myNotes = current ? notes.filter((n) => n.leadId === current.id) : [];
   const wantsDate = !!current && current.taps.some((t) => t.includes('מתי?'));
@@ -240,8 +242,11 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           <input id="typed-name" className="input" autoFocus value={typing.name} onChange={(e) => setTyping({ ...typing, name: e.target.value })} />
           <label className="label" htmlFor="typed-phone">טלפון</label>
           <input id="typed-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={typing.phone} onChange={(e) => setTyping({ ...typing, phone: e.target.value })} />
+          {/* A number cut short is caught here, while the visitor is still at the booth (30/10). */}
+          {typedPhoneBad && <p className="faint small" role="alert">המספר לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
+          {!typing.phone.trim() && typing.name.trim() && <p className="faint small">בלי טלפון לא יוצאות אליו הודעות בוואטסאפ.</p>}
           <div className="actions">
-            <button type="button" className="btn primary" disabled={!typing.name.trim()} onClick={() => capture({ name: typing.name, phone: typing.phone })}>✓ שמירה</button>
+            <button type="button" className="btn primary" disabled={!typing.name.trim() || typedPhoneBad} onClick={() => capture({ name: typing.name, phone: typing.phone })}>✓ שמירה</button>
           </div>
         </section>
       ) : (
@@ -258,7 +263,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
                 return (
                   <button key={p.id} type="button" role="listitem" className="result" onClick={() => capture({ person: p })}>
                     <span>
-                      <span className="nm">{p.fullName}</span><span className="city">{p.city || 'בלי עיר'}</span>
+                      <span className="nm">{p.fullName}</span><span className="city">{[p.father && `בן ${p.father}`, p.city || 'בלי עיר'].filter(Boolean).join(' · ')}</span>
                       {(p.businessOwner || done) && <span className="mt">{[p.businessOwner ? 'בעל עסק' : '', done ? 'כבר נרשם היום' : ''].filter(Boolean).join(' · ')}</span>}
                     </span>
                     {done && <span className="tag">כבר נרשם</span>}

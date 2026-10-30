@@ -90,8 +90,8 @@ export async function loadDirectory(): Promise<Person[]> {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.rpc('people_directory').order('id').range(from, from + 999);
     if (error) throw error;
-    for (const p of (data ?? []) as { id: string; full_name: string; city: string | null; business_owner: boolean }[]) {
-      out.push({ id: p.id, fullName: p.full_name, city: p.city ?? '', businessOwner: p.business_owner });
+    for (const p of (data ?? []) as { id: string; full_name: string; city: string | null; business_owner: boolean; father: string | null; father_in_law: string | null }[]) {
+      out.push({ id: p.id, fullName: p.full_name, city: p.city ?? '', businessOwner: p.business_owner, father: p.father ?? undefined, fatherInLaw: p.father_in_law ?? undefined });
     }
     if (!data || data.length < 1000) return out;
   }
@@ -120,7 +120,9 @@ export function searchIn(directory: Person[], q: string, max = 8): Person[] {
   const words = q.trim().split(/\s+/).filter(Boolean);
   if (q.trim().length < 2) return [];
   const rank = (p: Person) => (words.every((w) => p.fullName.includes(w)) ? (p.fullName.startsWith(words[0]!) ? 0 : 1) : 2);
-  return directory.filter((p) => words.every((w) => p.fullName.includes(w) || p.city.includes(w)))
+  // A word may also be the father's or the father-in-law's name ("משה כהן אברהם"), when the list has them.
+  const fits = (p: Person, w: string) => p.fullName.includes(w) || p.city.includes(w) || !!p.father?.includes(w) || !!p.fatherInLaw?.includes(w);
+  return directory.filter((p) => words.every((w) => fits(p, w)))
     .map((p) => [rank(p), p] as const).sort((a, b) => a[0] - b[0]).slice(0, max).map(([, p]) => p);
 }
 
@@ -275,21 +277,44 @@ export interface NoteRow { id: string; lead_id: string; body: string | null; aud
 export interface ReplyRow { lead_id: string; body: string; at: string; optout: boolean }
 export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup>; replies: ReplyRow[] }
 
+/** Every row, a thousand at a time: the server gives at most 1000 to one request, and after the fair a booth's steps and
+ *  notes pass that (30/10: the CRM's lists were cut there without a word, and done steps showed as due). Each page asks
+ *  in a fixed order, so no row is skipped or seen twice. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function every<T = any>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await page(from, from + 999);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+/** The older versions of the setup that visitors still follow (they were left on them by "רק על החדשים"). */
+export async function versionsInUse(): Promise<Setup[]> {
+  const rows = await every<{ setup_version: number }>((a, b) => supabase.from('leads').select('setup_version').not('setup_version', 'is', null).order('id').range(a, b));
+  const nums = [...new Set(rows.map((r) => r.setup_version))];
+  if (!nums.length) return [];
+  const { data, error } = await supabase.from('setups').select('version, data').in('version', nums);
+  if (error) throw error;
+  return (data ?? []).map((v) => v.data as Setup);
+}
+
 export async function loadBook(): Promise<Book> {
   const [leads, tasks, steps, manual, notes, versions, replies] = await Promise.all([
-    supabase.from('leads').select('*').order('captured_at', { ascending: false }),
-    supabase.from('tasks').select('*'),
-    supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').order('created_at'),
-    supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message'),
-    supabase.from('lead_notes').select('id, lead_id, body, audio_path, transcript, created_at').order('created_at'),
-    supabase.from('setups').select('version, data'),
-    supabase.from('lead_replies').select('lead_id, body, at, optout').order('at'),
+    every((a, b) => supabase.from('leads').select('*').order('captured_at', { ascending: false }).order('id').range(a, b)),
+    every((a, b) => supabase.from('tasks').select('*').order('lead_id').range(a, b)),
+    every((a, b) => supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').order('created_at').order('id').range(a, b)),
+    every((a, b) => supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message').order('id').range(a, b)),
+    every((a, b) => supabase.from('lead_notes').select('id, lead_id, body, audio_path, transcript, created_at').order('created_at').order('id').range(a, b)),
+    every((a, b) => supabase.from('setups').select('version, data').order('version').range(a, b)),
+    every((a, b) => supabase.from('lead_replies').select('lead_id, body, at, optout').order('at').order('id').range(a, b)),
   ]);
-  for (const r of [leads, tasks, steps, manual, notes, versions, replies]) if (r.error) throw r.error;
   return {
-    leads: leads.data ?? [], tasks: tasks.data ?? [], steps: steps.data ?? [], manual: manual.data ?? [], notes: notes.data ?? [],
-    versions: Object.fromEntries((versions.data ?? []).map((v) => [v.version, v.data as Setup])),
-    replies: replies.data ?? [],
+    leads, tasks, steps, manual, notes,
+    versions: Object.fromEntries(versions.map((v) => [v.version, v.data as Setup])),
+    replies,
   };
 }
 
@@ -370,8 +395,8 @@ export async function joinBooth(code: string, v: { name: string; phone: string; 
  */
 export async function pullSelf(exhibitorId: string, setup: Setup, directory: Person[], onDay: string): Promise<boolean> {
   const [mine, tasks] = await Promise.all([
-    supabase.from('leads').select('id, person_id, typed_name, typed_phone, taps, customer_date, note, captured_on, captured_at, source').eq('captured_on', onDay),
-    supabase.from('tasks').select('lead_id'),
+    every((a, b) => supabase.from('leads').select('id, person_id, typed_name, typed_phone, taps, customer_date, note, captured_on, captured_at, source').eq('captured_on', onDay).order('id').range(a, b)).then((data) => ({ data, error: null })),
+    every((a, b) => supabase.from('tasks').select('lead_id').order('lead_id').range(a, b)).then((data) => ({ data, error: null })),
   ]);
   if (mine.error) throw mine.error;
   if (tasks.error) throw tasks.error;
@@ -381,12 +406,15 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
   for (const r of mine.data ?? []) {
     const here = local.get(r.id);
     if (!here) {
-      if (r.source !== 'self' || (await getLead(r.id))) continue;
+      // Today's visitors of this booth from every tablet, and those who registered themselves (30/10): a second tablet
+      // sees the first one's, so a tap on the same person opens his card instead of registering him again.
+      if (await getLead(r.id)) continue;
       const p = person(r.person_id);
       await putLead({
         id: r.id, capturedOn: r.captured_on, capturedAt: r.captured_at, taps: r.taps, customerDate: r.customer_date ?? undefined,
         businessOwner: p?.businessOwner ?? false, history: [], name: p?.fullName ?? r.typed_name ?? '', city: p?.city,
-        personId: r.person_id ?? undefined, typedPhone: r.typed_phone ?? undefined, note: r.note ?? '', synced: true, self: true,
+        personId: r.person_id ?? undefined, typedPhone: r.typed_phone ?? undefined, note: r.note ?? '', synced: true, self: r.source === 'self',
+        owner: exhibitorId, rev: nextRev(),
       });
       changed = true;
     } else if (here.synced && !here.gone) {
@@ -399,8 +427,7 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
     }
   }
   const tasked = new Set((tasks.data ?? []).map((t) => t.lead_id));
-  const { data: all, error } = await supabase.from('leads').select('id');
-  if (error) throw error;
+  const all = await every<{ id: string }>((a, b) => supabase.from('leads').select('id').order('id').range(a, b));
   if ((all ?? []).some((l) => !tasked.has(l.id))) {
     const book = await loadBook();
     for (const row of book.leads.filter((l) => !tasked.has(l.id))) {
@@ -608,7 +635,8 @@ export async function recordSent(exhibitorId: string, leadId: string, channel: '
 }
 /** Each lead, with the messages already sent to it (by template id); one he chose not to send counts as dealt with. */
 export async function sentByLead(): Promise<Map<string, Set<string>>> {
-  const { data, error } = await supabase.from('outbox').select('lead_id, template_id').in('status', ['sent', 'cancelled']);
+  const { data, error } = await every((a, b) => supabase.from('outbox').select('lead_id, template_id').in('status', ['sent', 'cancelled']).order('id').range(a, b))
+    .then((d) => ({ data: d, error: null }), (e) => ({ data: null, error: e }));
   if (error) throw error;
   const out = new Map<string, Set<string>>();
   for (const r of data ?? []) if (r.lead_id && r.template_id) (out.get(r.lead_id) ?? out.set(r.lead_id, new Set()).get(r.lead_id)!).add(r.template_id);
@@ -627,7 +655,8 @@ export async function updateMe(exhibitorId: string, me: Partial<Omit<Exhibitor, 
 
 /** The phone and mail of all his leads, for the export. */
 export async function allContacts(): Promise<Map<string, { phone: string | null; email: string | null }>> {
-  const { data, error } = await supabase.rpc('my_lead_contacts');
+  const { data, error } = await every((a, b) => supabase.rpc('my_lead_contacts').order('lead_id').range(a, b))
+    .then((d) => ({ data: d, error: null }), (e) => ({ data: null, error: e }));
   if (error) throw error;
   return new Map(((data ?? []) as { lead_id: string; phone: string | null; email: string | null }[]).map((r) => [r.lead_id, { phone: r.phone, email: r.email }]));
 }
@@ -639,6 +668,18 @@ export async function adminCounts(): Promise<{ people: number; listed: number } 
 }
 export async function adminLoadExhibitors(rows: object[]): Promise<{ rows: number; approved: number }> {
   const { data, error } = await supabase.rpc('admin_load_exhibitor_list', { rows });
+  if (error) throw error;
+  return data;
+}
+/** The community list goes up in parts to a staging table, and is committed in one step (30/10): a load that fails half
+ *  way leaves the list as it was. */
+export async function adminStagePeople(rows: object[], fresh: boolean): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_people_stage', { rows, fresh });
+  if (error) throw error;
+  return data ?? 0;
+}
+export async function adminCommitPeople(replace: boolean): Promise<{ added: number; removed: number; total: number }> {
+  const { data, error } = await supabase.rpc('admin_people_commit', { replace });
   if (error) throw error;
   return data;
 }

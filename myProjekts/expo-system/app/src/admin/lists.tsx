@@ -1,7 +1,7 @@
 // The two lists the admin loads from a file (moved here from the exhibitor's screens, 28/10, with the admin platform).
 import { useEffect, useMemo, useState } from 'react';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from '../lib/csv.ts';
-import { adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople } from '../lib/backend.ts';
+import { adminCounts, adminLoadExhibitors, adminStagePeople, adminCommitPeople } from '../lib/backend.ts';
 
 // ---------- the two lists, from a file: Excel → "שמירה בשם" → CSV. The rows go from the browser straight to the server.
 
@@ -50,13 +50,15 @@ export function ListLoad({ kind, onDone }: { kind: keyof typeof LISTS; onDone: (
         const r = await adminLoadExhibitors(records);
         setResult(`נטענו ${r.rows} מציגים. ${r.approved ? `${r.approved} שחיכו אושרו עכשיו.` : ''}`);
       } else {
-        let removed = 0, added = 0;
-        if (replace) { setProgress('מוציא את השמות הקודמים…'); removed = await adminClearPeople(); }
+        // The file goes up in parts to the side, and only the last step changes the list, all at once: a load that
+        // stops half way leaves the list as it was (30/10).
         for (let i = 0; i < records.length; i += 500) {
-          setProgress(`טוען ${Math.min(i + 500, records.length)} מתוך ${records.length}…`);
-          added += (await adminLoadPeople(records.slice(i, i + 500))).added;
+          setProgress(`מעלה ${Math.min(i + 500, records.length)} מתוך ${records.length}…`);
+          await adminStagePeople(records.slice(i, i + 500), i === 0);
         }
-        setResult(`נוספו ${added} אנשים${removed ? `, ו־${removed} שמות קודמים יצאו` : ''}. שמות שכבר היו (אותו שם ואותו טלפון) לא נוספו שוב.`);
+        setProgress(replace ? 'מחליף את הרשימה…' : 'מוסיף לרשימה…');
+        const r = await adminCommitPeople(replace);
+        setResult(`נוספו ${r.added} אנשים${r.removed ? `, ו־${r.removed} שמות קודמים יצאו` : ''}. ברשימה עכשיו ${r.total}. שמות שכבר היו (אותו שם ואותו טלפון) לא נוספו שוב.`);
       }
       setFile(null); onDone();
     } catch (e) { setResult('לא נטען: ' + String((e as Error).message ?? e)); }
@@ -72,7 +74,7 @@ export function ListLoad({ kind, onDone }: { kind: keyof typeof LISTS; onDone: (
             בחירת קובץ CSV
             <input type="file" accept=".csv,text/csv,text/plain" hidden onChange={(e) => pick(e.target.files?.[0])} />
           </label>
-          <p className="faint small">מאקסל: קובץ ← שמירה בשם ← CSV UTF-8. השורה הראשונה היא הכותרות.</p>
+          <p className="faint small">מאקסל: קובץ ← שמירה בשם ← CSV. השורה הראשונה היא הכותרות.</p>
         </>
       ) : (
         <>

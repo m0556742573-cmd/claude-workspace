@@ -44,6 +44,8 @@ export const PEOPLE_FIELDS: Fields = {
   email: ['מייל', 'אימייל', 'דוא"ל', 'דואל', 'email', 'e-mail'],
   business_owner: ['בעל עסק', 'business owner', 'owner'],
   business_name: ['שם העסק', 'עסק', 'business', 'business name'],
+  father: ['שם האב', 'אב', 'האב', 'father'],
+  father_in_law: ['שם החותן', 'חותן', 'החותן', 'father in law'],
 };
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_\-:]+/g, ' ');

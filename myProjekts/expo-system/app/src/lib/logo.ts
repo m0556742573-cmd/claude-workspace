@@ -19,7 +19,12 @@ export async function prepareLogo(file: File): Promise<{ png: Blob; color: strin
     g.fillRect(0, 0, SIZE, SIZE);
     const k = Math.min((SIZE - 2 * PAD) / w, (SIZE - 2 * PAD) / h);
     g.drawImage(img, (SIZE - w * k) / 2, (SIZE - h * k) / 2, w * k, h * k);
-    const color = suggest(g.getImageData(0, 0, SIZE, SIZE).data);
+    const px = g.getImageData(0, 0, SIZE, SIZE).data;
+    // Nothing but white on the white square: a white logo meant for a dark background (30/10).
+    let ink = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i]! < 235 || px[i + 1]! < 235 || px[i + 2]! < 235) ink++;
+    if (ink < (SIZE * SIZE) / 200) throw new Error('white');
+    const color = suggest(px);
     const png = await new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error('png'))), 'image/png'));
     return { png, color };
   } finally {

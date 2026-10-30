@@ -25,7 +25,8 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
   onCancel?: () => void;
 }) {
   const [at, setAt] = useState(0);
-  const [s, setS] = useState<Setup>(() => { const b = start ?? EMPTY; return { ...b, business: b.business || business || '' }; });
+  // The business's name from sign-up is not what it does (30/10: "במה העסק עוסק?" opened filled with the name).
+  const [s, setS] = useState<Setup>(() => { const b = start ?? EMPTY; return { ...b, business: b.business || '' }; });
   const [from, setFrom] = useState<number | 'empty' | 'mine' | null>(start ? 'mine' : null);
   const [renames, setRenames] = useState<[string, string][]>([]);
   const [visitors, setVisitors] = useState(40);
@@ -104,8 +105,8 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
                 <div className="chips">
                   {items.map((b) => <EditChip key={b.label} label={b.label} primary={b.primary}
                     onRename={(to) => { const next = rename(s, b.label, to); if (next !== s) { setS(next); setRenames([...renames, [b.label, to.trim()]]); } }}
-                    onRemove={() => setS(remove(s, g, b.label))}
-                    onPrimary={g === 'needs' && s.needs.length > 1 ? () => setS(setGoal(s, b.label)) : undefined} />)}
+                    onRemove={() => { let next = remove(s, g, b.label); if (g === 'needs' && next.needs.length && !next.needs.some((n) => n.goal === 'primary')) next = setGoal(next, next.needs[0]!.label); setS(next); }}
+                    onPrimary={g === 'needs' && !b.primary ? () => setS(setGoal(s, b.label)) : undefined} />)}
                   <AddChip onAdd={(l) => { let next = add(s, g, l); if (g === 'needs' && next.needs.length === 1) next = setGoal(next, l.trim()); setS(next); }} />
                 </div>
               </div>
@@ -175,6 +176,9 @@ function PathPick({ title, need, onPick, edit }: { title: string; need: NeedPath
   const season = only?.steps.find((st) => st.timing.kind === 'calendar')?.timing;
   const holiday = season?.kind === 'calendar' && 'holiday' in season.anchor ? season.anchor.holiday : 'pesach';
   const pick = (id: string, h?: Holiday) => {
+    // A button whose path changes by what else was tapped (e.g. "רק בודק מחירים → מחירון מיד") has several; a pattern
+    // replaces them all with one, and he is told so first (30/10: they were dropped without a word).
+    if (need.variants.length > 1 && !confirm(`ל"${need.label}" יש ${need.variants.length} מסלולים, לפי מה שעוד סומן. מסלול מהרשימה יחליף את כולם במסלול אחד. להחליף?`)) return;
     if (id === 'none') return onPick({ ...need, variants: [{ path: { steps: [], end: { kind: 'list' } } as Path }] });
     const p = patternOf(id);
     if (p) onPick({ ...needFrom(need.label, p, need.goal, h), goal: need.goal });

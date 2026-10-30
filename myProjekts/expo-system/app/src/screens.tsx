@@ -21,7 +21,7 @@ import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -403,7 +403,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
-        ? <SendRow ctx={ctx} leadId={row.id} name={name} messageId={next.message} dests={dests} />
+        ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={next.message} dests={dests} />
         : ownPhone && ctx.phase !== 'practice' && (
           <div className="row">
             <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{showDestination(ownPhone)}</a>
@@ -468,11 +468,12 @@ function Frame({ bare, className, children }: { bare?: boolean; className: strin
 
 /** A step that carries a message: the text, filled for this visitor, goes out with one tap in WhatsApp or mail.
  *  A text with a hole left in it does not go out; it sends him to fill it first. */
-export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: Ctx; leadId: string; name: string; messageId: string; dests: Destination[] | null; onSent?: () => void }) {
+/** setup: the version the lead follows (30/10: the active one showed, and sent by a tap, another text than the server's). */
+export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, dests, onSent }: { ctx: Ctx; setup?: Setup; leadId: string; name: string; messageId: string; dests: Destination[] | null; onSent?: () => void }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [shown, setShown] = useState(false);
-  const raw = textOf(ctx.setup, texts, messageId);
+  const raw = textOf(setup, texts, messageId);
   const body = fill(raw, me, name);
   const missing = holes(body);
   // Files go with the message from his WhatsApp; a tap can carry text only, so there they go as links.
@@ -1019,8 +1020,16 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [open, setOpen] = useState<string | null>(null);
-  const list = messagesOf(ctx.setup);
-  const toFill = !texts ? 0 : list.filter((m) => holes(fill(textOf(ctx.setup, texts, m.id), me, SAMPLE)).length).length;
+  const [old, setOld] = useState<Setup[]>([]);
+  useEffect(() => { versionsInUse().then(setOld).catch(() => {}); }, []);
+  // The active setup's messages, and those of older versions still followed by visitors (30/10), each with its version.
+  const list = useMemo(() => {
+    const out = messagesOf(ctx.setup).map((m) => ({ ...m, setup: ctx.setup, older: false }));
+    const seen = new Set(out.map((m) => m.id));
+    for (const s of old) for (const m of messagesOf(s)) if (!seen.has(m.id)) { seen.add(m.id); out.push({ ...m, setup: s, older: true }); }
+    return out;
+  }, [ctx.setup, old]);
+  const toFill = !texts ? 0 : list.filter((m) => holes(fill(textOf(m.setup, texts, m.id), me, SAMPLE)).length).length;
   return (
     <div className="page">
       <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
@@ -1032,13 +1041,13 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       {!texts ? <p className="muted">טוען…</p> : (
         <ul className="list in-card">
           {list.map((m) => {
-            const body = textOf(ctx.setup, texts, m.id);
+            const body = textOf(m.setup, texts, m.id);
             const missing = holes(fill(body, me, SAMPLE));
             if (open === m.id) return <MessageEdit key={m.id} ctx={ctx} me={me} id={m.id} after={m.after} body={body} own={m.id in texts} onClose={() => setOpen(null)} />;
             return (
               <li key={m.id}>
                 <button type="button" className="list-row" onClick={() => setOpen(m.id)}>
-                  <div className="row-name">{m.id}{missing.length > 0 && <span className="tag">להשלים: {missing.length}</span>}{m.id in texts && <span className="tag">הנוסח שלך</span>}</div>
+                  <div className="row-name">{m.id}{missing.length > 0 && <span className="tag">להשלים: {missing.length}</span>}{m.id in texts && <span className="tag">הנוסח שלך</span>}{m.older && <span className="tag">מגרסה קודמת</span>}</div>
                   <div className="row-step">אחרי: {m.after.join(' · ')}</div>
                   <div className="row-id">{fill(body, me, SAMPLE).split('\n').find((l, n) => n > 0 && l.trim() && !l.startsWith('לכבוד')) ?? ''}</div>
                 </button>
@@ -1067,9 +1076,9 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
  * itself, written once and filled into all of them. A new one (his own edit; later the consultant's) shows up here by
  * itself. While one is empty, the messages that use it do not go out.
  */
-function MessageDetails({ ctx, texts, list }: { ctx: Ctx; texts: Record<string, string>; list: { id: string }[] }) {
+function MessageDetails({ ctx, texts, list }: { ctx: Ctx; texts: Record<string, string>; list: { id: string; setup?: Setup }[] }) {
   const uses = new Map<string, string[]>();
-  for (const m of list) for (const k of detailsIn(textOf(ctx.setup, texts, m.id))) (uses.get(k) ?? uses.set(k, []).get(k)!).push(m.id);
+  for (const m of list) for (const k of detailsIn(textOf(m.setup ?? ctx.setup, texts, m.id))) (uses.get(k) ?? uses.set(k, []).get(k)!).push(m.id);
   const fills = ctx.exhibitor.fills ?? {};
   const [vals, setVals] = useState<Record<string, string>>(fills);
   const [err, setErr] = useState('');
@@ -1494,7 +1503,9 @@ function Brand({ ctx }: { ctx: Ctx }) {
       const patch = !ex.brand_color && c ? { logo, brand_color: c } : { logo };
       await setBrand(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch });
       setMsg(patch.brand_color ? 'נשמר. הצבע נבחר לפי הלוגו, ואפשר לשנות אותו.' : 'נשמר.');
-    } catch { setMsg('הקובץ לא נקלט. אפשר לנסות תמונה אחרת, PNG או JPG.'); }
+    } catch (e) {
+      setMsg(String((e as Error).message) === 'white' ? 'הלוגו הזה כולו לבן, ועל רקע לבן הוא לא ייראה. כדאי להעלות גרסה כהה שלו.' : 'הקובץ לא נקלט. אפשר לנסות תמונה אחרת, PNG או JPG.');
+    }
     finally { setBusy(false); }
   }
   async function test() {

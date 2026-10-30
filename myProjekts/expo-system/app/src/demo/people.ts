@@ -1,6 +1,8 @@
 // Invented names for the demo booth, until the real community list is loaded on the server.
 // None of these are real people.
-export interface Person { id: string; fullName: string; city: string; businessOwner: boolean }
+export interface Person { id: string; fullName: string; city: string; businessOwner: boolean;
+  /** The father's and father-in-law's names, when the list has them (model §4): they tell two of the same name apart. */
+  father?: string; fatherInLaw?: string }
 
 const first = ['אברהם', 'יצחק', 'יעקב', 'משה', 'אהרן', 'יוסף', 'שמואל', 'דוד', 'שלמה', 'מנחם', 'ישראל', 'חיים', 'מרדכי', 'נחום', 'שמעון', 'בנימין'];
 const last = ['גרינברג', 'וייס', 'פרידמן', 'שטרן', 'רוזנבלום', 'קליין', 'הורוביץ', 'לנדאו', 'ברגר', 'גולדשטיין', 'פישר', 'שפירא'];
