@@ -9,7 +9,8 @@ export interface MailRow { id: string; to_email: string; body: string; from_name
   /** A trial mail before the fair, to the exhibitor himself or a mail he added. */ trial?: boolean;
   /** His own look (30/10): the logo's path in the files bucket and his colour; none of it in a sensitive business. */
   sensitive?: boolean; logo?: string | null; brand_color?: string | null; phone?: string | null; whatsapp?: string | null;
-  /** His own name before the @ (30/10), unique among the exhibitors. */ mail_name?: string | null }
+  /** His own name before the @ (30/10), unique among the exhibitors. */ mail_name?: string | null;
+  /** A mailing-list message (before a season or a holiday) is drawn as a newsletter, design ג (30/10). */ style?: 'letter' | 'newsletter' }
 export interface Attachment { name: string; type: string; data: Buffer }
 export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string; attachments?: Attachment[] }
 
@@ -59,7 +60,13 @@ export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, fi
   const mark = logo
     ? `<img src="${esc(logo)}" width="52" height="52" alt="${esc(r.subject)}" style="display:block;width:52px;height:52px;border:0;border-radius:10px;background:#FFFFFF;font-family:${FONT};font-size:12px;color:${ink}">`
     : `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:#FFFFFF;border-radius:26px;font-family:${FONT};font-size:24px;font-weight:bold;color:${onWhite}">${esc([...r.subject.trim()][0] ?? '')}</td></tr></table>`;
-  const button = (href: string, label: string, main: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 0 8px 8px;padding:11px 20px;border-radius:8px;font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;${main ? `background:${color};color:${ink};border:1px solid ${color}` : `background:#FFFFFF;color:${onWhite};border:1px solid ${onWhite}`}">${label}</a>`;
+  // A newsletter (design ג, a mailing-list message before a season or a holiday): a banner, a headline, a large button.
+  const news = r.style === 'newsletter';
+  const lines = r.body.split('\n');
+  const greet = /^(שלום|לכבוד|בס"ד)/.test(lines[0] ?? '') ? 1 : 0;
+  const head = news ? (lines.slice(greet).find((l) => l.trim()) ?? '').trim() : '';
+  const rest = news ? lines.filter((l, i) => !(i >= greet && l.trim() === head && lines.indexOf(l) === i)).join('\n') : r.body;
+  const button = (href: string, label: string, main: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 0 8px 8px;padding:${news && main ? '14px 34px' : '11px 20px'};border-radius:${news && main ? '30px' : '8px'};font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;${main ? `background:${color};color:${ink};border:1px solid ${color}` : `background:#FFFFFF;color:${onWhite};border:1px solid ${onWhite}`}">${label}</a>`;
   const buttons = [phone && button(`tel:${phone}`, 'להתקשר', true), wa && button(wa, 'וואטסאפ', !phone)].filter(Boolean).join('');
 
   const html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -67,14 +74,19 @@ export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, fi
     + '<body style="margin:0;padding:0;background:#F3F4F1">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F1"><tr><td align="center" style="padding:24px 12px">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="max-width:600px;background:#FFFFFF;border:1px solid #E3E5E0;border-radius:14px;overflow:hidden">'
-    // his strip: his logo (or the first letter of his business) and his name, in his colour
-    + `<tr><td dir="rtl" align="right" style="background:${color};padding:20px 24px">`
-    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr><td valign="middle" style="padding-left:14px">${mark}</td>`
-    + `<td valign="middle" style="font-family:${FONT};color:${ink};text-align:right"><div style="font-size:20px;font-weight:bold;line-height:1.3">${esc(r.subject)}</div>`
-    + (who ? `<div style="font-size:14px;line-height:1.4;opacity:.85">${esc(who)}</div>` : '')
-    + '</td></tr></table></td></tr>'
-    // his message
-    + `<tr><td dir="rtl" align="right" style="padding:26px 24px 8px;font-family:${FONT};font-size:16px;line-height:1.7;color:#1A1A1A;text-align:right">${linked(r.body)}</td></tr>`
+    // his strip: his logo (or the first letter of his business) and his name, in his colour; a newsletter's is a banner
+    + (news
+      ? `<tr><td align="center" style="background:${color};padding:30px 24px 26px;text-align:center"><table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">${mark}</td></tr></table>`
+        + `<div style="font-family:${FONT};color:${ink};font-size:26px;font-weight:bold;line-height:1.3;margin-top:12px">${esc(r.subject)}</div>`
+        + (who ? `<div style="font-family:${FONT};color:${ink};font-size:14px;opacity:.85;margin-top:2px">${esc(who)}</div>` : '') + '</td></tr>'
+      : `<tr><td dir="rtl" align="right" style="background:${color};padding:20px 24px">`
+        + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr><td valign="middle" style="padding-left:14px">${mark}</td>`
+        + `<td valign="middle" style="font-family:${FONT};color:${ink};text-align:right"><div style="font-size:20px;font-weight:bold;line-height:1.3">${esc(r.subject)}</div>`
+        + (who ? `<div style="font-size:14px;line-height:1.4;opacity:.85">${esc(who)}</div>` : '')
+        + '</td></tr></table></td></tr>')
+    // his message; a newsletter's first line is its headline
+    + (news && head ? `<tr><td dir="rtl" align="center" style="padding:28px 24px 0;font-family:${FONT};font-size:22px;font-weight:bold;line-height:1.4;color:#1A1A1A;text-align:center">${esc(head)}</td></tr>` : '')
+    + `<tr><td dir="rtl" align="${news ? 'center' : 'right'}" style="padding:${news ? '14px 28px 8px' : '26px 24px 8px'};font-family:${FONT};font-size:${news ? 17 : 16}px;line-height:1.7;color:#1A1A1A;text-align:${news ? 'center' : 'right'}">${linked(news && head ? rest : r.body)}</td></tr>`
     // how to reach him
     + (buttons
       ? `<tr><td style="padding:16px 24px 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F7F5;border-radius:10px"><tr><td dir="rtl" align="right" style="padding:16px 16px 8px;font-family:${FONT};text-align:right">`

@@ -363,13 +363,15 @@ export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & 
 
 /** Recompute one lead's task from what the server holds now. */
 async function recompute(row: LeadRow, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
-  const [steps, manual] = await Promise.all([
+  const [steps, manual, replies] = await Promise.all([
     supabase.from('lead_steps').select('lead_id, step_id, done_on, outcome, created_at').eq('lead_id', row.id).order('created_at'),
     supabase.from('manual_steps').select('id, lead_id, action, who, due_on, message').eq('lead_id', row.id),
+    supabase.from('lead_replies').select('lead_id, body, at, optout').eq('lead_id', row.id).order('at'),
   ]);
   if (steps.error) throw steps.error;
   if (manual.error) throw manual.error;
-  const lead = engineLead(row, { steps: steps.data ?? [], manual: manual.data ?? [] }, businessOwner);
+  // His replies too (30/10): a reply, also one marked by hand, makes the next task "he got back to you".
+  const lead = engineLead(row, { steps: steps.data ?? [], manual: manual.data ?? [], replies: replies.data ?? [] }, businessOwner);
   const { error } = await supabase.from('tasks').upsert(taskRow(exhibitorId, row.id, setup, lead, onDay));
   if (error) throw error;
 }
@@ -449,6 +451,13 @@ export async function markStep(row: LeadRow, stepId: string, outcome: StepRecord
   if (error) throw error;
   // "ביקש להסיר": his phone and mail go on the do-not-send list.
   if (outcome === 'optOut') { const o = await supabase.rpc('opt_out_lead', { lead: row.id, asked: true }); if (o.error) throw o.error; }
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
+
+/** "ענה לי" by hand (model §9): he got back to him outside what the system reads; the path stops and he rises in "היום". */
+export async function markReplied(row: LeadRow, note: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.rpc('mark_replied', { lead: row.id, note });
+  if (error) throw error;
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
 

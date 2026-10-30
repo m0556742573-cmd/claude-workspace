@@ -21,7 +21,7 @@ import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesO
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
+  addFollowNote, addManual, markReplied, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
   loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, signInMail, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
@@ -376,6 +376,15 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
     finally { setBusy(false); setMore(false); onChange(); }
   }
+  /** "ענה לי" (model §9): a reply the system did not see; the path stops, and "הוא חזר אליי" comes up as the next task. */
+  async function replied() {
+    const note = prompt('מה הוא אמר? (לא חובה)') ?? null;
+    if (note === null) return;
+    setBusy(true);
+    try { await markReplied(row, note, ...args); }
+    catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
+    finally { setBusy(false); setMore(false); onChange(); }
+  }
   async function date(d: string) {
     if (!d) return;
     setBusy(true);
@@ -440,6 +449,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       )}
       {more && !talk && (
         <div className="answers">
+          <button type="button" className="btn" disabled={busy} onClick={replied}>ענה לי</button>
           <button type="button" className="btn" disabled={busy} onClick={() => mark('closed', 'נסגרה עסקה')}>נסגרה עסקה</button>
           <button type="button" className="btn" disabled={busy} onClick={() => mark('notRelevant', 'לא רלוונטי')}>לא רלוונטי</button>
           <button type="button" className="btn" disabled={busy} onClick={() => mark('optOut', 'ביקש להסיר')}>ביקש לא לקבל הודעות</button>

@@ -294,7 +294,7 @@ async function planOnce(onlyFast: boolean): Promise<void> {
       const ch = { wa: wa && !p.me.blocked, mail };
       for (const d of due(p, today, approved, ch, b.fast ? { now: now.getTime(), minutesPerDay: 1 } : undefined)) {
         await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail,
-          files: d.files.length ? d.files : null, fast_day: d.virtual ?? null });
+          files: d.files.length ? d.files : null, fast_day: d.virtual ?? null, style: d.style });
       }
     } catch (err) { logger.error({ err, booth: b.id }, 'planning one booth failed'); } // the next booths still get planned
   }

@@ -31,7 +31,8 @@ export interface Plan {
 }
 /** files: "path#name" for each file the message carries (a detail written once as a file).
  *  virtual: on the trial's fast clock, the day the step is done on, as the path sees it. */
-export interface Due { lead: string; step: string; template: string; body: string; files: string[]; virtual?: string }
+export interface Due { lead: string; step: string; template: string; body: string; files: string[]; virtual?: string;
+  /** A message before a season or a holiday is a mailing-list message, drawn as a newsletter (30/10). */ style: 'letter' | 'newsletter' }
 
 /** The trial's fast clock (יצחק, 29/10): before the fair, a day of the path goes by in this many minutes, counted from each
  *  visitor's registration, so the whole path is seen in one sitting. On it a message a little late still goes. */
@@ -75,7 +76,9 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     const body = fill(text, plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
     const files = filesIn(text, plan.me).map((f) => `${f.path}#${encodeURIComponent(f.name)}`);
-    out.push({ lead: l.id, step: n.stepId, template: n.message, body, files, ...(fast ? { virtual: day } : {}) });
+    const timed = [...setup.needs.flatMap((x) => x.variants.map((v) => v.path)), setup.defaults.business, setup.defaults.private]
+      .flatMap((p) => p.steps).find((s) => s.id === n.stepId)?.timing.kind;
+    out.push({ lead: l.id, step: n.stepId, template: n.message, body, files, ...(fast ? { virtual: day } : {}), style: timed === 'calendar' ? 'newsletter' : 'letter' });
   }
   return out;
 }
