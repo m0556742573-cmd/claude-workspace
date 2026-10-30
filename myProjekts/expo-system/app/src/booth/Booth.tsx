@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CONSENT, immediateMessage, messagesOf, nextTask, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
-import type { LocalLead, LocalNote } from '../store/local.ts';
+import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
 import { Icon } from '../ui.tsx';
 import { Qr, joinUrl } from '../join.tsx';
@@ -22,7 +22,7 @@ export interface BoothProps {
   desk?: boolean;
   search: (q: string) => Person[];
   saveLead: (lead: LocalLead) => Promise<'saved' | 'waiting'>;
-  removeLead: (id: string) => Promise<void>;
+  removeLead: (id: string) => Promise<'saved' | 'waiting'>;
   saveNote: (note: LocalNote) => Promise<'saved' | 'waiting'>;
   todays: LocalLead[];
   notes: LocalNote[];
@@ -58,11 +58,24 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [toast, setToast] = useState('');
   const [checked, setChecked] = useState<Record<string, Checked[]>>({});
   const searchRef = useRef<HTMLInputElement>(null);
-  // Saves go one after the other, so a quick second tap never lands before the first.
-  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  // Visitors cancelled while a recording of theirs was still running: the recording is dropped, not saved (30/10).
+  const dropped = useRef(new Set<string>());
+  const recRef = useRef<Recording | null>(null);
+  recRef.current = rec;
+  // "＋ מבקר חדש" from the bar opens the form when pressed, not again each time the booth comes back on screen (30/10).
+  const seenNew = useRef(newVisitor);
 
   useEffect(() => { setCurrent(null); setQuery(''); }, [setup]);
-  useEffect(() => { if (newVisitor) newOne(); }, [newVisitor]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (newVisitor && newVisitor !== seenNew.current) { seenNew.current = newVisitor; newOne(); } }, [newVisitor]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Leaving the booth in the middle of a recording ends it, and it is saved like any other (30/10: before, it was lost
+  // and the microphone stayed on).
+  useEffect(() => () => { const r = recRef.current; if (r && r.recorder.state !== 'inactive') r.recorder.stop(); }, []);
+  // What the visitor added on his own phone reaches the card that is open for him, so the next tap does not erase it.
+  useEffect(() => {
+    if (!current) return;
+    const here = todays.find((l) => l.id === current.id);
+    if (here && (here.rev ?? 0) > (current.rev ?? 0)) setCurrent(here);
+  }, [todays]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!rec) return;
     const t = setInterval(() => setSeconds(Math.round((Date.now() - rec.started) / 1000)), 500);
@@ -80,11 +93,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     checkWa(id).then((r) => { if (r) setChecked((m) => ({ ...m, [id]: r })); }).catch(() => {});
   }
   function say(text: string) { setToast(text); setTimeout(() => setToast((t) => (t === text ? '' : t)), 4500); }
-  function store(l: LocalLead): Promise<'saved' | 'waiting'> {
-    const p = chain.current.then(() => saveLead(l));
-    chain.current = p.catch(() => {});
-    return p;
-  }
+  /** Saved on the tablet at once; the upload waits its turn in one line (lib/backend.ts), never ahead of an earlier tap. */
+  const store = (l: LocalLead) => saveLead(l);
   function open(l: LocalLead) {
     stopRecording();
     setCurrent(l); setNoteOpen(false); setNoteText(''); setAsking(false); setQuery(''); setTyping(null); setPicking(false);
@@ -111,6 +121,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       typedPhone: who.phone?.trim() || undefined,
       note: '',
       synced: false,
+      rev: nextRev(),
     };
     open(lead);
     const where = await store(lead);
@@ -120,14 +131,14 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
 
   function change(patch: Partial<LocalLead>) {
     if (!current) return;
-    const next = { ...current, ...patch, synced: false };
+    const next = { ...current, ...patch, synced: false, rev: nextRev(current.rev) };
     setCurrent(next);
     store(next);
   }
   /** Another number or mail for this visitor (his wife's, the office): it gets every message, as his own does. */
   function setExtra(extra: string[]) {
     if (!current) return;
-    const next = { ...current, extra, synced: false };
+    const next = { ...current, extra, synced: false, rev: nextRev(current.rev) };
     setCurrent(next);
     store(next).then((w) => { if (w === 'saved') verify(next.id); });
   }
@@ -137,10 +148,14 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     change({ taps });
   }
 
+  /** The box closes at once (the note is on the tablet before the network is asked), so a second tap cannot save it twice
+   *  and a slow answer cannot clear what is typed on the next card (30/10). */
   async function addNote() {
     if (!current || !noteText.trim()) return;
-    await saveNote({ id: crypto.randomUUID(), leadId: current.id, body: noteText.trim(), createdAt: new Date().toISOString(), synced: false });
-    setNoteText(''); setNoteOpen(false); say('ההערה נשמרה');
+    const note = { id: crypto.randomUUID(), leadId: current.id, body: noteText.trim(), createdAt: new Date().toISOString(), synced: false };
+    setNoteText(''); setNoteOpen(false);
+    const where = await saveNote(note);
+    say(where === 'saved' ? 'ההערה נשמרה' : 'ההערה נשמרה בטלפון · תעלה כשתחזור הרשת');
   }
 
   async function startRecording() {
@@ -155,6 +170,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     recorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
+      if (dropped.current.has(leadId)) return;
       const audio = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
       const secs = Math.max(1, Math.round((Date.now() - started) / 1000));
       if (!audio.size) { say('ההקלטה יצאה ריקה'); return; }
@@ -172,11 +188,12 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
 
   async function cancelLead() {
     if (!current) return;
-    stopRecording();
     const name = current.name;
-    await removeLead(current.id);
+    dropped.current.add(current.id);
+    stopRecording();
     setCurrent(null); setAsking(false);
-    say(`הרישום של ${name} בוטל`);
+    const where = await removeLead(current.id);
+    say(where === 'saved' ? `הרישום של ${name} בוטל` : `הרישום של ${name} בוטל בטאבלט · יימחק גם בשרת כשתחזור הרשת`);
     searchRef.current?.focus();
   }
 
@@ -298,7 +315,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </>
           )}
 
-          {messages.length > 0 && <SendLine lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
+          {messages.length > 0 && <SendLine key={current.id} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
             checked={checked[current.id]} onExtra={setExtra} />}
 

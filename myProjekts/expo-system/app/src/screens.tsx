@@ -1,7 +1,7 @@
 // The exhibitor's screens beside the booth: the snapshot of the day, and the CRM — home, tasks, leads, dashboard, messages —
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Path, type Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
@@ -21,7 +21,7 @@ import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -374,12 +374,13 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     try {
       await markStep(row, stepId, outcome, ...args);
       onUndo({ label: `${name}: ${label}`, run: async () => { await unmarkStep(row, stepId, ...args); onChange(); } });
-    } finally { setBusy(false); setMore(false); onChange(); }
+    } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
+    finally { setBusy(false); setMore(false); onChange(); }
   }
   async function date(d: string) {
     if (!d) return;
     setBusy(true);
-    await setCustomerDate(row, d, ...args).catch(() => {});
+    await setCustomerDate(row, d, ...args).catch(() => alert('התאריך לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'));
     setBusy(false); onChange();
   }
 
@@ -442,7 +443,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         <div className="answers">
           <button type="button" className="btn" disabled={busy} onClick={() => mark('closed', 'נסגרה עסקה')}>נסגרה עסקה</button>
           <button type="button" className="btn" disabled={busy} onClick={() => mark('notRelevant', 'לא רלוונטי')}>לא רלוונטי</button>
-          <button type="button" className="btn" disabled={busy} onClick={() => mark('optOut', 'ביקש להסיר')}>ביקש להסיר אותו</button>
+          <button type="button" className="btn" disabled={busy} onClick={() => mark('optOut', 'ביקש להסיר')}>ביקש לא לקבל הודעות</button>
         </div>
       )}
       {onOpen && !talk && <div className="nc-foot"><button type="button" className="btn ghost" onClick={onOpen}>כל הפרטים ←</button></div>}
@@ -454,9 +455,9 @@ function AutoLine({ blocked }: { blocked: boolean }) {
   const [linked, setLinked] = useState<boolean | null>(null);
   useEffect(() => { waOpen().then(setLinked); }, []);
   if (linked === null) return null;
-  if (blocked) return <div className="faint small">החיבור לוואטסאפ נעצר, אז הוא לא יוצא לבד. אפשר לשלוח ביד.</div>;
-  if (!linked) return <div className="faint small">אמור לצאת לבד כשהוואטסאפ שלך מחובר (הגדרות › חיבורים). בינתיים אפשר לשלוח ביד.</div>;
-  return <div className="faint small">יוצא לבד מהוואטסאפ שלך היום, בקצב של אדם ובשעות 9–20 (תקרה יומית למי שעוד לא ענה).</div>;
+  if (blocked) return <div className="faint small">החיבור לוואטסאפ נעצר, אז בוואטסאפ הוא לא יוצא לבד. במייל הוא יוצא למי שהשאיר מייל.</div>;
+  if (!linked) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, ובוואטסאפ כשהוואטסאפ שלך מחובר (הגדרות › חיבורים).</div>;
+  return <div className="faint small">יוצא לבד מהוואטסאפ שלך היום, לאט, כמו שאדם שולח, בשעות 9–20 (תקרה יומית למי שעוד לא ענה).</div>;
 }
 
 /** A task card is an item of a list, a card of its own, or (inside the lead's page) only its contents. */
@@ -488,7 +489,7 @@ export function SendRow({ ctx, leadId, name, messageId, dests, onSent }: { ctx: 
   const optedOut = !!dests?.some((d) => d.own && d.removed);
   const who = (d: Destination, all: Destination[]) => (all.length < 2 ? '' : ` · ${d.own ? 'אליו' : d.label || showDestination(d.value)}`);
   useEffect(() => { if (!ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at]);
-  useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued')) setQueued('yes'); }).catch(() => {}); }, [leadId]);
+  useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued' && x.template_id === messageId)) setQueued('yes'); }).catch(() => {}); }, [leadId, messageId]);
   async function viaServer() {
     setQueued('busy');
     try { const n = await queueSend(leadId, messageId, body, files); setQueued(n ? 'yes' : 'none'); if (n) onSent?.(); } catch { setQueued('err'); }
@@ -545,9 +546,11 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
 
   async function finish(outcome: 'engaged' | 'closed' | 'notRelevant', withNext: boolean) {
     setBusy(true);
+    let marked = false;
     try {
       const id = stepId ?? `talk:${Date.now()}`;
       await markStep(row, id, outcome, ...args);
+      marked = true;
       const manual = withNext ? await addManual(row, { action, dueOn: due }, ...args) : null;
       if (note.trim()) await addFollowNote(row.id, note.trim(), ctx.exhibitor.id);
       const label = outcome === 'engaged' ? (manual ? `${ACT[action]} ${dayLabel(due)}` : 'בלי המשך כרגע') : OUTCOME[outcome]!;
@@ -556,6 +559,10 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
         run: async () => { if (manual) await removeManual(row, manual, ...args); await unmarkStep(row, id, ...args); onChange(); },
       });
       onClose();
+    } catch {
+      // What was saved stays saved; the sheet closes, so a second "שמירה" does not mark the next step too (30/10).
+      alert(marked ? 'השיחה נשמרה, אבל ההמשך או ההערה לא: אין חיבור כרגע. אפשר להוסיף אותם מהדף של הליד.' : 'לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.');
+      if (marked) onClose();
     } finally { setBusy(false); onChange(); }
   }
 
@@ -707,7 +714,6 @@ export function Leads({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           ) : <p className="muted">אין לידים שמתאימים לסינון.</p>}
         </>
       )}
-      <Soon title="תשובות מהלקוח">תשובות שהגיעו בוואטסאפ יופיעו בציר הזמן של כל אחד, כשהחיבור לוואטסאפ יעבוד.</Soon>
     </div>
   );
 }
@@ -725,8 +731,10 @@ const STATES: [string, string, (i: Item) => boolean][] = [
 
 /** Excel opens a CSV with a BOM in Hebrew; one row per lead, with what he needs to call and what was tapped. */
 async function exportLeads(items: Item[], ctx: Ctx) {
-  const contacts = await allContacts().catch(() => new Map<string, { phone: string | null; email: string | null }>());
-  const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  let contacts: Map<string, { phone: string | null; email: string | null }>;
+  try { contacts = await allContacts(); } catch { alert('אין חיבור כרגע, אז הקובץ היה יוצא בלי טלפונים ומיילים. אפשר לנסות שוב.'); return; }
+  // A name typed by a visitor that starts with = + - @ would run in Excel as a formula: it is kept as text (30/10).
+  const cell = (raw: string) => { const v = /^[=+\-@]/.test(raw) ? `'${raw}` : raw; return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   const rows = [
     ['שם', 'עיר', 'טלפון', 'מייל', 'בעל עסק', 'נרשם', 'מה ביקש', 'התאריך שלו', 'הערה', 'הצעד הבא', 'מתי'],
     ...items.map((i) => {
@@ -808,7 +816,8 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
   const ddmm = (d: string) => d.split('-').reverse().join('.');
   async function saveNote() {
     if (!noteText.trim()) return;
-    await addFollowNote(row.id, noteText.trim(), ctx.exhibitor.id).catch(() => {});
+    try { await addFollowNote(row.id, noteText.trim(), ctx.exhibitor.id); }
+    catch { alert('ההערה לא נשמרה: אין חיבור כרגע. היא נשארת כאן, ואפשר לשמור שוב.'); return; }
     setNoteText(''); setNoting(false); onChange();
   }
   return (
@@ -1046,7 +1055,6 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
         <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › חיבורים): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
         <p className="muted"><b>בלי חיבור:</b> בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
         <p className="muted">הודעה עם פרט ריק בסוגריים מרובעים לא יוצאת עד שממלאים אותו.</p>
-        <Soon title="בהמשך">מייל שיוצא לבד, למי שאין לו וואטסאפ.</Soon>
       </section>
       </div>
       </div>
@@ -1339,7 +1347,7 @@ function Trial({ ctx }: { ctx: Ctx }) {
         </div>
         {bad && <p className="err small">זה לא נראה כמו מספר טלפון או מייל.</p>}
         <div className="switchrow">
-          <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה</span></span>
+          <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה. כל המבקרים מתחילים מהרגע שמדליקים.</span></span>
           <button type="button" className="switch" role="switch" aria-checked={e.trial_fast} aria-label="יום עובר בדקה" onClick={() => set({ trial_fast: !e.trial_fast })} />
         </div>
         <p className="muted small">עשרת מבקרי הניסיון הראשונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת. בוואטסאפ זה יוצא רק כשהוא מחובר.</p>
@@ -1433,7 +1441,7 @@ function SelfSign({ ctx }: { ctx: Ctx }) {
         <div className="ps-biz">{biz}</div>
         <div className="ps-call">סורקים ונרשמים</div>
         <Qr text={url} size={380} />
-        <div className="ps-how">שם, טלפון, ומה מעניין אותך. נחזור אליך עם בדיוק מה שמתאים.</div>
+        <div className="ps-how">שם, טלפון, ומה מעניין אותך. נחזור אליך עם מה שמתאים לך.</div>
         <div className="ps-url" dir="ltr">{url.replace(/^https?:\/\//, '')}</div>
       </div>
     </section>
@@ -1459,7 +1467,15 @@ function Brand({ ctx }: { ctx: Ctx }) {
   const [suggested, setSuggested] = useState<string | null>(null);
   const sensitive = ctx.setup.sensitive || ex.sensitive;
   const name = sensitive ? ex.name : ex.business || ex.name;
-  const color = ex.brand_color ?? COLORS[0]!;
+  // The picker's colour shows at once and is saved when he stops moving it (30/10: every move was a save).
+  const [picked, setPicked] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function pick(c: string) {
+    setPicked(c);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { save({ brand_color: c }, 'נשמר.').then(() => setPicked(null)); }, 600);
+  }
+  const color = picked ?? ex.brand_color ?? COLORS[0]!;
   const ink = inkOn(color);
   async function save(patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color'>>, done: string) {
     setBusy(true); setMsg('');
@@ -1516,12 +1532,52 @@ function Brand({ ctx }: { ctx: Ctx }) {
         ))}
         <label className="swatch other" title="צבע אחר">
           <span aria-hidden="true">+</span>
-          <input type="color" value={color} aria-label="צבע אחר" onChange={(e) => save({ brand_color: e.target.value.toUpperCase() }, 'נשמר.')} />
+          <input type="color" value={picked ?? color} aria-label="צבע אחר" onChange={(e) => pick(e.target.value.toUpperCase())} />
         </label>
       </div>
+      <MailName ctx={ctx} />
       {ctx.admin && <button type="button" className="btn ghost start-sm" disabled={busy} onClick={test}>לשלוח לי מייל לדוגמה</button>}
       {msg && <p className="muted small" role="status">{msg}</p>}
     </section>
+  );
+}
+
+/** His own name before the @ in the mails to his visitors (יצחק, 30/10): English letters, digits and a hyphen, and no
+ *  other exhibitor's. The reply to a mail always reaches his own inbox, whatever the name. */
+function MailName({ ctx }: { ctx: Ctx }) {
+  const ex = ctx.exhibitor;
+  const [name, setName] = useState(ex.mail_name ?? '');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const clean = name.trim().toLowerCase();
+  const valid = /^[a-z0-9]([a-z0-9-]{0,28}[a-z0-9])?$/.test(clean);
+  async function save() {
+    if (clean === (ex.mail_name ?? '')) return;
+    setBusy(true); setMsg('');
+    try {
+      if (clean && !valid) { setMsg('אפשר רק אותיות באנגלית, ספרות ומקף באמצע, עד 30 תווים.'); return; }
+      if (clean && !(await mailNameFree(clean))) { setMsg('השם הזה כבר תפוס אצל מציג אחר. אפשר להוסיף לו משהו, למשל את העיר.'); return; }
+      await setBrand(ex.id, { mail_name: clean || null });
+      ctx.setExhibitor({ ...ex, mail_name: clean || null });
+      setMsg(clean ? 'נשמר. מעכשיו המיילים שלך יוצאים מהכתובת הזו.' : 'נשמר. המיילים יוצאים מהכתובת הכללית.');
+    } catch (e) {
+      const m = String((e as Error).message ?? e);
+      setMsg(/duplicate|unique/i.test(m) ? 'השם הזה כבר תפוס אצל מציג אחר.' : /check/i.test(m) ? 'את השם הזה אי אפשר לבחור. כדאי לנסות אחר.' : 'לא נשמר: ' + m);
+    } finally { setBusy(false); }
+  }
+  return (
+    <>
+      <p className="label">הכתובת שממנה יוצאים המיילים שלך</p>
+      <div className="row mail-name">
+        <span className="mail-at" dir="ltr">
+          <input className="input" dir="ltr" aria-label="השם לפני ה-@" placeholder="levi-kitchens" value={name} disabled={busy}
+            onChange={(e) => { setName(e.target.value); setMsg(''); }} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
+          <span className="faint">@{MAIL_DOMAIN}</span>
+        </span>
+      </div>
+      <p className="faint small">באנגלית, למשל שם העסק. מי שעונה למייל מגיע לתיבה שלך, בלי קשר לשם.{!ex.mail_name ? ` עד שתבחר: expo@${MAIL_DOMAIN}.` : ''}</p>
+      {msg && <p className="muted small" role="status">{msg}</p>}
+    </>
   );
 }
 
@@ -1579,7 +1635,8 @@ function Custom({ ctx }: { ctx: Ctx }) {
   );
   const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי התערוכה עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
   if (steps) {
-    return <>{intro}{question}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} /></>;
+    // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
+    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} />{question}</>;
   }
   return (
     <>
@@ -1596,7 +1653,13 @@ function Custom({ ctx }: { ctx: Ctx }) {
           <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">החלפת תבנית</div><div className="row-step">להתחיל מעסק דומה מהסבבים.</div></button></li>
         </ul>
         {picking && (
-          <div className="chips">{fixtures.map((f) => <button key={f.id} type="button" className="chip" onClick={async () => { await changeTemplate(ctx.exhibitor.id, f.setup); ctx.setSetup(f.setup); setPicking(false); }}>{f.name}</button>)}</div>
+          // A template replaces the card and the paths, but keeps what he wrote about himself (his business, his goal,
+          // sensitivity, his time), and goes through the same "גם עליהם / רק על החדשים" question as any change (30/10).
+          <div className="chips">{fixtures.map((f) => <button key={f.id} type="button" className="chip" disabled={busy} onClick={() => {
+            if (!confirm(`להחליף את הכרטיס והמסלולים בתבנית "${f.name}"? הגרסה הנוכחית נשמרת, ואפשר לחזור אליה.`)) return;
+            setPicking(false);
+            apply({ ...f.setup, template: f.id, business: s.business, anchor: s.anchor, sensitive: s.sensitive, capacity: s.capacity }, []);
+          }}>{f.name}</button>)}</div>
         )}
       </section>
 

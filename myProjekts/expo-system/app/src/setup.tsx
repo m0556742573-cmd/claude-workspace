@@ -34,7 +34,7 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
 
   /** A starting point keeps what he already wrote about himself: the business, the goal, sensitivity. */
   function startFrom(f: number | 'empty' | 'mine') {
-    const base = f === 'empty' ? EMPTY : f === 'mine' ? start! : fixtures.find((x) => x.id === f)!.setup;
+    const base = f === 'empty' ? EMPTY : f === 'mine' ? start! : { ...fixtures.find((x) => x.id === f)!.setup, template: f };
     setS({ ...base, business: s.business, anchor: s.anchor, sensitive: s.sensitive, capacity: s.capacity });
     setFrom(f); setRenames([]);
   }

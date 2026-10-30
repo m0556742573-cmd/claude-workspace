@@ -14,7 +14,16 @@ export interface LocalLead extends Lead {
   self?: boolean;
   /** Numbers or mails added on the card ("לשנות"), as kept: the phone's digits from 0, the mail in lower case. */
   extra?: string[];
+  /** When it was last changed (a time that only grows): an upload marks it synced only if nothing changed after (30/10). */
+  rev?: number;
+  /** Cancelled at the booth: hidden at once, kept until the server has deleted it too (30/10). */
+  gone?: boolean;
+  /** The exhibitor it was registered for: another account on the same tablet never sees or sends it (30/10). */
+  owner?: string;
 }
+
+/** The next revision: now, or one more than the last when the clock has not moved. */
+export const nextRev = (prev?: number) => Math.max(Date.now(), (prev ?? 0) + 1);
 
 export interface LocalNote {
   id: string;
@@ -115,6 +124,9 @@ function run<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore)
 }
 
 export const putLead = (l: LocalLead) => run('leads', 'readwrite', (s) => s.put(l));
+export const getLead = (id: string) => run<LocalLead | undefined>('leads', 'readonly', (s) => s.get(id) as IDBRequest<LocalLead | undefined>);
+/** Signing out with nothing waiting: the tablet forgets the visitors, so the next account starts clean. */
+export const clearLocal = () => Promise.all([run('leads', 'readwrite', (s) => s.clear()), run('notes', 'readwrite', (s) => s.clear())]);
 export const dropLead = (id: string) => run('leads', 'readwrite', (s) => s.delete(id));
 export const allLeads = () => run<LocalLead[]>('leads', 'readonly', (s) => s.getAll() as IDBRequest<LocalLead[]>)
   .then((ls) => ls.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt)));

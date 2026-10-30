@@ -48,13 +48,21 @@ export function PathLines({ path, edit }: { path: Path; edit?: (index: number, d
       {path.steps.map((st, i) => {
         const t = st.timing;
         if (!edit || t.kind === 'weekday') return <li key={i}>{text.step(st)}</li>;
-        const sign = t.days < 0 ? -1 : 1;
-        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי התערוכה' : 'ימים אחרי הצעד הקודם') : t.kind === 'customerDate' ? (t.days < 0 ? 'ימים לפני התאריך שלו' : 'ימים אחרי התאריך שלו') : (t.days < 0 ? 'ימים לפני' : 'ימים אחרי') + ' ' + text.timing({ ...t, days: 0 });
+        // Before or after his date (or the holiday) is its own choice (30/10): read from the number alone, emptying the
+        // field turned "30 days before" into "after", and a reminder before the wedding went out after it.
+        const sign = t.days < 0 || Object.is(t.days, -0) ? -1 : 1;
+        const n = (v: string) => Math.max(0, Math.min(365, Number(v) || 0));
+        const what = t.kind === 'customerDate' ? 'התאריך שלו' : text.timing({ ...t, days: 0 });
+        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי התערוכה' : 'ימים אחרי הצעד הקודם') : `ימים ${sign < 0 ? 'לפני' : 'אחרי'} ${what}`;
         return (
           <li key={i}>
             {text.step({ ...st, timing: { kind: 'after', days: 0 } }).split(',')[0]},{' '}
             <input className="input days" type="number" min={0} max={365} inputMode="numeric" aria-label={unit} value={Math.abs(t.days)}
-              onChange={(e) => edit(i, sign * Math.max(0, Math.min(365, Number(e.target.value) || 0)))} /> {unit}
+              onChange={(e) => edit(i, sign * n(e.target.value))} />{' '}
+            {t.kind === 'after' ? unit : <>ימים{' '}
+              <select className="input days-dir" aria-label="לפני או אחרי" value={sign < 0 ? 'before' : 'after'} onChange={(e) => edit(i, (e.target.value === 'before' ? -1 : 1) * Math.abs(t.days))}>
+                <option value="before">לפני</option><option value="after">אחרי</option>
+              </select>{' '}{what}</>}
             {st.message ? <span className="muted"> — "{st.message}"</span> : null}
           </li>
         );

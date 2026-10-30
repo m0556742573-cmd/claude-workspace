@@ -79,6 +79,9 @@ export interface Setup {
   sensitive: boolean;
   /** Minutes a day he will have for the follow-up in the two weeks after the fair (round 7: half an hour by default). */
   capacity?: number;
+  /** The ready template he started from (its id), so its approved texts stay his after he renames, adds or removes a
+   *  button (30/10: recognised by the buttons alone, one change emptied every message). */
+  template?: number;
 }
 
 /** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops. */

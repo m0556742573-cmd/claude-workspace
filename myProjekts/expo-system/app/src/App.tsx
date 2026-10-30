@@ -13,7 +13,7 @@ import { Booth } from './booth/Booth.tsx';
 import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
-import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
+import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
@@ -21,6 +21,7 @@ import {
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
+import { MailCode } from './signin.tsx';
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine);
@@ -45,16 +46,19 @@ function useDesk(): boolean {
 }
 
 /** Today's leads and notes, from the phone's own copy. */
-function useToday() {
+/** Today's visitors on this tablet: his own only (another account signed in here never sees them), never one cancelled. */
+function useToday(owner: string | undefined) {
   const [todays, setTodays] = useState<LocalLead[]>([]);
   const [notes, setNotes] = useState<LocalNote[]>([]);
   const [waiting, setWaiting] = useState(0);
   const refresh = useCallback(async () => {
-    const [ls, ns] = await Promise.all([allLeads(), allNotes()]);
-    setTodays(ls.filter((l) => l.capturedOn === today()));
-    setNotes(ns);
-    setWaiting(ls.filter((l) => !l.synced).length + ns.filter((n) => !n.synced).length);
-  }, []);
+    const [all, ns] = await Promise.all([allLeads(), allNotes()]);
+    const ls = all.filter((l) => !l.owner || l.owner === owner);
+    const ids = new Set(ls.map((l) => l.id));
+    setTodays(ls.filter((l) => !l.gone && l.capturedOn === today()));
+    setNotes(ns.filter((n) => ids.has(n.leadId)));
+    setWaiting(ls.filter((l) => !l.synced).length + ns.filter((n) => !n.synced && ids.has(n.leadId)).length);
+  }, [owner]);
   useEffect(() => { refresh(); }, [refresh]);
   return { todays, notes, waiting, refresh };
 }
@@ -71,7 +75,7 @@ export function App() {
 function Gate({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="gate">
-      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">דוכן חכם</span></div></header>
+      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">אקספומקס</span></div></header>
       <section className="gate-box">
         <h1>{title}</h1>
         {children}
@@ -97,7 +101,8 @@ function Live() {
   const [exhibitor, setExhibitor] = useState<Exhibitor | null | undefined>(undefined);
   const [setup, setSetup] = useState<Setup | null | undefined>(undefined);
   const [directory, setDirectory] = useState<Person[]>([]);
-  const { todays, notes, waiting, refresh } = useToday();
+  const [loaded, setLoaded] = useState(false);
+  const { todays, notes, waiting, refresh } = useToday(exhibitor?.id);
   const [error, setError] = useState('');
   const [view, setView] = useState<View>(() => {
     const h = location.hash.slice(1);
@@ -121,9 +126,11 @@ function Live() {
 
   useEffect(() => {
     // Without a network an expired sign-in cannot be renewed; the booth still opens on what this tablet keeps.
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? (navigator.onLine ? null : keptSession())))
+    // A network that looks connected but carries nothing (a hall's Wi-Fi) fails the renewal the same way (30/10). The kept
+    // sign-in is gone only after a real sign-out, so it is the answer whenever the server's is missing.
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? keptSession()))
       .catch(() => setSession(keptSession()));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ?? (navigator.onLine ? null : keptSession())));
+    const { data } = supabase.auth.onAuthStateChange((e, s) => setSession(s ?? (e === 'SIGNED_OUT' ? null : keptSession())));
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -136,11 +143,17 @@ function Live() {
       setSetup(await activeSetup(ex.id));
       // In practice the booth searches sample names only: the real list is not even loaded (יצחק, 28/10); the server
       // gives it only from the fair on. The admin may try the real list before (29/10).
-      const ph = await loadPhase().catch(() => 'practice' as const);
-      const adm = await isAdmin();
+      // On a failure, the phase this tablet last knew, not practice (30/10: one failed request on the fair's morning
+      // would have meant sample names all day).
+      const last = await kept<Boot>('boot:' + userId).catch(() => undefined);
+      const ph = await loadPhase().catch(() => last?.phase ?? 'practice');
+      const adm = await isAdmin().catch(() => false);
       setPhase(ph);
-      setDirectory(ph === 'practice' && !adm ? demoPeople : await loadDirectory());
+      const dir = ph === 'practice' && !adm ? demoPeople : await loadDirectory().catch(() => null);
+      // The real list failed half way: the one kept from the last load, if any.
+      setDirectory(dir ?? (last?.phase === ph ? last.directory : []));
       setAdmin(adm);
+      setLoaded(!!dir);
     }).catch(async (e) => {
       // No server: the booth opens from the copy kept on this tablet at the last load.
       const k = await kept<Boot>('boot:' + userId).catch(() => undefined);
@@ -148,33 +161,47 @@ function Live() {
       else setError(navigator.onLine ? String(e.message ?? e) : 'אין רשת, ועוד אין בטאבלט הזה עותק של הדוכן. צריך להיכנס פעם אחת עם רשת.');
     });
   }, [userId]);
-  // What the booth needs to open without a network is kept after every change.
+  // What the booth needs to open without a network is kept after every change, once the list has fully loaded: a copy
+  // made while it was still loading (or after it failed) would replace a good one with an empty list.
   useEffect(() => {
-    if (!userId || !exhibitor || !setup) return;
+    if (!userId || !exhibitor || !setup || !loaded) return;
     keep('boot:' + userId, { exhibitor, setup, directory, phase } satisfies Boot).catch(() => {});
-  }, [userId, exhibitor, setup, directory, phase]);
+  }, [userId, exhibitor, setup, directory, phase, loaded]);
 
   useEffect(() => {
     if (!exhibitor || !setup) return;
     // What waits on the phone goes up; what visitors registered on their own phones comes down.
     const tick = () => flush(exhibitor.id, setup)
       .then(() => pullSelf(exhibitor.id, setup, directory, today()).catch(() => false))
-      .then(refresh).catch(() => {});
+      .then(refresh)
+      // The admin's switch (practice → the fair → after) reaches a booth already open, with the real list (30/10).
+      .then(() => loadPhase()).then(async (ph) => {
+        if (ph === phase) return;
+        setPhase(ph);
+        if (ph !== 'practice') { const dir = await loadDirectory().catch(() => null); if (dir) { setDirectory(dir); setLoaded(true); } }
+      }).catch(() => {});
     tick();
     const t = setInterval(tick, 30000);
     addEventListener('online', tick);
     return () => { clearInterval(t); removeEventListener('online', tick); };
-  }, [exhibitor, setup, directory, refresh]);
+  }, [exhibitor, setup, directory, refresh, phase]);
 
   const search = useCallback((q: string) => searchIn(directory, q), [directory]);
+  /** Signing out: with nothing waiting, the tablet forgets the visitors, so the next account starts clean; with some
+   *  waiting, they stay for this account only and go up when it signs in again (30/10). */
+  const leave = async () => {
+    if (waiting && !confirm(`${waiting} רישומים עוד לא עלו לשרת. הם יישארו בטאבלט הזה, ויעלו כשתיכנס שוב לאותו חשבון. לצאת?`)) return;
+    if (!waiting) await clearLocal().catch(() => {});
+    await signOut();
+  };
 
   if (session === undefined) return <Gate title="רגע…" />;
   if (!session) {
     return (
-      <Gate title="דוכן חכם">
+      <Gate title="אקספומקס">
         <p className="muted">לבעלי דוכנים בתערוכת העסקים. נכנסים פעם אחת, וממשיכים מכל מכשיר.</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
-        <p className="faint small">כניסה עם קוד למייל, בלי חשבון Google, תתווסף בקרוב.</p>
+        <MailCode newUsers />
       </Gate>
     );
   }
@@ -184,7 +211,7 @@ function Live() {
     return (
       <Gate title="החשבון שלך עוד לא נפתח">
         <p>נכנסת בתור <strong>{session.user.email}</strong>. רגע, החשבון נפתח. נסה לרענן.</p>
-        <div className="row"><button type="button" className="btn primary" onClick={() => location.reload()}>רענון</button><button type="button" className="btn" onClick={signOut}>יציאה</button></div>
+        <div className="row"><button type="button" className="btn primary" onClick={() => location.reload()}>רענון</button><button type="button" className="btn" onClick={leave}>יציאה</button></div>
       </Gate>
     );
   }
@@ -192,7 +219,7 @@ function Live() {
     return (
       <Gate title="הדוכן שלך ממתין לאישור">
         <p>נכנסת בתור <strong>{session.user.email}</strong>. המייל הזה לא ברשימת המציגים של התערוכה, אז הדוכן ייפתח אחרי אישור של מנהל התערוכה.</p>
-        <button type="button" className="btn" onClick={signOut}>יציאה</button>
+        <button type="button" className="btn" onClick={leave}>יציאה</button>
       </Gate>
     );
   }
@@ -272,9 +299,9 @@ function Live() {
             newVisitor={newVisitor}
             desk={desk}
             search={search}
-            saveLead={async (l) => { const r = await saveLead(l, exhibitor.id, setup); await refresh(); return r; }}
-            removeLead={async (id) => { await removeLead(id, exhibitor.id).catch(() => {}); await refresh(); }}
-            saveNote={async (n) => { const r = await saveNote(n, exhibitor.id); await refresh(); return r; }}
+            saveLead={async (l) => { const r = await saveLead(l, exhibitor.id, setup, () => { refresh(); }); refresh(); return r; }}
+            removeLead={async (id) => { const r = await removeLead(id, exhibitor.id, () => { refresh(); }); refresh(); return r; }}
+            saveNote={async (n) => { const r = await saveNote(n, exhibitor.id, () => { refresh(); }); refresh(); return r; }}
             todays={todays}
             notes={notes}
             waiting={waiting}
@@ -292,7 +319,7 @@ function Live() {
         {view === 'leads' && <Leads ctx={ctx} desk={desk} />}
         {view === 'dash' && <Dashboard ctx={ctx} desk={desk} />}
         {view === 'messages' && <Messages ctx={ctx} desk={desk} />}
-        {view === 'settings' && <Settings ctx={ctx} onSignOut={signOut} />}
+        {view === 'settings' && <Settings ctx={ctx} onSignOut={leave} />}
         
       </main>
 
@@ -401,7 +428,7 @@ function TrySetup() {
 function Demo() {
   const online = useOnline();
   const [biz, setBiz] = useState(0);
-  const { todays, notes, refresh } = useToday();
+  const { todays, notes, refresh } = useToday(undefined);
   return (
     <div className="shell is-tab">
       <header className="thead">
@@ -414,7 +441,7 @@ function Demo() {
           setup={fixtures[biz]!.setup}
           search={searchPeople}
           saveLead={async (l) => { await putLead({ ...l, synced: true }); await refresh(); return 'saved'; }}
-          removeLead={async (id) => { await dropLead(id); for (const n of notes.filter((x) => x.leadId === id)) await dropNote(n.id); await refresh(); }}
+          removeLead={async (id) => { await dropLead(id); for (const n of notes.filter((x) => x.leadId === id)) await dropNote(n.id); await refresh(); return 'saved'; }}
           saveNote={async (n) => { await putNote({ ...n, synced: true }); await refresh(); return 'saved'; }}
           todays={todays}
           notes={notes}

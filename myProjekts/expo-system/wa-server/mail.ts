@@ -8,12 +8,17 @@ import crypto from 'node:crypto';
 export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string; files?: string[] | null;
   /** A trial mail before the fair, to the exhibitor himself or a mail he added. */ trial?: boolean;
   /** His own look (30/10): the logo's path in the files bucket and his colour; none of it in a sensitive business. */
-  sensitive?: boolean; logo?: string | null; brand_color?: string | null; phone?: string | null; whatsapp?: string | null }
+  sensitive?: boolean; logo?: string | null; brand_color?: string | null; phone?: string | null; whatsapp?: string | null;
+  /** His own name before the @ (30/10), unique among the exhibitors. */ mail_name?: string | null }
 export interface Attachment { name: string; type: string; data: Buffer }
 export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string; attachments?: Attachment[] }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const linked = (s: string) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`).replace(/\n/g, '<br>');
+/** A link at the end of a sentence or in quotes keeps the period or the quote outside it (30/10). */
+const linked = (s: string) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => {
+  const [, link, tail] = /^(.*?)((?:[.,;:!?)\]]|&quot;|&#39;)*)$/.exec(u)!;
+  return `<a href="${link}">${link}</a>${tail}`;
+}).replace(/\n/g, '<br>');
 
 const YHM = { url: 'https://y-h-m.com', line: 'העסק ממשיך לעבוד, גם כשאתה לא שם', bg: '#0B1A13', ink: '#F2F5EE', lit: '#C9F26B', soft: '#9FB0A6' };
 const PLAIN = '#2F3E4E'; // his colour when he chose none
@@ -49,7 +54,7 @@ export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, fi
 
   const text = [r.body, '', '—',
     ...(phone ? [`לטלפון: ${r.phone}`] : []), ...(wa ? [`בוואטסאפ: ${wa}`] : []),
-    why, `להסרה מההודעות: ${unsubscribe}`, '', `נשלח דרך דוכן חכם של YHM · ${YHM.url}`].join('\n');
+    why, `להסרה מההודעות: ${unsubscribe}`, '', `נשלח דרך אקספומקס של YHM · ${YHM.url}`].join('\n');
 
   const mark = logo
     ? `<img src="${esc(logo)}" width="52" height="52" alt="${esc(r.subject)}" style="display:block;width:52px;height:52px;border:0;border-radius:10px;background:#FFFFFF;font-family:${FONT};font-size:12px;color:${ink}">`
@@ -82,7 +87,7 @@ export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, fi
     // YHM
     + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:14px 24px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr>`
     + `<td valign="middle" style="padding-left:12px"><a href="${YHM.url}"><img src="${publicUrl}/mail/yhm.png" width="36" height="36" alt="YHM" style="display:block;width:36px;height:36px;border:0;border-radius:8px;font-family:${FONT};font-size:13px;font-weight:bold;color:${YHM.lit}"></a></td>`
-    + `<td valign="middle" style="font-family:${FONT};text-align:right"><div style="font-size:13px;color:${YHM.ink}">נשלח דרך דוכן חכם של <a href="${YHM.url}" style="color:${YHM.lit};font-weight:bold;text-decoration:none">YHM</a></div>`
+    + `<td valign="middle" style="font-family:${FONT};text-align:right"><div style="font-size:13px;color:${YHM.ink}">נשלח דרך אקספומקס של <a href="${YHM.url}" style="color:${YHM.lit};font-weight:bold;text-decoration:none">YHM</a></div>`
     + `<div style="font-size:12px;color:${YHM.soft}">${YHM.line}</div></td></tr></table></td></tr>`
     + '</table></td></tr></table></body></html>';
   return { from: fromAddress, fromName: r.from_name, to: r.to_email, replyTo: r.reply_to ?? undefined, subject: r.subject, text, html, unsubscribe };

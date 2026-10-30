@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
+import { MailCode } from '../signin.tsx';
 import { ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
@@ -25,7 +26,7 @@ const isView = (h: string): h is View => MENU.some(([v]) => v === h);
 function Gate({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="gate">
-      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">דוכן חכם · ניהול</span></div></header>
+      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">אקספומקס · ניהול</span></div></header>
       <section className="gate-box">
         <h1>{title}</h1>
         {children}
@@ -51,6 +52,7 @@ export function AdminApp() {
       <Gate title="ניהול התערוכה">
         <p className="muted">הכניסה למי שמנהל את התערוכה: המציגים, האישורים והרשימות.</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
+        <MailCode newUsers={false} />
         <p className="faint small">מציגים נכנסים בכתובת של הדוכן: <a href={BOOTH_URL} dir="ltr">{BOOTH_URL.replace('https://', '')}</a></p>
       </Gate>
     );
@@ -162,7 +164,7 @@ function Overview({ rows, go, reload }: { rows: AdminExhibitor[] | undefined; go
 
 function ExhibitorRow({ r, reload }: { r: AdminExhibitor; reload: () => void }) {
   const [busy, setBusy] = useState(false);
-  const set = async (ok: boolean) => { setBusy(true); try { await adminApprove(r.id, ok); reload(); } finally { setBusy(false); } };
+  const set = async (ok: boolean) => { setBusy(true); try { await adminApprove(r.id, ok); reload(); } catch { alert('לא נשמר: אין חיבור כרגע.'); } finally { setBusy(false); } };
   return (
     <div className="adm-row">
       <span className="adm-id"><b>{r.name || 'בלי שם'}</b> <span className="muted">{r.business || ''}</span><span className="faint small adm-mail" dir="ltr">{r.email}</span></span>
@@ -208,7 +210,7 @@ function Exhibitors({ rows, reload }: { rows: AdminExhibitor[] | undefined; relo
 
 function ExhibitorLine({ r, reload }: { r: AdminExhibitor; reload: () => void }) {
   const [busy, setBusy] = useState(false);
-  const set = async (ok: boolean) => { setBusy(true); try { await adminApprove(r.id, ok); reload(); } finally { setBusy(false); } };
+  const set = async (ok: boolean) => { setBusy(true); try { await adminApprove(r.id, ok); reload(); } catch { alert('לא נשמר: אין חיבור כרגע.'); } finally { setBusy(false); } };
   const d = new Date(r.created_at);
   return (
     <tr>
@@ -251,10 +253,11 @@ const PHASES: [Phase, string, string][] = [
 function PhaseView() {
   const [st, setSt] = useState<Awaited<ReturnType<typeof adminPhase>> | null>(null);
   const [asking, setAsking] = useState<Phase | null>(null);
-  const [drop, setDrop] = useState(true);
+  const [drop, setDrop] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');
-  const load = useCallback(() => { adminPhase().then(setSt).catch(() => setSt(null)); }, []);
+  const [failed, setFailed] = useState(false);
+  const load = useCallback(() => { setFailed(false); adminPhase().then(setSt).catch(() => setFailed(true)); }, []);
   useEffect(() => { load(); }, [load]);
   async function change(to: Phase) {
     setBusy(true); setDone('');
@@ -269,7 +272,7 @@ function PhaseView() {
     <div className="page narrow">
       <PageHead title="מצב המערכת" sub={st ? `מאז ${new Date(st.changed_at).toLocaleDateString('he-IL')}${st.changed_by ? ` · ${st.changed_by}` : ''}` : undefined}
         tip="מצב אחד לכל הדוכנים. בניסיון אין שמות אמיתיים, ואף מבקר לא מקבל הודעה; במעבר לאמיתי אפשר למחוק את מה שנרשם בניסיון." />
-      {!st ? <p className="muted">טוען…</p> : (
+      {!st ? (failed ? <p className="muted">לא נטען: אין חיבור כרגע. <button type="button" className="text-btn" onClick={load}>לנסות שוב</button></p> : <p className="muted">טוען…</p>) : (
         <div className="phase-list">
           {PHASES.map(([p, title, about]) => (
             <button key={p} type="button" className="opt-card" aria-pressed={st.phase === p} disabled={busy || st.phase === p} onClick={() => { setAsking(p); setDone(''); }}>

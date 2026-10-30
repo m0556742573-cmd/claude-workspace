@@ -69,6 +69,16 @@ export function mapColumns(header: string[], fields: Fields): Record<string, num
 
 const YES = ['כן', 'v', 'x', '1', 'yes', 'true', '✓', '✔'];
 
+/** A phone as Excel may have saved it (30/10): without its leading 0 ("521234567"), with 972, or as a number in E
+ *  notation ("5.21235E+08", which lost digits and is dropped rather than guessed). */
+export function phoneFromExcel(v: string): string {
+  if (/e\+/i.test(v)) return '';
+  const d = v.replace(/\D/g, '');
+  if (d.startsWith('972')) return '0' + d.slice(3);
+  if (/^[5-9]\d{7,8}$/.test(d)) return '0' + d;
+  return v;
+}
+
 /** The rows as objects for the server; a full name is put together from first and last when there is no name column. */
 export function toRecords(rows: string[][], cols: Record<string, number>): Record<string, string | boolean>[] {
   return rows.map((r) => {
@@ -78,6 +88,7 @@ export function toRecords(rows: string[][], cols: Record<string, number>): Recor
     if (!rec.full_name && (cols.first !== undefined || cols.last !== undefined)) rec.full_name = `${get('first')} ${get('last')}`.trim();
     delete rec.first; delete rec.last;
     if ('business_owner' in rec) rec.business_owner = YES.includes(String(rec.business_owner).toLowerCase());
+    if (typeof rec.phone === 'string') rec.phone = phoneFromExcel(rec.phone);
     return rec;
   });
 }

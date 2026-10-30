@@ -30,7 +30,11 @@ export function ListLoad({ kind, onDone }: { kind: keyof typeof LISTS; onDone: (
   async function pick(f: File | undefined) {
     if (!f) return;
     setResult('');
-    const all = parseCsv(await f.text());
+    // Excel's "CSV (מופרד בפסיקים)" saves Hebrew in windows-1255, not UTF-8 (30/10): read as UTF-8 when it is, else as that.
+    const bytes = await f.arrayBuffer();
+    let text: string;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { text = new TextDecoder('windows-1255').decode(bytes); }
+    const all = parseCsv(text);
     const header = all[0] ?? [];
     setFile({ name: f.name, header, rows: all.slice(1) });
     setCols(mapColumns(header, L.fields as Fields));

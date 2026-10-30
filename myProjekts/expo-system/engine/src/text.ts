@@ -41,8 +41,9 @@ export interface Approved { id: number; label: string; text: string }
 
 const SIGN = '[שם המציג], [העסק] · [טלפון]';
 
-/** The template a setup was started from, recognised by its buttons. */
+/** The template a setup was started from: the one it names, or, for a setup saved before it named one, by its buttons. */
 function fixtureOf(setup: Setup) {
+  if (setup.template !== undefined) return fixtures.find((f) => f.id === setup.template);
   const key = (s: Setup) => s.needs.map((n) => n.label).join('|');
   return fixtures.find((f) => key(f.setup) === key(setup));
 }

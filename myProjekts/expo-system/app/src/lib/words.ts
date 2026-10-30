@@ -2,7 +2,7 @@
 import { addDays, type Next } from '@expo/engine';
 
 const DAYS = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
-export const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'להכין', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'לחכות ללקוח' };
+export const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה ללקוח' };
 export const END: Record<string, string> = { list: 'ברשימת התפוצה', stop: 'המעקב נגמר', engaged: 'בטיפול שלך', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר' };
 
 /** The day of the fair: until it ends the app opens on the booth, after it on the follow-up. */

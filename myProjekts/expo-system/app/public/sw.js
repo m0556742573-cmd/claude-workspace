@@ -21,14 +21,16 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE);
-      try {
-        const res = await fetch(req);
+      const kept = url.pathname === '/' ? await cache.match('/') : undefined;
+      const net = fetch(req).then(async (res) => {
         // Only the booth itself is kept as the page; a removal link opened on the tablet (/u/…) is not the booth.
         if (res.ok && url.pathname === '/') await cache.put('/', res.clone());
         return res;
-      } catch {
-        return (await cache.match('/')) ?? Response.error();
-      }
+      });
+      // A network that looks connected but carries nothing (a hall's Wi-Fi) must not hold the booth (30/10): after three
+      // seconds the kept page opens, and the new one, if it comes, is kept for next time.
+      if (!kept) return net.catch(() => Response.error());
+      return Promise.race([net.catch(() => kept), new Promise((r) => setTimeout(() => r(kept), 3000))]);
     })());
     return;
   }

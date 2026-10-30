@@ -67,7 +67,9 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
     };
     const n = nextTask(setup, lead, day);
-    if (n.kind !== 'task' || n.who !== 'auto' || !n.message || (n.late && !fast) || n.dueOn > day) continue;
+    // A message a day late still goes (יצחק, 30/10: a visitor registered on the fair's evening, a server down for a day);
+    // more than that is left to the exhibitor.
+    if (n.kind !== 'task' || n.who !== 'auto' || !n.message || (n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) || n.dueOn > day) continue;
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
     const text = textOf(setup, plan.texts, n.message, approved);
     const body = fill(text, plan.me, l.name ?? '');

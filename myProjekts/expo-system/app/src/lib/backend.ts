@@ -2,12 +2,20 @@
 // without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
 import { createClient, type Session } from '@supabase/supabase-js';
 import { nextTask, type Action, type Lead, type ManualStep, type Setup, type StepRecord, type Who } from '@expo/engine';
-import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
+import { allLeads, allNotes, dropLead, dropNote, getLead, nextRev, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import { destinationOf, type Typed } from './destination.ts';
 import type { FileRef } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 
-export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
+/** Every request has a time limit (30/10): on a network that looks connected but carries nothing (a hall's Wi-Fi), a
+ *  request without one waits minutes, and the booth with it. Recordings and files get longer. */
+function timed(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const ms = String(input instanceof Request ? input.url : input).includes('/storage/v1/') ? 120_000 : 20_000;
+  const limit = AbortSignal.timeout(ms);
+  const signal = init?.signal && 'any' in AbortSignal ? AbortSignal.any([init.signal, limit]) : init?.signal ?? limit;
+  return fetch(input, { ...init, signal });
+}
+export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY, { global: { fetch: timed } });
 export type { Session };
 
 export interface Exhibitor {
@@ -31,15 +39,26 @@ export interface Exhibitor {
   trial_send: boolean; trial_fast: boolean; trial_to: string[];
   /** His own look (30/10): the logo (a PNG path in his files folder) and his colour, both optional. */
   logo: string | null; brand_color: string | null;
+  /** His own name before the @ in the mails to his visitors (30/10), unique among the exhibitors; null: the system's. */
+  mail_name: string | null;
 }
 
 export async function signInWithGoogle(): Promise<void> {
   await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } });
 }
+/** A sign-in code by mail (30/10). newUsers: whether a mail not yet known may open an account (the booth: yes). */
+export async function sendMailCode(email: string, newUsers: boolean): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: newUsers } });
+  if (error) throw error;
+}
+export async function verifyMailCode(email: string, code: string): Promise<void> {
+  const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+  if (error) throw error;
+}
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color, mail_name').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -51,18 +70,15 @@ export async function activeSetup(exhibitorId: string): Promise<Setup | null> {
 }
 
 /** Until the setup screens exist: start from a ready template of a business from the rounds. */
-export async function startFromTemplate(exhibitorId: string, setup: Setup): Promise<void> {
-  const { error } = await supabase.from('setups').insert({ exhibitor_id: exhibitorId, version: 1, data: setup, source: 'manual', active: true });
+export async function startFromTemplate(_exhibitorId: string, setup: Setup): Promise<void> {
+  const { error } = await supabase.rpc('save_setup', { data: setup });
   if (error) throw error;
 }
 
-/** A new version of the setup; the old one stays in the history, inactive. */
-export async function changeTemplate(exhibitorId: string, setup: Setup): Promise<void> {
-  const { data } = await supabase.from('setups').select('version').eq('exhibitor_id', exhibitorId).order('version', { ascending: false }).limit(1);
-  const version = (data?.[0]?.version ?? 0) + 1;
-  const off = await supabase.from('setups').update({ active: false }).eq('exhibitor_id', exhibitorId).eq('active', true);
-  if (off.error) throw off.error;
-  const { error } = await supabase.from('setups').insert({ exhibitor_id: exhibitorId, version, data: setup, source: 'manual', active: true });
+/** A new version of the setup; the old one stays in the history, inactive. One step on the server (30/10): before, a
+ *  failure between switching the old one off and saving the new one left the booth with no setup at all. */
+export async function changeTemplate(_exhibitorId: string, setup: Setup): Promise<void> {
+  const { error } = await supabase.rpc('save_setup', { data: setup });
   if (error) throw error;
 }
 
@@ -98,10 +114,14 @@ export function keptSession(): Session | null {
   return null;
 }
 
+/** Names first (30/10): a word that matches only the city ("בני ברק") would otherwise fill the list with a whole town.
+ *  A name that starts with what he typed comes before one that only contains it. */
 export function searchIn(directory: Person[], q: string, max = 8): Person[] {
   const words = q.trim().split(/\s+/).filter(Boolean);
   if (q.trim().length < 2) return [];
-  return directory.filter((p) => words.every((w) => p.fullName.includes(w) || p.city.includes(w))).slice(0, max);
+  const rank = (p: Person) => (words.every((w) => p.fullName.includes(w)) ? (p.fullName.startsWith(words[0]!) ? 0 : 1) : 2);
+  return directory.filter((p) => words.every((w) => p.fullName.includes(w) || p.city.includes(w)))
+    .map((p) => [rank(p), p] as const).sort((a, b) => a[0] - b[0]).slice(0, max).map(([, p]) => p);
 }
 
 // ---------- the booth: leads and notes, phone first
@@ -142,21 +162,61 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
   if (t.error) throw t.error;
 }
 
-/** Save a lead: on the phone first (never lost), then up to the server. A failure leaves it waiting. */
-export async function saveLead(l: LocalLead, exhibitorId: string, setup: Setup): Promise<'saved' | 'waiting'> {
-  await putLead({ ...l, synced: false });
-  try { await uploadLead(l, exhibitorId, setup); await putLead({ ...l, synced: true }); return 'saved'; } catch { return 'waiting'; }
+// Every upload of the booth goes through one line, in the order things happened (30/10): a quick second tap, what waited
+// for the network, and a cancel never overtake one another. What goes up is the tablet's latest copy, read when its turn
+// comes, and it is marked as up only if nothing changed on it meanwhile, so an older copy never lands over a newer one.
+let line: Promise<unknown> = Promise.resolve();
+function inLine<T>(f: () => Promise<T>): Promise<T> {
+  const p = line.then(f, f);
+  line = p.catch(() => {});
+  return p;
 }
 
-/** "ביטול הרישום": the lead goes with its notes and recordings, on the phone and on the server. */
-export async function removeLead(id: string, exhibitorId: string): Promise<void> {
-  await dropLead(id);
+async function upLead(id: string, exhibitorId: string, setup: Setup): Promise<'saved' | 'waiting'> {
+  const l = await getLead(id);
+  if (!l) return 'saved';
+  if (l.gone) return (await downLead(id, exhibitorId)) ? 'saved' : 'waiting';
+  try {
+    await uploadLead(l, exhibitorId, setup);
+    const now = await getLead(id);
+    if (now && !now.gone && (now.rev ?? 0) === (l.rev ?? 0)) await putLead({ ...now, synced: true });
+    return 'saved';
+  } catch { return 'waiting'; }
+}
+
+/** Save a lead: on the phone first, at once (never lost, and the list shows it without waiting for the network); then
+ *  up to the server in its turn. A failure leaves it waiting. */
+export async function saveLead(l: LocalLead, exhibitorId: string, setup: Setup, kept?: () => void): Promise<'saved' | 'waiting'> {
+  const before = await getLead(l.id);
+  await putLead({ ...l, owner: exhibitorId, rev: Math.max(l.rev ?? 0, nextRev(before?.rev)), synced: false, gone: false });
+  kept?.();
+  return inLine(() => upLead(l.id, exhibitorId, setup));
+}
+
+/** On the server: the lead (its notes and steps go with it) and its recordings; then off the tablet. */
+async function downLead(id: string, exhibitorId: string): Promise<boolean> {
+  try {
+    const folder = `${exhibitorId}/${id}`;
+    const list = await supabase.storage.from('voice').list(folder);
+    if (list.error) throw list.error;
+    if (list.data?.length) { const r = await supabase.storage.from('voice').remove(list.data.map((f) => `${folder}/${f.name}`)); if (r.error) throw r.error; }
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (error) throw error;
+    await dropLead(id);
+    return true;
+  } catch { return false; }
+}
+
+/** "ביטול הרישום": gone from the booth at once; on the server in its turn, after any upload of it still in the line.
+ *  Without a network it stays marked on the tablet and is deleted when the network returns (30/10: before, a failed
+ *  delete was silent, and the path went on messaging the person tapped by mistake). */
+export async function removeLead(id: string, exhibitorId: string, kept?: () => void): Promise<'saved' | 'waiting'> {
   for (const n of (await allNotes()).filter((x) => x.leadId === id)) await dropNote(n.id);
-  const folder = `${exhibitorId}/${id}`;
-  const { data: files } = await supabase.storage.from('voice').list(folder);
-  if (files?.length) await supabase.storage.from('voice').remove(files.map((f) => `${folder}/${f.name}`));
-  const { error } = await supabase.from('leads').delete().eq('id', id);
-  if (error) throw error;
+  const l = await getLead(id);
+  if (!l) return 'saved';
+  await putLead({ ...l, gone: true, synced: false, rev: nextRev(l.rev) });
+  kept?.();
+  return inLine(async () => ((await downLead(id, exhibitorId)) ? 'saved' : 'waiting'));
 }
 
 async function uploadNote(n: LocalNote, exhibitorId: string): Promise<void> {
@@ -170,21 +230,28 @@ async function uploadNote(n: LocalNote, exhibitorId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function saveNote(n: LocalNote, exhibitorId: string): Promise<'saved' | 'waiting'> {
-  await putNote({ ...n, synced: false });
+async function upNote(n: LocalNote, exhibitorId: string): Promise<'saved' | 'waiting'> {
+  const lead = await getLead(n.leadId);
+  if (lead?.gone) { await dropNote(n.id); return 'saved'; } // its visitor was cancelled
   try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); return 'saved'; } catch { return 'waiting'; }
 }
 
-/** Send up whatever still waits on the phone: leads first (a note needs its lead). Returns how many still wait. */
+export async function saveNote(n: LocalNote, exhibitorId: string, kept?: () => void): Promise<'saved' | 'waiting'> {
+  await putNote({ ...n, synced: false });
+  kept?.();
+  return inLine(() => upNote(n, exhibitorId));
+}
+
+/** Send up whatever still waits on the phone, his own only, through the same line: leads first (a note needs its lead).
+ *  Returns how many still wait. */
 export async function flush(exhibitorId: string, setup: Setup): Promise<number> {
-  let left = 0;
-  for (const l of (await allLeads()).filter((x) => !x.synced)) {
-    try { await uploadLead(l, exhibitorId, setup); await putLead({ ...l, synced: true }); } catch { left++; }
-  }
-  for (const n of (await allNotes()).filter((x) => !x.synced)) {
-    try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); } catch { left++; }
-  }
-  return left;
+  const mine = (l: LocalLead) => !l.owner || l.owner === exhibitorId;
+  const leads = (await allLeads()).filter(mine);
+  for (const l of leads.filter((x) => !x.synced)) await inLine(() => upLead(l.id, exhibitorId, setup));
+  const ids = new Set(leads.map((l) => l.id));
+  for (const n of (await allNotes()).filter((x) => !x.synced && ids.has(x.leadId))) await inLine(() => upNote(n, exhibitorId));
+  const [ls, ns] = await Promise.all([allLeads(), allNotes()]);
+  return ls.filter((l) => mine(l) && !l.synced).length + ns.filter((n) => !n.synced && ids.has(n.leadId)).length;
 }
 
 // ---------- after the fair: the leads with everything the engine needs
@@ -314,7 +381,7 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
   for (const r of mine.data ?? []) {
     const here = local.get(r.id);
     if (!here) {
-      if (r.source !== 'self') continue;
+      if (r.source !== 'self' || (await getLead(r.id))) continue;
       const p = person(r.person_id);
       await putLead({
         id: r.id, capturedOn: r.captured_on, capturedAt: r.captured_at, taps: r.taps, customerDate: r.customer_date ?? undefined,
@@ -322,10 +389,11 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
         personId: r.person_id ?? undefined, typedPhone: r.typed_phone ?? undefined, note: r.note ?? '', synced: true, self: true,
       });
       changed = true;
-    } else if (here.synced) {
+    } else if (here.synced && !here.gone) {
       const taps = [...new Set([...here.taps, ...r.taps])];
-      if (taps.length !== here.taps.length || (!here.customerDate && r.customer_date)) {
-        await putLead({ ...here, taps, customerDate: here.customerDate ?? r.customer_date ?? undefined, self: true });
+      const cur = await getLead(r.id);
+      if (cur && cur.synced && !cur.gone && cur.rev === here.rev && (taps.length !== here.taps.length || (!here.customerDate && r.customer_date))) {
+        await putLead({ ...here, taps, customerDate: here.customerDate ?? r.customer_date ?? undefined, self: true, rev: nextRev(here.rev) });
         changed = true;
       }
     }
@@ -349,7 +417,7 @@ export async function markStep(row: LeadRow, stepId: string, outcome: StepRecord
   const { error } = await supabase.from('lead_steps').upsert({ lead_id: row.id, step_id: stepId, done_on: onDay, outcome }, { onConflict: 'lead_id,step_id' });
   if (error) throw error;
   // "ביקש להסיר": his phone and mail go on the do-not-send list.
-  if (outcome === 'optOut') await supabase.rpc('opt_out_lead', { lead: row.id, asked: true });
+  if (outcome === 'optOut') { const o = await supabase.rpc('opt_out_lead', { lead: row.id, asked: true }); if (o.error) throw o.error; }
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
 
@@ -358,7 +426,7 @@ export async function unmarkStep(row: LeadRow, stepId: string, exhibitorId: stri
   const { data: was } = await supabase.from('lead_steps').select('outcome').eq('lead_id', row.id).eq('step_id', stepId).maybeSingle();
   const { error } = await supabase.from('lead_steps').delete().eq('lead_id', row.id).eq('step_id', stepId);
   if (error) throw error;
-  if (was?.outcome === 'optOut') await supabase.rpc('opt_out_lead', { lead: row.id, asked: false });
+  if (was?.outcome === 'optOut') { const o = await supabase.rpc('opt_out_lead', { lead: row.id, asked: false }); if (o.error) throw o.error; }
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
 }
 
@@ -487,10 +555,18 @@ export async function uploadLogo(exhibitorId: string, png: Blob): Promise<string
   if (error) throw error;
   return path;
 }
-export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color'>>): Promise<void> {
+export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color' | 'mail_name'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }
+/** Whether no other exhibitor has chosen this name before the @. */
+export async function mailNameFree(name: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('mail_name_free', { name });
+  if (error) throw error;
+  return data === true;
+}
+/** The domain the mails to visitors go from (the part after the @). */
+export const MAIL_DOMAIN = 'expo.y-h-m.com';
 /** How a queued message names its file: "path#name". */
 export const fileRefText = (f: FileRef) => `${f.path}#${encodeURIComponent(f.name)}`;
 
@@ -517,8 +593,8 @@ export async function removeDestination(id: string): Promise<void> {
   if (error) throw error;
 }
 /** What waits in the queue for a lead, and what went wrong with it. */
-export async function queuedFor(leadId: string): Promise<{ status: string; error: string | null; created_at: string }[]> {
-  const { data } = await supabase.from('outbox').select('status, error, created_at').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
+export async function queuedFor(leadId: string): Promise<{ status: string; error: string | null; created_at: string; template_id: string | null }[]> {
+  const { data } = await supabase.from('outbox').select('status, error, created_at, template_id').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
   return data ?? [];
 }
 export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always' | 'trial_send' | 'trial_fast' | 'trial_to'>>): Promise<void> {
@@ -579,7 +655,8 @@ export async function adminClearPeople(): Promise<number> {
 
 /** A button renamed in the setup: the visitors already marked with it are marked with the new name. */
 export async function renameTaps(from: string, to: string): Promise<void> {
-  const { data, error } = await supabase.from('leads').select('id, taps').contains('taps', [from]);
+  // Only leads on the current version: one pinned to an older version keeps the names that version knows (30/10).
+  const { data, error } = await supabase.from('leads').select('id, taps').contains('taps', [from]).is('setup_version', null);
   if (error) throw error;
   for (const l of data ?? []) {
     const u = await supabase.from('leads').update({ taps: (l.taps as string[]).map((t) => (t === from ? to : t)) }).eq('id', l.id);

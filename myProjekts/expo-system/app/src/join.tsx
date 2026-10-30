@@ -22,9 +22,13 @@ export function Join({ code }: { code: string }) {
   const [state, setState] = useState<'' | 'busy' | 'done' | 'again'>('');
   const [error, setError] = useState('');
 
-  useEffect(() => { joinInfo(code).then(setInfo).catch(() => setInfo(null)); }, [code]);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
+  // A weak network is not "the booth was not found" (30/10): it says so, and offers to try again.
+  useEffect(() => { setFailed(false); joinInfo(code).then(setInfo).catch(() => setFailed(true)); }, [code, tries]);
   useEffect(() => { if (info) document.title = `הרשמה · ${info.business || info.name}`; }, [info]);
 
+  if (failed && info === undefined) return <JoinBox title="אין חיבור כרגע"><p className="muted">הדף לא נטען. כדאי לבדוק את האינטרנט ולנסות שוב.</p><button type="button" className="btn" onClick={() => setTries(tries + 1)}>לנסות שוב</button></JoinBox>;
   if (info === undefined) return <JoinBox title="רגע…" />;
   if (!info) return <JoinBox title="הדוכן לא נמצא"><p className="muted">אולי הקישור לא שלם. אפשר לסרוק שוב את הקוד שעל השלט.</p></JoinBox>;
 
@@ -45,6 +49,7 @@ export function Join({ code }: { code: string }) {
         : m.includes('email') ? 'המייל לא נראה תקין. אפשר גם להשאיר אותו ריק.'
           : m.includes('name') ? 'צריך שם, לפחות שתי אותיות.'
             : m.includes('busy') ? 'יש עומס רגעי בדוכן. אפשר לנסות שוב בעוד דקה.'
+              : m.includes('closed') ? 'התערוכה הסתיימה, וההרשמה בדוכן הזה נסגרה.'
               : 'משהו לא עבד. אפשר לנסות שוב, או לגשת לדוכן.');
       setState('');
     }
@@ -96,7 +101,7 @@ function JoinBox({ title, by, logo, children }: { title: string; by?: string; lo
   return (
     <div className="gate">
       <section className="gate-box join">
-        <div className="brand">{logo ? <img className="mark logo" src={fileUrl(logo)} alt="" /> : <span className="mark" aria-hidden="true" />}<span className="biz">{by ?? 'דוכן חכם'}</span></div>
+        <div className="brand">{logo ? <img className="mark logo" src={fileUrl(logo)} alt="" /> : <span className="mark" aria-hidden="true" />}<span className="biz">{by ?? 'אקספומקס'}</span></div>
         <h1>{title}</h1>
         {children}
       </section>

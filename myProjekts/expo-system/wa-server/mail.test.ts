@@ -67,7 +67,7 @@ test('the designed mail (30/10): his colour and logo at the head, a card to reac
   assert.ok(m.html.includes('src="https://x.supabase.co/storage/v1/object/public/files/11111111-2222-3333-4444-555555555555/66666666-7777-8888-9999-000000000000.png"'));
   assert.ok(m.html.includes('href="tel:0500000000"') && m.html.includes('href="https://wa.me/972500000000"'));
   assert.ok(m.html.includes('src="https://expo.y-h-m.com/mail/yhm.png"') && m.html.includes('alt="YHM"'));
-  assert.match(m.text, /נשלח דרך דוכן חכם של YHM/);
+  assert.match(m.text, /נשלח דרך אקספומקס של YHM/);
   assert.equal(waLink('+972 50-000-0000'), 'https://wa.me/972500000000');
   assert.equal(inkOn('#1E5AA8'), '#FFFFFF');
   assert.equal(inkOn('#F2E85C'), '#1A1A1A');
@@ -75,4 +75,6 @@ test('the designed mail (30/10): his colour and logo at the head, a card to reac
   assert.ok(!quiet.html.includes('66666666-7777'), 'no logo in a sensitive business');
   assert.ok(!quiet.html.includes('לוי מטבחים'));
   assert.ok(buildMail(row, 'https://e', 'a@b.c').html.length < 60_000); // far under Gmail's clipping
+  // a link at the end of a sentence keeps its period outside
+  assert.ok(buildMail({ ...row, body: 'המחירון: https://example.com/p.' }, 'https://e', 'a@b.c').html.includes('<a href="https://example.com/p">https://example.com/p</a>.'));
 });

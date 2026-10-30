@@ -47,7 +47,8 @@ function pickVariant(need: NeedPath, taps: string[]): Path | undefined {
 export const CONSENT = 'מסכים לקבל עדכונים';
 
 export type Next =
-  | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean; reply?: boolean }
+  | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean; reply?: boolean;
+      /** When it was due, for a late one (its dueOn moves to today): how late it is (30/10). */ wasDue?: LocalDate }
   /** A step needs the visitor's date and he gave none: the exhibitor is asked to find out when. */
   | { kind: 'askDate'; stepId: string; dueOn: LocalDate }
   | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' };
@@ -63,19 +64,19 @@ export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
   // Answering is recorded under reply:<day>, so a later reply opens a new task.
   if (lead.repliedOn && !recorded.has(replyId(lead.repliedOn))) {
     const late = lead.repliedOn < today;
-    return { kind: 'task', stepId: replyId(lead.repliedOn), action: 'talk', who: 'me', dueOn: settle(late ? today : lead.repliedOn, 'talk', 'me'), late, reply: true };
+    return { kind: 'task', stepId: replyId(lead.repliedOn), action: 'talk', who: 'me', dueOn: settle(late ? today : lead.repliedOn, 'talk', 'me'), late, reply: true, ...(late ? { wasDue: lead.repliedOn } : {}) };
   }
   // The message he chose at the booth goes out on the day of the visit, before anything else of the path.
   if (lead.booth?.message && !recorded.has(BOOTH_STEP)) {
     const late = lead.capturedOn < today;
-    return { kind: 'task', stepId: BOOTH_STEP, action: 'send', who: 'auto', message: lead.booth.message, dueOn: settle(late ? today : lead.capturedOn, 'send', 'auto'), late };
+    return { kind: 'task', stepId: BOOTH_STEP, action: 'send', who: 'auto', message: lead.booth.message, dueOn: settle(late ? today : lead.capturedOn, 'send', 'auto'), late, ...(late ? { wasDue: lead.capturedOn } : {}) };
   }
   // A step he set by hand comes next: it is what was agreed with the visitor.
   const manual = (lead.manual ?? []).filter((m) => !recorded.has(manualId(m.id))).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
   const m = manual[0];
   if (m) {
     const late = m.dueOn < today;
-    return { kind: 'task', stepId: manualId(m.id), action: m.action, who: m.who, message: m.message, dueOn: settle(late ? today : m.dueOn, m.action, m.who), late };
+    return { kind: 'task', stepId: manualId(m.id), action: m.action, who: m.who, message: m.message, dueOn: settle(late ? today : m.dueOn, m.action, m.who), late, ...(late ? { wasDue: m.dueOn } : {}) };
   }
   // He answered and nothing was set by hand: the path's ladder of attempts is over; he is in the exhibitor's hands.
   if (last && last.outcome === 'engaged') return { kind: 'end', reason: 'engaged' };
@@ -104,14 +105,16 @@ function schedule(step: Step, base: LocalDate, lead: Lead, today: LocalDate): Ne
   const raw = rawDue(step.timing, base, lead);
   const late = raw < today;
   const dueOn = settle(late ? today : raw, step.action, step.who);
-  return { kind: 'task', stepId: step.id, action: step.action, who: step.who, message: step.message, dueOn, late };
+  return { kind: 'task', stepId: step.id, action: step.action, who: step.who, message: step.message, dueOn, late, ...(late ? { wasDue: raw } : {}) };
 }
 
 function rawDue(t: Timing, base: LocalDate, lead: Lead): LocalDate {
   switch (t.kind) {
     case 'after': return addDays(base, t.days);
     case 'customerDate': return addDays(lead.customerDate!, t.days);
-    case 'calendar': return addDays(nextOccurrence(t.anchor, base), t.days);
+    // The occurrence whose day with the offset is still ahead (30/10): "21 days before Chanukah", counted from a fair 19
+    // days before it, is next year's, not a date already behind.
+    case 'calendar': return addDays(nextOccurrence(t.anchor, addDays(base, -t.days)), t.days);
     case 'weekday': {
       let d = addDays(base, 1);
       while (weekday(d) !== t.weekday) d = addDays(d, 1);

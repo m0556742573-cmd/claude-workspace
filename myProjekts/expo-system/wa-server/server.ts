@@ -13,7 +13,7 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, normalizeMessageContent, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { firstLeft, gapMs, sendingHours, typingMs } from './limits.ts';
 import { due, israelDay, type Plan } from './planner.ts';
@@ -66,7 +66,9 @@ async function start(exhibitorId: string): Promise<void> {
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
   const prev = sessions.get(exhibitorId);
   const linkedAt = Number(await fs.readFile(path.join(dir, 'linked-at'), 'utf8').catch(() => '')) || undefined;
-  const s: Session = { status: 'connecting', since: Date.now(), retries: prev?.retries ?? 0, linkedAt, nextAt: prev?.nextAt ?? 0, pausedUntil: prev?.pausedUntil ?? 0, busy: false };
+  // A rest after WhatsApp's rate warning is kept on disk: a restart must not end it early (30/10).
+  const paused = Number(await fs.readFile(path.join(dir, 'paused-until'), 'utf8').catch(() => '')) || 0;
+  const s: Session = { status: 'connecting', since: Date.now(), retries: prev?.retries ?? 0, linkedAt, nextAt: prev?.nextAt ?? 0, pausedUntil: Math.max(prev?.pausedUntil ?? 0, paused), busy: false };
   sessions.set(exhibitorId, s);
   const sock = makeWASocket({
     ...(version ? { version } : {}),
@@ -81,7 +83,12 @@ async function start(exhibitorId: string): Promise<void> {
   });
   s.sock = sock;
   sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('messages.upsert', ({ messages, type }) => { if (type === 'notify') inbound(exhibitorId, messages).catch((e) => logger.error(e)); });
+  // Replies as they come, and those that waited on WhatsApp's side while this server was down or reconnecting ("append"),
+  // from the last day only (30/10: before, a "הסר" sent during a restart was lost).
+  sock.ev.on('messages.upsert', ({ messages, type }) => {
+    const recent = type === 'notify' ? messages : messages.filter((m) => Number(m.messageTimestamp ?? 0) * 1000 > Date.now() - 24 * 3600_000);
+    inbound(exhibitorId, recent).catch((e) => logger.error(e));
+  });
   sock.ev.on('connection.update', async (u) => {
     if (sessions.get(exhibitorId) !== s) return; // a newer connection took over
     if (u.qr) { s.status = 'qr'; s.qr = u.qr; }
@@ -109,7 +116,9 @@ async function start(exhibitorId: string): Promise<void> {
       // Anything else (network, restart required): connect again, slower each time — never a storm of reconnects.
       s.status = 'connecting';
       s.retries += 1;
-      setTimeout(() => { if (sessions.get(exhibitorId) === s) start(exhibitorId).catch((e) => logger.error(e)); }, Math.min(300_000, 2000 * 2 ** Math.min(s.retries, 8)));
+      // Spread a little, so accounts that dropped together do not all come back at the same moment.
+      const wait = Math.min(300_000, 2000 * 2 ** Math.min(s.retries, 8)) * (0.75 + Math.random() * 0.5);
+      setTimeout(() => { if (sessions.get(exhibitorId) === s) start(exhibitorId).catch((e) => logger.error(e)); }, wait);
     }
   });
 }
@@ -179,16 +188,28 @@ async function tick(): Promise<void> {
   }
 }
 
+/** A result is recorded even when the database blinks: three tries, a few seconds apart (30/10: a message that went out
+ *  but failed to be recorded was marked failed, or sent again). */
+async function record(fn: string, args: Record<string, unknown>): Promise<void> {
+  for (let i = 0; ; i++) {
+    try { await rpc(fn, args); return; } catch (e) { if (i >= 2) throw e; await sleep(2000 * (i + 1)); }
+  }
+}
+
 async function sendOne(s: Session, q: Queued, self = false): Promise<void> {
   const sock = s.sock!;
-  if (!q.phone || !/^0\d{8,9}$/.test(q.phone)) return rpc('wa_result', { item: q.id, ok: false, err: 'no_phone' });
+  if (!q.phone || !/^0\d{8,9}$/.test(q.phone)) return record('wa_result', { item: q.id, ok: false, err: 'no_phone' });
   const jid = `972${q.phone.slice(1)}@s.whatsapp.net`;
+  let sent = false;
   try {
     // A number not checked at the visit: one number, right before sending to it, as a person starting a chat would. Never a list.
+    // No answer at all is not a "no": it is tried again later.
     let to = jid;
     if (!q.known) {
-      const [hit] = (await sock.onWhatsApp(jid)) ?? [];
-      if (!hit?.exists) return rpc('wa_result', { item: q.id, ok: false, err: 'no_whatsapp' });
+      const res = await sock.onWhatsApp(jid);
+      if (!res) throw new Error('whatsapp check gave no answer');
+      const [hit] = res;
+      if (!hit?.exists) return record('wa_result', { item: q.id, ok: false, err: 'no_whatsapp' });
       to = hit.jid ?? jid;
     }
     if (q.first_contact && q.save_contact && q.name) {
@@ -204,16 +225,22 @@ async function sendOne(s: Session, q: Queued, self = false): Promise<void> {
       const caption = i === 0 ? q.body : undefined;
       await sock.sendMessage(to, f.type.startsWith('image/') ? { image: f.data, mimetype: f.type, caption } : { document: f.data, mimetype: f.type, fileName: f.name, caption });
     }
-    await rpc('wa_result', { item: q.id, ok: true, first: q.first_contact && !self });
+    sent = true;
+    // His replies are read from this number from now on, not only after the next refresh of the list.
+    leadPhones.get(q.exhibitor_id)?.phones.add(q.phone);
+    await record('wa_result', { item: q.id, ok: true, first: q.first_contact && !self });
   } catch (e) {
     const msg = String((e as Error).message ?? e);
-    if (/rate-overlimit|429|too many/i.test(msg)) {
-      // WhatsApp asked to slow down: this number rests a day; the message stays in the queue.
+    if (sent) { logger.error({ msg, item: q.id }, 'sent, but not recorded'); return; }
+    if (/rate-overlimit/i.test(msg)) {
+      // WhatsApp asked to slow down: this number rests a day, kept on disk; the message stays in the queue.
       s.pausedUntil = Date.now() + 24 * 3600_000;
+      await fs.writeFile(path.join(DIR, q.exhibitor_id, 'paused-until'), String(s.pausedUntil)).catch(() => {});
       logger.warn({ msg }, 'rate warning, pausing a day');
       return;
     }
-    await rpc('wa_result', { item: q.id, ok: false, err: msg.slice(0, 200) });
+    // A passing fault (the connection dropped, a file did not load): tried again later, five times at most.
+    await record('send_retry', { item: q.id, err: msg }).catch((x) => logger.error(x));
   }
 }
 
@@ -243,10 +270,13 @@ const approved: Approved[] = JSON.parse(await fs.readFile(new URL('../consultant
 // Before the fair (29/10) the database hands over only the booths that try with sending, their trial leads, and whether
 // they run the fast clock (a day of the path in a minute); those are planned every half minute, at any hour.
 let planning = false;
+let pending: boolean | null = null; // a pass asked for while one was running: null none, false a full one, true a fast one
 async function plan(onlyFast = false): Promise<void> {
-  if (!WA_KEY || planning) return;
+  if (!WA_KEY) return;
+  if (planning) { pending = pending === false ? false : onlyFast; return; }
   planning = true;
   try { await planOnce(onlyFast); } finally { planning = false; }
+  if (pending !== null) { const next = pending; pending = null; await plan(next); }
 }
 async function planOnce(onlyFast: boolean): Promise<void> {
   const now = new Date();
@@ -258,12 +288,14 @@ async function planOnce(onlyFast: boolean): Promise<void> {
     if ((onlyFast && !b.fast) || (!hours && !b.trial)) continue;
     const wa = sessions.get(b.id)?.status === 'open';
     if (!wa && !mail) continue;
-    const p = await rpc<Plan>('wa_plan', { exhibitor: b.id });
-    const ch = { wa: wa && !p.me.blocked, mail };
-    for (const d of due(p, today, approved, ch, b.fast ? { now: now.getTime(), minutesPerDay: 1 } : undefined)) {
-      await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail,
-        files: d.files.length ? d.files : null, fast_day: d.virtual ?? null });
-    }
+    try {
+      const p = await rpc<Plan>('wa_plan', { exhibitor: b.id });
+      const ch = { wa: wa && !p.me.blocked, mail };
+      for (const d of due(p, today, approved, ch, b.fast ? { now: now.getTime(), minutesPerDay: 1 } : undefined)) {
+        await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail,
+          files: d.files.length ? d.files : null, fast_day: d.virtual ?? null });
+      }
+    } catch (e) { logger.error({ e, booth: b.id }, 'planning one booth failed'); } // the next booths still get planned
   }
 }
 
@@ -279,14 +311,31 @@ async function mailTick(): Promise<void> {
   try {
     for (const r of (await rpc<MailRow[]>('mail_queue', { max_rows: 60 })) ?? []) {
       if (!hours && !r.trial) continue;
+      let sent = false;
       try {
-        const attachments = await Promise.all((r.files ?? []).map(fileOf));
-        await provider.send({ ...buildMail(r, PUBLIC_URL, MAIL_FROM, FILES_URL), attachments });
-        await rpc('mail_result', { item: r.id, ok: true });
+        // A mail may weigh 5MB in all; a file that would pass it goes as a link in the text instead (30/10).
+        const files = await Promise.all((r.files ?? []).map(async (ref) => ({ ref, f: await fileOf(ref) })));
+        files.sort((a, b) => a.f.data.length - b.f.data.length);
+        const attachments: { name: string; type: string; data: Buffer }[] = [];
+        const links: string[] = [];
+        let size = 0;
+        for (const { ref, f } of files) {
+          if (size + f.data.length <= 3_500_000) { attachments.push(f); size += f.data.length; }
+          else links.push(`${f.name}: ${FILES_URL}${ref.split('#')[0]!.split('/').map(encodeURIComponent).join('/')}`);
+        }
+        const row = links.length ? { ...r, body: `${r.body}\n\n${links.join('\n')}` } : r;
+        // Each exhibitor's own name before the @ (יצחק, 30/10), the system's when he chose none.
+        const from = `${r.mail_name || MAIL_FROM.split('@')[0]}@${MAIL_FROM.split('@')[1]}`;
+        await provider.send({ ...buildMail(row, PUBLIC_URL, from, FILES_URL), attachments });
+        sent = true;
+        await record('mail_result', { item: r.id, ok: true });
       } catch (e) {
         const msg = String((e as Error).message ?? e);
-        if (/throttl|rate|429|too many|maximum sending/i.test(msg)) { logger.warn({ msg }, 'mail: slowed down'); break; }
-        await rpc('mail_result', { item: r.id, ok: false, err: msg.slice(0, 200) });
+        if (sent) { logger.error({ msg, item: r.id }, 'mail sent, but not recorded'); continue; }
+        if (/throttl|429|10004|too many|maximum sending/i.test(msg)) { logger.warn({ msg }, 'mail: slowed down'); break; }
+        // Refused by the provider (a bad address, a bounce): final. Anything else is passing, and is tried again later.
+        if (/cloudflare 4\d\d|permanent|bounce|MessageRejected|InvalidParameter/i.test(msg)) await record('mail_result', { item: r.id, ok: false, err: msg.slice(0, 200) }).catch((x) => logger.error(x));
+        else await record('send_retry', { item: r.id, err: msg }).catch((x) => logger.error(x));
       }
       await sleep(400);
     }
@@ -331,8 +380,9 @@ async function check(exhibitorId: string, lead: string): Promise<Checked[] | nul
     const rows = (await rpc<Checked[]>('wa_to_check', { exhibitor: exhibitorId, lead })) ?? [];
     for (const r of rows) {
       if (r.wa !== null || !/^0\d{8,9}$/.test(r.num)) continue;
-      const [hit] = (await s.sock!.onWhatsApp(`972${r.num.slice(1)}@s.whatsapp.net`)) ?? [];
-      r.wa = !!hit?.exists;
+      const res = await s.sock!.onWhatsApp(`972${r.num.slice(1)}@s.whatsapp.net`);
+      if (!res) continue; // no answer: left unknown, checked again before the first message
+      r.wa = !!res[0]?.exists;
       await rpc('wa_checked', { exhibitor: exhibitorId, lead, num: r.num, ok: r.wa });
     }
     return rows;
@@ -341,29 +391,40 @@ async function check(exhibitorId: string, lead: string): Promise<Checked[] | nul
   return run;
 }
 
-// ---------- replies: only from his leads' numbers, only if he switched it on
+// ---------- replies: only from his leads' numbers. With "לקרוא תשובות" on, the reply is kept and stops the path; with
+// it off, only the word "הסר" is looked at, and nothing of the message is kept but that he asked (יצחק, 30/10).
 
-let leadPhones = new Map<string, Set<string>>();
+const OPT_OUT = /^(הסר|הסירו|להסיר|הסרה|תסירו|stop)[.!\s]*$/i;
+let leadPhones = new Map<string, { phones: Set<string>; reads: boolean }>();
+let phonesAt = 0;
 async function refreshPhones(): Promise<void> {
   if (!WA_KEY) return;
-  const rows = await rpc<{ exhibitor_id: string; phones: string[] }[]>('wa_lead_phones', {});
-  leadPhones = new Map((rows ?? []).map((r) => [r.exhibitor_id, new Set(r.phones ?? [])]));
+  phonesAt = Date.now();
+  const rows = await rpc<{ exhibitor_id: string; phones: string[]; reads: boolean }[]>('wa_lead_phones', {});
+  leadPhones = new Map((rows ?? []).map((r) => [r.exhibitor_id, { phones: new Set(r.phones ?? []), reads: r.reads }]));
 }
 
-type Incoming = { key: { remoteJid?: string | null; fromMe?: boolean | null; remoteJidAlt?: string | null }; message?: { conversation?: string | null; extendedTextMessage?: { text?: string | null } | null } | null };
+const handled = new Set<string>(); // message ids already passed on: a message delivered twice is counted once
+type Incoming = { key: { id?: string | null; remoteJid?: string | null; fromMe?: boolean | null; remoteJidAlt?: string | null }; message?: Parameters<typeof normalizeMessageContent>[0] };
 async function inbound(exhibitorId: string, messages: Incoming[]): Promise<void> {
-  const phones = leadPhones.get(exhibitorId);
-  if (!phones || !WA_KEY) return; // replies are not read for him: nothing is looked at
+  if (!WA_KEY) return;
   for (const m of messages) {
     if (m.key.fromMe) continue;
+    if (m.key.id) { if (handled.has(m.key.id)) continue; handled.add(m.key.id); if (handled.size > 5000) handled.clear(); }
     const jid = m.key.remoteJid ?? '';
-    // A chat with a person only; the phone number may come as the "alt" id when WhatsApp uses its newer ids (LID).
-    const pn = jid.endsWith('@s.whatsapp.net') ? jid : m.key.remoteJidAlt?.endsWith('@s.whatsapp.net') ? m.key.remoteJidAlt : '';
+    // A chat with a person only, never a status post; the phone number comes as the "alt" id when WhatsApp addresses the
+    // chat by its newer ids (LID).
+    const pn = jid.endsWith('@s.whatsapp.net') ? jid : jid.endsWith('@lid') && m.key.remoteJidAlt?.endsWith('@s.whatsapp.net') ? m.key.remoteJidAlt : '';
     if (!pn) continue;
     const phone = '0' + pn.split('@')[0]!.replace(/^972/, '');
-    if (!phones.has(phone)) continue; // not one of his leads: dropped here, never stored or sent on
-    const text = m.message?.conversation ?? m.message?.extendedTextMessage?.text ?? '[הודעה שאינה טקסט: תמונה, קול או קובץ]';
-    await rpc('wa_inbound', { exhibitor: exhibitorId, phone, body: text });
+    let mine = leadPhones.get(exhibitorId);
+    // A lead registered since the last refresh: look again, at most once a minute.
+    if (!mine?.phones.has(phone) && Date.now() - phonesAt > 60_000) { await refreshPhones().catch(() => {}); mine = leadPhones.get(exhibitorId); }
+    if (!mine?.phones.has(phone)) continue; // not one of his leads: dropped here, never stored or sent on
+    const c = normalizeMessageContent(m.message ?? undefined);
+    const text = c?.conversation ?? c?.extendedTextMessage?.text ?? '';
+    if (!mine.reads && !OPT_OUT.test(text.trim())) continue; // replies are not read for him: only "הסר" counts
+    await rpc('wa_inbound', { exhibitor: exhibitorId, phone, body: mine.reads ? text || '[הודעה שאינה טקסט: תמונה, קול או קובץ]' : text });
   }
 }
 
@@ -402,7 +463,8 @@ const server = http.createServer(async (req, res) => {
   }
   const send = (code: number, body: unknown) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-  const url = new URL(req.url ?? '/', 'http://x');
+  let url: URL;
+  try { url = new URL(req.url ?? '/', 'http://x'); } catch { return send(400, { error: 'bad request' }); }
   if (url.pathname === '/health') return send(200, { ok: true });
   const unsub = /^\/u\/([0-9a-f-]{36})$/i.exec(url.pathname);
   if (unsub && (req.method === 'GET' || req.method === 'POST')) {
@@ -474,11 +536,22 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-await restore();
+// A stray failure is logged, never the end of the server and every account on it (30/10).
+process.on('unhandledRejection', (e) => logger.error({ e }, 'unhandled rejection'));
+process.on('uncaughtException', (e) => logger.error({ e }, 'uncaught exception'));
+// A stop (a new version) closes each connection properly, so no account's credentials are left half written.
+process.on('SIGTERM', () => {
+  for (const s of sessions.values()) s.sock?.end(undefined);
+  setTimeout(() => process.exit(0), 3000);
+});
+
+// The page and the removal link answer at once; the accounts come back in the background (30/10: with many accounts,
+// everything waited minutes after each restart).
+restore().catch((e) => logger.error(e));
 await refreshPhones().catch((e) => logger.error(e));
 setInterval(() => { tick().catch((e) => logger.error(e)); }, 20_000);
 setInterval(() => { refreshPhones().catch((e) => logger.error(e)); }, 5 * 60_000);
 setInterval(() => { plan().catch((e) => logger.error(e)); }, 2 * 60_000);
 setInterval(() => { plan(true).catch((e) => logger.error(e)); }, 30_000);
 setInterval(() => { mailTick().catch((e) => logger.error(e)); }, 30_000);
-server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, ${sessions.size} accounts restored, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}, mail ${mailProvider()?.name ?? 'not set'}`));
+server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, accounts coming back in the background, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}, mail ${mailProvider()?.name ?? 'not set'}`));

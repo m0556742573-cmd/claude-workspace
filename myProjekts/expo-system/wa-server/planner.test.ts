@@ -86,9 +86,10 @@ test('a hole in the text: nothing goes out; a detail written once fills it', () 
   assert.match(d[0]!.body, /הכתובת: רחוב השומר 5/);
 });
 
-test('overdue is left to the exhibitor; the next step is his own call, not a message', () => {
-  assert.equal(due(plan(), '2026-11-18', []).length, 0); // the message was due on the 16th
-  assert.equal(due(plan({ steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] }), '2026-11-19', []).length, 0);
+test('a day late still goes (30/10); more than that is left to the exhibitor', () => {
+  assert.equal(due(plan(), '2026-11-17', []).length, 1); // due on the 16th: a visitor of the fair's evening
+  assert.equal(due(plan(), '2026-11-18', []).length, 0); // two days late
+  assert.equal(due(plan({ steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] }), '2026-11-20', []).length, 0);
 });
 
 test('mail carries the path where WhatsApp cannot: no WhatsApp, not linked, or stopped', () => {
