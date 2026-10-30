@@ -426,10 +426,10 @@ function TrySetup() {
 function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: Setup) => void }) {
   const [mode, setMode] = useState<'choose' | 'consult' | 'steps'>('choose');
   const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
-  async function save(s: Setup) {
+  async function save(s: Setup, _renames: [string, string][], texts: Record<string, string>) {
     await startFromTemplate(exhibitor.id, s);
-    // The consultant's message texts become his own, as if he had written them; he can change them in הודעות.
-    if (built) for (const [id, body] of Object.entries(built.texts)) await saveText(exhibitor.id, id, body).catch(() => {});
+    // The texts he wrote in the messages step (the consultant's among them) become his own; he can change them in הודעות.
+    for (const [id, body] of Object.entries(texts)) await saveText(exhibitor.id, id, body).catch(() => {});
     onSaved(s);
   }
   return (
@@ -445,7 +445,7 @@ function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: S
         </section>
       )}
       {mode === 'consult' && <Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setMode('steps'); }} onSteps={() => setMode('steps')} />}
-      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} business={exhibitor.business} onSave={save} onCancel={() => setMode(built ? 'consult' : 'choose')} />}
+      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} texts={built?.texts} business={exhibitor.business} onSave={save} onCancel={() => setMode(built ? 'consult' : 'choose')} />}
     </div>
   );
 }

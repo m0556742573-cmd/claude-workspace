@@ -1,12 +1,12 @@
-// The setup step by step, without AI (model, section 15): the same structure the consultant fills, in six short
-// steps — the goal, a starting point, the card, what happens after, his time, and a check before saving.
+// The setup step by step, without AI (model, section 15): the same structure the consultant fills, in seven short
+// steps — the goal, a starting point, the card, what happens after, the messages, his time, and a check before saving.
 // It opens for a new booth instead of the bare list of templates, and from the settings to set up again.
 import { useMemo, useState } from 'react';
 import type { Holiday, NeedPath, Path, Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { add, remove, rename, setDays, setGoal, type At } from './lib/edit.ts';
 import { HOLIDAY, variantTitle } from './lib/describe.ts';
-import { messagesOf } from './lib/messages.ts';
+import { fill, holes, messagesOf, textOf, useTexts } from './lib/messages.ts';
 import { PATTERNS, minutesIn14, needFrom, patternOf, recognise } from './lib/patterns.ts';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 
@@ -14,16 +14,21 @@ const EMPTY: Setup = {
   business: '', anchor: { goal: '', success: '' }, needs: [], when: [], who: [],
   defaults: { business: { steps: [], end: { kind: 'list' } }, private: { steps: [], end: { kind: 'list' } } }, sensitive: false,
 };
-const STEPS = ['המטרה', 'נקודת התחלה', 'הכרטיס', 'מה קורה אחרי', 'הזמן שלך', 'בדיקה ושמירה'];
+const STEPS = ['המטרה', 'נקודת התחלה', 'הכרטיס', 'מה קורה אחרי', 'ההודעות', 'הזמן שלך', 'בדיקה ושמירה'];
 const MINUTES = [15, 30, 60, 90, 120];
 
-export function SetupSteps({ start, business, onSave, onCancel }: {
+export function SetupSteps({ start, business, onSave, onCancel, texts: given }: {
   start: Setup | null;
   /** The business he gave at sign-up: the first answer until he writes another. */
   business?: string;
-  onSave: (s: Setup, renames: [string, string][]) => Promise<void>;
+  /** texts: the message texts he wrote or changed in the messages step, to be saved as his own. */
+  onSave: (s: Setup, renames: [string, string][], texts: Record<string, string>) => Promise<void>;
   onCancel?: () => void;
+  /** Texts that come with the setup (the consultant's), shown in the messages step and saved with it. */
+  texts?: Record<string, string>;
 }) {
+  const own = useTexts();
+  const [edits, setEdits] = useState<Record<string, string>>(given ?? {});
   const [at, setAt] = useState(0);
   // The business's name from sign-up is not what it does (30/10: "במה העסק עוסק?" opened filled with the name).
   const [s, setS] = useState<Setup>(() => { const b = start ?? EMPTY; return { ...b, business: b.business || '' }; });
@@ -45,17 +50,33 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
     return { need: Math.round((each * visitors) / 60), have: Math.round((capacity * 10) / 60) };
   }, [s, visitors, capacity]);
 
+  // A "מתי" or "מי הוא" button changes something when a path or a step names it, or (for "(מתי?)") when it asks his date.
+  const named = useMemo(() => {
+    const out = new Set<string>();
+    const walk = (c: unknown) => { if (!c || typeof c !== 'object') return; const o = c as Record<string, unknown>; if (typeof o.tapped === 'string') out.add(o.tapped); for (const v of Object.values(o)) if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') walk(v); };
+    for (const n of s.needs) for (const v of n.variants) { walk(v.if); for (const st of v.path.steps) walk(st.onlyIf); }
+    return out;
+  }, [s]);
+  const idle = [...s.when, ...s.who].filter((b) => !named.has(b.label) && !/\(מתי\?\)\s*$/.test(b.label)).map((b) => b.label);
+  const lone = ([['מה הוא צריך', s.needs.length], ['מתי', s.when.length], ['מי הוא', s.who.length]] as const).filter(([, n]) => n === 1).map(([q]) => q);
+  const list = messagesOf(s);
+  const bodyOf = (id: string) => edits[id] ?? textOf(s, own, id);
   const checks: [boolean, string][] = [
     [!!s.anchor.goal.trim(), 'נכתב מה יהפוך את התערוכה להצלחה'],
     [!s.needs.length || s.needs.some((n) => n.goal === 'primary'), 'סומנה מטרה ראשית בין הכפתורים'],
     [s.needs.every((n) => n.variants.length > 0), 'לכל כפתור "מה הוא צריך" יש מסלול'],
+    // 26/10: every "מתי" and "מי הוא" button changes something; a button that changes nothing does not belong on the card.
+    [!idle.length, idle.length ? `כפתורים שלא משנים כלום: ${idle.join(', ')}. כדאי לחבר אותם למסלול או להוציא מהכרטיס` : 'כל כפתור "מתי" ו"מי הוא" משנה משהו'],
+    // Round 4: a question with one button is not a question.
+    [!lone.length, lone.length ? `שאלה עם כפתור אחד: ${lone.join(', ')}. כדאי להוסיף עוד אחד, או להוציא אותה` : 'אין שאלה עם כפתור אחד בלבד'],
     [load.need <= load.have, 'הזמן שלך מספיק למסלולים'],
   ];
-  const messages = messagesOf(s).length;
+  const messages = list.length;
 
   async function save() {
     setState('busy');
-    try { await onSave(s, renames); } catch (e) { setState('לא נשמר: ' + String((e as Error).message ?? e)); return; }
+    // Only the texts he wrote or changed here are his own; the rest stay the suggested ones.
+    try { await onSave(s, renames, edits); } catch (e) { setState('לא נשמר: ' + String((e as Error).message ?? e)); return; }
     setState('');
   }
   const can = at === 0 ? !!s.anchor.goal.trim() : at === 1 ? from !== null : true;
@@ -134,6 +155,22 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
 
       {at === 4 && (
         <section className="panel-w">
+          <p className="muted">ההודעות שהמסלולים שולחים, כל אחת עם נוסח מוצע. אפשר לשנות כאן או אחר כך בעמוד "הודעות". פרט בסוגריים מרובעים, כמו [כתובת] או [מחירון], ממלאים פעם אחת ב"פרטים להודעות", והוא נכנס לכל ההודעות.</p>
+          {!list.length && <p className="muted">המסלולים שבחרת לא שולחים הודעות.</p>}
+          {list.map((m) => {
+            const body = bodyOf(m.id);
+            const missing = holes(fill(body, { name: 'אני', business: 'העסק', phone: '050-0000000', greeting: 'shalom', sensitive: s.sensitive }, 'ישראל ישראלי'));
+            return (
+              <label key={m.id} className="field">{m.id} <span className="faint small">· אחרי: {m.after.join(' · ')}{missing.length ? ` · להשלים: ${missing.join(', ')}` : ''}</span>
+                <textarea className="area" rows={Math.min(8, body.split('\n').length + 1)} value={body} onChange={(e) => setEdits({ ...edits, [m.id]: e.target.value })} />
+              </label>
+            );
+          })}
+        </section>
+      )}
+
+      {at === 5 && (
+        <section className="panel-w">
           <span className="sec">כמה זמן ביום יהיה לך למעקב, בשבועיים שאחרי התערוכה?</span>
           <div className="chips">{MINUTES.map((m) => <button key={m} type="button" className="chip" aria-pressed={capacity === m} onClick={() => setS({ ...s, capacity: m })}>{m < 60 ? `${m} דקות` : m === 60 ? 'שעה' : m === 90 ? 'שעה וחצי' : 'שעתיים'}</button>)}</div>
           <label className="field" htmlFor="su-vis">כמה מבקרים אתה מצפה לרשום?<input id="su-vis" className="input days" type="number" min={1} max={2000} inputMode="numeric" value={visitors} onChange={(e) => setVisitors(Math.max(1, Number(e.target.value) || 1))} /></label>
@@ -146,13 +183,12 @@ export function SetupSteps({ start, business, onSave, onCancel }: {
         </section>
       )}
 
-      {at === 5 && (
+      {at === 6 && (
         <section className="panel-w">
           <ul className="checks">
             {checks.map(([ok, t]) => <li key={t} className={ok ? 'ok' : 'miss'}><span aria-hidden="true">{ok ? '✓' : '!'}</span>{t}</li>)}
-            <li className="ok"><span aria-hidden="true">✓</span>כל מסלול מסתיים: ברשימת התפוצה, בעצירה, או בבדיקה חוזרת</li>
           </ul>
-          <p className="muted">{messages} הודעות יוצאות במסלולים האלה. אחרי השמירה, בעמוד "הודעות", רואים לכל אחת נוסח מוצע ומשלימים מה שחסר.</p>
+          <p className="muted">{messages} הודעות יוצאות במסלולים האלה. פרטים שחסרים בהן ממלאים בעמוד "הודעות" › "פרטים להודעות".</p>
           {s.anchor.goal && <p className="note"><b>המטרה:</b> {s.anchor.goal}{s.anchor.success ? ` · ${s.anchor.success}` : ''}</p>}
         </section>
       )}

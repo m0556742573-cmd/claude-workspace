@@ -1755,10 +1755,12 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי התערוכה עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
   if (steps) {
     // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
-    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={built?.setup ?? ctx.setup} business={ctx.exhibitor.business} onCancel={() => { setSteps(false); setBuilt(null); }}
-      onSave={async (next, names) => {
+    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={built?.setup ?? ctx.setup} texts={built?.texts} business={ctx.exhibitor.business} onCancel={() => { setSteps(false); setBuilt(null); }}
+      onSave={async (next, names, texts) => {
         await apply(next, names);
-        if (built) { for (const [id, body] of Object.entries(built.texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {}); setBuilt(null); }
+        for (const [id, body] of Object.entries(texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {});
+        if (Object.keys(texts).length) loadTexts().then(setTexts).catch(() => {});
+        setBuilt(null);
       }} />{question}</>;
   }
   if (consulting) {
