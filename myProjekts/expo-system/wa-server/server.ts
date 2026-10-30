@@ -30,6 +30,8 @@ const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://expo.y-h-m.com,https://
 // The removal link in mails: on the app's address, which passes it here (app/functions/u). 30/10.
 const PUBLIC_URL = process.env.PUBLIC_URL ?? 'https://expo.y-h-m.com';
 const MAIL_FROM = process.env.MAIL_FROM ?? 'expo@expo.y-h-m.com';
+// His logo in a mail is a public file of the files bucket (30/10).
+const FILES_URL = `${SUPABASE_URL}/storage/v1/object/public/files/`;
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_URL and SUPABASE_KEY are required');
 
 const logger = pino({ level: 'warn' });
@@ -279,7 +281,7 @@ async function mailTick(): Promise<void> {
       if (!hours && !r.trial) continue;
       try {
         const attachments = await Promise.all((r.files ?? []).map(fileOf));
-        await provider.send({ ...buildMail(r, PUBLIC_URL, MAIL_FROM), attachments });
+        await provider.send({ ...buildMail(r, PUBLIC_URL, MAIL_FROM, FILES_URL), attachments });
         await rpc('mail_result', { item: r.id, ok: true });
       } catch (e) {
         const msg = String((e as Error).message ?? e);
@@ -423,11 +425,18 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/admin/mail-test' && req.method === 'POST') {
         const p = mailProvider();
         if (!p) return send(409, { error: 'mail is not set' });
-        const to = String((await readJson(req)).to ?? '').trim();
+        const b = await readJson(req);
+        const to = String(b.to ?? '').trim();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return send(400, { error: 'to' });
+        // The test shows the real design with his own booth: his name, business, phone, WhatsApp, logo and colour (30/10).
+        const str = (k: string, max = 120) => (typeof b[k] === 'string' ? (b[k] as string).slice(0, max) : null);
+        const name = str('from_name') || 'מערכת התערוכה';
+        const logo = str('logo');
         try {
-          await p.send(buildMail({ id: '00000000-0000-0000-0000-000000000000', to_email: to, from_name: 'מערכת התערוכה', reply_to: null, subject: 'בדיקת מייל',
-            body: 'שלום,\nזו בדיקה של שליחת המיילים של מערכת התערוכה. אם הגיע לתיבה ולא לספאם, הכל בסדר.' }, PUBLIC_URL, MAIL_FROM));
+          await p.send(buildMail({ id: '00000000-0000-0000-0000-000000000000', to_email: to, from_name: name, reply_to: null,
+            subject: str('subject') || 'בדיקת מייל', sensitive: b.sensitive === true, phone: str('phone', 20), whatsapp: str('whatsapp', 20),
+            brand_color: str('brand_color', 7), logo: logo && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(logo) ? logo : null,
+            body: `שלום יעקב,\nתודה שעצרת אצלנו בדוכן בתערוכה.\nכמו שסיכמנו, אשלח לך את המחירון, ונדבר השבוע.\n\nבברכה,\n${name}` }, PUBLIC_URL, MAIL_FROM, FILES_URL));
           return send(200, { ok: true });
         } catch (e) { return send(502, { error: String((e as Error).message ?? e).slice(0, 300) }); }
       }

@@ -636,3 +636,18 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .fills .row .input { flex: 1 1 200px; min-width: 0; }
 .file-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: var(--pill); background: var(--surface-2); color: inherit; text-decoration: none; font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fills label.btn, .fills label.text-btn { cursor: pointer; }
+
+/* His own logo and colour (30/10): the booth's head, the join page, the settings preview, the printed sign. */
+.mark.logo { object-fit: contain; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+.brand-preview { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: var(--r); margin: 6px 0 14px; }
+.bp-logo, .bp-letter { width: 52px; height: 52px; flex: none; border-radius: 10px; background: #fff; }
+.bp-logo { object-fit: contain; }
+.bp-letter { border-radius: 50%; display: grid; place-items: center; font-size: 24px; font-weight: 700; }
+.bp-name { font-size: 20px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 14px; }
+.swatch { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; padding: 0; position: relative; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ink); }
+.swatch.other { display: grid; place-items: center; background: var(--surface-2); color: var(--ink); font-size: 20px; overflow: hidden; }
+.swatch.other input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+label.btn.disabled { opacity: .5; pointer-events: none; }
+@media print { .ps-logo { width: 40mm; height: 40mm; object-fit: contain; } }

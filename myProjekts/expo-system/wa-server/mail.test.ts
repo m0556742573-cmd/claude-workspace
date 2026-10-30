@@ -57,3 +57,22 @@ test('AWS Signature Version 4: the example in AWS documentation', () => {
   });
   assert.equal(auth, 'AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7');
 });
+
+test('the designed mail (30/10): his colour and logo at the head, a card to reach him, YHM at the foot; a sensitive business shows only his name', async () => {
+  const { inkOn, waLink } = await import('./mail.ts');
+  const brand = { ...row, subject: 'לוי מטבחים', from_name: 'אלי לוי', phone: '050-000-0000', whatsapp: '0500000000', brand_color: '#1e5aa8',
+    logo: '11111111-2222-3333-4444-555555555555/66666666-7777-8888-9999-000000000000.png' };
+  const m = buildMail(brand, 'https://expo.y-h-m.com', 'expo@expo.y-h-m.com', 'https://x.supabase.co/storage/v1/object/public/files/');
+  assert.match(m.html, /background:#1E5AA8;padding:20px 24px/);
+  assert.ok(m.html.includes('src="https://x.supabase.co/storage/v1/object/public/files/11111111-2222-3333-4444-555555555555/66666666-7777-8888-9999-000000000000.png"'));
+  assert.ok(m.html.includes('href="tel:0500000000"') && m.html.includes('href="https://wa.me/972500000000"'));
+  assert.ok(m.html.includes('src="https://expo.y-h-m.com/mail/yhm.png"') && m.html.includes('alt="YHM"'));
+  assert.match(m.text, /נשלח דרך דוכן חכם של YHM/);
+  assert.equal(waLink('+972 50-000-0000'), 'https://wa.me/972500000000');
+  assert.equal(inkOn('#1E5AA8'), '#FFFFFF');
+  assert.equal(inkOn('#F2E85C'), '#1A1A1A');
+  const quiet = buildMail({ ...brand, sensitive: true, subject: 'אלי לוי' }, 'https://expo.y-h-m.com', 'a@b.c', 'https://x/');
+  assert.ok(!quiet.html.includes('66666666-7777'), 'no logo in a sensitive business');
+  assert.ok(!quiet.html.includes('לוי מטבחים'));
+  assert.ok(buildMail(row, 'https://e', 'a@b.c').html.length < 60_000); // far under Gmail's clipping
+});

@@ -6,24 +6,85 @@
 import crypto from 'node:crypto';
 
 export interface MailRow { id: string; to_email: string; body: string; from_name: string; reply_to: string | null; subject: string; files?: string[] | null;
-  /** A trial mail before the fair, to the exhibitor himself or a mail he added. */ trial?: boolean }
+  /** A trial mail before the fair, to the exhibitor himself or a mail he added. */ trial?: boolean;
+  /** His own look (30/10): the logo's path in the files bucket and his colour; none of it in a sensitive business. */
+  sensitive?: boolean; logo?: string | null; brand_color?: string | null; phone?: string | null; whatsapp?: string | null }
 export interface Attachment { name: string; type: string; data: Buffer }
 export interface Mail { from: string; fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string; unsubscribe: string; attachments?: Attachment[] }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const linked = (s: string) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`).replace(/\n/g, '<br>');
 
-/** The mail as the visitor gets it: his message, and beneath it why he got it and how to stop. */
-export function buildMail(r: MailRow, publicUrl: string, fromAddress: string): Mail {
+const YHM = { url: 'https://y-h-m.com', line: 'העסק ממשיך לעבוד, גם כשאתה לא שם', bg: '#0B1A13', ink: '#F2F5EE', lit: '#C9F26B', soft: '#9FB0A6' };
+const PLAIN = '#2F3E4E'; // his colour when he chose none
+const FONT = 'Arial,Helvetica,sans-serif';
+
+/** Dark text on a light colour, white on a dark one. */
+export function inkOn(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b! > 0.45 ? '#1A1A1A' : '#FFFFFF';
+}
+const digits = (s: string) => s.replace(/\D/g, '');
+/** wa.me wants the number with the country: 050… becomes 97250…. */
+export const waLink = (num: string) => { const d = digits(num); return `https://wa.me/${d.startsWith('0') ? '972' + d.slice(1) : d}`; };
+
+/**
+ * The mail as the visitor gets it (30/10: "הכי מעוצב, אבל הכי בטוח"). The design is code, not pictures: his colour,
+ * the letters and the buttons are drawn by the mail itself, so they show where pictures are blocked (filtered
+ * internet, Outlook) and do not read as an advertisement. The only pictures are two small logos, his and YHM's, each
+ * with its name instead when pictures are off. One main button. Beneath: why he got it and how to stop, and YHM's strip.
+ */
+export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, filesUrl = ''): Mail {
   const unsubscribe = `${publicUrl}/u/${r.id}`;
   const why = `קיבלת את ההודעה כי ביקרת בדוכן של ${r.subject} בתערוכה.`;
-  const text = `${r.body}\n\n—\n${why}\nלהסרה מההודעות: ${unsubscribe}`;
-  const html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"></head>'
-    + '<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a;direction:rtl;text-align:right">'
-    + `<div>${linked(r.body)}</div>`
-    + '<hr style="border:0;border-top:1px solid #ddd;margin:24px 0 12px">'
-    + `<p style="font-size:13px;color:#666;margin:0">${esc(why)} <a href="${unsubscribe}" style="color:#666">להסרה מההודעות</a></p>`
-    + '</body></html>';
+  const color = /^#[0-9a-f]{6}$/i.test(r.brand_color ?? '') ? r.brand_color!.toUpperCase() : PLAIN;
+  const ink = inkOn(color);
+  // On white, his colour carries text only when it is dark enough.
+  const onWhite = ink === '#FFFFFF' ? color : '#1A1A1A';
+  const logo = !r.sensitive && r.logo && filesUrl ? `${filesUrl}${r.logo}` : null;
+  const who = r.sensitive || r.from_name === r.subject ? '' : r.from_name;
+  const card = r.sensitive || r.from_name === r.subject ? r.from_name : `${r.from_name} · ${r.subject}`;
+  const phone = r.phone ? digits(r.phone) : '';
+  const wa = r.whatsapp ? waLink(r.whatsapp) : '';
+
+  const text = [r.body, '', '—',
+    ...(phone ? [`לטלפון: ${r.phone}`] : []), ...(wa ? [`בוואטסאפ: ${wa}`] : []),
+    why, `להסרה מההודעות: ${unsubscribe}`, '', `נשלח דרך דוכן חכם של YHM · ${YHM.url}`].join('\n');
+
+  const mark = logo
+    ? `<img src="${esc(logo)}" width="52" height="52" alt="${esc(r.subject)}" style="display:block;width:52px;height:52px;border:0;border-radius:10px;background:#FFFFFF;font-family:${FONT};font-size:12px;color:${ink}">`
+    : `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:#FFFFFF;border-radius:26px;font-family:${FONT};font-size:24px;font-weight:bold;color:${onWhite}">${esc([...r.subject.trim()][0] ?? '')}</td></tr></table>`;
+  const button = (href: string, label: string, main: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 0 8px 8px;padding:11px 20px;border-radius:8px;font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;${main ? `background:${color};color:${ink};border:1px solid ${color}` : `background:#FFFFFF;color:${onWhite};border:1px solid ${onWhite}`}">${label}</a>`;
+  const buttons = [phone && button(`tel:${phone}`, 'להתקשר', true), wa && button(wa, 'וואטסאפ', !phone)].filter(Boolean).join('');
+
+  const html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + `<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${esc(r.subject)}</title></head>`
+    + '<body style="margin:0;padding:0;background:#F3F4F1">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F1"><tr><td align="center" style="padding:24px 12px">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="max-width:600px;background:#FFFFFF;border:1px solid #E3E5E0;border-radius:14px;overflow:hidden">'
+    // his strip: his logo (or the first letter of his business) and his name, in his colour
+    + `<tr><td dir="rtl" align="right" style="background:${color};padding:20px 24px">`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr><td valign="middle" style="padding-left:14px">${mark}</td>`
+    + `<td valign="middle" style="font-family:${FONT};color:${ink};text-align:right"><div style="font-size:20px;font-weight:bold;line-height:1.3">${esc(r.subject)}</div>`
+    + (who ? `<div style="font-size:14px;line-height:1.4;opacity:.85">${esc(who)}</div>` : '')
+    + '</td></tr></table></td></tr>'
+    // his message
+    + `<tr><td dir="rtl" align="right" style="padding:26px 24px 8px;font-family:${FONT};font-size:16px;line-height:1.7;color:#1A1A1A;text-align:right">${linked(r.body)}</td></tr>`
+    // how to reach him
+    + (buttons
+      ? `<tr><td style="padding:16px 24px 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F7F5;border-radius:10px"><tr><td dir="rtl" align="right" style="padding:16px 16px 8px;font-family:${FONT};text-align:right">`
+        + `<div style="font-size:15px;font-weight:bold;color:#1A1A1A;margin-bottom:4px">${esc(card)}</div>`
+        + (r.phone ? `<div style="font-size:14px;color:#4A4F47;margin-bottom:12px"><span dir="ltr">${esc(r.phone)}</span></div>` : '<div style="height:8px"></div>')
+        + `${buttons}<div style="font-size:13px;color:#6B6F68;margin:4px 0 8px">אפשר גם פשוט להשיב למייל הזה.</div></td></tr></table></td></tr>`
+      : '<tr><td style="height:16px"></td></tr>')
+    // why he got it, and how to stop
+    + `<tr><td dir="rtl" align="right" style="padding:14px 24px;border-top:1px solid #ECEEE9;font-family:${FONT};font-size:12px;line-height:1.5;color:#6B6F68;text-align:right">${esc(why)} <a href="${unsubscribe}" style="color:#6B6F68">להסרה מההודעות</a></td></tr>`
+    // YHM
+    + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:14px 24px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr>`
+    + `<td valign="middle" style="padding-left:12px"><a href="${YHM.url}"><img src="${publicUrl}/mail/yhm.png" width="36" height="36" alt="YHM" style="display:block;width:36px;height:36px;border:0;border-radius:8px;font-family:${FONT};font-size:13px;font-weight:bold;color:${YHM.lit}"></a></td>`
+    + `<td valign="middle" style="font-family:${FONT};text-align:right"><div style="font-size:13px;color:${YHM.ink}">נשלח דרך דוכן חכם של <a href="${YHM.url}" style="color:${YHM.lit};font-weight:bold;text-decoration:none">YHM</a></div>`
+    + `<div style="font-size:12px;color:${YHM.soft}">${YHM.line}</div></td></tr></table></td></tr>`
+    + '</table></td></tr></table></body></html>';
   return { from: fromAddress, fromName: r.from_name, to: r.to_email, replyTo: r.reply_to ?? undefined, subject: r.subject, text, html, unsubscribe };
 }
 

@@ -13,14 +13,15 @@ import { MeForm } from './me.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
-import { forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
+import { adminMailTest, forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
+import { prepareLogo } from './lib/logo.ts';
 import { destinationOf, showDestination } from './lib/destination.ts';
 import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -1212,6 +1213,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
               <button type="button" className="chip" aria-pressed={greeting === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
             </div>
           </section>
+          <Brand ctx={ctx} />
           <Signature ctx={ctx} />
           <MailChoice ctx={ctx} />
           <section className="panel-w">
@@ -1427,12 +1429,98 @@ function SelfSign({ ctx }: { ctx: Ctx }) {
         </div>
       </div>
       <div className="print-sign" aria-hidden="true">
+        {ctx.exhibitor.logo && !(ctx.setup.sensitive || ctx.exhibitor.sensitive) && <img className="ps-logo" src={fileUrl(ctx.exhibitor.logo)} alt="" />}
         <div className="ps-biz">{biz}</div>
         <div className="ps-call">סורקים ונרשמים</div>
         <Qr text={url} size={380} />
         <div className="ps-how">שם, טלפון, ומה מעניין אותך. נחזור אליך עם בדיוק מה שמתאים.</div>
         <div className="ps-url" dir="ltr">{url.replace(/^https?:\/\//, '')}</div>
       </div>
+    </section>
+  );
+}
+
+
+const COLORS = ['#2F3E4E', '#1E5AA8', '#0F766E', '#3F6B12', '#7A1F2B', '#B45309', '#1A1A1A'];
+/** Dark text on a light colour, white on a dark one (the mail does the same). */
+const inkOn = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b! > 0.45 ? '#1A1A1A' : '#FFFFFF';
+};
+
+/**
+ * His logo and colour (יצחק, 30/10): at the head of every mail he sends, on his self-registration page and on the sign.
+ * Both optional; with no logo the mail shows the first letter of his business. The preview is the mail's own head.
+ */
+function Brand({ ctx }: { ctx: Ctx }) {
+  const ex = ctx.exhibitor;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [suggested, setSuggested] = useState<string | null>(null);
+  const sensitive = ctx.setup.sensitive || ex.sensitive;
+  const name = sensitive ? ex.name : ex.business || ex.name;
+  const color = ex.brand_color ?? COLORS[0]!;
+  const ink = inkOn(color);
+  async function save(patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color'>>, done: string) {
+    setBusy(true); setMsg('');
+    try { await setBrand(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); setMsg(done); }
+    catch (e) { setMsg('לא נשמר: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    setBusy(true); setMsg('');
+    try {
+      const { png, color: c } = await prepareLogo(file);
+      const logo = await uploadLogo(ex.id, png);
+      setSuggested(c);
+      // The first logo also sets the colour, when he chose none yet; a colour he chose stays.
+      const patch = !ex.brand_color && c ? { logo, brand_color: c } : { logo };
+      await setBrand(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch });
+      setMsg(patch.brand_color ? 'נשמר. הצבע נבחר לפי הלוגו, ואפשר לשנות אותו.' : 'נשמר.');
+    } catch { setMsg('הקובץ לא נקלט. אפשר לנסות תמונה אחרת, PNG או JPG.'); }
+    finally { setBusy(false); }
+  }
+  async function test() {
+    const to = ex.email;
+    if (!to) { setMsg('אין מייל בפרטים שלך.'); return; }
+    setBusy(true); setMsg('');
+    try {
+      await adminMailTest(to, { from_name: ex.name, subject: name, sensitive, phone: ex.phone, whatsapp: ex.whatsapp, brand_color: ex.brand_color, logo: ex.logo });
+      setMsg(`נשלח אל ${to}. כדאי לבדוק גם לאיזו לשונית הוא הגיע.`);
+    } catch (e) { setMsg('לא נשלח: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  const swatches = [...new Set([...(suggested ? [suggested] : []), ...(ex.brand_color ? [ex.brand_color] : []), ...COLORS])];
+  return (
+    <section className="panel-w">
+      <h2>הלוגו והצבע שלך</h2>
+      <p className="muted">מופיעים בראש כל מייל שיוצא ממך, בדף ההרשמה העצמית ועל השלט בדוכן. לא חובה: בלי לוגו מופיעה האות הראשונה של העסק.{sensitive ? ' בעסק שלך המייל יוצא בלי לוגו, רק עם השם שלך.' : ''}</p>
+      <div className="brand-preview" style={{ background: color, color: ink }} aria-label="כך נראה הראש של המייל">
+        {ex.logo && !sensitive ? <img className="bp-logo" src={fileUrl(ex.logo)} alt="" />
+          : <span className="bp-letter" style={{ color: ink === '#FFFFFF' ? color : '#1A1A1A' }}>{[...name.trim()][0] ?? ''}</span>}
+        <span className="bp-name">{name}</span>
+      </div>
+      <div className="row">
+        <label className={'btn' + (busy ? ' disabled' : '')}>
+          {ex.logo ? 'להחליף לוגו' : 'להעלות לוגו'}
+          <input type="file" accept="image/*" hidden disabled={busy} onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        {ex.logo && <button type="button" className="text-btn" disabled={busy} onClick={() => save({ logo: null }, 'הלוגו הוסר.')}>להסיר את הלוגו</button>}
+      </div>
+      <p className="label">הצבע</p>
+      <div className="swatches">
+        {swatches.map((c) => (
+          <button key={c} type="button" className="swatch" style={{ background: c }} aria-label={c === suggested ? `${c}, לפי הלוגו` : c}
+            aria-pressed={c.toUpperCase() === color.toUpperCase()} disabled={busy} onClick={() => save({ brand_color: c.toUpperCase() }, 'נשמר.')} />
+        ))}
+        <label className="swatch other" title="צבע אחר">
+          <span aria-hidden="true">+</span>
+          <input type="color" value={color} aria-label="צבע אחר" onChange={(e) => save({ brand_color: e.target.value.toUpperCase() }, 'נשמר.')} />
+        </label>
+      </div>
+      {ctx.admin && <button type="button" className="btn ghost start-sm" disabled={busy} onClick={test}>לשלוח לי מייל לדוגמה</button>}
+      {msg && <p className="muted small" role="status">{msg}</p>}
     </section>
   );
 }

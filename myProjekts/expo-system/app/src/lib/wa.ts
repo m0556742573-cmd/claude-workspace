@@ -35,5 +35,7 @@ export async function waCheck(lead: string): Promise<Checked[] | null> {
 export interface AdminKeys { keys: Record<string, string | null>; mail: string | null }
 export const adminKeys = () => call<AdminKeys>('/admin/keys');
 export const adminSetKey = (name: string, value: string) => call<AdminKeys>('/admin/keys', 'POST', { name, value });
-export const adminMailTest = (to: string) => call<{ ok: true }>('/admin/mail-test', 'POST', { to });
+/** A test mail in the real design, with his own booth's name, phone, WhatsApp, logo and colour (30/10). */
+export interface MailSample { from_name?: string; subject?: string; sensitive?: boolean; phone?: string | null; whatsapp?: string | null; brand_color?: string | null; logo?: string | null }
+export const adminMailTest = (to: string, sample: MailSample = {}) => call<{ ok: true }>('/admin/mail-test', 'POST', { to, ...sample });
 export const waStats = () => call<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number }>('/wa/stats');

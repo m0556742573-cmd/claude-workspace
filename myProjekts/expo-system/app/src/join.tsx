@@ -3,7 +3,7 @@
 // its buttons (join_info), and can only add one visitor (join_booth). The lead lands in the exhibitor's booth list.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import qrcode from 'qrcode-generator';
-import { joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
+import { fileUrl, joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
 
 const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 /** On the visitor's page a button reads without the "(מתי?)" the exhibitor sees; a date field opens instead. */
@@ -53,7 +53,7 @@ export function Join({ code }: { code: string }) {
   if (state === 'done' || state === 'again') {
     const first = f.name.trim().split(/\s+/)[0];
     return (
-      <JoinBox title={`תודה, ${first}`} by={who}>
+      <JoinBox title={`תודה, ${first}`} by={who} logo={info.logo}>
         <p>{state === 'again' ? 'כבר היית רשום היום. הוספנו את מה שסימנת עכשיו.' : `נרשמת אצל ${who}.`}</p>
         <p className="muted">{info.sensitive && !consent ? 'נחזור אליך רק אם יהיה צורך.' : 'נחזור אליך על מה שסימנת.'} אפשר לבקש להסיר בכל רגע.</p>
         <button type="button" className="text-btn" onClick={() => { setF({ name: '', phone: '', email: '' }); setTaps([]); setDate(''); setConsent(false); setState(''); }}>לרשום עוד מישהו</button>
@@ -63,7 +63,7 @@ export function Join({ code }: { code: string }) {
 
   const questions: [string, string[]][] = [['מה מעניין אותך?', info.needs], ['מתי?', info.when], ['מי אתה?', info.who]];
   return (
-    <JoinBox title="הרשמה" by={who}>
+    <JoinBox title="הרשמה" by={who} logo={info.logo}>
       <p className="muted">משאירים שם וטלפון, ו{info.name} יחזור אליך. הסימונים למטה עוזרים להכין לך בדיוק את מה שמתאים.</p>
       <div className="stack">
         <div className="typed">
@@ -91,11 +91,12 @@ export function Join({ code }: { code: string }) {
   );
 }
 
-function JoinBox({ title, by, children }: { title: string; by?: string; children?: ReactNode }) {
+/** The page heads with the booth's own logo when it has one (30/10). */
+function JoinBox({ title, by, logo, children }: { title: string; by?: string; logo?: string | null; children?: ReactNode }) {
   return (
     <div className="gate">
       <section className="gate-box join">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">{by ?? 'דוכן חכם'}</span></div>
+        <div className="brand">{logo ? <img className="mark logo" src={fileUrl(logo)} alt="" /> : <span className="mark" aria-hidden="true" />}<span className="biz">{by ?? 'דוכן חכם'}</span></div>
         <h1>{title}</h1>
         {children}
       </section>

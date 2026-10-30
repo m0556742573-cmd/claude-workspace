@@ -17,7 +17,7 @@ import { allLeads, allNotes, dropLead, dropNote, putLead, putNote, type LocalLea
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
-  activeSetup, flush, isAdmin, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, fileUrl, flush, isAdmin, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
@@ -216,6 +216,8 @@ function Live() {
 
   const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
+  // His own logo heads the booth when he uploaded one (30/10); otherwise the system's mark.
+  const mark = exhibitor.logo ? <img className="mark logo" src={fileUrl(exhibitor.logo)} alt="" /> : <span className="mark" aria-hidden="true" />;
   const items = part === 'day' ? DAY : CRM;
   const slim = desk && (folded || !!panel);
   const switcher = (
@@ -241,7 +243,7 @@ function Live() {
     <div className={'shell ' + (desk ? 'is-desk' : 'is-tab') + (slim ? ' slim' : '') + (desk && panel ? ' with-panel' : '')}>
       {desk ? (
         <nav className="side" aria-label="תפריט ראשי">
-          <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">{biz}</span></div>
+          <div className="brand">{mark}<span className="biz">{biz}</span></div>
           {switcher}
           {items.map(([v, l, i]) => nv(l, i, view === v, () => go(v)))}
           <div className="side-gap" />
@@ -257,7 +259,7 @@ function Live() {
         </nav>
       ) : (
         <header className="thead">
-          <span className="mark" aria-hidden="true" /><span className="biz">{biz}</span>
+          {mark}<span className="biz">{biz}</span>
           {switcher}
         </header>
       )}

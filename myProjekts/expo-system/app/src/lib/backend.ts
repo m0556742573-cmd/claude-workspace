@@ -29,6 +29,8 @@ export interface Exhibitor {
   /** Trying the booth before the fair (29/10): every message to himself instead of nowhere; a day of the path in a
    *  minute; more numbers or mails that get the trial messages too. */
   trial_send: boolean; trial_fast: boolean; trial_to: string[];
+  /** His own look (30/10): the logo (a PNG path in his files folder) and his colour, both optional. */
+  logo: string | null; brand_color: string | null;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -37,7 +39,7 @@ export async function signInWithGoogle(): Promise<void> {
 export const signOut = () => supabase.auth.signOut();
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -278,7 +280,7 @@ async function recompute(row: LeadRow, exhibitorId: string, setup: Setup, busine
 
 // ---------- self-registration: the visitor registers himself from the code on the booth's sign
 
-export interface JoinInfo { name: string; business: string; sensitive: boolean; needs: string[]; when: string[]; who: string[] }
+export interface JoinInfo { name: string; business: string; sensitive: boolean; logo: string | null; color: string | null; needs: string[]; when: string[]; who: string[] }
 
 export async function joinInfo(code: string): Promise<JoinInfo | null> {
   const { data, error } = await supabase.rpc('join_info', { code });
@@ -476,6 +478,19 @@ export async function uploadFile(exhibitorId: string, file: File): Promise<FileR
   return { path, name: file.name };
 }
 export const fileUrl = (path: string) => supabase.storage.from('files').getPublicUrl(path).data.publicUrl;
+
+// ---------- his logo and colour (30/10): the logo is kept as a PNG in his own folder, a new name each time, so a mail
+// already on its way keeps the picture it was written with.
+export async function uploadLogo(exhibitorId: string, png: Blob): Promise<string> {
+  const path = `${exhibitorId}/${crypto.randomUUID()}.png`;
+  const { error } = await supabase.storage.from('files').upload(path, png, { contentType: 'image/png', upsert: false });
+  if (error) throw error;
+  return path;
+}
+export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color'>>): Promise<void> {
+  const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
+  if (error) throw error;
+}
 /** How a queued message names its file: "path#name". */
 export const fileRefText = (f: FileRef) => `${f.path}#${encodeURIComponent(f.name)}`;
 
