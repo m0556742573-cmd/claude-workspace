@@ -295,7 +295,7 @@ async function planOnce(onlyFast: boolean): Promise<void> {
         await rpc('wa_plan_queue', { lead: d.lead, step: d.step, template: d.template, body: d.body, wa: ch.wa, mail: ch.mail,
           files: d.files.length ? d.files : null, fast_day: d.virtual ?? null });
       }
-    } catch (e) { logger.error({ e, booth: b.id }, 'planning one booth failed'); } // the next booths still get planned
+    } catch (err) { logger.error({ err, booth: b.id }, 'planning one booth failed'); } // the next booths still get planned
   }
 }
 
@@ -546,8 +546,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 // A stray failure is logged, never the end of the server and every account on it (30/10).
-process.on('unhandledRejection', (e) => logger.error({ e }, 'unhandled rejection'));
-process.on('uncaughtException', (e) => logger.error({ e }, 'uncaught exception'));
+process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled rejection'));
+process.on('uncaughtException', (err) => logger.error({ err }, 'uncaught exception'));
 // A stop (a new version) closes each connection properly, so no account's credentials are left half written.
 process.on('SIGTERM', () => {
   for (const s of sessions.values()) s.sock?.end(undefined);
