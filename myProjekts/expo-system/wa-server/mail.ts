@@ -93,6 +93,41 @@ export function buildMail(r: MailRow, publicUrl: string, fromAddress: string, fi
   return { from: fromAddress, fromName: r.from_name, to: r.to_email, replyTo: r.reply_to ?? undefined, subject: r.subject, text, html, unsubscribe };
 }
 
+/** One of his tasks in the morning message. */
+export interface MorningTask { name: string; action: string; message: string | null; late: boolean; due: string }
+const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה ללקוח' };
+
+/**
+ * The morning message (07/10, 20/10, 30/10): his tasks of the day, the late ones first, and a button straight to them.
+ * From YHM to him, in YHM's own look; no removal line (it is his own system's message, switched off in his settings).
+ */
+export function buildMorning(to: string, name: string, tasks: MorningTask[], appUrl: string, fromAddress: string): Mail {
+  const late = tasks.filter((t) => t.late), today = tasks.filter((t) => !t.late);
+  const line = (t: MorningTask) => `${t.name} · ${ACT[t.action] ?? t.action}${t.message ? ` — "${t.message}"` : ''}`;
+  const subject = `המשימות שלך להיום · ${tasks.length}`;
+  const first = name.trim().split(/\s+/)[0] ?? '';
+  const text = [`בוקר טוב ${first},`, '', ...(late.length ? ['באיחור:', ...late.map((t) => '• ' + line(t)), ''] : []),
+    ...(today.length ? ['להיום:', ...today.map((t) => '• ' + line(t)), ''] : []), `לפתוח את המשימות: ${appUrl}/#tasks`, '', 'אקספומקס · מערכת של YHM'].join('\n');
+  const list = (title: string, items: MorningTask[], color: string) => items.length
+    ? `<tr><td dir="rtl" align="right" style="padding:6px 24px 0;font-family:${FONT};text-align:right"><div style="font-size:13px;font-weight:bold;color:${color};margin:10px 0 6px">${title} · ${items.length}</div>`
+      + items.map((t) => `<div style="font-size:15px;line-height:1.5;color:#1A1A1A;padding:8px 0;border-bottom:1px solid #ECEEE9"><b>${esc(t.name)}</b> · ${esc(ACT[t.action] ?? t.action)}${t.message ? `<span style="color:#6B6F68"> — ${esc(t.message)}</span>` : ''}</div>`).join('')
+      + '</td></tr>'
+    : '';
+  const html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + `<meta name="color-scheme" content="light"><title>${esc(subject)}</title></head><body style="margin:0;padding:0;background:#F3F4F1">`
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F1"><tr><td align="center" style="padding:24px 12px">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="max-width:560px;background:#FFFFFF;border:1px solid #E3E5E0;border-radius:14px;overflow:hidden">'
+    + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:16px 24px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr>`
+    + `<td valign="middle" style="padding-left:12px"><img src="${appUrl}/mail/yhm.png" width="36" height="36" alt="YHM" style="display:block;width:36px;height:36px;border:0;border-radius:8px;font-family:${FONT};font-size:13px;font-weight:bold;color:${YHM.lit}"></td>`
+    + `<td valign="middle" style="font-family:${FONT};color:${YHM.ink};font-size:19px;font-weight:bold">אקספומקס</td></tr></table></td></tr>`
+    + `<tr><td dir="rtl" align="right" style="padding:22px 24px 4px;font-family:${FONT};font-size:17px;color:#1A1A1A;text-align:right">בוקר טוב ${esc(first)},<br><span style="font-size:15px;color:#4A4F47">${tasks.length === 1 ? 'משימה אחת מחכה לך היום.' : `${tasks.length} משימות מחכות לך היום.`}</span></td></tr>`
+    + list('באיחור', late, '#A33A1F') + list('להיום', today, '#1A1A1A')
+    + `<tr><td align="right" dir="rtl" style="padding:20px 24px 26px"><a href="${appUrl}/#tasks" style="display:inline-block;background:${YHM.bg};color:${YHM.ink};font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;padding:12px 22px;border-radius:8px">לפתוח את המשימות</a></td></tr>`
+    + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:12px 24px;font-family:${FONT};font-size:12px;color:${YHM.soft};text-align:right">אקספומקס · מערכת של <a href="${YHM.url}" style="color:${YHM.lit};font-weight:bold;text-decoration:none">YHM</a> · ${YHM.line}<br>אפשר לשנות את השעה, או לכבות, בהגדרות › הודעות.</td></tr>`
+    + '</table></td></tr></table></body></html>';
+  return { from: fromAddress, fromName: 'אקספומקס', to, subject, text, html, unsubscribe: '' };
+}
+
 /** Hebrew in a header: RFC 2047, base64, in pieces short enough for a header line. */
 function word(s: string): string {
   if (/^[\x20-\x7e]*$/.test(s)) return s;
@@ -151,8 +186,8 @@ export function mime(m: Mail, now = new Date(), id: string = crypto.randomUUID()
     `Date: ${now.toUTCString().replace('GMT', '+0000')}`,
     `Message-ID: <${id}@${domain}>`,
     'MIME-Version: 1.0',
-    `List-Unsubscribe: <${m.unsubscribe}>`,
-    'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+    // A system mail to the exhibitor himself (the morning message) has no removal link: he switches it off in his settings.
+    ...(m.unsubscribe ? [`List-Unsubscribe: <${m.unsubscribe}>`, 'List-Unsubscribe-Post: List-Unsubscribe=One-Click'] : []),
     ...parts,
     '',
   ].join('\r\n');
@@ -209,7 +244,7 @@ export function cloudflareBody(m: Mail) {
     subject: m.subject,
     text: m.text,
     html: m.html,
-    headers: { 'List-Unsubscribe': `<${m.unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    ...(m.unsubscribe ? { headers: { 'List-Unsubscribe': `<${m.unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),
     ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({ content: a.data.toString('base64'), filename: a.name, type: a.type, disposition: 'attachment' })) } : {}),
   };
 }

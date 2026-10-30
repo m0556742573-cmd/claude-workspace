@@ -15,9 +15,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, normalizeMessageContent, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
-import { firstLeft, gapMs, sendingHours, typingMs } from './limits.ts';
+import { firstLeft, gapMs, restDay, sendingHours, typingMs } from './limits.ts';
 import { due, israelDay, type Plan } from './planner.ts';
-import { buildMail, providerFrom, type MailRow } from './mail.ts';
+import { buildMail, buildMorning, providerFrom, type MailRow, type MorningTask } from './mail.ts';
 import { EMPTY, GREETING, build, checks, cleanDraft, converse, type Draft, type Turn } from './consult.ts';
 import type { Approved } from '../engine/src/index.ts';
 
@@ -343,6 +343,26 @@ async function mailTick(): Promise<void> {
   } finally { mailing = false; }
 }
 
+// ---------- the morning message (07/10, 20/10, 30/10): once a day, at the hour he chose, his tasks of the day. Not on
+// Shabbat or Yom Tov; a morning with nothing to do sends nothing. From YHM to him, from the system's address until his
+// own address at y-h-m.com is connected (SYSTEM_FROM).
+const SYSTEM_FROM = process.env.SYSTEM_FROM ?? `hello@${MAIL_FROM.split('@')[1]}`;
+let morning = false;
+async function morningTick(): Promise<void> {
+  const provider = mailProvider();
+  if (morning || !provider || !WA_KEY || restDay(new Date())) return;
+  morning = true;
+  try {
+    for (const b of (await rpc<{ exhibitor_id: string; name: string; email: string | null; tasks: MorningTask[] }[]>('morning_due', {})) ?? []) {
+      try {
+        if (b.email && b.tasks.length) await provider.send(buildMorning(b.email, b.name, b.tasks, PUBLIC_URL, SYSTEM_FROM));
+        await record('morning_sent', { exhibitor: b.exhibitor_id });
+      } catch (err) { logger.error({ err, booth: b.exhibitor_id }, 'morning message failed'); } // tried again next minute
+      await sleep(400);
+    }
+  } finally { morning = false; }
+}
+
 // ---------- the removal link in every mail: a page that asks once; mail services that offer "unsubscribe" post here
 // directly (one click, RFC 8058). It removes him from that exhibitor's messages altogether.
 const page = (body: string) => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>הסרה מההודעות</title>
@@ -614,4 +634,5 @@ setInterval(() => { refreshPhones().catch((e) => logger.error(e)); }, 5 * 60_000
 setInterval(() => { plan().catch((e) => logger.error(e)); }, 2 * 60_000);
 setInterval(() => { plan(true).catch((e) => logger.error(e)); }, 30_000);
 setInterval(() => { mailTick().catch((e) => logger.error(e)); }, 30_000);
+setInterval(() => { morningTick().catch((err) => logger.error({ err }, 'morning round failed')); }, 60_000);
 server.listen(PORT, () => logger.warn(`wa-server on ${PORT}, accounts coming back in the background, sending ${WA_KEY ? 'on' : 'off (no WA_KEY)'}, mail ${mailProvider()?.name ?? 'not set'}`));

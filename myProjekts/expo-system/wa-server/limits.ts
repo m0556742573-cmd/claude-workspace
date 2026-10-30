@@ -41,6 +41,12 @@ export function israel(at: Date): { weekday: string; hour: number; hebDay: numbe
   return { weekday: c.weekday!, hour: Number(c.hour), hebDay: Number(h.day), hebMonth: h.month! };
 }
 
+/** Shabbat or Yom Tov in Israel at this moment: the morning message waits for the next weekday. */
+export function restDay(at: Date): boolean {
+  const t = israel(at);
+  return t.weekday === 'Sat' || !!YOM_TOV[t.hebMonth]?.includes(t.hebDay);
+}
+
 /** May a message go out at this moment? Not at night, not on Shabbat or Yom Tov, not on their eve after midday. */
 export function sendingHours(at: Date): boolean {
   const t = israel(at);

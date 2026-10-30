@@ -41,6 +41,8 @@ export interface Exhibitor {
   logo: string | null; brand_color: string | null;
   /** His own name before the @ in the mails to his visitors (30/10), unique among the exhibitors; null: the system's. */
   mail_name: string | null;
+  /** The morning message (30/10): by mail and/or WhatsApp, at an hour he chose, to the mail or number he picked. */
+  morning_mail: boolean; morning_wa: boolean; morning_at: string; morning_email: string | null; morning_phone: string | null;
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -56,9 +58,11 @@ export async function verifyMailCode(email: string, code: string): Promise<void>
   if (error) throw error;
 }
 export const signOut = () => supabase.auth.signOut();
+/** The mail he signed in with: one of the places the morning message can go. */
+export const signInMail = async () => (await supabase.auth.getSession()).data.session?.user.email ?? null;
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color, mail_name').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color, mail_name, morning_mail, morning_wa, morning_at, morning_email, morning_phone').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -635,7 +639,7 @@ export async function queuedFor(leadId: string): Promise<{ status: string; error
   const { data } = await supabase.from('outbox').select('status, error, created_at, template_id').eq('lead_id', leadId).eq('channel', 'whatsapp').in('status', ['queued', 'failed']).order('created_at');
   return data ?? [];
 }
-export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always' | 'trial_send' | 'trial_fast' | 'trial_to'>>): Promise<void> {
+export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always' | 'trial_send' | 'trial_fast' | 'trial_to' | 'morning_mail' | 'morning_wa' | 'morning_at' | 'morning_email' | 'morning_phone'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }

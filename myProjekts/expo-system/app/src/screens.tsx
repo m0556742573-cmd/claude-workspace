@@ -22,7 +22,7 @@ import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, signInMail, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -350,7 +350,6 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       )) : (
         <div className="empty"><b>{tab === 'today' ? 'אין מה לעשות היום' : 'אין משימות'}</b><p className="muted">{open.length ? 'אפשר לראות את מה שבהמשך ב"הכל".' : 'כל מבקר שתרשום בדוכן יקבל כאן את הצעד הבא שלו.'}</p></div>
       )}
-      <Soon title="הודעת בוקר">כל בוקר תגיע אליך בוואטסאפ רשימת המשימות של היום, עם קישור ישר לכאן.</Soon>
     </div>
   );
 }
@@ -1233,6 +1232,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
               <button type="button" className="chip" aria-pressed={greeting === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
             </div>
           </section>
+          <Morning ctx={ctx} />
           <Brand ctx={ctx} />
           <Signature ctx={ctx} />
           <MailChoice ctx={ctx} />
@@ -1559,6 +1559,50 @@ function Brand({ ctx }: { ctx: Ctx }) {
       </div>
       <MailName ctx={ctx} />
       {ctx.admin && <button type="button" className="btn ghost start-sm" disabled={busy} onClick={test}>לשלוח לי מייל לדוגמה</button>}
+      {msg && <p className="muted small" role="status">{msg}</p>}
+    </section>
+  );
+}
+
+/**
+ * The morning message (יצחק, 07/10 and 20/10): his tasks of the day, every morning, with a link straight to them. Mail
+ * and WhatsApp as he ticks, at any hour, to the mail or number he picks when he has more than one. WhatsApp goes from
+ * YHM's official number, and waits until that number is approved.
+ */
+function Morning({ ctx }: { ctx: Ctx }) {
+  const ex = ctx.exhibitor;
+  const [signIn, setSignIn] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { signInMail().then(setSignIn).catch(() => {}); }, []);
+  const mails = [...new Set([ex.email?.trim().toLowerCase(), signIn?.toLowerCase()].filter(Boolean) as string[])];
+  const at = (ex.morning_at ?? '08:00').slice(0, 5);
+  async function set(patch: Partial<Pick<Exhibitor, 'morning_mail' | 'morning_wa' | 'morning_at' | 'morning_email'>>) {
+    setMsg('');
+    try { await setWaOptions(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); setMsg('נשמר.'); }
+    catch { setMsg('לא נשמר: אין חיבור כרגע.'); }
+  }
+  return (
+    <section className="panel-w">
+      <h2>הודעת הבוקר</h2>
+      <p className="muted">כל בוקר, המשימות שלך להיום, עם קישור ישר אליהן. לא בשבת ובחג, ולא כשאין משימות.</p>
+      <div className="switchrow">
+        <span>במייל</span>
+        <button type="button" className="switch" role="switch" aria-checked={ex.morning_mail} aria-label="הודעת בוקר במייל" onClick={() => set({ morning_mail: !ex.morning_mail })} />
+      </div>
+      {ex.morning_mail && mails.length > 1 && (
+        <label className="field">לאיזה מייל
+          <select className="input" value={ex.morning_email ?? mails[0]} onChange={(e) => set({ morning_email: e.target.value })}>
+            {mails.map((m) => <option key={m} value={m} dir="ltr">{m}</option>)}
+          </select>
+        </label>
+      )}
+      <div className="switchrow">
+        <span>בוואטסאפ <span className="faint small">· בקרוב, כשהמספר הרשמי של המערכת יאושר</span></span>
+        <button type="button" className="switch" role="switch" aria-checked={ex.morning_wa} aria-label="הודעת בוקר בוואטסאפ" onClick={() => set({ morning_wa: !ex.morning_wa })} />
+      </div>
+      <label className="field" style={{ maxWidth: 180 }}>באיזו שעה
+        <input className="input" type="time" value={at} onChange={(e) => { if (e.target.value) set({ morning_at: e.target.value }); }} />
+      </label>
       {msg && <p className="muted small" role="status">{msg}</p>}
     </section>
   );
