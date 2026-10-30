@@ -15,6 +15,7 @@ import { SetupSteps } from './setup.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { adminMailTest, forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { prepareLogo } from './lib/logo.ts';
+import { Consultant } from './consult.tsx';
 import { destinationOf, showDestination } from './lib/destination.ts';
 import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
@@ -25,7 +26,6 @@ import {
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
-const LAB_URL = 'https://claude.ai/artifact/ThNurpj84KQfa4ETqSwUdH';
 const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר' };
 /** For a step that is not a talk, "noAnswer" means only "done, the path goes on". */
 const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
@@ -1622,6 +1622,9 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const s = draft ?? ctx.setup;
   const [picking, setPicking] = useState(false);
   const [steps, setSteps] = useState(false);
+  // The consultant (30/10): its setup opens in the steps for review; its message texts are saved with it.
+  const [consulting, setConsulting] = useState(false);
+  const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
   const [ask, setAsk] = useState<{ count: number; setup: Setup; renames: [string, string][] } | null>(null);
   const [sub, setSub] = useState<'card' | 'after' | 'build'>('card');
 
@@ -1658,7 +1661,15 @@ function Custom({ ctx }: { ctx: Ctx }) {
   const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי התערוכה עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
   if (steps) {
     // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
-    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={ctx.setup} business={ctx.exhibitor.business} onCancel={() => setSteps(false)} onSave={(next, names) => apply(next, names)} />{question}</>;
+    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={built?.setup ?? ctx.setup} business={ctx.exhibitor.business} onCancel={() => { setSteps(false); setBuilt(null); }}
+      onSave={async (next, names) => {
+        await apply(next, names);
+        if (built) { for (const [id, body] of Object.entries(built.texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {}); setBuilt(null); }
+      }} />{question}</>;
+  }
+  if (consulting) {
+    return <>{intro}<Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setConsulting(false); setSteps(true); scrollTo(0, 0); }} onSteps={() => { setConsulting(false); setSteps(true); }} />
+      <button type="button" className="text-btn" onClick={() => setConsulting(false)}>חזרה להגדרות</button></>;
   }
   return (
     <>
@@ -1670,7 +1681,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
       <section className="panel-w">
         <h2>איך מקימים</h2>
         <ul className="list" style={{ background: 'var(--surface-2)' }}>
-          <li><a className="list-row" href={LAB_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}><div className="row-name">שיחה עם היועץ החכם</div><div className="row-step">בגרסת ניסיון, בחלון נפרד. בקרוב בתוך המערכת, וההקמה תישמר ישר לכאן.</div></a></li>
+          <li><button type="button" className="list-row" onClick={() => { setConsulting(true); setSaved(''); scrollTo(0, 0); }}><div className="row-name">שיחה עם היועץ</div><div className="row-step">היועץ שואל על העסק ובונה הקמה. היא נפתחת לבדיקה, ונשמרת רק כשתאשר. השיחה נשמרת, ואפשר לחזור אליה.</div></button></li>
           <li><button type="button" className="list-row" onClick={() => { setSteps(true); setSaved(''); scrollTo(0, 0); }}><div className="row-name">הקמה שלב אחר שלב</div><div className="row-step">שישה שלבים קצרים: מטרה, נקודת התחלה, כרטיס, מסלולים, זמן, ובדיקה.</div></button></li>
           <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">החלפת תבנית</div><div className="row-step">להתחיל מעסק דומה מהסבבים.</div></button></li>
         </ul>

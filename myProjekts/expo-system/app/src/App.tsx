@@ -17,11 +17,12 @@ import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, t
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import {
-  activeSetup, fileUrl, flush, isAdmin, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
 import { MailCode } from './signin.tsx';
+import { Consultant } from './consult.tsx';
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine);
@@ -232,14 +233,7 @@ function Live() {
     );
   }
   if (setup === undefined) return <Gate title="טוען…" />;
-  if (!setup) {
-    return (
-      <div className="setup-gate">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">בוא נקים את הדוכן</span></div>
-        <SetupSteps start={null} business={exhibitor.business} onSave={async (s) => { await startFromTemplate(exhibitor.id, s); setSetup(s); }} />
-      </div>
-    );
-  }
+  if (!setup) return <NewBooth exhibitor={exhibitor} onSaved={setSetup} />;
 
   const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
@@ -420,6 +414,37 @@ function TrySetup() {
     <div className="setup-gate">
       <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">הקמה · הדגמה</span></div>
       <SetupSteps start={null} onSave={async (s) => setDone(s)} />
+    </div>
+  );
+}
+
+/**
+ * A new booth (30/10): with the consultant (a conversation that builds the setup, which he then reviews step by step),
+ * or step by step on his own.
+ */
+function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: Setup) => void }) {
+  const [mode, setMode] = useState<'choose' | 'consult' | 'steps'>('choose');
+  const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
+  async function save(s: Setup) {
+    await startFromTemplate(exhibitor.id, s);
+    // The consultant's message texts become his own, as if he had written them; he can change them in הודעות.
+    if (built) for (const [id, body] of Object.entries(built.texts)) await saveText(exhibitor.id, id, body).catch(() => {});
+    onSaved(s);
+  }
+  return (
+    <div className="setup-gate">
+      <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">בוא נקים את הדוכן</span></div>
+      {mode === 'choose' && (
+        <section className="panel-w">
+          <h2>איך נקים את הדוכן?</h2>
+          <div className="phase-list">
+            <button type="button" className="opt-card" onClick={() => setMode('consult')}><b>בשיחה עם היועץ · מומלץ</b><span className="muted">יועץ חכם שואל כמה שאלות על העסק שלך, ובונה מהן את הכרטיס, המסלולים וההודעות. אחר כך אפשר לשנות כל דבר.</span></button>
+            <button type="button" className="opt-card" onClick={() => setMode('steps')}><b>לבד, שלב אחר שלב</b><span className="muted">שישה שלבים קצרים, מעסק דומה או מאפס.</span></button>
+          </div>
+        </section>
+      )}
+      {mode === 'consult' && <Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setMode('steps'); }} onSteps={() => setMode('steps')} />}
+      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} business={exhibitor.business} onSave={save} onCancel={() => setMode(built ? 'consult' : 'choose')} />}
     </div>
   );
 }

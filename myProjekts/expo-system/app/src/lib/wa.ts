@@ -39,3 +39,15 @@ export const adminSetKey = (name: string, value: string) => call<AdminKeys>('/ad
 export interface MailSample { from_name?: string; subject?: string; sensitive?: boolean; phone?: string | null; whatsapp?: string | null; brand_color?: string | null; logo?: string | null }
 export const adminMailTest = (to: string, sample: MailSample = {}) => call<{ ok: true }>('/admin/mail-test', 'POST', { to, ...sample });
 export const waStats = () => call<{ sessions: number; open: number; rssMb: number; heapMb: number; uptimeMin: number }>('/wa/stats');
+
+// ---------- the setup consultant (30/10): his conversation runs on the server, which keeps the key and the conversation
+export interface ConsultTurn { role: 'assistant' | 'user'; text: string; quick?: string[] }
+export interface ConsultDraft { business: string; anchor: { goal: string; success: string }; goals: { primary: string; secondary: string[] }; capacity: string;
+  need: { label: string; goal: string; relation: string; steps: string[]; variants: { for: string; steps: string[] }[] }[];
+  when: { label: string; effect: string }[]; who: { label: string; effect: string }[]; defaults: { business: string; private: string };
+  messages: { name: string; purpose: string }[]; open: string[] }
+export interface ConsultState { id: string | null; turns: ConsultTurn[]; draft: ConsultDraft; checks: [string, boolean][]; built: { setup: unknown; texts: Record<string, string> } | null }
+export const consultSession = () => call<ConsultState>('/ai/session');
+export const consultNew = () => call<ConsultState>('/ai/new', 'POST');
+export const consultSay = (session: string | null, text: string) => call<ConsultState>('/ai/say', 'POST', { session, text });
+export const consultBuild = (session: string) => call<{ setup: unknown; texts: Record<string, string> }>('/ai/build', 'POST', { session });

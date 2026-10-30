@@ -661,3 +661,18 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 /* His own name before the @ (30/10). */
 .mail-at { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; }
 .mail-at .input { width: 220px; max-width: 100%; }
+
+/* The setup consultant (30/10): the conversation, and beside it (below it on a tablet) the setup it is building. */
+.consult { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .consult { grid-template-columns: minmax(0, 1fr); } }
+.consult-chat { display: grid; gap: 10px; }
+.consult-log { display: grid; gap: 8px; max-height: 58vh; overflow-y: auto; padding-inline-end: 4px; }
+.bubble { border-radius: var(--r); padding: 10px 13px; max-width: 92%; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.bubble.ai { background: var(--surface-2); justify-self: start; }
+.bubble.me { background: var(--brand); color: #fff; justify-self: end; }
+.bubble.thinking { color: var(--muted); font-style: italic; }
+.consult-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.consult-side { display: grid; gap: 8px; }
+.consult-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 14px; color: var(--muted); }
+.consult-checks li.ok { color: var(--ink); }
+.consult-checks li span { display: inline-block; width: 1.2em; }

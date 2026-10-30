@@ -18,6 +18,7 @@ import pino from 'pino';
 import { firstLeft, gapMs, sendingHours, typingMs } from './limits.ts';
 import { due, israelDay, type Plan } from './planner.ts';
 import { buildMail, providerFrom, type MailRow } from './mail.ts';
+import { EMPTY, GREETING, build, checks, cleanDraft, converse, type Draft, type Turn } from './consult.ts';
 import type { Approved } from '../engine/src/index.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -428,6 +429,55 @@ async function inbound(exhibitorId: string, messages: Incoming[]): Promise<void>
   }
 }
 
+// ---------- the setup consultant (30/10): his conversation with Claude, kept in the database; the key stays here
+
+const CONSULT_DAY_LIMIT = 240; // turns a day per booth: a conversation that runs away is stopped, not billed
+interface Saved { id: string | null; turns: Turn[]; draft: Draft; built: unknown }
+async function consultLoad(exhibitor: string, session?: string): Promise<Saved> {
+  const r = await rpc<{ id: string | null; turns: Turn[]; draft: Draft; built: unknown } | null>('consult_get', { exhibitor, session: session ?? null });
+  if (!r?.id) return { id: null, turns: [{ role: 'assistant', text: GREETING, quick: [] }], draft: EMPTY, built: null };
+  return { id: r.id, turns: r.turns ?? [], draft: cleanDraft(r.draft, EMPTY), built: r.built ?? null };
+}
+const shown = (s: Saved) => ({ id: s.id, turns: s.turns, draft: s.draft, checks: checks(s.draft), built: s.built });
+async function consultRoute(pathname: string, req: http.IncomingMessage, exhibitor: string, send: (code: number, body: unknown) => void): Promise<void> {
+  if (pathname === '/ai/session' && req.method === 'GET') return send(200, shown(await consultLoad(exhibitor)));
+  if (pathname === '/ai/new' && req.method === 'POST') return send(200, shown({ id: null, turns: [{ role: 'assistant', text: GREETING, quick: [] }], draft: EMPTY, built: null }));
+  const key = keys.anthropic_key;
+  if (!key) return send(409, { error: 'no_key' });
+  const b = await readJson(req, 16384);
+  const session = typeof b.session === 'string' && /^[0-9a-f-]{36}$/.test(b.session) ? b.session : undefined;
+  if (pathname === '/ai/say' && req.method === 'POST') {
+    const text = String(b.text ?? '').trim().slice(0, 2000);
+    if (!text) return send(400, { error: 'text' });
+    if ((await rpc<number>('consult_today', { exhibitor })) >= CONSULT_DAY_LIMIT) return send(429, { error: 'limit' });
+    const s = session ? await consultLoad(exhibitor, session) : await consultLoad(exhibitor).then((x) => (x.id ? { ...x, id: null, turns: [{ role: 'assistant' as const, text: GREETING, quick: [] }], draft: EMPTY, built: null } : x));
+    const turns: Turn[] = [...s.turns, { role: 'user', text }];
+    try {
+      const r = await converse(key, turns, s.draft);
+      turns.push({ role: 'assistant', text: r.reply, quick: r.quick });
+      const saved = await rpc<{ id: string }>('consult_save', { exhibitor, session: s.id, turns, draft: r.draft, built: null, tin: r.usage.input + r.usage.cacheRead, tout: r.usage.output });
+      return send(200, shown({ id: saved.id, turns, draft: r.draft, built: s.built }));
+    } catch (err) {
+      logger.error({ err }, 'consultant turn failed');
+      return send(502, { error: 'claude' });
+    }
+  }
+  if (pathname === '/ai/build' && req.method === 'POST') {
+    if (!session) return send(400, { error: 'session' });
+    const s = await consultLoad(exhibitor, session);
+    if (!s.id) return send(404, { error: 'session' });
+    try {
+      const r = await build(key, s.draft, s.turns);
+      await rpc('consult_save', { exhibitor, session: s.id, turns: s.turns, draft: s.draft, built: { setup: r.setup, texts: r.texts }, tin: r.usage.input + r.usage.cacheRead, tout: r.usage.output });
+      return send(200, { setup: r.setup, texts: r.texts });
+    } catch (err) {
+      logger.error({ err }, 'consultant build failed');
+      return send(502, { error: 'claude' });
+    }
+  }
+  return send(404, { error: 'not found' });
+}
+
 // ---------- who is calling: his own sign-in, checked with Supabase
 
 const seen = new Map<string, { exhibitorId: string; until: number }>();
@@ -516,6 +566,7 @@ const server = http.createServer(async (req, res) => {
     }
     const id = await exhibitorOf(token);
     if (!id) return send(403, { error: 'not an approved exhibitor' });
+    if (url.pathname.startsWith('/ai/')) return await consultRoute(url.pathname, req, id, send);
     if (url.pathname === '/wa/status' && req.method === 'GET') return send(200, view(sessions.get(id)));
     if (url.pathname === '/wa/link' && req.method === 'POST') {
       const s = sessions.get(id);

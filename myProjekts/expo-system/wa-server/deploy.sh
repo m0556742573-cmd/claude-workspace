@@ -19,7 +19,7 @@ ssh_run 'mkdir -p /opt/expo-wa/data && chmod 700 /opt/expo-wa/data'
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/wa-server" "$STAGE/engine" "$STAGE/consultant-rounds"
 cp package.json package-lock.json Dockerfile .dockerignore "$STAGE/"
-cp server.ts limits.ts planner.ts mail.ts "$STAGE/wa-server/"
+cp server.ts limits.ts planner.ts mail.ts consult.ts consult-rules.ts "$STAGE/wa-server/"
 cp -r ../engine/src ../engine/fixtures "$STAGE/engine/"
 cp ../consultant-rounds/messages-approved.json "$STAGE/consultant-rounds/"
 ssh_run 'cd /opt/expo-wa && rm -rf wa-server engine consultant-rounds server.ts limits.ts'
