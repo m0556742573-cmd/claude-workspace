@@ -3,7 +3,7 @@
 // the exhibitor's own edit (table message_templates) replaces them. Every other detail in square brackets ([כתובת],
 // [שעות]) the exhibitor writes once, and it is filled into every message it appears in (יצחק, 29/10). Whatever is still
 // left in square brackets is a hole: a message with a hole is not sent.
-import type { Path, Setup } from './model.ts';
+import type { Order, Path, Setup } from './model.ts';
 import { fixtures } from '../fixtures/businesses.ts';
 
 export interface Me {
@@ -68,6 +68,13 @@ export function draftFor(setup: Setup, id: string, approved: Approved[]): string
   const hit = mine.find((a) => a.label === id) ?? mine.find((a) => id.startsWith(a.label));
   if (hit) return hit.text;
   return `שלום [שם],\n[${id}]\n${SIGN}`;
+}
+
+const money = (n: number) => `${Math.round(n * 100) / 100} ₪`;
+/** The summary a visitor gets of what he ordered at the booth (model §14א): the items, the expo prices, the total. */
+export function orderSummary(order: Order): string {
+  const lines = order.items.filter((i) => i.qty > 0).map((i) => `• ${i.qty} × ${i.name} · ${money(i.qty * i.price)}`);
+  return [`שלום [שם],`, `תודה על ההזמנה בתערוכה${order.offer ? `, במבצע "${order.offer}"` : ''}:`, ...lines, `סה"כ: ${money(order.total)}`, SIGN].join('\n');
 }
 
 /** The text as the visitor gets it: his name, the exhibitor's signature and greeting. Holes stay as they are. */

@@ -676,3 +676,12 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 .consult-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 14px; color: var(--muted); }
 .consult-checks li.ok { color: var(--ink); }
 .consult-checks li span { display: inline-block; width: 1.2em; }
+
+/* The expo offer (30/10): the items at the booth, and their editor in settings. */
+.order-pick { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--r); padding: 12px; }
+.order-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.order-name { min-width: 0; overflow-wrap: anywhere; }
+.order-qty { display: inline-flex; align-items: center; gap: 10px; }
+.order-qty .btn { min-width: 44px; justify-content: center; }
+.offer-item .input { flex: 1 1 140px; min-width: 0; }
+.offer-item .input.price { flex: 0 1 110px; }

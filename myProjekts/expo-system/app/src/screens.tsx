@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Path, type Setup } from '@expo/engine';
+import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
 import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
@@ -401,7 +401,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
 
   return (
     <Frame bare={bare} className={held ? 'held next-card' : 'task'}>
-      {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · ')].filter(Boolean).join(' · ')}</span></div>}
+      {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · '), row.booth_order ? `הזמין · ${row.booth_order.total} ₪` : ''].filter(Boolean).join(' · ')}</span></div>}
       <div className="nc-now">
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
         {isAuto && (ctx.phase === 'practice'
@@ -1618,6 +1618,46 @@ function Morning({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/**
+ * The expo offer (יצחק, 23/10; model §14א): a name, items with the regular and the expo price, and until when. At the
+ * booth, "הזמין" opens them; the visitor ordering is a deal, and gets a summary of his order. No payment or stock.
+ */
+export function OfferEdit({ ctx }: { ctx: Ctx }) {
+  const ex = ctx.exhibitor;
+  const blank = { name: 'מבצע תערוכה', until: EXPO_DAY, items: [] as Offer['items'] };
+  const [o, setO] = useState<Offer>(ex.offer ?? blank);
+  const [msg, setMsg] = useState('');
+  const item = (i: number, patch: Partial<Offer['items'][number]>) => setO({ ...o, items: o.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  async function save(next: Offer | null) {
+    setMsg('');
+    try { await setBrand(ex.id, { offer: next }); ctx.setExhibitor({ ...ex, offer: next }); if (!next) setO(blank); setMsg(next ? 'נשמר. בדוכן יש עכשיו כפתור "הזמין".' : 'המבצע הוסר.'); }
+    catch { setMsg('לא נשמר: אין חיבור כרגע.'); }
+  }
+  const ok = o.name.trim() && o.items.length > 0 && o.items.every((i) => i.name.trim() && i.expoPrice > 0);
+  return (
+    <section className="panel-w">
+      <h2>מבצע תערוכה</h2>
+      <p className="muted">פריטים במחיר מיוחד לתערוכה. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה. תשלום, מלאי וחשבונית נשארים אצלך.</p>
+      <label className="field">שם המבצע<input className="input" value={o.name} onChange={(e) => setO({ ...o, name: e.target.value })} /></label>
+      <label className="field" style={{ maxWidth: 200 }}>עד מתי<input className="input" type="date" value={o.until} onChange={(e) => setO({ ...o, until: e.target.value })} /></label>
+      {o.items.map((i, n) => (
+        <div key={i.id} className="row offer-item">
+          <input className="input" placeholder="הפריט" aria-label="הפריט" value={i.name} onChange={(e) => item(n, { name: e.target.value })} />
+          <input className="input price" inputMode="decimal" placeholder="מחיר רגיל" aria-label="מחיר רגיל" value={i.price || ''} onChange={(e) => item(n, { price: Number(e.target.value) || 0 })} />
+          <input className="input price" inputMode="decimal" placeholder="מחיר תערוכה" aria-label="מחיר תערוכה" value={i.expoPrice || ''} onChange={(e) => item(n, { expoPrice: Number(e.target.value) || 0 })} />
+          <button type="button" className="text-btn" aria-label={`להסיר את ${i.name || 'הפריט'}`} onClick={() => setO({ ...o, items: o.items.filter((_, j) => j !== n) })}>✕</button>
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" className="btn" onClick={() => setO({ ...o, items: [...o.items, { id: crypto.randomUUID().slice(0, 8), name: '', price: 0, expoPrice: 0 }] })}>＋ פריט</button>
+        <button type="button" className="btn primary" disabled={!ok} onClick={() => save(o)}>שמירה</button>
+        {ex.offer && <button type="button" className="text-btn" onClick={() => { if (confirm('להסיר את מבצע התערוכה? הזמנות שכבר נשמרו נשארות.')) save(null); }}>להסיר את המבצע</button>}
+      </div>
+      {msg && <p className="muted small" role="status">{msg}</p>}
+    </section>
+  );
+}
+
 /** His own name before the @ in the mails to his visitors (יצחק, 30/10): English letters, digits and a hyphen, and no
  *  other exhibitor's. The reply to a mail always reaches his own inbox, whatever the name. */
 function MailName({ ctx }: { ctx: Ctx }) {
@@ -1784,6 +1824,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
         {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
       </section>}
       {sub === 'card' && !draft && <BoothDefault ctx={ctx} />}
+      {sub === 'card' && !draft && <OfferEdit ctx={ctx} />}
 
       {sub === 'after' && <section className={draft ? 'held' : 'panel-w'}>
         <div className="card-top">

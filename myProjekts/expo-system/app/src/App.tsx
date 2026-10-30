@@ -305,6 +305,7 @@ function Live() {
             boothDefault={exhibitor.booth_default}
             checkWa={phase === 'live' ? waCheck : undefined}
             trialSend={exhibitor.trial_send}
+            offer={exhibitor.offer}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}

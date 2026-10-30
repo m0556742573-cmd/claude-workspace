@@ -102,6 +102,11 @@ export interface ManualStep {
   message?: string;
 }
 
+/** The expo offer (יצחק 23/10, model §14א): items at an expo price, until a date. */
+export interface Offer { name: string; until: LocalDate; items: { id: string; name: string; price: number; expoPrice: number }[] }
+/** What a visitor ordered from the offer at the booth: it makes him a deal, and he gets its summary. */
+export interface Order { offer: string; items: { id: string; name: string; qty: number; price: number }[]; total: number }
+
 export interface Lead {
   id: string;
   capturedOn: LocalDate;

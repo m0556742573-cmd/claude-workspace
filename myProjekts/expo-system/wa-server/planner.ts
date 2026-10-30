@@ -4,7 +4,7 @@
 // days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
 // one of his destinations can get it (a number with WhatsApp when his WhatsApp is linked, a mail when mail is set on
 // the server); and the filled text has no hole left in it. The database queues it to each.
-import { addDays, filesIn, fill, holes, nextTask, textOf, type Approved, type Lead, type ManualStep, type Me, type Setup } from '../engine/src/index.ts';
+import { addDays, filesIn, fill, holes, nextTask, orderSummary, textOf, type Approved, type Lead, type ManualStep, type Me, type Order, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
@@ -17,6 +17,8 @@ export interface PlanLead {
   mails: number;
   /** What he chose at the booth: a message, or none now. */
   booth_message: string | null; booth_none: boolean;
+  /** What he ordered from the expo offer at the booth (model §14א): its summary goes to him once. */
+  booth_order?: Order | null;
 }
 export interface Plan {
   me: Me & { blocked: boolean };
@@ -55,6 +57,14 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     if (!l.settled || !((wa ? l.targets : 0) + (ch.mail ? l.mails : 0))) continue;
     const replies = plan.replies.filter((r) => r.lead_id === l.id);
     if (replies.some((r) => r.optout)) continue;
+    // An order at the booth: the visitor gets its summary, once; the order closed his path (0040).
+    if (l.booth_order) {
+      if (!planned.has(`${l.id}|order`)) {
+        const body = fill(orderSummary(l.booth_order), plan.me, l.name ?? '');
+        if (!holes(body).length) out.push({ lead: l.id, step: 'order', template: 'סיכום הזמנה', body, files: [], style: 'letter' });
+      }
+      continue;
+    }
     const setup = (l.setup_version !== null && versions.get(l.setup_version)) || active;
     const said = replies.filter((r) => !r.optout);
     const day = fast && l.captured_at

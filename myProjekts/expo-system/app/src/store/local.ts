@@ -1,6 +1,6 @@
 // The phone's own copy: every lead and every note is saved here first, so the booth never waits for the network.
 // Each keeps `synced: false` until the server has it; ids are made here, so sending twice stays one record.
-import type { Lead } from '@expo/engine';
+import type { Lead, Order } from '@expo/engine';
 
 export interface LocalLead extends Lead {
   name: string;
@@ -14,6 +14,8 @@ export interface LocalLead extends Lead {
   self?: boolean;
   /** Numbers or mails added on the card ("לשנות"), as kept: the phone's digits from 0, the mail in lower case. */
   extra?: string[];
+  /** What he ordered from the expo offer at the booth (model §14א). */
+  order?: Order;
   /** When it was last changed (a time that only grows): an upload marks it synced only if nothing changed after (30/10). */
   rev?: number;
   /** Cancelled at the booth: hidden at once, kept until the server has deleted it too (30/10). */

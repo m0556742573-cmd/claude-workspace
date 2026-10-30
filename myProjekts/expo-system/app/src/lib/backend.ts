@@ -1,7 +1,7 @@
 // The app's connection to the database. Every lead and note is written to the phone first and to Supabase at once;
 // without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
 import { createClient, type Session } from '@supabase/supabase-js';
-import { nextTask, type Action, type Lead, type ManualStep, type Setup, type StepRecord, type Who } from '@expo/engine';
+import { nextTask, type Action, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, getLead, nextRev, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import { destinationOf, type Typed } from './destination.ts';
 import type { FileRef } from '@expo/engine';
@@ -41,6 +41,8 @@ export interface Exhibitor {
   logo: string | null; brand_color: string | null;
   /** His own name before the @ in the mails to his visitors (30/10), unique among the exhibitors; null: the system's. */
   mail_name: string | null;
+  /** The expo offer (model §14א): items at an expo price, until a date; null when he has none. */
+  offer: Offer | null;
   /** The morning message (30/10): by mail and/or WhatsApp, at an hour he chose, to the mail or number he picked. */
   morning_mail: boolean; morning_wa: boolean; morning_at: string; morning_email: string | null; morning_phone: string | null;
 }
@@ -62,7 +64,7 @@ export const signOut = () => supabase.auth.signOut();
 export const signInMail = async () => (await supabase.auth.getSession()).data.session?.user.email ?? null;
 
 export async function myExhibitor(): Promise<Exhibitor | null> {
-  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color, mail_name, morning_mail, morning_wa, morning_at, morning_email, morning_phone').maybeSingle();
+  const { data, error } = await supabase.from('exhibitors').select('id, name, business, approved, phone, email, sensitive, whatsapp, whatsapp_kind, onboarded, join_code, wa_read_replies, wa_save_contacts, wa_blocked_at, wa_blocked_reason, booth_default, mail_always, fills, trial_send, trial_fast, trial_to, logo, brand_color, mail_name, morning_mail, morning_wa, morning_at, morning_email, morning_phone, offer').maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -149,6 +151,7 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     taps: l.taps, customer_date: l.customerDate ?? null, note: l.note || null,
     captured_at: l.capturedAt, captured_on: l.capturedOn,
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
+    ...(l.order ? { booth_order: l.order } : {}),
   });
   if (error) throw error;
   // What was added on the card ("לשנות" › another number or mail): the card keeps its own list; what the CRM added stays.
@@ -269,6 +272,8 @@ export interface LeadRow {
   setup_version: number | null;
   /** What he chose at the booth: a message, or none now. */
   booth_message: string | null; booth_none: boolean;
+  /** What he ordered from the expo offer at the booth. */
+  booth_order: Order | null;
 }
 export interface TaskRow {
   lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
@@ -606,7 +611,7 @@ export async function uploadLogo(exhibitorId: string, png: Blob): Promise<string
   if (error) throw error;
   return path;
 }
-export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color' | 'mail_name'>>): Promise<void> {
+export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color' | 'mail_name' | 'offer'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
 }

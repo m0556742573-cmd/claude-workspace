@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CONSENT, immediateMessage, messagesOf, nextTask, type Setup } from '@expo/engine';
+import { CONSENT, immediateMessage, messagesOf, nextTask, type Offer, type Order, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -38,11 +38,13 @@ export interface BoothProps {
   checkWa?: (leadId: string) => Promise<Checked[] | null>;
   /** Before the fair: he chose to get every message himself instead of nowhere (29/10). */
   trialSend?: boolean;
+  /** His expo offer (model §14א): "הזמין" on the card opens its items. */
+  offer?: Offer | null;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -55,6 +57,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [rec, setRec] = useState<Recording | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [asking, setAsking] = useState(false);
+  const [ordering, setOrdering] = useState(false);
   const [toast, setToast] = useState('');
   const [checked, setChecked] = useState<Record<string, Checked[]>>({});
   const searchRef = useRef<HTMLInputElement>(null);
@@ -337,6 +340,12 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </div>
           )}
 
+          {current.order && !ordering && (
+            <div className="next-line ro"><span className="faint">הזמין:</span> <b>{current.order.items.filter((i) => i.qty > 0).map((i) => `${i.qty} × ${i.name}`).join(' · ')} · {current.order.total} ₪</b>
+              {' '}<button type="button" className="text-btn" onClick={() => setOrdering(true)}>לשנות</button></div>
+          )}
+          {ordering && offer && <OrderPick offer={offer} order={current.order} onDone={(order) => { setOrdering(false); if (order !== undefined) { change({ order: order ?? undefined }); say(order ? `נשמרה ההזמנה של ${current.name}` : 'ההזמנה בוטלה'); } }} />}
+
           {asking ? (
             <div className="confirm">
               <span>לבטל את הרישום של {current.name}? ההערות וההקלטות שלו יימחקו איתו.</span>
@@ -351,6 +360,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               <button type="button" className="btn" aria-pressed={recordingHere} onClick={recordingHere ? stopRecording : startRecording}>
                 {recordingHere ? <><span className="rec-dot" aria-hidden="true" />עצירה ושמירה · {clock(seconds)}</> : <><Icon name="mic" size={18} />הקלטה</>}
               </button>
+              {offer && offer.items.length > 0 && !current.order && <button type="button" className="btn" aria-expanded={ordering} onClick={() => setOrdering(!ordering)}>הזמין</button>}
               <button type="button" className="btn danger far" onClick={() => setAsking(true)}>ביטול הרישום</button>
             </div>
           )}
@@ -491,6 +501,34 @@ function NotePeek({ note, count }: { note: LocalNote; count: number }) {
     <div className="note-peek voice">
       <span>הקלטה {note.seconds ? clock(note.seconds) : ''}{!note.synced ? ' · ממתינה לעלות' : ''}{more}</span>
       {url ? <audio controls src={url} preload="metadata" /> : <span className="faint small">נשמרה בשרת</span>}
+    </div>
+  );
+}
+
+/** The expo offer's items with quantities (model §14א): the order is kept with the visitor, and makes him a deal. */
+function OrderPick({ offer, order, onDone }: { offer: Offer; order?: Order; onDone: (o: Order | null | undefined) => void }) {
+  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries((order?.items ?? []).map((i) => [i.id, i.qty])));
+  const items = offer.items.map((i) => ({ id: i.id, name: i.name, qty: qty[i.id] ?? 0, price: i.expoPrice }));
+  const total = items.reduce((t, i) => t + i.qty * i.price, 0);
+  const set = (id: string, n: number) => setQty({ ...qty, [id]: Math.max(0, Math.min(999, n)) });
+  return (
+    <div className="order-pick">
+      <p className="label">{offer.name}{offer.until ? ` · עד ${offer.until.split('-').reverse().join('.')}` : ''}</p>
+      {offer.items.map((i) => (
+        <div key={i.id} className="order-row">
+          <span className="order-name">{i.name} <span className="faint">{i.price > i.expoPrice && <s>{i.price} ₪</s>} {i.expoPrice} ₪</span></span>
+          <span className="order-qty">
+            <button type="button" className="btn" aria-label={`פחות ${i.name}`} onClick={() => set(i.id, (qty[i.id] ?? 0) - 1)}>−</button>
+            <b aria-live="polite">{qty[i.id] ?? 0}</b>
+            <button type="button" className="btn" aria-label={`עוד ${i.name}`} onClick={() => set(i.id, (qty[i.id] ?? 0) + 1)}>+</button>
+          </span>
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" className="btn primary" disabled={total <= 0} onClick={() => onDone({ offer: offer.name, items: items.filter((i) => i.qty > 0), total })}>שמירת ההזמנה · {total} ₪</button>
+        {order && <button type="button" className="btn" onClick={() => onDone(null)}>לבטל את ההזמנה</button>}
+        <button type="button" className="btn ghost" onClick={() => onDone(undefined)}>חזרה</button>
+      </div>
     </div>
   );
 }
