@@ -23,7 +23,8 @@ self.addEventListener('fetch', (e) => {
       const cache = await caches.open(CACHE);
       try {
         const res = await fetch(req);
-        if (res.ok) await cache.put('/', res.clone());
+        // Only the booth itself is kept as the page; a removal link opened on the tablet (/u/…) is not the booth.
+        if (res.ok && url.pathname === '/') await cache.put('/', res.clone());
         return res;
       } catch {
         return (await cache.match('/')) ?? Response.error();

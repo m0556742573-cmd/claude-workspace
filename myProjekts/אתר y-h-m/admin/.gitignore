@@ -1,0 +1,4 @@
+.env.local
+worker/public/
+worker/.wrangler/
+worker/.dev.vars

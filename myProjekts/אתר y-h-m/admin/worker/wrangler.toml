@@ -1,0 +1,25 @@
+# The control center and the site's counting, on y-h-m.com next to the site.
+# SUPABASE_URL and SUPABASE_KEY come from admin/.env.local at deploy time (admin/deploy.sh);
+# HQ_SALT is a Cloudflare secret, set once.
+name = "yhm-hq"
+main = "src/index.js"
+compatibility_date = "2025-03-01"
+workers_dev = false
+
+routes = [
+  { pattern = "y-h-m.com/admin*", zone_name = "y-h-m.com" },
+  { pattern = "y-h-m.com/api/*", zone_name = "y-h-m.com" },
+  { pattern = "y-h-m.com/c/*", zone_name = "y-h-m.com" },
+  { pattern = "www.y-h-m.com/admin*", zone_name = "y-h-m.com" },
+  { pattern = "www.y-h-m.com/api/*", zone_name = "y-h-m.com" },
+  { pattern = "www.y-h-m.com/c/*", zone_name = "y-h-m.com" }
+]
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "none"
+
+[observability]
+enabled = true

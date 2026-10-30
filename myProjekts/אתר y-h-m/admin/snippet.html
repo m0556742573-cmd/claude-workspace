@@ -1,0 +1,30 @@
+<script>
+/* counting for the control center (y-h-m.com/admin): a visit, and a click on WhatsApp, phone or mail. No cookies, nothing personal. */
+(function () {
+  if (!/(^|\.)y-h-m\.com$/.test(location.hostname)) return;
+  try { if (localStorage.getItem('yhm-me') === '1') return; } catch (e) {}
+  var c = null;
+  try {
+    var q = new URLSearchParams(location.search), code = q.get('c');
+    if (code && /^[a-z0-9-]{2,24}$/.test(code)) {
+      sessionStorage.setItem('yhm-c', code);
+      q.delete('c');
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    }
+    c = sessionStorage.getItem('yhm-c');
+  } catch (e) {}
+  function hit(t) {
+    var b = JSON.stringify({ t: t, p: location.pathname, r: document.referrer, c: c });
+    if (navigator.sendBeacon) navigator.sendBeacon('/api/hit', b);
+    else fetch('/api/hit', { method: 'POST', body: b, keepalive: true });
+  }
+  hit('visit');
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    var h = a.getAttribute('href');
+    var t = /wa\.me|whatsapp/.test(h) ? 'whatsapp' : /^tel:/.test(h) ? 'phone' : /^mailto:|email-protection/.test(h) ? 'mail' : null;
+    if (t) hit(t);
+  }, true);
+})();
+</script>

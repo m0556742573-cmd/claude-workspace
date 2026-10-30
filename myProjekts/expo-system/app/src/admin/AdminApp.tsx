@@ -9,7 +9,7 @@ import { ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
 
-const BOOTH_URL = 'https://expo-booth.pages.dev';
+const BOOTH_URL = 'https://expo.y-h-m.com';
 
 type View = 'overview' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
 const MENU: [View, string, IconName][] = [

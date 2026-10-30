@@ -25,9 +25,10 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY ?? ''; // the publishable key: the same one the booth's page carries
 const WA_KEY = process.env.WA_KEY ?? '';             // this server's own key for the queue; without it nothing is sent
 const DIR = process.env.SESSIONS_DIR ?? '/data/sessions';
-const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://expo-booth.pages.dev,https://expo-admin.pages.dev').split(',');
+const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://expo.y-h-m.com,https://expo-booth.pages.dev,https://expo-admin.pages.dev').split(',');
 /** This server's own address: the removal link in every mail points here. */
-const PUBLIC_URL = process.env.PUBLIC_URL ?? 'https://expo-wa.paydfb.easypanel.host';
+// The removal link in mails: on the app's address, which passes it here (app/functions/u). 30/10.
+const PUBLIC_URL = process.env.PUBLIC_URL ?? 'https://expo.y-h-m.com';
 const MAIL_FROM = process.env.MAIL_FROM ?? 'expo@expo.y-h-m.com';
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_URL and SUPABASE_KEY are required');
 

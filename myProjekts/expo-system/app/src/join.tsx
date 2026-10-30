@@ -9,7 +9,9 @@ const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 /** On the visitor's page a button reads without the "(מתי?)" the exhibitor sees; a date field opens instead. */
 const shown = (label: string) => label.replace(ASKS_DATE, '');
 
-export const joinUrl = (code: string) => `${location.origin}/#join/${code}`;
+/** The sign always carries the public address (30/10), even when the exhibitor opened the booth at the old one. */
+const PUBLIC = location.hostname === 'localhost' ? location.origin : 'https://expo.y-h-m.com';
+export const joinUrl = (code: string) => `${PUBLIC}/#join/${code}`;
 
 export function Join({ code }: { code: string }) {
   const [info, setInfo] = useState<JoinInfo | null | undefined>(undefined);

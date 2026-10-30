@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YHM · מרכז הבקרה · אפיון</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,700..900&family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --surface:#F4F6F1; --raised:#FFFFFF; --sunken:#E8EDE4; --moss:#DCE5D8; --line:#D3DCCF; --ink:#0B1A13; --muted:#405247; --subtle:#5A6D61;
+    --forest:#0B1A13; --forest-2:#12261C; --forest-line:#23402F; --snow:#F2F5EE; --sage:#7F9488; --leaf:#C9F26B; --leaf-soft:#E7F5C4; --positive:#3F6B12; --caution:#855600; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--surface); color:var(--ink); font-family:Heebo,system-ui,sans-serif; font-size:16px; line-height:1.7; }
+  .wrap { max-width:980px; margin:0 auto; padding:40px 16px 90px; }
+  header.top { border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:8px; }
+  .eyebrow { font-size:13px; color:var(--subtle); letter-spacing:.04em; }
+  h1 { font-size:36px; font-weight:800; line-height:1.15; margin:6px 0 8px; }
+  h2 { font-size:24px; font-weight:800; margin:44px 0 10px; }
+  h3 { font-size:18px; font-weight:700; margin:22px 0 6px; }
+  p { margin:0 0 12px; max-width:68ch; }
+  .lead { font-size:18px; color:var(--muted); }
+  ul { margin:0 0 12px; padding-inline-start:20px; } li { margin:5px 0; }
+  table { width:100%; border-collapse:collapse; background:var(--raised); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:15px; }
+  th { text-align:start; font-size:13px; font-weight:500; color:var(--subtle); background:var(--sunken); padding:10px 14px; }
+  td { padding:10px 14px; border-top:1px solid var(--line); vertical-align:top; }
+  .tw { overflow-x:auto; }
+  .tag { display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:1px 9px; white-space:nowrap; }
+  .t1 { background:var(--leaf); color:var(--forest); } .tn { background:var(--moss); color:var(--ink); }
+  .box { background:var(--raised); border:1px solid var(--line); border-radius:14px; padding:16px 20px; margin:12px 0; }
+  .warn { border-color:#E8D29C; background:#FBF4E2; }
+  .q { background:var(--leaf-soft); border:1px solid #CFE59A; border-radius:14px; padding:16px 20px; }
+  .q ol { margin:0; padding-inline-start:22px; } .q li { margin:8px 0; }
+  code { font-size:13.5px; background:var(--sunken); border-radius:5px; padding:0 5px; direction:ltr; unicode-bidi:isolate; }
+  /* the mock-up of the shell */
+  .mock { margin:16px 0; border-radius:18px; overflow:hidden; border:1px solid var(--forest-line); background:var(--forest); color:var(--snow); display:grid; grid-template-columns:200px 1fr; min-height:440px; box-shadow:0 30px 60px -34px rgba(11,26,19,.6); }
+  .side { background:#07110C; border-left:1px solid var(--forest-line); padding:18px 14px; display:flex; flex-direction:column; gap:4px; }
+  .side .brand { font-family:Archivo; font-stretch:120%; font-weight:800; font-size:20px; margin:0 6px 16px; }
+  .side .brand i { display:block; width:46px; height:4px; border-radius:2px; background:var(--leaf); margin-top:2px; }
+  .side a { color:#A9B7AE; text-decoration:none; font-size:14.5px; padding:7px 10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; }
+  .side a.on { background:#12261C; color:var(--snow); font-weight:700; }
+  .side a.on::before { content:""; width:14px; height:4px; border-radius:2px; background:var(--leaf); margin-inline-end:8px; order:-1; }
+  .side a span.s { font-size:11px; color:var(--sage); }
+  .main { padding:22px 24px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .main h4 { margin:0; font-size:22px; font-weight:800; }
+  .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .kpi { background:var(--forest-2); border:1px solid var(--forest-line); border-radius:14px; padding:14px 16px; }
+  .kpi .v { font-family:Archivo; font-stretch:120%; font-weight:800; font-size:34px; line-height:1.1; }
+  .kpi .l { font-size:13px; color:#A9B7AE; }
+  .kpi .d { font-size:12px; color:var(--leaf); }
+  .chart { background:var(--forest-2); border:1px solid var(--forest-line); border-radius:14px; padding:14px 16px; }
+  .chart svg { display:block; width:100%; height:auto; }
+  .feed { background:var(--forest-2); border:1px solid var(--forest-line); border-radius:14px; padding:6px 16px; font-size:13.5px; color:#A9B7AE; }
+  .feed div { padding:8px 0; border-bottom:1px solid var(--forest-line); } .feed div:last-child { border:0; }
+  .feed b { color:var(--snow); font-weight:500; }
+  .note { font-size:13px; color:var(--subtle); }
+  @media (max-width:760px) { .mock { grid-template-columns:1fr; } .side { flex-direction:row; flex-wrap:wrap; } .kpis { grid-template-columns:1fr; } h1 { font-size:28px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">אפיון · טיוטה לאישור · 29/10/2026</div>
+  <h1>מרכז הבקרה של YHM</h1>
+  <p class="lead">המקום שממנו מנהלים את כל YHM: האתר, הוואטסאפ, הפניות, הלקוחות, דוכן חכם והשיווק. בכתובת <code>y-h-m.com/admin</code>, כניסה עם חשבון גוגל, בעיצוב של YHM.</p>
+</header>
+
+<h2>החלקים</h2>
+<div class="tw"><table>
+  <tr><th>חלק</th><th>מה יש בו</th><th>שלב</th></tr>
+  <tr><td><b>סקירה</b></td><td>מסך הפתיחה: מה קרה היום בכל הפרויקטים, ומה מחכה לך.</td><td><span class="tag t1">1</span></td></tr>
+  <tr><td><b>האתר</b></td><td>כניסות, מבקרים, מאיפה הגיעו, טלפון או מחשב, עיר, וכמה לחצו על וואטסאפ, טלפון או מייל.</td><td><span class="tag t1">1</span></td></tr>
+  <tr><td><b>קישורי קמפיין</b></td><td>קישור מעקב לכל קמפיין, פוסט או סטטוס, כדי לדעת מה הביא כניסות ופניות.</td><td><span class="tag t1">1</span></td></tr>
+  <tr><td><b>וואטסאפ</b></td><td>תיבה אחת לשני מספרים: הוואטסאפ שלך (לא רשמי) והוואטסאפ העסקי הרשמי. רשימת שיחות, שיחה, תשובה, ותבניות.</td><td><span class="tag tn">2</span></td></tr>
+  <tr><td><b>פניות</b></td><td>כל מי שפנה, מהאתר, מוואטסאפ או מקמפיין, עם סטטוס: חדש, דיברנו, פגישה, הצעה, לקוח.</td><td><span class="tag tn">3</span></td></tr>
+  <tr><td><b>לקוחות ופרויקטים</b></td><td>איפה כל לקוח עומד, מה הצעד הבא, ומסמכים.</td><td><span class="tag tn">4</span></td></tr>
+  <tr><td><b>דוכן חכם</b></td><td>האדמין של התערוכה, שהיום יושב ב-expo-admin.pages.dev, כחלק מהמרכז.</td><td><span class="tag tn">5</span></td></tr>
+  <tr><td><b>שיווק ותוכן</b></td><td>קמפיינים, לוח תוכן לפוסטים ולסטטוסים, ושליחות רשמיות בוואטסאפ לרשימות שהסכימו.</td><td><span class="tag tn">6</span></td></tr>
+  <tr><td><b>נכסי מותג</b></td><td>הלוגו, ה-GIF-ים, הסטטוס ומערכת העיצוב.</td><td><span class="tag tn">6</span></td></tr>
+  <tr><td><b>הגדרות</b></td><td>מי נכנס (כרגע רק אתה), וחיבורים.</td><td><span class="tag t1">1</span></td></tr>
+</table></div>
+
+<h2>איך זה ייראה (שלב 1)</h2>
+<p class="note">סקיצה עם מספרים לדוגמה. המסך יעבוד בכהה ובבהיר, כמו האתר.</p>
+<div class="mock" aria-label="סקיצה של מרכז הבקרה">
+  <nav class="side">
+    <div class="brand">YHM<i></i></div>
+    <a class="on" href="#">סקירה</a>
+    <a href="#">האתר</a>
+    <a href="#">קישורי קמפיין</a>
+    <a href="#">וואטסאפ <span class="s">שלב 2</span></a>
+    <a href="#">פניות <span class="s">שלב 3</span></a>
+    <a href="#">לקוחות <span class="s">שלב 4</span></a>
+    <a href="#">דוכן חכם <span class="s">שלב 5</span></a>
+    <a href="#">שיווק ותוכן <span class="s">שלב 6</span></a>
+    <a href="#">הגדרות</a>
+  </nav>
+  <div class="main">
+    <h4>בוקר טוב, יצחק</h4>
+    <div class="kpis">
+      <div class="kpi"><div class="v">142</div><div class="l">כניסות השבוע</div><div class="d">+18% משבוע שעבר</div></div>
+      <div class="kpi"><div class="v">96</div><div class="l">מבקרים שונים</div><div class="d">71% מהטלפון</div></div>
+      <div class="kpi"><div class="v">7</div><div class="l">פניות (וואטסאפ, טלפון, מייל)</div><div class="d">5 מוואטסאפ</div></div>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 600 120" aria-hidden="true">
+        <g fill="#1D3A2C"><rect x="10" y="60" width="60" height="60" rx="6"/><rect x="95" y="40" width="60" height="80" rx="6"/><rect x="180" y="70" width="60" height="50" rx="6"/><rect x="265" y="30" width="60" height="90" rx="6"/><rect x="350" y="50" width="60" height="70" rx="6"/><rect x="435" y="20" width="60" height="100" rx="6"/><rect x="520" y="45" width="60" height="75" rx="6"/></g>
+        <g fill="#C9F26B"><rect x="10" y="108" width="60" height="12" rx="4"/><rect x="95" y="104" width="60" height="16" rx="4"/><rect x="265" y="100" width="60" height="20" rx="4"/><rect x="435" y="96" width="60" height="24" rx="4"/><rect x="520" y="108" width="60" height="12" rx="4"/></g>
+      </svg>
+      <div class="note" style="color:#7F9488">כניסות (כהה) ופניות (ירוק) בשבעת הימים האחרונים</div>
+    </div>
+    <div class="feed">
+      <div><b>לפני 5 דקות</b> · בני ברק · טלפון · הגיע מוואטסאפ · לחץ על הטלפון</div>
+      <div><b>לפני 40 דקות</b> · ירושלים · מחשב · הגיע מגוגל</div>
+      <div><b>אתמול</b> · קמפיין "סטטוס חנוכה" · 23 כניסות · 2 פניות</div>
+    </div>
+  </div>
+</div>
+
+<h2>על מה זה רץ</h2>
+<ul>
+  <li><b>המסכים:</b> ב-Cloudflare, תחת <code>y-h-m.com/admin</code>. Cloudflare עונה על הכתובת הזו לפני שהבקשה מגיעה לשרת, ולכן האתר הקיים לא משתנה.</li>
+  <li><b>הנתונים:</b> פרויקט Supabase חדש ונפרד, "YHM מרכז". נפרד מגרינוולד ומדוכן חכם, כדי שהנתונים לא יתערבבו.</li>
+  <li><b>הכניסה:</b> עם גוגל, דרך Supabase. רק החשבון שלך מורשה, והבדיקה נעשית בבסיס הנתונים עצמו, כך שגם מי שיעקוף את המסך לא יראה כלום.</li>
+  <li><b>וואטסאפ לא רשמי:</b> שרת הוואטסאפ שכבר רץ על השרת שלך בשביל דוכן חכם. המספר שלך מתחבר אליו בסריקת QR, בחשבון נפרד.</li>
+  <li><b>וואטסאפ רשמי:</b> WhatsApp Cloud API של Meta. כבר כתבנו מדריך להקמה שלו בשביל הודעת הבוקר של דוכן חכם, ואותו מספר רשמי יכול לשרת את שניהם.</li>
+</ul>
+
+<h2>שלב 1 בפירוט</h2>
+<h3>מה נבנה</h3>
+<ul>
+  <li><b>המעטפת:</b> תפריט, כניסה עם גוגל, כהה ובהיר, מותאם לטלפון.</li>
+  <li><b>סקירה:</b> שלושה מספרים (כניסות, מבקרים, פניות), גרף לפי ימים, ופעילות אחרונה.</li>
+  <li><b>האתר:</b> אותם נתונים בפירוט, לפי טווח תאריכים: מאיפה הגיעו, מכשיר, עיר, ואיזה כפתור לחצו.</li>
+  <li><b>קישורי קמפיין:</b> נותנים לקמפיין שם, ומקבלים קישור קצר לאתר. בטבלה רואים כמה כניסות וכמה פניות הביא כל אחד.</li>
+  <li><b>קוד קטן באתר</b> ששולח כל כניסה וכל לחיצה על וואטסאפ, טלפון או מייל.</li>
+</ul>
+<h3>מה נשמר</h3>
+<div class="tw"><table>
+  <tr><th>טבלה</th><th>מה בה</th></tr>
+  <tr><td><code>site_events</code></td><td>זמן, סוג (כניסה / וואטסאפ / טלפון / מייל), עמוד, מאיפה הגיע (רק שם האתר), קמפיין, מכשיר, עיר ומדינה, ומספר מבקר מוצפן שמתחלף כל יום.</td></tr>
+  <tr><td><code>campaigns</code></td><td>שם הקמפיין, הקוד שלו בקישור, תאריך, הערה.</td></tr>
+  <tr><td><code>admins</code></td><td>מי מורשה להיכנס. כרגע שורה אחת: אתה.</td></tr>
+</table></div>
+<p class="note">לא נשמרים כתובת IP, עוגיות או שום דבר שמזהה אדם, ולכן לא צריך באנר הסכמה באתר.</p>
+<h3>מה צריך ממך</h3>
+<ol>
+  <li><b>אישור ליצור פרויקט Supabase חדש.</b> אני יוצר אותו דרך החיבור שלך, בתוכנית החינמית.</li>
+  <li><b>מפתח גוגל לכניסה</b> (5 דקות, אתן לך הוראות). אחרי שהפרויקט ייווצר תקבל ממני כתובת אחת להדביק אצל גוגל.</li>
+  <li><b>איזה חשבון גוגל מורשה</b> להיכנס.</li>
+  <li><b>הרצה אחת של פקודת ההעלאה</b> בסוף, כי הקוד באתר משתנה.</li>
+</ol>
+
+<h2>וואטסאפ (שלב 2): מה חשוב לדעת מראש</h2>
+<div class="box">
+  <h3 style="margin-top:0">תיבה אחת, שני מספרים</h3>
+  <p>רשימת שיחות כמו בוואטסאפ, ולכל שיחה סימן שמראה מאיזה מספר היא. לוחצים ועונים מהמחשב. כל שיחה אפשר לחבר לפנייה או ללקוח.</p>
+</div>
+<div class="box warn">
+  <h3 style="margin-top:0">הוואטסאפ שלך (לא רשמי)</h3>
+  <ul>
+    <li>מתחבר כמו וואטסאפ ווב. מתאים לקרוא ולענות. <b>לא מתאים לשליחה המונית:</b> וואטסאפ יכולים לחסום את המספר.</li>
+    <li>החיבור נותן גישה מלאה לוואטסאפ שלך, ולכן גם השיחות יישמרו מוגנות, ורק אתה תוכל לראות אותן.</li>
+  </ul>
+</div>
+<div class="box warn">
+  <h3 style="margin-top:0">הוואטסאפ העסקי (רשמי)</h3>
+  <ul>
+    <li>צריך מספר שלא מחובר לאפליקציה רגילה, ואימות עסק אצל Meta, שלוקח כמה ימים.</li>
+    <li>הודעה שאתה יוזם יוצאת רק מתבנית ש-Meta אישרה, ועולה כמה אגורות להודעה. תשובה בתוך 24 שעות מהודעה של הלקוח חינם.</li>
+    <li>זה הערוץ הנכון לשליחות לרשימות, למשל קמפיינים, בתנאי שהאנשים הסכימו לקבל.</li>
+  </ul>
+</div>
+
+<h2>שאלות פתוחות</h2>
+<div class="q"><ol>
+  <li><b>חלקים:</b> חסר משהו בטבלה? צריך להוציא משהו?</li>
+  <li><b>דוכן חכם:</b> הנחתי שהאדמין של התערוכה עובר בסוף לתוך המרכז (שלב 5). נכון?</li>
+  <li><b>הוואטסאפ הרשמי:</b> יש כבר מספר בשבילו, או שצריך מספר חדש?</li>
+  <li><b>שלב 1:</b> מאשר את מה שכתוב בו, כולל פרויקט Supabase חדש?</li>
+</ol></div>
+</div>
+</body>
+</html>
