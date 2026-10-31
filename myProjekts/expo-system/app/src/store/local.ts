@@ -7,6 +7,8 @@ export interface LocalLead extends Lead {
   city?: string;
   personId?: string;
   typedPhone?: string;
+  /** A typed visitor's mail, asked at the booth when the exhibitor has no WhatsApp (31/10). */
+  typedEmail?: string;
   note: string;
   capturedAt: string;
   synced: boolean;

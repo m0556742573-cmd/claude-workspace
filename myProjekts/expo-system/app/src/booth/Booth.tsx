@@ -40,17 +40,19 @@ export interface BoothProps {
   trialSend?: boolean;
   /** His expo offer (model §14א): "הזמין" on the card opens its items. */
   offer?: Offer | null;
+  /** He has WhatsApp. Without it (31/10) the booth says nothing of it, and asks a typed visitor for his mail. */
+  wa?: boolean;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
   const [showCode, setShowCode] = useState(false);
   const [query, setQuery] = useState('');
-  const [typing, setTyping] = useState<{ name: string; phone: string } | null>(null);
+  const [typing, setTyping] = useState<{ name: string; phone: string; email: string } | null>(null);
   const [current, setCurrent] = useState<LocalLead | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -88,6 +90,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const results = useMemo(() => (typing ? [] : search(query)), [query, typing, search]);
   const typedDigits = typing ? typing.phone.replace(/\D/g, '').replace(/^972/, '0') : '';
   const typedPhoneBad = !!typing?.phone.trim() && !/^0\d{8,9}$/.test(typedDigits);
+  const typedMailBad = !!typing?.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(typing.email.trim());
   const byPerson = useMemo(() => new Map(todays.filter((l) => l.personId).map((l) => [l.personId!, l])), [todays]);
   const myNotes = current ? notes.filter((n) => n.leadId === current.id) : [];
   const wantsDate = !!current && current.taps.some((t) => t.includes('מתי?'));
@@ -107,10 +110,10 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   /** Someone who is not on the list: a name and a phone, typed. */
   function newOne() {
     stopRecording();
-    setCurrent(null); setTyping({ name: query.trim(), phone: '' });
+    setCurrent(null); setTyping({ name: query.trim(), phone: '', email: '' });
   }
 
-  async function capture(who: { person?: Person; name?: string; phone?: string }) {
+  async function capture(who: { person?: Person; name?: string; phone?: string; email?: string }) {
     const existing = who.person && byPerson.get(who.person.id);
     if (existing) { open(existing); say(`${existing.name} כבר נרשם היום — פתחתי את הכרטיס שלו`); return; }
     const lead: LocalLead = {
@@ -124,6 +127,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       city: who.person?.city,
       personId: practice ? undefined : who.person?.id,
       typedPhone: who.phone?.trim() || undefined,
+      typedEmail: who.email?.trim().toLowerCase() || undefined,
       note: '',
       synced: false,
       rev: nextRev(),
@@ -247,9 +251,15 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           <input id="typed-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={typing.phone} onChange={(e) => setTyping({ ...typing, phone: e.target.value })} />
           {/* A number cut short is caught here, while the visitor is still at the booth (30/10). */}
           {typedPhoneBad && <p className="faint small" role="alert">המספר לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
-          {!typing.phone.trim() && typing.name.trim() && <p className="faint small">בלי טלפון לא יוצאות אליו הודעות בוואטסאפ.</p>}
+          {!wa && <>
+            <label className="label" htmlFor="typed-email">מייל</label>
+            <input id="typed-email" className="input" inputMode="email" dir="ltr" style={{ textAlign: 'right' }} value={typing.email} onChange={(e) => setTyping({ ...typing, email: e.target.value })} />
+          </>}
+          {typedMailBad && <p className="faint small" role="alert">המייל לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
+          {wa && !typing.phone.trim() && typing.name.trim() && <p className="faint small">בלי טלפון לא יוצאות אליו הודעות בוואטסאפ.</p>}
+          {!wa && !typing.email.trim() && typing.name.trim() && <p className="faint small">בלי מייל לא יוצאות אליו הודעות.</p>}
           <div className="actions">
-            <button type="button" className="btn primary" disabled={!typing.name.trim() || typedPhoneBad} onClick={() => capture({ name: typing.name, phone: typing.phone })}>✓ שמירה</button>
+            <button type="button" className="btn primary" disabled={!typing.name.trim() || typedPhoneBad || typedMailBad} onClick={() => capture({ name: typing.name, phone: typing.phone, email: typing.email })}>✓ שמירה</button>
           </div>
         </section>
       ) : (

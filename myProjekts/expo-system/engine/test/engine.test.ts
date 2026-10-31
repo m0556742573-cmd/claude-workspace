@@ -1,7 +1,7 @@
 // The engine against setups taken from the 109-business rounds. The expo is Monday 16/11/2026.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { choosePath, detailsIn, fileValue, filesIn, fill, holes, immediateMessage, isRestDay, nextOccurrence, nextTask, settle } from '../src/index.ts';
+import { choosePath, detailsIn, fileValue, filesIn, fill, holes, immediateMessage, isRestDay, nextOccurrence, nextTask, settle, withoutWa } from '../src/index.ts';
 import type { Lead, Path, Setup, StepRecord } from '../src/index.ts';
 
 const EXPO = '2026-11-16';
@@ -258,4 +258,10 @@ test('a detail that is a file: its line leaves the text, and the file goes with 
   assert.equal(out, 'שלום יעקב, המחירון מצורף.\nאנחנו ברחוב השומר 5.\nיצחק, שטריימלך · 050-0000000');
   assert.deepEqual(filesIn(body, me), [{ path: 'ex1/abc.pdf', name: 'מחירון חורף.pdf' }]);
   assert.equal(holes(out).length, 0);
+});
+
+test('an exhibitor without WhatsApp: the suggested text says nothing of it (31/10)', () => {
+  assert.equal(withoutWa('מזמינים בטלפון [טלפון] או בוואטסאפ למספר הזה, עד [שעה], והמשלוח מגיע [מתי].'), 'מזמינים בטלפון [טלפון], עד [שעה], והמשלוח מגיע [מתי].');
+  assert.equal(withoutWa('אפשר לשלוח צילום בוואטסאפ. כשיגיעו — נתקשר.'), 'אפשר לשלוח צילום במייל. כשיגיעו — נתקשר.');
+  assert.equal(withoutWa('שלום [שם],\nתודה.'), 'שלום [שם],\nתודה.');
 });

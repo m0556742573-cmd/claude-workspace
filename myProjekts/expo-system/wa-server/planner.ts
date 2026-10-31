@@ -21,7 +21,8 @@ export interface PlanLead {
   booth_order?: Order | null;
 }
 export interface Plan {
-  me: Me & { blocked: boolean };
+  /** whatsapp: his number, or null when he answered that he has none (then the suggested texts say nothing of it). */
+  me: Me & { blocked: boolean; whatsapp?: string | null };
   setups: { version: number; active: boolean; data: Setup }[];
   texts: Record<string, string>;
   leads: PlanLead[];
@@ -82,7 +83,7 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     // more than that is left to the exhibitor.
     if (n.kind !== 'task' || n.who !== 'auto' || !n.message || (n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) || n.dueOn > day) continue;
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
-    const text = textOf(setup, plan.texts, n.message, approved);
+    const text = textOf(setup, plan.texts, n.message, approved, plan.me.whatsapp === null);
     const body = fill(text, plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
     const files = filesIn(text, plan.me).map((f) => `${f.path}#${encodeURIComponent(f.name)}`);

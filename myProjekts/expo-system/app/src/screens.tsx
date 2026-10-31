@@ -62,7 +62,7 @@ function waNumber(phone: string): string {
   return d.startsWith('0') ? '972' + d.slice(1) : d;
 }
 const eyebrowOf = (desk: boolean) => (desk ? 'CRM' : undefined);
-/** He answered "no WhatsApp": no WhatsApp button anywhere. Not asked yet counts as yes. */
+/** He answered "no WhatsApp": no word of WhatsApp anywhere in the system (יצחק, 31/10). Not asked yet counts as yes. */
 const hasWa = (ctx: Ctx) => !ctx.exhibitor.onboarded || !!ctx.exhibitor.whatsapp;
 
 // ---------- the home page sends him to the leads with something to do there: a new lead, the export, or one lead open
@@ -206,7 +206,7 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
-      {ctx.exhibitor.wa_blocked_at && <p className="offline-line">החיבור לוואטסאפ שלך נעצר ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}), ושום הודעה לא יוצאת ממנו. <button type="button" className="text-btn" onClick={() => ctx.go('settings')}>להגדרות</button></p>}
+      {ctx.exhibitor.wa_blocked_at && hasWa(ctx) && <p className="offline-line">החיבור לוואטסאפ שלך נעצר ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}), ושום הודעה לא יוצאת ממנו. <button type="button" className="text-btn" onClick={() => ctx.go('settings')}>להגדרות</button></p>}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
       <div className="ov-grid">
         <section>
@@ -396,7 +396,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
   const isWait = next.kind === 'task' && next.action === 'wait';
   const isAuto = next.kind === 'task' && next.who === 'auto';
   const late = next.kind === 'task' && next.late;
-  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : next.reply ? 'ענה לך בוואטסאפ — לחזור אליו' : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
+  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : next.reply ? (hasWa(ctx) ? 'ענה לך בוואטסאפ — לחזור אליו' : 'ענה לך — לחזור אליו') : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
   const tall = held ? ' tall' : '';
 
   return (
@@ -406,7 +406,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
         {isAuto && (ctx.phase === 'practice'
           ? <div className="faint small">{ctx.exhibitor.trial_send ? 'בניסיון היא יוצאת אליך, לא למבקר.' : 'בניסיון לא יוצא כלום. במצב אמיתי היא תצא לבד.'}</div>
-          : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} />)}
+          : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} wa={hasWa(ctx)} />)}
       </div>
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
@@ -415,7 +415,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         : ownPhone && ctx.phase !== 'practice' && (
           <div className="row">
             <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{showDestination(ownPhone)}</a>
-            <a className="btn" href={`https://wa.me/${waNumber(ownPhone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>
+            {hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(ownPhone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>}
           </div>
         )}
 
@@ -460,9 +460,10 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
   );
 }
 /** An automatic step: with his WhatsApp linked it goes out by itself (at a person's pace and hours); otherwise by hand. */
-function AutoLine({ blocked }: { blocked: boolean }) {
+function AutoLine({ blocked, wa }: { blocked: boolean; wa: boolean }) {
   const [linked, setLinked] = useState<boolean | null>(null);
-  useEffect(() => { waOpen().then(setLinked); }, []);
+  useEffect(() => { if (wa) waOpen().then(setLinked); }, [wa]);
+  if (!wa) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, בשעות 9–20.</div>;
   if (linked === null) return null;
   if (blocked) return <div className="faint small">החיבור לוואטסאפ נעצר, אז בוואטסאפ הוא לא יוצא לבד. במייל הוא יוצא למי שהשאיר מייל.</div>;
   if (!linked) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, ובוואטסאפ כשהוואטסאפ שלך מחובר (הגדרות › חיבורים).</div>;
@@ -498,7 +499,7 @@ export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, dests
   const ownPhone = dests?.find((d) => d.own && d.kind === 'phone');
   const optedOut = !!dests?.some((d) => d.own && d.removed);
   const who = (d: Destination, all: Destination[]) => (all.length < 2 ? '' : ` · ${d.own ? 'אליו' : d.label || showDestination(d.value)}`);
-  useEffect(() => { if (!ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at]);
+  useEffect(() => { if (hasWa(ctx) && !ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at, ctx.exhibitor.whatsapp]);
   useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued' && x.template_id === messageId)) setQueued('yes'); }).catch(() => {}); }, [leadId, messageId]);
   async function viaServer() {
     setQueued('busy');
@@ -874,7 +875,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
             <h2>מה היה עד עכשיו</h2>
             <ul className="log timeline">
               <li><span className="when">{dayLabel(row.captured_on)}</span>ביקר בדוכן</li>
-              {book.replies.filter((r) => r.lead_id === row.id).map((r) => <li key={r.at} className="tl-reply"><span className="when">{dayLabel(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(r.at)))}</span>{r.optout ? (r.body.includes('במייל') ? 'ביקש להסיר (בקישור במייל)' : 'ביקש להסיר (בוואטסאפ)') : <>ענה בוואטסאפ: <b>{r.body}</b></>}</li>)}
+              {book.replies.filter((r) => r.lead_id === row.id).map((r) => <li key={r.at} className="tl-reply"><span className="when">{dayLabel(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(r.at)))}</span>{r.optout ? (r.body.includes('במייל') ? 'ביקש להסיר (בקישור במייל)' : hasWa(ctx) ? 'ביקש להסיר (בוואטסאפ)' : 'ביקש להסיר') : <>ענה: <b>{r.body}</b></>}</li>)}
               {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{(x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
               {manual.filter((m) => !steps.some((x) => x.step_id === `m:${m.id}`)).map((m) => <li key={m.id}><span className="when">{dayLabel(m.due_on)}</span>נקבע: {ACT[m.action]}</li>)}
             </ul>
@@ -916,12 +917,12 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
     try {
       await addDestination(ctx.exhibitor.id, leadId, d, whose);
       setTyped(''); setWhose(''); setErr(''); load(); onChange();
-      if (d.kind === 'phone' && ctx.phase === 'live') waCheck(leadId).then(load).catch(() => {});
+      if (d.kind === 'phone' && ctx.phase === 'live' && hasWa(ctx)) waCheck(leadId).then(load).catch(() => {});
     } catch { setErr('לא נשמר. אפשר לנסות שוב.'); }
   }
   async function drop(d: Destination) { await removeDestination(d.id!).catch(() => {}); load(); onChange(); }
   const title = (d: Destination) => (d.own ? (d.kind === 'phone' ? 'טלפון' : 'מייל') : d.label || (d.kind === 'phone' ? 'טלפון נוסף' : 'מייל נוסף'));
-  const state = (d: Destination) => (d.removed ? 'ביקש להסיר' : d.kind !== 'phone' ? '' : d.wa === true ? 'וואטסאפ' : d.wa === false ? 'אין וואטסאפ' : '');
+  const state = (d: Destination) => (d.removed ? 'ביקש להסיר' : d.kind !== 'phone' || !hasWa(ctx) ? '' : d.wa === true ? 'וואטסאפ' : d.wa === false ? 'אין וואטסאפ' : '');
   return (
     <div className="dests">
       {list === null ? <p className="muted small">טוען…</p> : !list.length ? (
@@ -1070,8 +1071,13 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       {texts && <MessageDetails ctx={ctx} texts={texts} list={list} />}
       <section className="card">
         <h2>איך הן יוצאות</h2>
-        <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › חיבורים): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
-        <p className="muted"><b>בלי חיבור:</b> בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
+        {hasWa(ctx) ? <>
+          <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › חיבורים): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
+          <p className="muted"><b>בלי חיבור:</b> בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
+        </> : <>
+          <p className="muted"><b>במייל, לבד:</b> ההודעות של המסלול יוצאות ביום שלהן למי שהשאיר מייל, בשעות 9–20, לא בשבת ובחג.</p>
+          <p className="muted"><b>ביד:</b> מכרטיס המשימה נפתח מייל עם ההודעה מוכנה, ואתה לוחץ שלח. למי שלא השאיר מייל, מתקשרים.</p>
+        </>}
         <p className="muted">הודעה עם פרט ריק בסוגריים מרובעים לא יוצאת עד שממלאים אותו.</p>
       </section>
       </div>
@@ -1115,7 +1121,7 @@ function MessageDetails({ ctx, texts, list }: { ctx: Ctx; texts: Record<string, 
   return (
     <section className="card">
       <h2>פרטים להודעות {empty > 0 && <span className="tag">חסרים {empty}</span>}</h2>
-      <p className="muted">ממלאים פעם אחת, וזה נכנס לכל ההודעות שבהן הפרט מופיע. כל פרט יכול להיות גם קובץ (מחירון, טופס): הוא יוצא עם ההודעה, בוואטסאפ כמסמך ובמייל כקובץ מצורף. כל עוד פרט ריק, ההודעות שלו לא יוצאות.</p>
+      <p className="muted">ממלאים פעם אחת, וזה נכנס לכל ההודעות שבהן הפרט מופיע. כל פרט יכול להיות גם קובץ (מחירון, טופס): הוא יוצא עם ההודעה, {hasWa(ctx) ? 'בוואטסאפ כמסמך ובמייל כקובץ מצורף' : 'כקובץ מצורף למייל'}. כל עוד פרט ריק, ההודעות שלו לא יוצאות.</p>
       <div className="fills">
         {[...uses].map(([k, ids]) => {
           const file = k.startsWith('קובץ');
@@ -1231,7 +1237,8 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
   return (
     <>
       <p className="muted set-intro"><b>הפרטים שלך, ואיך ההודעות יוצאות.</b> כל שינוי כאן חל על כל ההודעות.</p>
-      <SubTabs label="פרטים וחיבורים" on={sub} set={setSub} tabs={[['msgs', 'הודעות'], ['self', 'הרשמה עצמית'], ['links', 'חיבורים'], ['account', 'החשבון']]} />
+      {/* חיבורים is the WhatsApp link and reading replies: without WhatsApp there is nothing in it (31/10). */}
+      <SubTabs label="פרטים וחיבורים" on={sub} set={setSub} tabs={[['msgs', 'הודעות'], ['self', 'הרשמה עצמית'], ...(hasWa(ctx) ? [['links', 'חיבורים'] as ['links', string]] : []), ['account', 'החשבון']]} />
       <div className="subview">
         {sub === 'msgs' && <>
           {ctx.phase === 'practice' && <Trial ctx={ctx} />}
@@ -1245,7 +1252,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
           <Morning ctx={ctx} />
           <Brand ctx={ctx} />
           <Signature ctx={ctx} />
-          <MailChoice ctx={ctx} />
+          {hasWa(ctx) && <MailChoice ctx={ctx} />}
           <section className="panel-w">
             <h2>הנוסח של כל הודעה</h2>
             <p className="muted">ההודעות עצמן, כמו שהמבקר יקבל אותן, נערכות במסך ההודעות.</p>
@@ -1253,7 +1260,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
           </section>
         </>}
         {sub === 'self' && <SelfSign ctx={ctx} />}
-        {sub === 'links' && <>
+        {sub === 'links' && hasWa(ctx) && <>
           {(ctx.admin || waOpenNow) && <WaLink ctx={ctx} />}
           {!ctx.admin && !waOpenNow && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
           <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
@@ -1380,7 +1387,7 @@ function Trial({ ctx }: { ctx: Ctx }) {
           <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה. כל המבקרים מתחילים מהרגע שמדליקים.</span></span>
           <button type="button" className="switch" role="switch" aria-checked={e.trial_fast} aria-label="יום עובר בדקה" onClick={() => set({ trial_fast: !e.trial_fast })} />
         </div>
-        <p className="muted small">עשרת מבקרי הניסיון הראשונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת. בוואטסאפ זה יוצא רק כשהוא מחובר.</p>
+        <p className="muted small">עשרת מבקרי הניסיון הראשונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת.{hasWa(ctx) ? ' בוואטסאפ זה יוצא רק כשהוא מחובר.' : ''}</p>
       </>}
     </section>
   );
@@ -1606,10 +1613,10 @@ function Morning({ ctx }: { ctx: Ctx }) {
           </select>
         </label>
       )}
-      <div className="switchrow">
+      {hasWa(ctx) && <div className="switchrow">
         <span>בוואטסאפ <span className="faint small">· בקרוב, כשהמספר הרשמי של המערכת יאושר</span></span>
         <button type="button" className="switch" role="switch" aria-checked={ex.morning_wa} aria-label="הודעת בוקר בוואטסאפ" onClick={() => set({ morning_wa: !ex.morning_wa })} />
-      </div>
+      </div>}
       <label className="field" style={{ maxWidth: 180 }}>באיזו שעה
         <input className="input" type="time" value={at} onChange={(e) => { if (e.target.value) set({ morning_at: e.target.value }); }} />
       </label>

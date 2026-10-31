@@ -21,6 +21,7 @@ import {
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
+import { setNoWa } from './lib/messages.ts';
 import { MailCode } from './signin.tsx';
 import { Consultant } from './consult.tsx';
 
@@ -235,6 +236,7 @@ function Live() {
   if (setup === undefined) return <Gate title="טוען…" />;
   if (!setup) return <NewBooth exhibitor={exhibitor} onSaved={setSetup} />;
 
+  setNoWa(!exhibitor.whatsapp);
   const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
   // His own logo heads the booth when he uploaded one (30/10); otherwise the system's mark.
@@ -303,7 +305,8 @@ function Live() {
             joinCode={exhibitor.join_code}
             phase={phase}
             boothDefault={exhibitor.booth_default}
-            checkWa={phase === 'live' ? waCheck : undefined}
+            checkWa={phase === 'live' && exhibitor.whatsapp ? waCheck : undefined}
+            wa={!!exhibitor.whatsapp}
             trialSend={exhibitor.trial_send}
             offer={exhibitor.offer}
           />

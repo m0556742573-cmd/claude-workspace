@@ -61,12 +61,20 @@ export function messagesOf(setup: Setup): { id: string; after: string[] }[] {
   return [...out].map(([id, after]) => ({ id, after: [...after] }));
 }
 
+/**
+ * An exhibitor without WhatsApp sees no word of it anywhere (יצחק, 31/10): a suggested text that offers WhatsApp as
+ * one way among others loses it, and one that offers only WhatsApp offers the mail.
+ */
+export function withoutWa(text: string): string {
+  return text.replace(/\s*או בוואטסאפ[^,.\n]*/g, '').replaceAll('בוואטסאפ', 'במייל');
+}
+
 /** The suggested text: the approved one when there is one, otherwise a frame with the message's name as a hole. */
-export function draftFor(setup: Setup, id: string, approved: Approved[]): string {
+export function draftFor(setup: Setup, id: string, approved: Approved[], noWa = false): string {
   const f = fixtureOf(setup);
   const mine = f ? approved.filter((a) => a.id === f.id) : [];
   const hit = mine.find((a) => a.label === id) ?? mine.find((a) => id.startsWith(a.label));
-  if (hit) return hit.text;
+  if (hit) return noWa ? withoutWa(hit.text) : hit.text;
   return `שלום [שם],\n[${id}]\n${SIGN}`;
 }
 
@@ -105,4 +113,5 @@ export const holes = (t: string) => [...new Set(t.match(/\[[^\]\n]+\]/g) ?? [])]
 export const detailsIn = (body: string) => holes(body).map((h) => h.slice(1, -1)).filter((k) => !AUTO_FIELDS.includes(k));
 
 /** The exhibitor's own text for a message, or the suggested one. */
-export const textOf = (setup: Setup, texts: Record<string, string> | null, id: string, approved: Approved[]) => texts?.[id] ?? draftFor(setup, id, approved);
+export const textOf = (setup: Setup, texts: Record<string, string> | null, id: string, approved: Approved[], noWa = false) =>
+  texts?.[id] ?? draftFor(setup, id, approved, noWa);

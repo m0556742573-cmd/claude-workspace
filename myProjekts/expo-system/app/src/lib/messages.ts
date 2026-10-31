@@ -9,8 +9,11 @@ import { loadTexts } from './backend.ts';
 export { asFile, detailsIn, fileValue, filesIn, fill, holes, messagesOf, type FileRef, type Me } from '@expo/engine';
 const approved = approvedJson as Approved[];
 
-export const draftFor = (setup: Setup, id: string) => draft(setup, id, approved);
-export const textOf = (setup: Setup, texts: Record<string, string> | null, id: string) => textFrom(setup, texts, id, approved);
+// An exhibitor who answered that he has no WhatsApp (31/10): the suggested texts say nothing of it. Set by App.
+let noWa = false;
+export function setNoWa(v: boolean) { noWa = v; }
+export const draftFor = (setup: Setup, id: string) => draft(setup, id, approved, noWa);
+export const textOf = (setup: Setup, texts: Record<string, string> | null, id: string) => textFrom(setup, texts, id, approved, noWa);
 
 // The exhibitor's own texts, loaded once and shared by every screen; a save tells them all.
 let cache: Record<string, string> | null = null;

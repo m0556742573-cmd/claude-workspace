@@ -148,6 +148,7 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
   const { error } = await supabase.from('leads').upsert({
     id: l.id, exhibitor_id: exhibitorId, person_id: l.personId ?? null,
     typed_name: l.personId ? null : l.name, typed_phone: l.typedPhone ?? null,
+    ...(l.typedEmail ? { typed_email: l.typedEmail } : {}),
     taps: l.taps, customer_date: l.customerDate ?? null, note: l.note || null,
     captured_at: l.capturedAt, captured_on: l.capturedOn,
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
