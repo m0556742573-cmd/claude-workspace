@@ -53,7 +53,7 @@ export function PathLines({ path, edit }: { path: Path; edit?: (index: number, d
         const sign = t.days < 0 || Object.is(t.days, -0) ? -1 : 1;
         const n = (v: string) => Math.max(0, Math.min(365, Number(v) || 0));
         const what = t.kind === 'customerDate' ? 'התאריך שלו' : text.timing({ ...t, days: 0 });
-        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי התערוכה' : 'ימים אחרי הצעד הקודם') : `ימים ${sign < 0 ? 'לפני' : 'אחרי'} ${what}`;
+        const unit = t.kind === 'after' ? (i === 0 ? 'ימים אחרי האקספו' : 'ימים אחרי הצעד הקודם') : `ימים ${sign < 0 ? 'לפני' : 'אחרי'} ${what}`;
         return (
           <li key={i}>
             {text.step({ ...st, timing: { kind: 'after', days: 0 } }).split(',')[0]},{' '}

@@ -86,7 +86,7 @@ THE MODEL YOU BUILD:
 4. Capacity: ask how much time a day he will have for follow-up in the two weeks after the expo. Spread steps so he is never buried; say so.
 5. Default when nothing was tapped: one for a visitor who is a business owner (known from the community list), one for a private visitor (usually רשימת תפוצה — do not chase private people without reason).
 6. Calendar rules the system applies by itself: no tasks or sends on Shabbat and Yom Tov; calls and meetings not on Friday by default. Seasons only as confirmed by him (see CALENDAR).
-7. Expo offer (optional): if it fits, ask whether he wants a special expo offer ("מבצע תערוכה", e.g. 10 items at an expo price for whoever closes today, or until a date). Record it in "offers"; a visitor can order from it at the booth, and paths may remind before it ends.
+7. Expo offer (optional): if it fits, ask whether he wants a special expo offer ("מבצע אקספו", e.g. 10 items at an expo price for whoever closes today, or until a date). Record it in "offers"; a visitor can order from it at the booth, and paths may remind before it ends.
 8. Messages: list the messages his paths need (name and purpose), e.g. "מחירון", "תודה שביקרת + פרטים".
 
 SETUP (JSON) — always return the WHOLE updated setup, keys exactly:
@@ -94,4 +94,4 @@ SETUP (JSON) — always return the WHOLE updated setup, keys exactly:
 
 REPLY with ONLY one compact JSON object (no Markdown, no text before or after): {"reply":"your message to him, Hebrew, short","quick":["0-4 short quick replies to your one question"],"setup":{...}}`;
 
-export const GREETING = "שלום, אני היועץ של אקספומקס. בכמה דקות נבנה יחד את הדוכן שלך לתערוכה: מה תסמן אצל כל מבקר, ומה המערכת תעשה איתו אחר כך.\n\nספר לי במשפט או שניים: מה העסק שלך, ולמי אתה מוכר?";
+export const GREETING = "שלום, אני היועץ של אקספומקס. בכמה דקות נבנה יחד את הדוכן שלך לאקספו: מה תסמן אצל כל מבקר, ומה המערכת תעשה איתו אחר כך.\n\nספר לי במשפט או שניים: מה העסק שלך, ולמי אתה מוכר?";

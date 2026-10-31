@@ -224,7 +224,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   if (phase === 'after') {
     return (
       <div className="booth">
-        <div className="empty"><b>התערוכה הסתיימה, והדוכן נסגר.</b><br />כל מי שנרשם נמצא ב-CRM, עם הצעד הבא שלו.</div>
+        <div className="empty"><b>האקספו הסתיים, והדוכן נסגר.</b><br />כל מי שנרשם נמצא ב-CRM, עם הצעד הבא שלו.</div>
       </div>
     );
   }
@@ -234,7 +234,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       {eyebrow && <div className="sec eyebrow">{eyebrow}</div>}
       {practice && (
         <div className="practice-banner">
-          <b>דוכן לניסיון.</b> השמות כאן לדוגמה{trialSend ? ', וההודעות מגיעות אליך ולא למבקר.' : ', ושום הודעה לא נשלחת.'} מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני התערוכה.
+          <b>דוכן לניסיון.</b> השמות כאן לדוגמה{trialSend ? ', וההודעות מגיעות אליך ולא למבקר.' : ', ושום הודעה לא נשלחת.'} מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני האקספו.
         </div>
       )}
       {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}

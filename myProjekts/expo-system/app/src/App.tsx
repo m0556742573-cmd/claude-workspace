@@ -16,6 +16,7 @@ import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
 import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
+import { Logo } from './brand.tsx';
 import {
   activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
@@ -74,12 +75,13 @@ export function App() {
   return demo ? <Demo /> : <Live />;
 }
 
-function Gate({ title, children }: { title: string; children?: ReactNode }) {
+/** Before the system. hero: the sign-in, where the logo stands tall with "מבית YHM" (design system, 09: מסך הכניסה). */
+function Gate({ title, children, hero }: { title: string; children?: ReactNode; hero?: boolean }) {
   return (
     <div className="gate">
-      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">אקספומקס</span></div></header>
+      {!hero && <header className="gate-top"><Logo height={26} /></header>}
       <section className="gate-box">
-        <h1>{title}</h1>
+        {hero ? <h1 className="gate-hero"><Logo layout="stacked" endorsed height={64} /></h1> : <h1>{title}</h1>}
         {children}
       </section>
     </div>
@@ -200,8 +202,8 @@ function Live() {
   if (session === undefined) return <Gate title="רגע…" />;
   if (!session) {
     return (
-      <Gate title="אקספומקס">
-        <p className="muted">לבעלי דוכנים בתערוכת העסקים. נכנסים פעם אחת, וממשיכים מכל מכשיר.</p>
+      <Gate title="אקספומקס" hero>
+        <p className="muted">לבעלי דוכנים באקספו. נכנסים פעם אחת, וממשיכים מכל מכשיר.</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
         <MailCode newUsers />
       </Gate>
@@ -220,7 +222,7 @@ function Live() {
   if (!exhibitor.approved) {
     return (
       <Gate title="הדוכן שלך ממתין לאישור">
-        <p>נכנסת בתור <strong>{session.user.email}</strong>. המייל הזה לא ברשימת המציגים של התערוכה, אז הדוכן ייפתח אחרי אישור של מנהל התערוכה.</p>
+        <p>נכנסת בתור <strong>{session.user.email}</strong>. המייל הזה לא ברשימת המציגים של האקספו, אז הדוכן ייפתח אחרי אישור של מנהל האקספו.</p>
         <button type="button" className="btn" onClick={leave}>יציאה</button>
       </Gate>
     );
@@ -240,12 +242,12 @@ function Live() {
   const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
   const biz = exhibitor.business || exhibitor.name;
   // His own logo heads the booth when he uploaded one (30/10); otherwise the system's mark.
-  const mark = exhibitor.logo ? <img className="mark logo" src={fileUrl(exhibitor.logo)} alt="" /> : <span className="mark" aria-hidden="true" />;
+  const mark = exhibitor.logo ? <img className="mark logo" src={fileUrl(exhibitor.logo)} alt="" /> : <span className="mark" aria-hidden="true">{biz.trim().slice(0, 1)}</span>;
   const items = part === 'day' ? DAY : CRM;
   const slim = desk && (folded || !!panel);
   const switcher = (
     <div className="seg" role="group" aria-label="החלק במערכת">
-      <button type="button" aria-pressed={part === 'day'} title="יום התערוכה" onClick={() => go('booth')}><Icon name="stand" size={18} /><span>יום התערוכה</span></button>
+      <button type="button" aria-pressed={part === 'day'} title="יום האקספו" onClick={() => go('booth')}><Icon name="stand" size={18} /><span>יום האקספו</span></button>
       <button type="button" aria-pressed={part === 'crm'} title="CRM" onClick={() => go('home')}><Icon name="crm" size={18} /><span>CRM</span></button>
     </div>
   );
@@ -266,6 +268,8 @@ function Live() {
     <div className={'shell ' + (desk ? 'is-desk' : 'is-tab') + (slim ? ' slim' : '') + (desk && panel ? ' with-panel' : '')}>
       {desk ? (
         <nav className="side" aria-label="תפריט ראשי">
+          {/* The product heads the menu (design system, 09: the logo across, without "מבית"); the booth's business under it. */}
+          <div className="side-logo"><Logo height={28} /></div>
           <div className="brand">{mark}<span className="biz">{biz}</span></div>
           {switcher}
           {items.map(([v, l, i]) => nv(l, i, view === v, () => go(v)))}
@@ -282,7 +286,8 @@ function Live() {
         </nav>
       ) : (
         <header className="thead">
-          {mark}<span className="biz">{biz}</span>
+          <Logo height={26} />
+          <div className="thead-biz">{mark}<span className="biz">{biz}</span></div>
           {switcher}
         </header>
       )}
@@ -291,7 +296,7 @@ function Live() {
         {view === 'booth' && (
           <Booth
             setup={setup}
-            eyebrow={desk ? 'יום התערוכה · הדוכן' : undefined}
+            eyebrow={desk ? 'יום האקספו · הדוכן' : undefined}
             newVisitor={newVisitor}
             desk={desk}
             search={search}
@@ -311,7 +316,7 @@ function Live() {
             offer={exhibitor.offer}
           />
         )}
-        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום התערוכה' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
+        {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום האקספו' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
         {view === 'home' && <Home ctx={ctx} desk={desk} />}
         {view === 'tasks' && <Tasks ctx={ctx} desk={desk} />}
         {view === 'leads' && <Leads ctx={ctx} desk={desk} />}
@@ -386,7 +391,7 @@ function HelpPanel({ kind, desk, view, onPick, onClose }: { kind: Exclude<Panel,
             </section>
             <section className="stack">
               <div className="sec">הסברים קצרים בכתב</div>
-              <details className="qa"><summary>מה קורה כשאין רשת בתערוכה?</summary><p>הכל נשמר בטלפון, ועולה לשרת לבד כשהרשת חוזרת. בראש הדוכן כתוב כמה ממתינים לעלות.</p></details>
+              <details className="qa"><summary>מה קורה כשאין רשת באקספו?</summary><p>הכל נשמר בטלפון, ועולה לשרת לבד כשהרשת חוזרת. בראש הדוכן כתוב כמה ממתינים לעלות.</p></details>
               <details className="qa"><summary>נגעתי בשם הלא נכון</summary><p>בכרטיס שנפתח יש "ביטול הרישום". הוא מוחק את המבקר, עם ההערות וההקלטות שלו, אחרי אישור.</p></details>
               <details className="qa"><summary>מה ההבדל בין "לא רלוונטי" לרשימת התפוצה?</summary><p>"לא רלוונטי" מסיים את המעקב אחריו. רשימת התפוצה היא מי שלא סימנת אצלו כלום: הוא מקבל רק הודעות כלליות.</p></details>
             </section>
@@ -395,7 +400,7 @@ function HelpPanel({ kind, desk, view, onPick, onClose }: { kind: Exclude<Panel,
         {kind === 'support' && (
           <>
             <p className="muted">משהו לא עובד, או יש שאלה? כאן מגיעים לאדם, לא לבוט.</p>
-            <div className="contact-card"><div><b>פרטי התמיכה</b><small>הטלפון והמייל של התמיכה יפורסמו כאן לפני התערוכה, עם מענה מיידי ביום עצמו.</small></div></div>
+            <div className="contact-card"><div><b>פרטי התמיכה</b><small>הטלפון והמייל של התמיכה יפורסמו כאן לפני האקספו, עם מענה מיידי ביום עצמו.</small></div></div>
           </>
         )}
       </div>
@@ -416,7 +421,7 @@ function TrySetup() {
   }
   return (
     <div className="setup-gate">
-      <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">הקמה · הדגמה</span></div>
+      <div className="brand"><Logo height={26} /><span className="biz muted">הקמה · הדגמה</span></div>
       <SetupSteps start={null} onSave={async (s) => setDone(s)} />
     </div>
   );
@@ -437,7 +442,7 @@ function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: S
   }
   return (
     <div className="setup-gate">
-      <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">בוא נקים את הדוכן</span></div>
+      <div className="brand"><Logo height={26} /><span className="biz muted">בוא נקים את הדוכן</span></div>
       {mode === 'choose' && (
         <section className="panel-w">
           <h2>איך נקים את הדוכן?</h2>
@@ -461,7 +466,7 @@ function Demo() {
   return (
     <div className="shell is-tab">
       <header className="thead">
-        <span className="mark" aria-hidden="true" />
+        <Logo height={24} layout="symbol" />
         <select className="input" style={{ width: 'auto' }} aria-label="העסק (הדגמה)" value={biz} onChange={(e) => setBiz(Number(e.target.value))}>{fixtures.map((f, i) => <option key={f.id} value={i}>{f.name}</option>)}</select>
         <span className="faint small" style={{ marginInlineStart: 'auto' }}>הדגמה · שמות לדוגמה</span>
       </header>

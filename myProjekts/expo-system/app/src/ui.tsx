@@ -1,18 +1,19 @@
-// The pieces every screen is built from, from the brand book (artifact PhXCTLxz4Xu6GhDPCaUaMK, 19-20/10):
-// line icons on a 24 grid with square caps; one title per screen with a "?" beside it; small grey section labels.
+// The pieces every screen is built from. Icons: the YHM set of the ExpoMax design system (31/10): a 24 grid, a 1.75
+// line with round caps; where the design system draws an icon (check, phone, mail, plus) its drawing is used.
+// One title per screen with a "?" beside it; small section labels.
 import { useEffect, useState, type ReactNode } from 'react';
 
 const PATHS = {
   search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z M16 16l5 5',
-  check: 'M4 12l5 5L20 6',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
   key: 'M15 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z M12.2 11.8 4 20 M6 18l2 2 M8.5 15.5l2 2',
   home: 'M4 11l8-7 8 7v10H4Z M10 21v-6h4v6',
   leads: 'M4 20v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2 M9 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6 M16 20v-2a5 5 0 0 0-2-4 M15 4a3 3 0 0 1 0 6',
   tasks: 'M5 5h14v14H5Z M8 12l3 3 5-6',
   bars: 'M3 21h18 M6 21V11 M12 21V4 M18 21v-7',
-  mail: 'M3 5h18v14H3Z M3 6l9 7 9-7',
+  mail: 'M3.5 6.5h17v11h-17z M3.5 7.5l8.5 6 8.5-6',
   help: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14 M12 17h.01',
-  phone: 'M4 4h5l1.5 5L8 11a11 11 0 0 0 5 5l2-1.5 5 1.5v5h-1C9 21 4 16 4 5Z',
+  phone: 'M6.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 6 6l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 4.5 5.5a2 2 0 0 1 2-2z',
   gear: 'M15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0Z M12 4v3 M12 17v3 M4 12h3 M17 12h3 M6.3 6.3l2.2 2.2 M15.5 15.5l2.2 2.2 M17.7 6.3l-2.2 2.2 M8.5 15.5l-2.2 2.2',
   play: 'M8 5l11 7-11 7Z',
   video: 'M3 5h18v14H3Z M10 9l5 3-5 3Z',
@@ -31,8 +32,18 @@ export type IconName = keyof typeof PATHS;
 export function Icon({ name, size = 20, stroke = 1.75 }: { name: IconName; size?: number; stroke?: number }) {
   return (
     <svg className="ic" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke}
-      strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true"><path d={PATHS[name]} /></svg>
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={PATHS[name]} /></svg>
   );
+}
+
+// The two looks of the design system (31/10): forest (dark, the default) and snow (light). Kept on this device; the
+// page's head reads it before anything paints.
+export type Theme = 'forest' | 'snow';
+export const themeNow = (): Theme => (document.documentElement.dataset.theme === 'snow' ? 'snow' : 'forest');
+export function setTheme(t: Theme) {
+  if (t === 'snow') document.documentElement.dataset.theme = 'snow'; else delete document.documentElement.dataset.theme;
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', t === 'snow' ? '#F4F6F1' : '#0B1A13');
+  try { localStorage.setItem('expo-theme', t); } catch { /* the device may not keep it */ }
 }
 
 // The "?" beside each title. There are no videos yet, so it opens a few words about the screen;

@@ -119,23 +119,24 @@ export function buildMorning(to: string, name: string, tasks: MorningTask[], app
   const subject = `המשימות שלך להיום · ${tasks.length}`;
   const first = name.trim().split(/\s+/)[0] ?? '';
   const text = [`בוקר טוב ${first},`, '', ...(late.length ? ['באיחור:', ...late.map((t) => '• ' + line(t)), ''] : []),
-    ...(today.length ? ['להיום:', ...today.map((t) => '• ' + line(t)), ''] : []), `לפתוח את המשימות: ${appUrl}/#tasks`, '', 'אקספומקס · מערכת של YHM'].join('\n');
+    ...(today.length ? ['להיום:', ...today.map((t) => '• ' + line(t)), ''] : []), `לפתוח את המשימות: ${appUrl}/#tasks`, '', 'אקספומקס, מבית YHM'].join('\n');
+  // The ExpoMax look (design system, MorningMessage, 31/10): a forest strip with the logo (without "מבית"), "בוקר טוב" and
+  // a short list with orange chevrons, one button, and "מבית YHM" at the foot. Here ExpoMax speaks in its own name.
+  const X = { forest: '#0B1A13', orange: '#F8AC00', snow: '#F2F5EE', ink: '#0B1A13', muted: '#405247', line: '#E3E8E0', late: '#B3361B', foot: '#55625A' };
   const list = (title: string, items: MorningTask[], color: string) => items.length
-    ? `<tr><td dir="rtl" align="right" style="padding:6px 24px 0;font-family:${FONT};text-align:right"><div style="font-size:13px;font-weight:bold;color:${color};margin:10px 0 6px">${title} · ${items.length}</div>`
-      + items.map((t) => `<div style="font-size:15px;line-height:1.5;color:#1A1A1A;padding:8px 0;border-bottom:1px solid #ECEEE9"><b>${esc(t.name)}</b> · ${esc(ACT[t.action] ?? t.action)}${t.message ? `<span style="color:#6B6F68"> — ${esc(t.message)}</span>` : ''}</div>`).join('')
+    ? `<tr><td dir="rtl" align="right" style="padding:4px 24px 0;font-family:${FONT};text-align:right"><div style="font-size:13px;font-weight:bold;color:${color};margin:12px 0 4px">${title} · ${items.length}</div>`
+      + items.map((t) => `<div style="font-size:15px;line-height:1.5;color:${X.ink};padding:8px 0;border-bottom:1px solid ${X.line}"><span style="color:${X.orange};font-weight:bold">&#9652;</span>&nbsp; <b>${esc(t.name)}</b> · ${esc(ACT[t.action] ?? t.action)}${t.message ? `<span style="color:${X.muted}"> — ${esc(t.message)}</span>` : ''}</div>`).join('')
       + '</td></tr>'
     : '';
   const html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-    + `<meta name="color-scheme" content="light"><title>${esc(subject)}</title></head><body style="margin:0;padding:0;background:#F3F4F1">`
-    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F1"><tr><td align="center" style="padding:24px 12px">'
-    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="max-width:560px;background:#FFFFFF;border:1px solid #E3E5E0;border-radius:14px;overflow:hidden">'
-    + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:16px 24px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" dir="rtl"><tr>`
-    + `<td valign="middle" style="padding-left:12px"><img src="${appUrl}/mail/yhm.png" width="36" height="36" alt="YHM" style="display:block;width:36px;height:36px;border:0;border-radius:8px;font-family:${FONT};font-size:13px;font-weight:bold;color:${YHM.lit}"></td>`
-    + `<td valign="middle" style="font-family:${FONT};color:${YHM.ink};font-size:19px;font-weight:bold">אקספומקס</td></tr></table></td></tr>`
-    + `<tr><td dir="rtl" align="right" style="padding:22px 24px 4px;font-family:${FONT};font-size:17px;color:#1A1A1A;text-align:right">בוקר טוב ${esc(first)},<br><span style="font-size:15px;color:#4A4F47">${tasks.length === 1 ? 'משימה אחת מחכה לך היום.' : `${tasks.length} משימות מחכות לך היום.`}</span></td></tr>`
-    + list('באיחור', late, '#A33A1F') + list('להיום', today, '#1A1A1A')
-    + `<tr><td align="right" dir="rtl" style="padding:20px 24px 26px"><a href="${appUrl}/#tasks" style="display:inline-block;background:${YHM.bg};color:${YHM.ink};font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;padding:12px 22px;border-radius:8px">לפתוח את המשימות</a></td></tr>`
-    + `<tr><td dir="rtl" align="right" style="background:${YHM.bg};padding:12px 24px;font-family:${FONT};font-size:12px;color:${YHM.soft};text-align:right">אקספומקס · מערכת של <a href="${YHM.url}" style="color:${YHM.lit};font-weight:bold;text-decoration:none">YHM</a> · ${YHM.line}<br>אפשר לשנות את השעה, או לכבות, בהגדרות › הודעות.</td></tr>`
+    + `<meta name="color-scheme" content="light"><title>${esc(subject)}</title></head><body style="margin:0;padding:0;background:#F4F6F1">`
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F6F1"><tr><td align="center" style="padding:24px 12px">'
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="rtl" style="max-width:520px;background:#FFFFFF;border:1px solid #D3DCCF;border-radius:14px;overflow:hidden">`
+    + `<tr><td dir="rtl" align="right" style="background:${X.forest};padding:16px 22px"><img src="${appUrl}/mail/expomax-on-dark.png" width="147" height="30" alt="אקספומקס" style="display:block;width:147px;height:30px;border:0;font-family:${FONT};font-size:18px;font-weight:bold;color:${X.snow}"></td></tr>`
+    + `<tr><td dir="rtl" align="right" style="padding:22px 24px 2px;font-family:${FONT};text-align:right"><div style="font-size:22px;font-weight:bold;color:${X.ink}">בוקר טוב, ${esc(first)}</div><div style="font-size:15px;color:${X.muted};margin-top:4px">${tasks.length === 1 ? 'משימה אחת להיום, מהאקספו:' : `${tasks.length} משימות להיום, מהאקספו:`}</div></td></tr>`
+    + list('באיחור', late, X.late) + list('להיום', today, X.ink)
+    + `<tr><td align="right" dir="rtl" style="padding:20px 24px 24px"><a href="${appUrl}/#tasks" style="display:inline-block;background:${X.forest};color:${X.orange};font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:999px">לפתוח את המשימות</a></td></tr>`
+    + `<tr><td dir="rtl" align="right" style="background:${X.snow};padding:12px 24px;font-family:${FONT};font-size:12px;line-height:1.6;color:${X.foot};text-align:right">אקספומקס, מבית <a href="${YHM.url}" style="color:${X.ink};font-weight:bold;text-decoration:none">YHM</a><br>אפשר לשנות את השעה, או לכבות, בהגדרות › הודעות.</td></tr>`
     + '</table></td></tr></table></body></html>';
   return { from: fromAddress, fromName: 'אקספומקס', to, subject, text, html, unsubscribe: '' };
 }

@@ -214,7 +214,7 @@ async function sendOne(s: Session, q: Queued, self = false): Promise<void> {
       to = hit.jid ?? jid;
     }
     if (q.first_contact && q.save_contact && q.name) {
-      await sock.addOrEditContact(to, { fullName: `${q.name} · תערוכה`, saveOnPrimaryAddressbook: true }).catch(() => {});
+      await sock.addOrEditContact(to, { fullName: `${q.name} · אקספו`, saveOnPrimaryAddressbook: true }).catch(() => {});
     }
     await sock.sendPresenceUpdate('composing', to).catch(() => {});
     await sleep(typingMs(q.body));
@@ -562,7 +562,7 @@ const server = http.createServer(async (req, res) => {
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return send(400, { error: 'to' });
         // The test shows the real design with his own booth: his name, business, phone, WhatsApp, logo and colour (30/10).
         const str = (k: string, max = 120) => (typeof b[k] === 'string' ? (b[k] as string).slice(0, max) : null);
-        const name = str('from_name') || 'מערכת התערוכה';
+        const name = str('from_name') || 'אקספומקס';
         const logo = str('logo');
         try {
           await p.send(buildMail({ id: '00000000-0000-0000-0000-000000000000', to_email: to, from_name: name, reply_to: null,

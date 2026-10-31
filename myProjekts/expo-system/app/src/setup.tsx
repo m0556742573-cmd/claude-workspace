@@ -62,7 +62,7 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
   const list = messagesOf(s);
   const bodyOf = (id: string) => edits[id] ?? textOf(s, own, id);
   const checks: [boolean, string][] = [
-    [!!s.anchor.goal.trim(), 'נכתב מה יהפוך את התערוכה להצלחה'],
+    [!!s.anchor.goal.trim(), 'נכתב מה יהפוך את האקספו להצלחה'],
     [!s.needs.length || s.needs.some((n) => n.goal === 'primary'), 'סומנה מטרה ראשית בין הכפתורים'],
     [s.needs.every((n) => n.variants.length > 0), 'לכל כפתור "מה הוא צריך" יש מסלול'],
     // 26/10: every "מתי" and "מי הוא" button changes something; a button that changes nothing does not belong on the card.
@@ -92,7 +92,7 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
       {at === 0 && (
         <section className="panel-w">
           <label className="field" htmlFor="su-biz">במה העסק עוסק?<input id="su-biz" className="input" placeholder="למשל: נגרות מטבחים, קייטרינג, שטריימלך" value={s.business} onChange={(e) => setS({ ...s, business: e.target.value })} /></label>
-          <label className="field" htmlFor="su-goal">מה יהפוך את התערוכה להצלחה בשבילך?<textarea id="su-goal" className="area" rows={3} placeholder="במילים שלך. למשל: אבות שכבר יש להם חתן, שיבואו למדידה." value={s.anchor.goal} onChange={(e) => setS({ ...s, anchor: { ...s.anchor, goal: e.target.value } })} /></label>
+          <label className="field" htmlFor="su-goal">מה יהפוך את האקספו להצלחה בשבילך?<textarea id="su-goal" className="area" rows={3} placeholder="במילים שלך. למשל: אבות שכבר יש להם חתן, שיבואו למדידה." value={s.anchor.goal} onChange={(e) => setS({ ...s, anchor: { ...s.anchor, goal: e.target.value } })} /></label>
           <label className="field" htmlFor="su-num">ובמספר?<input id="su-num" className="input" placeholder="למשל: 15 מדידות, 30 הזמנות" value={s.anchor.success} onChange={(e) => setS({ ...s, anchor: { ...s.anchor, success: e.target.value } })} /></label>
           <div className="switchrow">
             <span>עסק רגיש<span className="faint small" style={{ display: 'block' }}>שדכנות, טיפול, ייעוץ אישי: בלי שם העסק בהודעות, ורשימת תפוצה רק למי שהסכים.</span></span>
@@ -139,7 +139,7 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
 
       {at === 3 && (
         <>
-          <p className="muted">לכל כפתור: מה קורה אחרי התערוכה. בוחרים דפוס, ומשנים כמה ימים עובר בין צעד לצעד.</p>
+          <p className="muted">לכל כפתור: מה קורה אחרי האקספו. בוחרים דפוס, ומשנים כמה ימים עובר בין צעד לצעד.</p>
           {s.needs.map((n, ni) => (
             <PathPick key={n.label} title={n.label} need={n} onPick={(p) => setS({ ...s, needs: s.needs.map((x, i) => (i === ni ? p : x)) })}
               edit={(vi, i, d) => setS(setDays(s, { need: ni, variant: vi }, i, d))} />
@@ -171,7 +171,7 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
 
       {at === 5 && (
         <section className="panel-w">
-          <span className="sec">כמה זמן ביום יהיה לך למעקב, בשבועיים שאחרי התערוכה?</span>
+          <span className="sec">כמה זמן ביום יהיה לך למעקב, בשבועיים שאחרי האקספו?</span>
           <div className="chips">{MINUTES.map((m) => <button key={m} type="button" className="chip" aria-pressed={capacity === m} onClick={() => setS({ ...s, capacity: m })}>{m < 60 ? `${m} דקות` : m === 60 ? 'שעה' : m === 90 ? 'שעה וחצי' : 'שעתיים'}</button>)}</div>
           <label className="field" htmlFor="su-vis">כמה מבקרים אתה מצפה לרשום?<input id="su-vis" className="input days" type="number" min={1} max={2000} inputMode="numeric" value={visitors} onChange={(e) => setVisitors(Math.max(1, Number(e.target.value) || 1))} /></label>
           <p className={load.need > load.have ? 'note warn' : 'note'}>

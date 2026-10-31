@@ -1,6 +1,7 @@
 // Self-registration: the visitor scans the code on the booth's sign and registers himself — a name, a phone, and what
 // interests him, from the same buttons as the exhibitor's card. No sign-in: the page sees only the booth's name and
 // its buttons (join_info), and can only add one visitor (join_booth). The lead lands in the exhibitor's booth list.
+import { Logo } from './brand.tsx';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import qrcode from 'qrcode-generator';
 import { fileUrl, joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
@@ -49,7 +50,7 @@ export function Join({ code }: { code: string }) {
         : m.includes('email') ? 'המייל לא נראה תקין. אפשר גם להשאיר אותו ריק.'
           : m.includes('name') ? 'צריך שם, לפחות שתי אותיות.'
             : m.includes('busy') ? 'יש עומס רגעי בדוכן. אפשר לנסות שוב בעוד דקה.'
-              : m.includes('closed') ? 'התערוכה הסתיימה, וההרשמה בדוכן הזה נסגרה.'
+              : m.includes('closed') ? 'האקספו הסתיים, וההרשמה בדוכן הזה נסגרה.'
               : 'משהו לא עבד. אפשר לנסות שוב, או לגשת לדוכן.');
       setState('');
     }
@@ -101,7 +102,9 @@ function JoinBox({ title, by, logo, children }: { title: string; by?: string; lo
   return (
     <div className="gate">
       <section className="gate-box join">
-        <div className="brand">{logo ? <img className="mark logo" src={fileUrl(logo)} alt="" /> : <span className="mark" aria-hidden="true" />}<span className="biz">{by ?? 'אקספומקס'}</span></div>
+        {/* The visitor sees the exhibitor, not the product: his logo, or his initial (whether the product's name shows to a
+            visitor is still Yitzhak's to decide, design system README). Before the booth is known, the product. */}
+        <div className="brand">{!by ? <Logo height={26} /> : <>{logo ? <img className="mark logo" src={fileUrl(logo)} alt="" /> : <span className="mark" aria-hidden="true">{by.trim().slice(0, 1)}</span>}<span className="biz">{by}</span></>}</div>
         <h1>{title}</h1>
         {children}
       </section>

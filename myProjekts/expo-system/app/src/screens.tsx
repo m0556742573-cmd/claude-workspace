@@ -7,7 +7,7 @@ import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
 import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
-import { Icon, PageHead, Tiles, longDate, setTipsOn, tipsOn } from './ui.tsx';
+import { Icon, PageHead, Tiles, longDate, setTheme, setTipsOn, themeNow, tipsOn, type Theme } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
@@ -282,7 +282,7 @@ function Harvest({ items }: { items: Item[] }) {
             </li>
           ))}
         </ul>
-      ) : <div className="empty"><p className="muted">כרגע אין. אחרי התערוכה יופיעו כאן מי שעוד לא דיברת איתם, מי שהתאריך שלו מתקרב, ומי שכדאי להזכיר לו לפני החג.</p></div>}
+      ) : <div className="empty"><p className="muted">כרגע אין. אחרי האקספו יופיעו כאן מי שעוד לא דיברת איתם, מי שהתאריך שלו מתקרב, ומי שכדאי להזכיר לו לפני החג.</p></div>}
     </section>
   );
 }
@@ -955,7 +955,7 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
 export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const [book, , error] = useData(loadBook);
   const items = useItems(ctx, book);
-  const head = <PageHead title="דשבורד" eyebrow={eyebrowOf(desk)} tip="איפה כל הלידים עומדים, מה ביקשו בדוכן, ומה עוד אפשר להוציא מהתערוכה." />;
+  const head = <PageHead title="דשבורד" eyebrow={eyebrowOf(desk)} tip="איפה כל הלידים עומדים, מה ביקשו בדוכן, ומה עוד אפשר להוציא מהאקספו." />;
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const { now, later } = split(items);
@@ -972,13 +972,13 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       <Tiles items={[[now.length, 'לטיפול היום'], [late, 'באיחור', late > 0], [now.length + later.length, 'במעקב'], [ended('closed'), 'עסקאות שנסגרו']]} onPick={(k) => ctx.go(k === 'עסקאות שנסגרו' ? 'leads' : 'tasks')} />
       {now.length > 0 && <button type="button" className="btn primary big start-btn" onClick={() => ctx.go('tasks')}>להתחיל: {now.length} לטיפול ←</button>}
       <section className="card">
-        <h2>14 הימים שאחרי התערוכה</h2>
+        <h2>14 הימים שאחרי האקספו</h2>
         <div className="days14" aria-hidden="true">
           {Array.from({ length: 14 }, (_, n) => <span key={n} className={n + 1 < dayN ? 'past' : n + 1 === dayN ? 'now' : ''} />)}
         </div>
         <p className="muted">
           {dayN < 1
-            ? `התערוכה ב-${dayLabel(EXPO_DAY)}. מהיום שאחריה נספרים כאן 14 הימים שבהם המבקרים עוד זוכרים את הדוכן.`
+            ? `האקספו ב-${dayLabel(EXPO_DAY)}. מהיום שאחריו נספרים כאן 14 הימים שבהם המבקרים עוד זוכרים את הדוכן.`
             : <>{dayN <= 14 ? <>יום <b>{dayN}</b> מתוך 14. </> : 'עברו 14 הימים. '}מתוך {items.length} לידים: <b>{touched}</b> כבר בקשר, <b>{untouched}</b> עוד לא היה קשר, <b>{ended('closed')}</b> עסקאות.</>}
         </p>
         {dayN >= 1 && untouched > 0 && <button type="button" className="btn start-sm" onClick={() => ctx.go('tasks')}>לראות את {untouched} שעוד לא היה איתם קשר</button>}
@@ -1205,7 +1205,7 @@ export function Settings({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }
   return (
     <div className="page settings">
       <div className="set-head">
-        <PageHead title="הגדרות" tip="פרטים וחיבורים: איך ההודעות שלך פונות ויוצאות, וההרשמה העצמית. התאמה אישית: הכרטיס בדוכן ומה קורה אחרי התערוכה." />
+        <PageHead title="הגדרות" tip="פרטים וחיבורים: איך ההודעות שלך פונות ויוצאות, וההרשמה העצמית. התאמה אישית: הכרטיס בדוכן ומה קורה אחרי האקספו." />
         <div className="seg" role="group" aria-label="חלק בהגדרות">
           <button type="button" aria-pressed={tab === 'details'} onClick={() => setTab('details')}>פרטים וחיבורים</button>
           <button type="button" aria-pressed={tab === 'custom'} onClick={() => setTab('custom')}>התאמה אישית</button>
@@ -1222,6 +1222,22 @@ function SubTabs<K extends string>({ label, tabs, on, set }: { label: string; ta
     <nav className="subtabs chips" aria-label={label}>
       {tabs.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={on === k} onClick={() => set(k)}>{l}</button>)}
     </nav>
+  );
+}
+
+/** Dark or light (the design system's forest and snow, 31/10), on this device. */
+function Look() {
+  const [t, setT] = useState<Theme>(themeNow);
+  const pick = (x: Theme) => { setTheme(x); setT(x); };
+  return (
+    <section className="panel-w">
+      <h2>מראה</h2>
+      <div className="chips">
+        <button type="button" className="chip" aria-pressed={t === 'forest'} onClick={() => pick('forest')}>כהה</button>
+        <button type="button" className="chip" aria-pressed={t === 'snow'} onClick={() => pick('snow')}>בהיר</button>
+      </div>
+      <p className="muted small">נשמר במכשיר הזה.</p>
+    </section>
   );
 }
 
@@ -1266,6 +1282,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
           <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
         </>}
         {sub === 'account' && <>
+          <Look />
           <section className="panel-w">
             <div className="switchrow">
               <span>להציג הסבר ליד כל מסך</span>
@@ -1277,7 +1294,7 @@ function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
             <p>{ctx.exhibitor.name}{ctx.exhibitor.business ? ` · ${ctx.exhibitor.business}` : ''}</p>
             <div className="row">
               <button type="button" className="btn" onClick={onSignOut}>יציאה</button>
-              {ctx.admin && <a className="text-btn" href="https://expo-admin.pages.dev" target="_blank" rel="noreferrer">ניהול התערוכה ←</a>}
+              {ctx.admin && <a className="text-btn" href="https://expo-admin.pages.dev" target="_blank" rel="noreferrer">ניהול האקספו ←</a>}
             </div>
           </section>
         </>}
@@ -1321,7 +1338,7 @@ function WaLink({ ctx }: { ctx: Ctx }) {
           <WaSwitch ctx={ctx} field="wa_read_replies" label="לקרוא תשובות של מבקרים"
             hint="רק ממספרים של מבקרים שנרשמו אצלך. כל שיחה אחרת לא נקראת ולא נשמרת. תשובה עוצרת את המסלול ומקפיצה אותו ל'היום'; 'הסר' מוריד אותו מהרשימה." />
           <WaSwitch ctx={ctx} field="wa_save_contacts" label="לשמור כל מבקר באנשי הקשר שלי"
-            hint="לפני ההודעה הראשונה אליו, בשם כמו 'יעקב גרינברג · תערוכה'. כך תראה את השם שלו כשהוא עונה." />
+            hint="לפני ההודעה הראשונה אליו, בשם כמו 'יעקב גרינברג · אקספו'. כך תראה את השם שלו כשהוא עונה." />
           <button type="button" className="btn start-sm" disabled={busy} onClick={() => { forgetWa(); run(waUnlink); }}>לנתק</button>
         </>
         : st.status === 'qr' && st.qr ? <div className="sign-row">
@@ -1360,8 +1377,8 @@ function Trial({ ctx }: { ctx: Ctx }) {
   }
   return (
     <section className="panel-w">
-      <h2>ניסיון לפני התערוכה</h2>
-      <p className="muted">עד התערוכה הדוכן עובד עם שמות לדוגמה, ואף מבקר לא מקבל הודעה. אפשר לנסות בלי שליחה, או לקבל כל הודעה בעצמך, כדי לראות בדיוק מה המבקר יקבל.</p>
+      <h2>ניסיון לפני האקספו</h2>
+      <p className="muted">עד האקספו הדוכן עובד עם שמות לדוגמה, ואף מבקר לא מקבל הודעה. אפשר לנסות בלי שליחה, או לקבל כל הודעה בעצמך, כדי לראות בדיוק מה המבקר יקבל.</p>
       <div className="chips">
         <button type="button" className="chip" aria-pressed={!e.trial_send} onClick={() => set({ trial_send: false })}>בלי שליחה</button>
         <button type="button" className="chip" aria-pressed={e.trial_send} onClick={() => set({ trial_send: true })}>ההודעות אליי</button>
@@ -1631,7 +1648,7 @@ function Morning({ ctx }: { ctx: Ctx }) {
  */
 export function OfferEdit({ ctx }: { ctx: Ctx }) {
   const ex = ctx.exhibitor;
-  const blank = { name: 'מבצע תערוכה', until: EXPO_DAY, items: [] as Offer['items'] };
+  const blank = { name: 'מבצע אקספו', until: EXPO_DAY, items: [] as Offer['items'] };
   const [o, setO] = useState<Offer>(ex.offer ?? blank);
   const [msg, setMsg] = useState('');
   const item = (i: number, patch: Partial<Offer['items'][number]>) => setO({ ...o, items: o.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
@@ -1643,22 +1660,22 @@ export function OfferEdit({ ctx }: { ctx: Ctx }) {
   const ok = o.name.trim() && o.items.length > 0 && o.items.every((i) => i.name.trim() && i.expoPrice > 0);
   return (
     <section className="panel-w">
-      <h2>מבצע תערוכה</h2>
-      <p className="muted">פריטים במחיר מיוחד לתערוכה. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה. תשלום, מלאי וחשבונית נשארים אצלך.</p>
+      <h2>מבצע אקספו</h2>
+      <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה. תשלום, מלאי וחשבונית נשארים אצלך.</p>
       <label className="field">שם המבצע<input className="input" value={o.name} onChange={(e) => setO({ ...o, name: e.target.value })} /></label>
       <label className="field" style={{ maxWidth: 200 }}>עד מתי<input className="input" type="date" value={o.until} onChange={(e) => setO({ ...o, until: e.target.value })} /></label>
       {o.items.map((i, n) => (
         <div key={i.id} className="row offer-item">
           <input className="input" placeholder="הפריט" aria-label="הפריט" value={i.name} onChange={(e) => item(n, { name: e.target.value })} />
           <input className="input price" inputMode="decimal" placeholder="מחיר רגיל" aria-label="מחיר רגיל" value={i.price || ''} onChange={(e) => item(n, { price: Number(e.target.value) || 0 })} />
-          <input className="input price" inputMode="decimal" placeholder="מחיר תערוכה" aria-label="מחיר תערוכה" value={i.expoPrice || ''} onChange={(e) => item(n, { expoPrice: Number(e.target.value) || 0 })} />
+          <input className="input price" inputMode="decimal" placeholder="מחיר אקספו" aria-label="מחיר אקספו" value={i.expoPrice || ''} onChange={(e) => item(n, { expoPrice: Number(e.target.value) || 0 })} />
           <button type="button" className="text-btn" aria-label={`להסיר את ${i.name || 'הפריט'}`} onClick={() => setO({ ...o, items: o.items.filter((_, j) => j !== n) })}>✕</button>
         </div>
       ))}
       <div className="row">
         <button type="button" className="btn" onClick={() => setO({ ...o, items: [...o.items, { id: crypto.randomUUID().slice(0, 8), name: '', price: 0, expoPrice: 0 }] })}>＋ פריט</button>
         <button type="button" className="btn primary" disabled={!ok} onClick={() => save(o)}>שמירה</button>
-        {ex.offer && <button type="button" className="text-btn" onClick={() => { if (confirm('להסיר את מבצע התערוכה? הזמנות שכבר נשמרו נשארות.')) save(null); }}>להסיר את המבצע</button>}
+        {ex.offer && <button type="button" className="text-btn" onClick={() => { if (confirm('להסיר את מבצע האקספו? הזמנות שכבר נשמרו נשארות.')) save(null); }}>להסיר את המבצע</button>}
       </div>
       {msg && <p className="muted small" role="status">{msg}</p>}
     </section>
@@ -1759,7 +1776,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
       <button type="button" className="text-btn" disabled={busy} onClick={() => setAsk(null)}>חזרה, בלי לשמור</button>
     </section>
   );
-  const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי התערוכה עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
+  const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי האקספו עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
   if (steps) {
     // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
     return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={built?.setup ?? ctx.setup} texts={built?.texts} business={ctx.exhibitor.business} onCancel={() => { setSteps(false); setBuilt(null); }}
@@ -1800,7 +1817,7 @@ function Custom({ ctx }: { ctx: Ctx }) {
       </section>
 
       {(s.anchor.goal || s.anchor.success) && (
-        <section className="panel-w"><h2>מה תהיה הצלחה בתערוכה</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
+        <section className="panel-w"><h2>מה תהיה הצלחה באקספו</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
       )}
       {!draft && <Versions ctx={ctx} key={saved} onRestore={(old) => apply(old, [])} />}
       </>}
@@ -1837,10 +1854,10 @@ function Custom({ ctx }: { ctx: Ctx }) {
 
       {sub === 'after' && <section className={draft ? 'held' : 'panel-w'}>
         <div className="card-top">
-          <h2>מה קורה אחרי התערוכה</h2>
+          <h2>מה קורה אחרי האקספו</h2>
           {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
         </div>
-        {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי התערוכה.</p>}
+        {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי האקספו.</p>}
         {s.needs.map((n, ni) => (
           <div key={n.label} className="q-block">
             <span className="sec">{n.label}</span>

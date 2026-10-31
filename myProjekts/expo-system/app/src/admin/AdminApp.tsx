@@ -4,6 +4,7 @@
 // Same database and same pieces as the booth (lib/backend.ts, ui.tsx, styles.css); the server checks is_admin() on every call.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, adminSetWa, waOpenState, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
+import { Logo } from '../brand.tsx';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { MailCode } from '../signin.tsx';
 import { ListLoad } from './lists.tsx';
@@ -26,7 +27,7 @@ const isView = (h: string): h is View => MENU.some(([v]) => v === h);
 function Gate({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="gate">
-      <header className="gate-top"><div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">אקספומקס · ניהול</span></div></header>
+      <header className="gate-top"><div className="brand"><Logo height={26} /><span className="biz muted">ניהול</span></div></header>
       <section className="gate-box">
         <h1>{title}</h1>
         {children}
@@ -49,8 +50,8 @@ export function AdminApp() {
   if (session === undefined) return <Gate title="רגע…" />;
   if (!session) {
     return (
-      <Gate title="ניהול התערוכה">
-        <p className="muted">הכניסה למי שמנהל את התערוכה: המציגים, האישורים והרשימות.</p>
+      <Gate title="ניהול האקספו">
+        <p className="muted">הכניסה למי שמנהל את האקספו: המציגים, האישורים והרשימות.</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
         <MailCode newUsers={false} />
         <p className="faint small">מציגים נכנסים בכתובת של הדוכן: <a href={BOOTH_URL} dir="ltr">{BOOTH_URL.replace('https://', '')}</a></p>
@@ -61,7 +62,7 @@ export function AdminApp() {
   if (!allowed) {
     return (
       <Gate title="אין לך גישה לניהול">
-        <p>נכנסת בתור <strong>{session.user.email}</strong>. הכתובת הזאת למנהל התערוכה בלבד.</p>
+        <p>נכנסת בתור <strong>{session.user.email}</strong>. הכתובת הזאת למנהל האקספו בלבד.</p>
         <div className="row" style={{ justifyContent: 'center' }}>
           <a className="btn primary" href={BOOTH_URL}>לדוכן שלי</a>
           <button type="button" className="btn" onClick={signOut}>יציאה</button>
@@ -88,7 +89,8 @@ function Shell({ email }: { email: string }) {
   return (
     <div className="adm">
       <nav className="adm-side" aria-label="ניהול">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="biz">ניהול התערוכה</span></div>
+        <div className="side-logo"><Logo height={28} /></div>
+        <div className="brand"><span className="biz muted">ניהול</span></div>
         <div className="adm-nav">
           {MENU.map(([v, label, icon]) => (
             <button key={v} type="button" className="nv" aria-current={view === v} onClick={() => go(v)}>
@@ -135,7 +137,7 @@ function Shell({ email }: { email: string }) {
 function Overview({ rows, go, reload }: { rows: AdminExhibitor[] | undefined; go: (v: View) => void; reload: () => void }) {
   const [counts, setCounts] = useState<{ people: number; listed: number } | null>(null);
   useEffect(() => { adminCounts().then(setCounts).catch(() => {}); }, []);
-  const head = <PageHead title="סקירה" sub="התערוכה ב-16.11" tip="המצב של התערוכה במבט אחד: מי נרשם, מי ממתין לאישור, וכמה שמות יש ברשימות." />;
+  const head = <PageHead title="סקירה" sub="האקספו ב-16.11" tip="המצב של האקספו במבט אחד: מי נרשם, מי ממתין לאישור, וכמה שמות יש ברשימות." />;
   if (!rows) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const waiting = rows.filter((r) => !r.approved);
   const leads = rows.reduce((n, r) => n + r.leads, 0);
@@ -246,9 +248,9 @@ function WaCard() {
 /** The system's phase, one for all booths (migration 0019). Moving to live can delete what was registered in practice:
  *  that cannot be undone, so it is asked in so many words, with the numbers, before it is done. */
 const PHASES: [Phase, string, string][] = [
-  ['practice', 'ניסיון · לפני התערוכה', 'הדוכן מחפש בשמות לדוגמה, ואף מבקר לא מקבל הודעה. כל מציג בוחר אם לנסות בלי שליחה, או לקבל את ההודעות בעצמו. מה שנרשם נשמר כניסיון.'],
-  ['live', 'אמיתי', 'רשימת הקהילה האמיתית, וההודעות יוצאות. זה המצב לתערוכה ולימים שאחריה.'],
-  ['after', 'אחרי התערוכה · CRM בלבד', 'הדוכן נסגר אצל כולם, וה-CRM נשאר. ההודעות ממשיכות לצאת לפי המסלולים.'],
+  ['practice', 'ניסיון · לפני האקספו', 'הדוכן מחפש בשמות לדוגמה, ואף מבקר לא מקבל הודעה. כל מציג בוחר אם לנסות בלי שליחה, או לקבל את ההודעות בעצמו. מה שנרשם נשמר כניסיון.'],
+  ['live', 'אמיתי', 'רשימת הקהילה האמיתית, וההודעות יוצאות. זה המצב לאקספו ולימים שאחריו.'],
+  ['after', 'אחרי האקספו · CRM בלבד', 'הדוכן נסגר אצל כולם, וה-CRM נשאר. ההודעות ממשיכות לצאת לפי המסלולים.'],
 ];
 function PhaseView() {
   const [st, setSt] = useState<Awaited<ReturnType<typeof adminPhase>> | null>(null);
