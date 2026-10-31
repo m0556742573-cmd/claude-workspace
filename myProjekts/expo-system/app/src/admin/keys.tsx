@@ -36,7 +36,7 @@ export function KeysView() {
                 <button key={v} type="button" className="chip" aria-pressed={(st.keys.mail_provider ?? '') === v} onClick={() => save('mail_provider', v)}>{label}</button>
               ))}
             </div>
-            <p className="muted small">{st.mail ? 'המייל מוכן: מיילים יוצאים מ-expo.y-h-m.com.' : 'המייל עוד לא פעיל. מיילים מחכים בתור עד שהספק והמפתחות שלו מוגדרים.'}</p>
+            <p className="muted small">{st.mail ? 'המייל מוכן: מיילים יוצאים מ-expomax.y-h-m.com.' : 'המייל עוד לא פעיל. מיילים מחכים בתור עד שהספק והמפתחות שלו מוגדרים.'}</p>
             {st.mail && <MailTest />}
           </section>
           {GROUPS.filter((g) => !g.when || g.when(st.keys)).map((g) => (

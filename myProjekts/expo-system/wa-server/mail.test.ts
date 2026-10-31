@@ -6,13 +6,13 @@ import { buildMail, cloudflareBody, mime, providerFrom, sigv4 } from './mail.ts'
 const row = { id: '11111111-2222-3333-4444-555555555555', to_email: 'visitor@example.com', body: 'שלום יעקב,\nהמחירון: https://example.com/p\nיצחק, שטריימלך', from_name: 'יצחק', reply_to: 'itzhak@example.com', subject: 'שטריימלך' };
 
 test('every mail says why he got it and carries the removal link, in the text, the HTML and the header', () => {
-  const m = buildMail(row, 'https://expo-wa.example', 'expo@expo.y-h-m.com');
+  const m = buildMail(row, 'https://expo-wa.example', 'expo@expomax.y-h-m.com');
   assert.equal(m.unsubscribe, 'https://expo-wa.example/u/11111111-2222-3333-4444-555555555555');
   assert.match(m.text, /ביקרת בדוכן של שטריימלך/);
   assert.ok(m.text.includes(m.unsubscribe) && m.html.includes(m.unsubscribe));
   assert.match(m.html, /<a href="https:\/\/example.com\/p">/); // a link in the message can be clicked
   const raw = mime(m, new Date('2026-11-16T10:00:00Z'), 'x');
-  assert.match(raw, /^From: =\?UTF-8\?B\?[^?]+\?= <expo@expo\.y-h-m\.com>/);
+  assert.match(raw, /^From: =\?UTF-8\?B\?[^?]+\?= <expo@expomax.y-h-m.com>/);
   assert.match(raw, /\r\nReply-To: <itzhak@example\.com>\r\n/);
   assert.match(raw, /\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n/);
   assert.ok(!/[^\x00-\x7f]/.test(raw)); // nothing but ASCII on the wire: Hebrew goes encoded
@@ -28,9 +28,9 @@ test('a file goes attached, its Hebrew name encoded', () => {
 });
 
 test('Cloudflare gets the mail as fields: his name, his reply address, the one-click removal headers and the files', () => {
-  const m = { ...buildMail(row, 'https://expo-wa.example', 'expo@expo.y-h-m.com'), attachments: [{ name: 'מחירון.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 x') }] };
+  const m = { ...buildMail(row, 'https://expo-wa.example', 'expo@expomax.y-h-m.com'), attachments: [{ name: 'מחירון.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 x') }] };
   const b = cloudflareBody(m);
-  assert.deepEqual(b.from, { address: 'expo@expo.y-h-m.com', name: 'יצחק' });
+  assert.deepEqual(b.from, { address: 'expo@expomax.y-h-m.com', name: 'יצחק' });
   assert.deepEqual(b.to, ['visitor@example.com']);
   assert.equal(b.reply_to, 'itzhak@example.com');
   assert.deepEqual(b.headers, { 'List-Unsubscribe': '<https://expo-wa.example/u/11111111-2222-3333-4444-555555555555>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' });
@@ -62,16 +62,16 @@ test('the designed mail (30/10): his colour and logo at the head, a card to reac
   const { inkOn, waLink } = await import('./mail.ts');
   const brand = { ...row, subject: 'לוי מטבחים', from_name: 'אלי לוי', phone: '050-000-0000', whatsapp: '0500000000', brand_color: '#1e5aa8',
     logo: '11111111-2222-3333-4444-555555555555/66666666-7777-8888-9999-000000000000.png' };
-  const m = buildMail(brand, 'https://expo.y-h-m.com', 'expo@expo.y-h-m.com', 'https://x.supabase.co/storage/v1/object/public/files/');
+  const m = buildMail(brand, 'https://expomax.y-h-m.com', 'expo@expomax.y-h-m.com', 'https://x.supabase.co/storage/v1/object/public/files/');
   assert.match(m.html, /background:#1E5AA8;padding:20px 24px/);
   assert.ok(m.html.includes('src="https://x.supabase.co/storage/v1/object/public/files/11111111-2222-3333-4444-555555555555/66666666-7777-8888-9999-000000000000.png"'));
   assert.ok(m.html.includes('href="tel:0500000000"') && m.html.includes('href="https://wa.me/972500000000"'));
-  assert.ok(m.html.includes('src="https://expo.y-h-m.com/mail/yhm.png"') && m.html.includes('alt="YHM"'));
+  assert.ok(m.html.includes('src="https://expomax.y-h-m.com/mail/yhm.png"') && m.html.includes('alt="YHM"'));
   assert.match(m.text, /נשלח דרך אקספומקס של YHM/);
   assert.equal(waLink('+972 50-000-0000'), 'https://wa.me/972500000000');
   assert.equal(inkOn('#1E5AA8'), '#FFFFFF');
   assert.equal(inkOn('#F2E85C'), '#1A1A1A');
-  const quiet = buildMail({ ...brand, sensitive: true, subject: 'אלי לוי' }, 'https://expo.y-h-m.com', 'a@b.c', 'https://x/');
+  const quiet = buildMail({ ...brand, sensitive: true, subject: 'אלי לוי' }, 'https://expomax.y-h-m.com', 'a@b.c', 'https://x/');
   assert.ok(!quiet.html.includes('66666666-7777'), 'no logo in a sensitive business');
   assert.ok(!quiet.html.includes('לוי מטבחים'));
   assert.ok(buildMail(row, 'https://e', 'a@b.c').html.length < 60_000); // far under Gmail's clipping

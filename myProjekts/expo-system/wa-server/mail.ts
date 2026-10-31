@@ -1,7 +1,7 @@
 // Mail (29/10): one message as the visitor gets it, and the provider that carries it. The provider is set on this server
 // (the admin platform's keys page): Amazon SES or Cloudflare Email Service (26/10 compared both; on 29/10 he set up
-// expo.y-h-m.com for sending in Cloudflare).
-// Each mail goes in the exhibitor's name from expo.y-h-m.com, replies go to his own mail, and every mail carries a
+// expomax.y-h-m.com for sending in Cloudflare; expo.y-h-m.com until 31/10).
+// Each mail goes in the exhibitor's name from expomax.y-h-m.com, replies go to his own mail, and every mail carries a
 // removal link, also as the one-click header mail services look for.
 import crypto from 'node:crypto';
 

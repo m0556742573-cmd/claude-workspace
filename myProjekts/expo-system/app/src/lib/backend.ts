@@ -22,7 +22,7 @@ export interface Exhibitor {
   id: string; name: string; business: string; approved: boolean; phone: string | null; email: string | null; sensitive: boolean;
   /** The number his WhatsApp runs on; null = no WhatsApp (when onboarded) or not asked yet. */
   whatsapp: string | null; whatsapp_kind: 'personal' | 'business' | null; onboarded: boolean;
-  /** The code in his self-registration link: expo.y-h-m.com/#join/<code>. */
+  /** The code in his self-registration link: expomax.y-h-m.com/#join/<code>. */
   join_code: string;
   /** WhatsApp through the server (step 2a): replies read only if he switched it on; visitors saved as contacts if he chose. */
   wa_read_replies: boolean; wa_save_contacts: boolean;
@@ -623,7 +623,7 @@ export async function mailNameFree(name: string): Promise<boolean> {
   return data === true;
 }
 /** The domain the mails to visitors go from (the part after the @). */
-export const MAIL_DOMAIN = 'expo.y-h-m.com';
+export const MAIL_DOMAIN = 'expomax.y-h-m.com';
 /** How a queued message names its file: "path#name". */
 export const fileRefText = (f: FileRef) => `${f.path}#${encodeURIComponent(f.name)}`;
 

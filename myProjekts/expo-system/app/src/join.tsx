@@ -10,7 +10,7 @@ const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 const shown = (label: string) => label.replace(ASKS_DATE, '');
 
 /** The sign always carries the public address (30/10), even when the exhibitor opened the booth at the old one. */
-const PUBLIC = location.hostname === 'localhost' ? location.origin : 'https://expo.y-h-m.com';
+const PUBLIC = location.hostname === 'localhost' ? location.origin : 'https://expomax.y-h-m.com';
 export const joinUrl = (code: string) => `${PUBLIC}/#join/${code}`;
 
 export function Join({ code }: { code: string }) {

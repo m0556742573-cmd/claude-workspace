@@ -1,4 +1,4 @@
-// The removal link in every mail sits on the app's own address (expo.y-h-m.com/u/<id>, 30/10), so the visitor sees
+// The removal link in every mail sits on the app's own address (expomax.y-h-m.com/u/<id>; expo.y-h-m.com until 31/10), so the visitor sees
 // the same name as the sender's. The page itself, and the one-click removal mail services post here, are the
 // WhatsApp server's: this only passes the request on and brings its answer back. When that server cannot be reached,
 // the visitor gets a page that says so, and a mail service's one-click removal gets an error it will try again.
