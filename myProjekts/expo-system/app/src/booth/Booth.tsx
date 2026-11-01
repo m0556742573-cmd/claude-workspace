@@ -8,7 +8,7 @@ import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
 import { Icon } from '../ui.tsx';
 import { Qr, joinUrl } from '../join.tsx';
-import { destinationOf, showDestination } from '../lib/destination.ts';
+import { destinationOf, maskDestination } from '../lib/destination.ts';
 
 type Checked = { num: string; own: boolean; wa: boolean | null };
 
@@ -470,7 +470,8 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
 }) {
   const fromList = !!lead.personId;
   const [listed, setListed] = useState<{ phone: string | null; email: string | null } | null>(null);
-  const [editing, setEditing] = useState<{ kind: 'phone' | 'email' | 'add'; text: string } | null>(null);
+  // Editing starts from an empty field (the full value is never shown), with the half that is shown as its hint.
+  const [editing, setEditing] = useState<{ kind: 'phone' | 'email' | 'add'; text: string; was?: string } | null>(null);
   const [bad, setBad] = useState('');
   const tries = useRef(0);
   // Asked until the card is up (a card only just tapped may still be on its way), then kept.
@@ -520,13 +521,13 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
       <div className="ct-row" key={kind}>
         <span className="faint">{label}</span>
         <span className="ct-val">
-          {replaced ? <s dir="ltr">{showDestination(v)}</s> : <span dir="ltr">{showDestination(v)}</span>}
+          {replaced ? <s dir="ltr">{maskDestination(v)}</s> : <span dir="ltr">{maskDestination(v)}</span>}
           {replaced && <span className="faint small"> · הוחלף</span>}
           {noWa && !replaced && <span className="faint small"> · אין וואטסאפ</span>}
         </span>
         {replaced
           ? <button type="button" className="text-btn" onClick={() => onChange({ ownOff: off.filter((k) => k !== kind) })}>להחזיר</button>
-          : <button type="button" className="text-btn" onClick={() => { setEditing({ kind, text: v }); setBad(''); }}>לערוך</button>}
+          : <button type="button" className="text-btn" onClick={() => { setEditing({ kind, text: '', was: maskDestination(v) }); setBad(''); }}>לערוך</button>}
       </div>
     );
   };
@@ -542,8 +543,8 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
         return (
           <div className="ct-row" key={v}>
             <span className="faint">{kind === 'phone' ? 'טלפון נוסף' : 'מייל נוסף'}</span>
-            <span className="ct-val"><span dir="ltr">{showDestination(v)}</span>{kind === 'phone' && waOf(v, false) === false && <span className="faint small"> · אין וואטסאפ</span>}</span>
-            <button type="button" className="text-btn" aria-label={`להסיר את ${showDestination(v)}`} onClick={() => onChange({ extra: extra.filter((x) => x !== v) })}>להסיר</button>
+            <span className="ct-val"><span dir="ltr">{maskDestination(v)}</span>{kind === 'phone' && waOf(v, false) === false && <span className="faint small"> · אין וואטסאפ</span>}</span>
+            <button type="button" className="text-btn" aria-label={`להסיר את ${maskDestination(v)}`} onClick={() => onChange({ extra: extra.filter((x) => x !== v) })}>להסיר</button>
           </div>
         );
       })}
@@ -553,7 +554,7 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
         <form className="extra-add" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={editing.kind === 'email' ? 'email' : editing.kind === 'phone' ? 'tel' : 'text'}
             aria-label={editing.kind === 'add' ? 'טלפון או מייל נוסף, למשל של אשתו' : editing.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'}
-            placeholder={editing.kind === 'add' ? 'טלפון או מייל' : ''} value={editing.text} onChange={(e) => { setEditing({ ...editing, text: e.target.value }); setBad(''); }} />
+            placeholder={editing.kind === 'add' ? 'טלפון או מייל' : editing.was} value={editing.text} onChange={(e) => { setEditing({ ...editing, text: e.target.value }); setBad(''); }} />
           <button type="submit" className="btn" disabled={!editing.text.trim()}>{editing.kind === 'add' ? 'להוסיף' : 'לשמור'}</button>
           <button type="button" className="btn ghost" onClick={() => { setEditing(null); setBad(''); }}>ביטול</button>
           {bad && <span className="err small">{bad}</span>}

@@ -16,7 +16,7 @@ import { Qr, joinUrl } from './join.tsx';
 import { adminMailTest, forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { prepareLogo } from './lib/logo.ts';
 import { Consultant } from './consult.tsx';
-import { destinationOf, showDestination } from './lib/destination.ts';
+import { destinationOf, maskDestination, showDestination } from './lib/destination.ts';
 import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
@@ -414,7 +414,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={next.message} dests={dests} />
         : ownPhone && ctx.phase !== 'practice' && (
           <div className="row">
-            <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{showDestination(ownPhone)}</a>
+            <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{maskDestination(ownPhone)}</a>
             {hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(ownPhone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>}
           </div>
         )}
@@ -498,7 +498,7 @@ export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, dests
   const mailTo = live.filter((d) => d.kind === 'email');
   const ownPhone = dests?.find((d) => d.own && d.kind === 'phone');
   const optedOut = !!dests?.some((d) => d.own && d.removed);
-  const who = (d: Destination, all: Destination[]) => (all.length < 2 ? '' : ` · ${d.own ? 'אליו' : d.label || showDestination(d.value)}`);
+  const who = (d: Destination, all: Destination[]) => (all.length < 2 ? '' : ` · ${d.own ? 'אליו' : d.label || maskDestination(d.value)}`);
   useEffect(() => { if (hasWa(ctx) && !ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked); }, [ctx.exhibitor.wa_blocked_at, ctx.exhibitor.whatsapp]);
   useEffect(() => { queuedFor(leadId).then((q) => { if (q.some((x) => x.status === 'queued' && x.template_id === messageId)) setQueued('yes'); }).catch(() => {}); }, [leadId, messageId]);
   async function viaServer() {
@@ -525,7 +525,7 @@ export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, dests
           {waTo.length > 0 && linked && queued !== 'yes' && <button type="button" className="btn primary" disabled={queued === 'busy'} onClick={viaServer}>לשלוח מהוואטסאפ שלי{waTo.length > 1 ? ` · ל-${waTo.length}` : ''}</button>}
           {hasWa(ctx) && !linked && waTo.map((d) => <a key={d.value} className="btn" href={`https://wa.me/${waNumber(d.value)}?text=${encodeURIComponent(tapBody)}`} target="_blank" rel="noreferrer" onClick={() => sent('whatsapp')}>{waTo.length > 1 ? 'וואטסאפ' : 'וואטסאפ עם ההודעה'}{who(d, waTo)}</a>)}
           {mailTo.map((d) => <a key={d.value} className="btn" href={`mailto:${d.value}?subject=${encodeURIComponent(me.sensitive ? me.name : me.business || me.name)}&body=${encodeURIComponent(tapBody)}`} onClick={() => sent('email')}><Icon name="mail" />מייל{who(d, mailTo)}</a>)}
-          {ownPhone && <a className="btn" href={`tel:${ownPhone.value}`}><Icon name="phone" />{showDestination(ownPhone.value)}</a>}
+          {ownPhone && <a className="btn" href={`tel:${ownPhone.value}`}><Icon name="phone" />{maskDestination(ownPhone.value)}</a>}
           {dests && !dests.length && <span className="muted">אין לו טלפון או מייל ברשימה.</span>}
         </div>
       )}
@@ -854,7 +854,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
         )}
         <div className="actions rec-acts">
           <button type="button" className="btn" aria-expanded={noting} onClick={() => setNoting(!noting)}><Icon name="pen" size={18} />הערה</button>
-          {next.kind === 'end' && contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" size={18} />{contact.phone}</a>}
+          {next.kind === 'end' && contact?.phone && <a className="btn" href={`tel:${contact.phone}`}><Icon name="phone" size={18} />{maskDestination(contact.phone)}</a>}
           {next.kind === 'end' && contact?.phone && hasWa(ctx) && <a className="btn" href={`https://wa.me/${waNumber(contact.phone)}`} target="_blank" rel="noreferrer">וואטסאפ</a>}
         </div>
         {noting && (
@@ -944,16 +944,16 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
         <div className="dest" key={d.id ?? d.kind}>
           <div className="field-row">
             <span className="faint">{title(d)}</span>
-            <span><span dir="ltr">{showDestination(d.value)}</span>{state(d) && <span className="faint small"> · {state(d)}</span>}</span>
+            <span><span dir="ltr">{maskDestination(d.value)}</span>{state(d) && <span className="faint small"> · {state(d)}</span>}</span>
           </div>
           <span className="dest-acts">
             <button type="button" className="switch" role="switch" aria-checked={d.receives && !d.removed} aria-label={`${title(d)}: מקבל הודעות`} disabled={d.removed} onClick={() => flip(d)} />
-            {d.own ? <button type="button" className="text-btn" onClick={() => { setFixing({ kind: d.kind, text: d.value }); setErr(''); }}>לערוך</button>
+            {d.own ? <button type="button" className="text-btn" onClick={() => { setFixing({ kind: d.kind, text: '' }); setErr(''); }}>לערוך</button>
               : <button type="button" className="text-btn" onClick={() => drop(d)}>להסיר</button>}
           </span>
           {fixing && d.own && fixing.kind === d.kind && (
             <form className="dest-add" onSubmit={(e) => { e.preventDefault(); fix(); }}>
-              <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={d.kind === 'phone' ? 'tel' : 'email'} aria-label={d.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'}
+              <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={d.kind === 'phone' ? 'tel' : 'email'} aria-label={d.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'} placeholder={maskDestination(d.value)}
                 value={fixing.text} onChange={(e) => { setFixing({ ...fixing, text: e.target.value }); setErr(''); }} />
               <button type="submit" className="btn" disabled={!fixing.text.trim()}>לשמור</button>
               <button type="button" className="btn ghost" onClick={() => { setFixing(null); setErr(''); }}>ביטול</button>
