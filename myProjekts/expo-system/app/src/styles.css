@@ -662,6 +662,16 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ct-row .text-btn, .ct-add { min-height: 38px; padding: 0 6px; }
 .ct-add { justify-self: start; }
 .contacts .extra-add { margin-top: 4px; }
+.ct-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ct-top > .label { margin: 0; }
+.ct-short { width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; padding: 8px 16px; font: inherit; font-size: 15px; color: inherit; text-align: start; cursor: pointer; }
+.ct-short:hover { border-color: var(--line-strong); }
+.ct-short > .faint { font-size: 13px; }
+.ct-short .ct-val { overflow-wrap: normal; }
+.ct-short .ct-val [dir="ltr"] { white-space: nowrap; }
+@media (max-width: 480px) { .ct-short { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; } .ct-short > .ct-val { grid-column: 1 / -1; grid-row: 2; } }
+.ct-short .ct-more { font-size: 14px; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+.ct-none { color: var(--accent-text); font-weight: 600; }
 
 /* details for messages, written once */
 .msgs .col { display: grid; gap: 16px; align-content: start; min-width: 0; }

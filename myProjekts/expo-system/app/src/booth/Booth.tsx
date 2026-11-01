@@ -473,6 +473,8 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
   // Editing starts from an empty field (the full value is never shown), with the half that is shown as its hint.
   const [editing, setEditing] = useState<{ kind: 'phone' | 'email' | 'add'; text: string; was?: string } | null>(null);
   const [bad, setBad] = useState('');
+  // Short at first, one line (יצחק, 1/11: "רק מידע קצר עם הרחבה"); a tap opens the rows, editing and adding.
+  const [open, setOpen] = useState(false);
   const tries = useRef(0);
   // Asked until the card is up (a card only just tapped may still be on its way), then kept.
   useEffect(() => {
@@ -533,9 +535,30 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
   };
 
   const waiting = fromList && !listed && !!ownOf;
+  if (!open) {
+    // What receives now: his own (unless replaced), then the added ones. Two shown, the rest counted.
+    const live = [...(['phone', 'email'] as const).filter((k) => own[k] && !off.includes(k)).map((k) => own[k] as string), ...extra];
+    const none = !waiting && !live.length;
+    return (
+      <button type="button" className="contacts ct-short" aria-expanded={false}
+        onClick={() => { setOpen(true); if (none) setEditing({ kind: 'add', text: '' }); }}>
+        <span className="faint">פרטי קשר</span>
+        <span className="ct-val">
+          {waiting ? <span className="faint">{online ? 'נטענים…' : 'יופיעו כשתחזור הרשת'}</span>
+            : none ? <span className="ct-none">אין עדיין טלפון או מייל</span>
+            : <>{live.slice(0, 2).map((v, i) => <span key={v}>{i > 0 && ' · '}<span dir="ltr">{maskDestination(v)}</span></span>)}
+              {live.length > 2 && <span className="faint"> · ועוד {live.length - 2}</span>}</>}
+        </span>
+        <span className="ct-more">{none ? '＋ להוסיף' : 'לערוך'} ▾</span>
+      </button>
+    );
+  }
   return (
     <div className="contacts" aria-label="פרטי הקשר">
-      <div className="label">פרטי קשר</div>
+      <div className="ct-top">
+        <span className="label">פרטי קשר</span>
+        <button type="button" className="text-btn" aria-expanded={true} onClick={() => { setOpen(false); setEditing(null); setBad(''); }}>לסגור ▴</button>
+      </div>
       {row('phone')}
       {row('email')}
       {extra.map((v) => {
