@@ -178,6 +178,15 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
 // for the network, and a cancel never overtake one another. What goes up is the tablet's latest copy, read when its turn
 // comes, and it is marked as up only if nothing changed on it meanwhile, so an older copy never lands over a newer one.
 let line: Promise<unknown> = Promise.resolve();
+
+/** Why the last upload failed (1/11), so the booth can tell a lost sign-in from anything else. A good upload clears it. */
+let trouble: 'auth' | 'other' | null = null;
+export const uploadTrouble = () => trouble;
+function failed(e: unknown) {
+  const x = e as { message?: string; status?: number; statusCode?: string | number; code?: string };
+  trouble = /jwt|401|not authenticated|invalid claim|refresh token|PGRST30/i.test(`${x?.message ?? e} ${x?.status ?? ''} ${x?.statusCode ?? ''} ${x?.code ?? ''}`) ? 'auth' : 'other';
+  console.warn('upload failed', e);
+}
 function inLine<T>(f: () => Promise<T>): Promise<T> {
   const p = line.then(f, f);
   line = p.catch(() => {});
@@ -192,8 +201,9 @@ async function upLead(id: string, exhibitorId: string, setup: Setup): Promise<'s
     await uploadLead(l, exhibitorId, setup);
     const now = await getLead(id);
     if (now && !now.gone && (now.rev ?? 0) === (l.rev ?? 0)) await putLead({ ...now, synced: true });
+    trouble = null;
     return 'saved';
-  } catch { return 'waiting'; }
+  } catch (e) { failed(e); return 'waiting'; }
 }
 
 /** Save a lead: on the phone first, at once (never lost, and the list shows it without waiting for the network); then
@@ -216,7 +226,7 @@ async function downLead(id: string, exhibitorId: string): Promise<boolean> {
     if (error) throw error;
     await dropLead(id);
     return true;
-  } catch { return false; }
+  } catch (e) { failed(e); return false; }
 }
 
 /** "ביטול הרישום": gone from the booth at once; on the server in its turn, after any upload of it still in the line.
@@ -245,7 +255,7 @@ async function uploadNote(n: LocalNote, exhibitorId: string): Promise<void> {
 async function upNote(n: LocalNote, exhibitorId: string): Promise<'saved' | 'waiting'> {
   const lead = await getLead(n.leadId);
   if (lead?.gone) { await dropNote(n.id); return 'saved'; } // its visitor was cancelled
-  try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); return 'saved'; } catch { return 'waiting'; }
+  try { await uploadNote(n, exhibitorId); await putNote({ ...n, synced: true, audio: undefined }); trouble = null; return 'saved'; } catch (e) { failed(e); return 'waiting'; }
 }
 
 export async function saveNote(n: LocalNote, exhibitorId: string, kept?: () => void): Promise<'saved' | 'waiting'> {

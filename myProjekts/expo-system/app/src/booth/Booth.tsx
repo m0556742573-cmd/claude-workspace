@@ -13,6 +13,9 @@ import { MailInput, mailHints, mailProblem } from '../mail.tsx';
 
 type Checked = { num: string; own: boolean; wa: boolean | null };
 
+/** Uploads that keep failing with the network on (1/11): rounds of 30 seconds in a row, and whether the sign-in was lost. */
+export interface Stuck { rounds: number; why: 'auth' | 'other' | null }
+
 export interface BoothProps {
   setup: Setup;
   /** On a computer, the small label naming the part. */
@@ -28,6 +31,10 @@ export interface BoothProps {
   todays: LocalLead[];
   notes: LocalNote[];
   waiting: number;
+  /** Uploads that keep failing with the network on, and why (1/11). */
+  stuck?: Stuck;
+  /** Try the waiting uploads now. */
+  onRetry?: () => Promise<unknown>;
   online: boolean;
   /** The booth's self-registration code: in a rush, the tablet turns around and shows it. */
   joinCode?: string;
@@ -49,7 +56,7 @@ export interface BoothProps {
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, stuck, onRetry, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -106,6 +113,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     checkWa(id).then((r) => { if (r) setChecked((m) => ({ ...m, [id]: r })); }).catch(() => {});
   }
   function say(text: string) { setToast(text); setTimeout(() => setToast((t) => (t === text ? '' : t)), 4500); }
+  /** What a save that did not go up says (1/11): without a network it waits for it; with one, it keeps trying. */
+  const upLater = (fem: boolean) => (online ? `עוד לא ${fem ? 'עלתה' : 'עלה'} לשרת, ממשיכים לנסות` : `${fem ? 'תעלה' : 'יעלה'} כשתחזור הרשת`);
   /** Saved on the tablet at once; the upload waits its turn in one line (lib/backend.ts), never ahead of an earlier tap. */
   const store = (l: LocalLead) => saveLead(l);
   function open(l: LocalLead) {
@@ -139,7 +148,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     };
     open(lead);
     const where = await store(lead);
-    say(where === 'saved' ? `נשמר: ${lead.name}` : `נשמר בטלפון: ${lead.name} · יעלה כשתחזור הרשת`);
+    say(where === 'saved' ? `נשמר: ${lead.name}` : `נשמר בטלפון: ${lead.name} · ${upLater(false)}`);
     if (where === 'saved') verify(lead.id);
   }
 
@@ -169,7 +178,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     const note = { id: crypto.randomUUID(), leadId: current.id, body: noteText.trim(), createdAt: new Date().toISOString(), synced: false };
     setNoteText(''); setNoteOpen(false);
     const where = await saveNote(note);
-    say(where === 'saved' ? 'ההערה נשמרה' : 'ההערה נשמרה בטלפון · תעלה כשתחזור הרשת');
+    say(where === 'saved' ? 'ההערה נשמרה' : `ההערה נשמרה בטלפון · ${upLater(true)}`);
   }
 
   async function startRecording() {
@@ -189,7 +198,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       const secs = Math.max(1, Math.round((Date.now() - started) / 1000));
       if (!audio.size) { say('ההקלטה יצאה ריקה'); return; }
       const where = await saveNote({ id: crypto.randomUUID(), leadId, body: '', audio, seconds: secs, createdAt: new Date().toISOString(), synced: false });
-      say(where === 'saved' ? `ההקלטה נשמרה (${clock(secs)})` : `ההקלטה נשמרה בטלפון (${clock(secs)}) · תעלה כשתחזור הרשת`);
+      say(where === 'saved' ? `ההקלטה נשמרה (${clock(secs)})` : `ההקלטה נשמרה בטלפון (${clock(secs)}) · ${upLater(true)}`);
     };
     recorder.start();
     setSeconds(0);
@@ -207,7 +216,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     stopRecording();
     setCurrent(null); setAsking(false);
     const where = await removeLead(current.id);
-    say(where === 'saved' ? `הרישום של ${name} בוטל` : `הרישום של ${name} בוטל בטאבלט · יימחק גם בשרת כשתחזור הרשת`);
+    say(where === 'saved' ? `הרישום של ${name} בוטל` : `הרישום של ${name} בוטל בטאבלט · ${online ? 'עוד לא נמחק בשרת, ממשיכים לנסות' : 'יימחק גם בשרת כשתחזור הרשת'}`);
     searchRef.current?.focus();
   }
 
@@ -243,6 +252,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
         </div>
       )}
       {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}
+      {online && waiting > 0 && stuck && stuck.rounds >= 2 && <StuckLine waiting={waiting} why={stuck.why} onRetry={onRetry} />}
 
       {typing ? (
         <section className="lead" aria-label="מבקר שלא ברשימה">
@@ -408,7 +418,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
                   </span>
                   <span className="r-side">
                     {l.self && <span className="tag">נרשם לבד</span>}
-                    {!l.synced && <span className="tag">ממתין לעלות</span>}
+                    {(!l.synced || notes.some((n) => n.leadId === l.id && !n.synced)) && <span className="tag">ממתין לעלות</span>}
                     <span className="r-next">{describe(nextTask(setup, l, today()))}</span>
                   </span>
                 </button>
@@ -599,6 +609,21 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
   );
 }
 
+/**
+ * Uploads that keep failing with the network on (1/11: before, the booth did not say that a note or a recording had
+ * not gone up). Shown from the second round of 30 seconds in a row; a lost sign-in is told apart, with what to do.
+ */
+function StuckLine({ waiting, why, onRetry }: { waiting: number; why: Stuck['why']; onRetry?: () => Promise<unknown> }) {
+  const [busy, setBusy] = useState(false);
+  const what = waiting === 1 ? 'רישום אחד עוד לא עלה לשרת' : `${waiting} רישומים עוד לא עלו לשרת`;
+  return (
+    <div className="offline-line stuck-line" role="alert">
+      <span>{what}{why === 'auth' ? ', כי החיבור לחשבון נותק. הכל שמור בטלפון. אם זה לא מסתדר, לצאת ולהיכנס שוב לאותו חשבון.' : '. הכל שמור בטלפון, וממשיכים לנסות לבד.'}</span>
+      {onRetry && <button type="button" className="btn" disabled={busy} onClick={() => { setBusy(true); onRetry().finally(() => setBusy(false)); }}>{busy ? 'מנסה…' : 'לנסות עכשיו'}</button>}
+    </div>
+  );
+}
+
 /** The "?" beside the search, as beside every title: a few words, and a video once there is one. */
 function HelpDot() {
   const [open, setOpen] = useState(false);
@@ -621,7 +646,7 @@ function NotePeek({ note, count }: { note: LocalNote; count: number }) {
   const url = useMemo(() => (note.audio ? URL.createObjectURL(note.audio) : null), [note.audio]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const more = count > 1 ? <span className="faint"> ({count} הערות)</span> : null;
-  if (note.body) return <div className="note-peek">{note.body.slice(0, 120)}{more}</div>;
+  if (note.body) return <div className="note-peek">{note.body.slice(0, 120)}{!note.synced && <span className="faint"> · ממתינה לעלות</span>}{more}</div>;
   return (
     <div className="note-peek voice">
       <span>הקלטה {note.seconds ? clock(note.seconds) : ''}{!note.synced ? ' · ממתינה לעלות' : ''}{more}</span>

@@ -672,6 +672,9 @@ table.tb { width: 100%; border-collapse: collapse; font-size: 14px; }
 @media (max-width: 480px) { .ct-short { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; } .ct-short > .ct-val { grid-column: 1 / -1; grid-row: 2; } }
 .ct-short .ct-more { font-size: 14px; font-weight: 600; text-decoration: underline; white-space: nowrap; }
 .ct-none { color: var(--accent-text); font-weight: 600; }
+/* Uploads that keep failing (1/11): the line with its button beside it, or under it on a phone. */
+.stuck-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.stuck-line .btn { min-height: 38px; }
 /* The hints under a mail field (1/11). In a row with buttons beside the field, they go below the whole row. */
 .mail-hints { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; order: 1; margin-top: 2px; font-weight: 400; }
 .mail-hints .chip { min-height: 38px; padding: 0 12px; font-size: 14.5px; }

@@ -3,13 +3,13 @@
 // and the navigation shows only the part you are in. A computer: a white side menu, help and settings pinned at its foot,
 // panels opening beside it. A tablet or a phone: a header with the switch and a bar at the bottom with a raised middle.
 // The app opens on the part that fits the date. "?demo" keeps the demo (invented names, the phone only).
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { MeForm } from './me.tsx';
 import { Join } from './join.tsx';
 import { SetupSteps } from './setup.tsx';
-import { Booth } from './booth/Booth.tsx';
+import { Booth, type Stuck } from './booth/Booth.tsx';
 import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
@@ -18,7 +18,7 @@ import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
-  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, leadContact, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, leadContact, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase, uploadTrouble,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
@@ -107,6 +107,9 @@ function Live() {
   const [directory, setDirectory] = useState<Person[]>([]);
   const [loaded, setLoaded] = useState(false);
   const { todays, notes, waiting, refresh } = useToday(exhibitor?.id);
+  // Rounds in a row that left something waiting with the network on (1/11): from the second, the booth says so.
+  const [stuck, setStuck] = useState<Stuck>({ rounds: 0, why: null });
+  const tickRef = useRef<() => Promise<unknown>>(async () => {});
   const [error, setError] = useState('');
   const [view, setView] = useState<View>(() => {
     const h = location.hash.slice(1);
@@ -176,6 +179,7 @@ function Live() {
     if (!exhibitor || !setup) return;
     // What waits on the phone goes up; what visitors registered on their own phones comes down.
     const tick = () => flush(exhibitor.id, setup)
+      .then((left) => setStuck((s) => (left && navigator.onLine ? { rounds: s.rounds + 1, why: uploadTrouble() } : { rounds: 0, why: null })))
       .then(() => pullSelf(exhibitor.id, setup, directory, today()).catch(() => false))
       .then(refresh)
       // The admin's switch (practice → the fair → after) reaches a booth already open, with the real list (30/10).
@@ -184,6 +188,7 @@ function Live() {
         setPhase(ph);
         if (ph !== 'practice') { const dir = await loadDirectory().catch(() => null); if (dir) { setDirectory(dir); setLoaded(true); } }
       }).catch(() => {});
+    tickRef.current = tick;
     tick();
     const t = setInterval(tick, 30000);
     addEventListener('online', tick);
@@ -306,6 +311,8 @@ function Live() {
             todays={todays}
             notes={notes}
             waiting={waiting}
+            stuck={stuck}
+            onRetry={() => tickRef.current()}
             online={online}
             joinCode={exhibitor.join_code}
             phase={phase}
