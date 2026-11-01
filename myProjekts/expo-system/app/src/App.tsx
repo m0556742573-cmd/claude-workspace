@@ -18,7 +18,7 @@ import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
-  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
+  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, leadContact, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
@@ -314,6 +314,7 @@ function Live() {
             wa={!!exhibitor.whatsapp}
             trialSend={exhibitor.trial_send}
             offer={exhibitor.offer}
+            ownOf={leadContact}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום האקספו' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}

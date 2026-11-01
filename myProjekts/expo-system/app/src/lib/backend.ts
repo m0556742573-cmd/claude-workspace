@@ -153,6 +153,8 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     captured_at: l.capturedAt, captured_on: l.capturedOn,
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
     ...(l.order ? { booth_order: l.order } : {}),
+    // A list phone or mail corrected on the card stops receiving; the CRM's own switch is left alone otherwise.
+    ...(l.ownOff ? { own_phone_on: l.ownOff.includes('phone') ? false : null, own_email_on: l.ownOff.includes('email') ? false : null } : {}),
   });
   if (error) throw error;
   // What was added on the card ("לשנות" › another number or mail): the card keeps its own list; what the CRM added stays.
@@ -638,6 +640,25 @@ export async function leadDestinations(leadId: string): Promise<Destination[]> {
 export async function addDestination(exhibitorId: string, leadId: string, d: Typed, label: string): Promise<void> {
   const { error } = await supabase.from('lead_contacts').insert({ lead_id: leadId, exhibitor_id: exhibitorId, kind: d.kind, value: d.value, label: label.trim() || null });
   if (error) throw error;
+}
+/**
+ * His own phone or mail, corrected (יצחק, 1/11: "עם אפשרות של עריכה"). A visitor who was typed has it changed in place;
+ * one from the community list keeps the list as it is (other exhibitors use it): for this exhibitor it stops receiving,
+ * and the right one is added beside it.
+ */
+export async function editOwn(exhibitorId: string, leadId: string, d: Typed): Promise<void> {
+  const { data, error } = await supabase.from('leads').select('person_id').eq('id', leadId).single();
+  if (error) throw error;
+  if (!data.person_id) {
+    const r = await supabase.from('leads').update(d.kind === 'phone' ? { typed_phone: d.value } : { typed_email: d.value }).eq('id', leadId);
+    if (r.error) throw r.error;
+    return;
+  }
+  const add = await supabase.from('lead_contacts').upsert({ lead_id: leadId, exhibitor_id: exhibitorId, kind: d.kind, value: d.value, label: d.kind === 'phone' ? 'טלפון מעודכן' : 'מייל מעודכן' },
+    { onConflict: 'lead_id,kind,value', ignoreDuplicates: true });
+  if (add.error) throw add.error;
+  const off = await supabase.from('leads').update(d.kind === 'phone' ? { own_phone_on: false } : { own_email_on: false }).eq('id', leadId);
+  if (off.error) throw off.error;
 }
 export async function setReceives(leadId: string, d: Destination, on: boolean): Promise<void> {
   const { error } = d.id

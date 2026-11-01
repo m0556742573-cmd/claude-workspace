@@ -14,8 +14,10 @@ export interface LocalLead extends Lead {
   synced: boolean;
   /** He registered himself, from the code on the booth's sign. */
   self?: boolean;
-  /** Numbers or mails added on the card ("לשנות"), as kept: the phone's digits from 0, the mail in lower case. */
+  /** Numbers or mails added on the card, as kept: the phone's digits from 0, the mail in lower case. */
   extra?: string[];
+  /** His phone or mail from the list, corrected on the card (1/11): it stops receiving, and the right one is in extra. */
+  ownOff?: ('phone' | 'email')[];
   /** What he ordered from the expo offer at the booth (model §14א). */
   order?: Order;
   /** When it was last changed (a time that only grows): an upload marks it synced only if nothing changed after (30/10). */

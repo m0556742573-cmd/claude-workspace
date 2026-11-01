@@ -22,7 +22,7 @@ import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
   addFollowNote, addManual, markReplied, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, signInMail, leadDestinations, addDestination, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, signInMail, leadDestinations, addDestination, editOwn, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -903,6 +903,8 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
   const [typed, setTyped] = useState('');
   const [whose, setWhose] = useState('');
   const [err, setErr] = useState('');
+  // His own phone or mail, being corrected (1/11).
+  const [fixing, setFixing] = useState<{ kind: 'phone' | 'email'; text: string } | null>(null);
   const load = useCallback(() => { leadDestinations(leadId).then(setList).catch(() => setList([])); }, [leadId]);
   useEffect(load, [load]);
   async function flip(d: Destination) {
@@ -921,6 +923,17 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
     } catch { setErr('לא נשמר. אפשר לנסות שוב.'); }
   }
   async function drop(d: Destination) { await removeDestination(d.id!).catch(() => {}); load(); onChange(); }
+  async function fix() {
+    if (!fixing) return;
+    const d = destinationOf(fixing.text);
+    if (!d || d.kind !== fixing.kind) { setErr(fixing.kind === 'phone' ? 'זה לא נראה כמו מספר טלפון' : 'זה לא נראה כמו מייל'); return; }
+    if (list?.some((x) => x.own && x.kind === d.kind && x.value === d.value)) { setFixing(null); setErr(''); return; }
+    try {
+      await editOwn(ctx.exhibitor.id, leadId, d);
+      setFixing(null); setErr(''); load(); onChange();
+      if (d.kind === 'phone' && ctx.phase === 'live' && hasWa(ctx)) waCheck(leadId).then(load).catch(() => {});
+    } catch { setErr('לא נשמר. אפשר לנסות שוב.'); }
+  }
   const title = (d: Destination) => (d.own ? (d.kind === 'phone' ? 'טלפון' : 'מייל') : d.label || (d.kind === 'phone' ? 'טלפון נוסף' : 'מייל נוסף'));
   const state = (d: Destination) => (d.removed ? 'ביקש להסיר' : d.kind !== 'phone' || !hasWa(ctx) ? '' : d.wa === true ? 'וואטסאפ' : d.wa === false ? 'אין וואטסאפ' : '');
   return (
@@ -935,8 +948,17 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
           </div>
           <span className="dest-acts">
             <button type="button" className="switch" role="switch" aria-checked={d.receives && !d.removed} aria-label={`${title(d)}: מקבל הודעות`} disabled={d.removed} onClick={() => flip(d)} />
-            {!d.own && <button type="button" className="text-btn" onClick={() => drop(d)}>להסיר</button>}
+            {d.own ? <button type="button" className="text-btn" onClick={() => { setFixing({ kind: d.kind, text: d.value }); setErr(''); }}>לערוך</button>
+              : <button type="button" className="text-btn" onClick={() => drop(d)}>להסיר</button>}
           </span>
+          {fixing && d.own && fixing.kind === d.kind && (
+            <form className="dest-add" onSubmit={(e) => { e.preventDefault(); fix(); }}>
+              <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={d.kind === 'phone' ? 'tel' : 'email'} aria-label={d.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'}
+                value={fixing.text} onChange={(e) => { setFixing({ ...fixing, text: e.target.value }); setErr(''); }} />
+              <button type="submit" className="btn" disabled={!fixing.text.trim()}>לשמור</button>
+              <button type="button" className="btn ghost" onClick={() => { setFixing(null); setErr(''); }}>ביטול</button>
+            </form>
+          )}
         </div>
       ))}
       {!!list?.length && <p className="faint small">מי שהמתג שלו דלוק מקבל את כל ההודעות. תשובה או "הסר" מכל אחד מהם נחשבים שלו.</p>}

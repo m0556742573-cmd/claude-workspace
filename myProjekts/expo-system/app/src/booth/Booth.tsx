@@ -40,13 +40,15 @@ export interface BoothProps {
   trialSend?: boolean;
   /** His expo offer (model §14א): "הזמין" on the card opens its items. */
   offer?: Offer | null;
-  /** He has WhatsApp. Without it (31/10) the booth says nothing of it, and asks a typed visitor for his mail. */
+  /** He has WhatsApp. Without it (31/10) the booth says nothing of it. */
   wa?: boolean;
+  /** A list visitor's phone and mail, from the server once his card is up (the tablet's copy of the list has none). */
+  ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -144,10 +146,10 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
     setCurrent(next);
     store(next);
   }
-  /** Another number or mail for this visitor (his wife's, the office): it gets every message, as his own does. */
-  function setExtra(extra: string[]) {
+  /** His contact details changed on the card: once up, a new number is checked for WhatsApp. */
+  function setContact(patch: Pick<LocalLead, 'extra' | 'ownOff' | 'typedPhone' | 'typedEmail'>) {
     if (!current) return;
-    const next = { ...current, extra, synced: false, rev: nextRev(current.rev) };
+    const next = { ...current, ...patch, synced: false, rev: nextRev(current.rev) };
     setCurrent(next);
     store(next).then((w) => { if (w === 'saved') verify(next.id); });
   }
@@ -251,13 +253,13 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           <input id="typed-phone" className="input" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={typing.phone} onChange={(e) => setTyping({ ...typing, phone: e.target.value })} />
           {/* A number cut short is caught here, while the visitor is still at the booth (30/10). */}
           {typedPhoneBad && <p className="faint small" role="alert">המספר לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
-          {!wa && <>
-            <label className="label" htmlFor="typed-email">מייל</label>
-            <input id="typed-email" className="input" inputMode="email" dir="ltr" style={{ textAlign: 'right' }} value={typing.email} onChange={(e) => setTyping({ ...typing, email: e.target.value })} />
-          </>}
+          {/* The mail is asked of every typed visitor (יצחק, 1/11), not only when the exhibitor has no WhatsApp. */}
+          <label className="label" htmlFor="typed-email">מייל</label>
+          <input id="typed-email" className="input" type="email" inputMode="email" dir="ltr" style={{ textAlign: 'right' }} value={typing.email} onChange={(e) => setTyping({ ...typing, email: e.target.value })} />
           {typedMailBad && <p className="faint small" role="alert">המייל לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
-          {wa && !typing.phone.trim() && typing.name.trim() && <p className="faint small">בלי טלפון לא יוצאות אליו הודעות בוואטסאפ.</p>}
-          {!wa && !typing.email.trim() && typing.name.trim() && <p className="faint small">בלי מייל לא יוצאות אליו הודעות.</p>}
+          {typing.name.trim() && (!typing.phone.trim() && !typing.email.trim() ? <p className="faint small">בלי טלפון ובלי מייל לא יוצאות אליו הודעות.</p>
+            : wa && !typing.phone.trim() ? <p className="faint small">בלי טלפון ההודעות יוצאות אליו רק במייל.</p>
+            : !wa && !typing.email.trim() ? <p className="faint small">בלי מייל לא יוצאות אליו הודעות.</p> : null)}
           <div className="actions">
             <button type="button" className="btn primary" disabled={!typing.name.trim() || typedPhoneBad || typedMailBad} onClick={() => capture({ name: typing.name, phone: typing.phone, email: typing.email })}>✓ שמירה</button>
           </div>
@@ -293,7 +295,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             <div className="empty">
               כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br />כל השאר רשות.
               <div className="empty-acts">
-                {!desk && <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד שם וטלפון</button>}
+                {!desk && <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד את הפרטים שלו</button>}
                 {joinCode && <button type="button" className="text-btn" onClick={() => setShowCode(true)}>תור? קוד להרשמה עצמית</button>}
               </div>
             </div>
@@ -306,8 +308,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           <div className="lead-head">
             <div>
               <span className="nm">{current.name}</span> <span className="muted">{current.city ?? ''}</span>
-              {(current.businessOwner || current.typedPhone || current.self) && (
-                <div className="faint">{[current.businessOwner ? 'בעל עסק' : '', current.typedPhone ?? '', current.self ? 'נרשם לבד' : ''].filter(Boolean).join(' · ')}</div>
+              {(current.businessOwner || current.self) && (
+                <div className="faint">{[current.businessOwner ? 'בעל עסק' : '', current.self ? 'נרשם לבד' : ''].filter(Boolean).join(' · ')}</div>
               )}
             </div>
             <div className="head-acts">
@@ -315,6 +317,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               <button type="button" className="btn primary" onClick={() => { stopRecording(); setCurrent(null); searchRef.current?.focus(); }}>✓ סיום</button>
             </div>
           </div>
+
+          <Contacts key={current.id} lead={current} wa={wa} online={online} checked={checked[current.id]} ownOf={practice ? undefined : ownOf} onChange={setContact} />
 
           {questions.filter(([, items]) => items.length).map(([q, items]) => (
             <div key={q}>
@@ -335,7 +339,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
 
           {messages.length > 0 && <SendLine key={current.id} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
-            checked={checked[current.id]} onExtra={setExtra} />}
+            checked={checked[current.id]} />}
 
           <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
 
@@ -421,24 +425,15 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
  * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
  * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
  */
-function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked, onExtra }: {
+function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked }: {
   lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; trialSend: boolean; picking: boolean;
   onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
-  /** What the check at the visit found, when it ran. */ checked?: Checked[]; onExtra: (extra: string[]) => void;
+  /** What the check at the visit found, when it ran. */ checked?: Checked[];
 }) {
   const auto = immediateMessage(setup, lead);
   const chosen = lead.booth;
   const def = boothDefault && messages.includes(boothDefault) ? boothDefault : null;
-  const extra = lead.extra ?? [];
   const noWa = checked?.find((c) => c.own)?.wa === false;
-  const [typed, setTyped] = useState('');
-  const [bad, setBad] = useState(false);
-  function add() {
-    const d = destinationOf(typed);
-    if (!d) { setBad(true); return; }
-    if (!extra.includes(d.value)) onExtra([...extra, d.value]);
-    setTyped(''); setBad(false);
-  }
   return (
     <div className="send-line">
       <div className="send-row">
@@ -451,20 +446,6 @@ function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, pi
         {noWa && <span className="faint small">· אין לו וואטסאפ</span>}
         {practice && <span className="faint small">{trialSend ? '· בניסיון יוצא אליך' : '· בניסיון לא נשלח'}</span>}
       </div>
-      {extra.length > 0 && (
-        <div className="send-row">
-          <span className="faint">גם ל:</span>
-          {extra.map((v) => {
-            const wa = checked?.find((c) => c.num === v)?.wa;
-            return (
-              <span key={v} className="extra-chip">
-                <span dir="ltr">{showDestination(v)}</span>{wa === false && <span className="faint small"> · אין וואטסאפ</span>}
-                <button type="button" className="text-btn" aria-label={`להסיר את ${showDestination(v)}`} onClick={() => onExtra(extra.filter((x) => x !== v))}>✕</button>
-              </span>
-            );
-          })}
-        </div>
-      )}
       {picking && (
         <div className="chips">
           {messages.map((m) => <button key={m} type="button" className="chip" aria-pressed={chosen?.message === m} onClick={() => onChoose({ message: m })}>{m}</button>)}
@@ -472,13 +453,113 @@ function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, pi
           {chosen && <button type="button" className="chip" onClick={() => onChoose(undefined)}>כמו במסלול</button>}
         </div>
       )}
-      {picking && (
-        <form className="extra-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
-          <input className="input" dir="auto" inputMode="tel" aria-label="גם למספר או מייל נוסף, למשל של אשתו" placeholder="גם למספר או מייל נוסף"
-            value={typed} onChange={(e) => { setTyped(e.target.value); setBad(false); }} />
-          <button type="submit" className="btn" disabled={!typed.trim()}>להוסיף</button>
-          {bad && <span className="err small">זה לא נראה כמו טלפון או מייל</span>}
+    </div>
+  );
+}
+
+/**
+ * His contact details on the card, with editing and adding (יצחק, 1/11: "בכל כרטיס מבקר חייב להופיע פרטי הקשר שלו עם
+ * אפשרות של עריכה והוספה"). A typed visitor's phone and mail are changed in place. A list visitor's come from the
+ * server once the card is up; correcting one leaves the community list as it is (other exhibitors use it): his old one
+ * stops receiving for this exhibitor, and the right one is added. Everything added receives every message, as his own does.
+ */
+function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
+  lead: LocalLead; wa: boolean; online: boolean; checked?: Checked[];
+  ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
+  onChange: (patch: Pick<LocalLead, 'extra' | 'ownOff' | 'typedPhone' | 'typedEmail'>) => void;
+}) {
+  const fromList = !!lead.personId;
+  const [listed, setListed] = useState<{ phone: string | null; email: string | null } | null>(null);
+  const [editing, setEditing] = useState<{ kind: 'phone' | 'email' | 'add'; text: string } | null>(null);
+  const [bad, setBad] = useState('');
+  const tries = useRef(0);
+  // Asked until the card is up (a card only just tapped may still be on its way), then kept.
+  useEffect(() => {
+    if (!fromList || !ownOf || !online || listed) return;
+    let stop = false;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const again = () => { if (tries.current++ < 5) t = setTimeout(go, 3000); else setListed({ phone: null, email: null }); };
+    const go = () => { ownOf(lead.id).then((c) => { if (stop) return; if (c) setListed({ phone: c.phone, email: c.email }); else again(); }, () => { if (!stop) again(); }); };
+    go();
+    return () => { stop = true; clearTimeout(t); };
+  }, [fromList, ownOf, online, lead.id, listed]);
+
+  const extra = lead.extra ?? [];
+  const off = lead.ownOff ?? [];
+  const typedPhone = lead.typedPhone ? destinationOf(lead.typedPhone)?.value ?? lead.typedPhone : null;
+  const own = { phone: fromList ? listed?.phone ?? null : typedPhone, email: fromList ? listed?.email ?? null : lead.typedEmail ?? null };
+  const waOf = (v: string, isOwn: boolean) => (wa ? checked?.find((c) => (isOwn ? c.own : c.num === v))?.wa : undefined);
+
+  function save() {
+    if (!editing) return;
+    const d = destinationOf(editing.text);
+    const want = editing.kind === 'add' ? null : editing.kind;
+    if (!d || (want && d.kind !== want)) { setBad(want === 'email' ? 'זה לא נראה כמו מייל' : want === 'phone' ? 'זה לא נראה כמו מספר טלפון' : 'זה לא נראה כמו טלפון או מייל'); return; }
+    const kind = d.kind;
+    const typedOwn = (): Pick<LocalLead, 'typedPhone' | 'typedEmail'> => (kind === 'phone' ? { typedPhone: d.value } : { typedEmail: d.value });
+    if (editing.kind === 'add') {
+      // A typed visitor's first phone or mail is his own; anything else goes beside it.
+      if (!fromList && !own[kind]) onChange(typedOwn());
+      else if (d.value !== own[kind] && !extra.includes(d.value)) onChange({ extra: [...extra, d.value] });
+    } else if (!fromList) {
+      onChange(typedOwn());
+    } else if (d.value !== own[kind]) {
+      // A list value corrected: the right one goes beside it, and the old one stops receiving.
+      onChange({ extra: extra.includes(d.value) ? extra : [...extra, d.value], ownOff: off.includes(kind) ? off : [...off, kind] });
+    }
+    setEditing(null); setBad('');
+  }
+
+  const row = (kind: 'phone' | 'email') => {
+    const v = own[kind];
+    const replaced = off.includes(kind);
+    const label = kind === 'phone' ? 'טלפון' : 'מייל';
+    if (!v) return null;
+    const noWa = kind === 'phone' && waOf(v, true) === false;
+    return (
+      <div className="ct-row" key={kind}>
+        <span className="faint">{label}</span>
+        <span className="ct-val">
+          {replaced ? <s dir="ltr">{showDestination(v)}</s> : <span dir="ltr">{showDestination(v)}</span>}
+          {replaced && <span className="faint small"> · הוחלף</span>}
+          {noWa && !replaced && <span className="faint small"> · אין וואטסאפ</span>}
+        </span>
+        {replaced
+          ? <button type="button" className="text-btn" onClick={() => onChange({ ownOff: off.filter((k) => k !== kind) })}>להחזיר</button>
+          : <button type="button" className="text-btn" onClick={() => { setEditing({ kind, text: v }); setBad(''); }}>לערוך</button>}
+      </div>
+    );
+  };
+
+  const waiting = fromList && !listed && !!ownOf;
+  return (
+    <div className="contacts" aria-label="פרטי הקשר">
+      <div className="label">פרטי קשר</div>
+      {row('phone')}
+      {row('email')}
+      {extra.map((v) => {
+        const kind = v.includes('@') ? 'email' : 'phone';
+        return (
+          <div className="ct-row" key={v}>
+            <span className="faint">{kind === 'phone' ? 'טלפון נוסף' : 'מייל נוסף'}</span>
+            <span className="ct-val"><span dir="ltr">{showDestination(v)}</span>{kind === 'phone' && waOf(v, false) === false && <span className="faint small"> · אין וואטסאפ</span>}</span>
+            <button type="button" className="text-btn" aria-label={`להסיר את ${showDestination(v)}`} onClick={() => onChange({ extra: extra.filter((x) => x !== v) })}>להסיר</button>
+          </div>
+        );
+      })}
+      {waiting && <p className="faint small">{online ? 'הטלפון והמייל שלו מהרשימה נטענים…' : 'הטלפון והמייל שלו מהרשימה יופיעו כשתחזור הרשת.'}</p>}
+      {!waiting && !own.phone && !own.email && !extra.length && <p className="faint small">אין לו עדיין טלפון או מייל. בלי אחד מהם לא יוצאות אליו הודעות.</p>}
+      {editing ? (
+        <form className="extra-add" onSubmit={(e) => { e.preventDefault(); save(); }}>
+          <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={editing.kind === 'email' ? 'email' : editing.kind === 'phone' ? 'tel' : 'text'}
+            aria-label={editing.kind === 'add' ? 'טלפון או מייל נוסף, למשל של אשתו' : editing.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'}
+            placeholder={editing.kind === 'add' ? 'טלפון או מייל' : ''} value={editing.text} onChange={(e) => { setEditing({ ...editing, text: e.target.value }); setBad(''); }} />
+          <button type="submit" className="btn" disabled={!editing.text.trim()}>{editing.kind === 'add' ? 'להוסיף' : 'לשמור'}</button>
+          <button type="button" className="btn ghost" onClick={() => { setEditing(null); setBad(''); }}>ביטול</button>
+          {bad && <span className="err small">{bad}</span>}
         </form>
+      ) : (
+        <button type="button" className="text-btn ct-add" onClick={() => { setEditing({ kind: 'add', text: '' }); setBad(''); }}>＋ טלפון או מייל</button>
       )}
     </div>
   );
