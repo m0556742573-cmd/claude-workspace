@@ -14,7 +14,7 @@ import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx }
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
-import { EXPO_DAY, today } from './lib/words.ts';
+import { EXPO_DAY, LIST_CLOSES, today } from './lib/words.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
@@ -322,6 +322,7 @@ function Live() {
             trialSend={exhibitor.trial_send}
             offer={exhibitor.offer}
             ownOf={leadContact}
+            listClosed={!admin && today() >= LIST_CLOSES}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום האקספו' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}

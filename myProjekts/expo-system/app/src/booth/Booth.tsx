@@ -52,11 +52,13 @@ export interface BoothProps {
   wa?: boolean;
   /** A list visitor's phone and mail, from the server once his card is up (the tablet's copy of the list has none). */
   ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
+  /** The community list closed two days after the fair (1/11): a new visitor is typed. */
+  listClosed?: boolean;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, stuck, onRetry, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, stuck, onRetry, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf, listClosed }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -302,13 +304,15 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </div>
           )}
           {query.trim().length >= 2 && !results.length && (
-            <div className="results"><button type="button" className="result add-row" onClick={newOne}><span className="muted">לא נמצא ברשימה. <b>＋ מבקר חדש</b></span></button></div>
+            <div className="results"><button type="button" className="result add-row" onClick={newOne}><span className="muted">{listClosed ? 'רשימת הקהילה סגורה.' : 'לא נמצא ברשימה.'} <b>＋ מבקר חדש</b></span></button></div>
           )}
           {!current && !query.trim() && (
             <div className="empty">
-              כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br />כל השאר רשות.
+              {listClosed
+                ? <>החיפוש ברשימת הקהילה נסגר יומיים אחרי האקספו.<br />מבקר חדש נרשם עם שם וטלפון שמקלידים.</>
+                : <>כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br />כל השאר רשות.</>}
               <div className="empty-acts">
-                {!desk && <button type="button" className="text-btn" onClick={newOne}>לא ברשימה? להקליד את הפרטים שלו</button>}
+                {!desk && <button type="button" className="text-btn" onClick={newOne}>{listClosed ? 'להקליד את הפרטים שלו' : 'לא ברשימה? להקליד את הפרטים שלו'}</button>}
                 {joinCode && <button type="button" className="text-btn" onClick={() => setShowCode(true)}>תור? קוד להרשמה עצמית</button>}
               </div>
             </div>

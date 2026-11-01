@@ -7,6 +7,9 @@ export const END: Record<string, string> = { list: 'ברשימת התפוצה', 
 
 /** The day of the fair: until it ends the app opens on the booth, after it on the follow-up. */
 export const EXPO_DAY = '2026-11-16';
+/** Two days after the fair the community list closes to exhibitors (יצחק, 1/11): the server keeps it (migration 0045);
+ *  the app only says why the search is empty. */
+export const LIST_CLOSES = addDays(EXPO_DAY, 3);
 
 export function today(): string {
   const d = new Date();
