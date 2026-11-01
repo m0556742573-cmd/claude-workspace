@@ -1392,7 +1392,7 @@ function WaLink({ ctx }: { ctx: Ctx }) {
 
 /** When the visitor's own mail gets messages: his choice (יצחק, 29/10). Only when his phone gets no WhatsApp (§10), or always. */
 /** Trying the booth before the fair (יצחק, 29/10): with sample names, without sending, or with every message sent to him
- *  instead of the visitor, opening with whom it would have gone to. The first 10 trial visitors get messages. */
+ *  instead of the visitor, opening with whom it would have gone to. The last 10 trial visitors get messages (0043, 1/11). */
 function Trial({ ctx }: { ctx: Ctx }) {
   const e = ctx.exhibitor;
   const [typed, setTyped] = useState('');
@@ -1437,7 +1437,7 @@ function Trial({ ctx }: { ctx: Ctx }) {
           <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה. כל המבקרים מתחילים מהרגע שמדליקים.</span></span>
           <button type="button" className="switch" role="switch" aria-checked={e.trial_fast} aria-label="יום עובר בדקה" onClick={() => set({ trial_fast: !e.trial_fast })} />
         </div>
-        <p className="muted small">עשרת מבקרי הניסיון הראשונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת.{hasWa(ctx) ? ' בוואטסאפ זה יוצא רק כשהוא מחובר.' : ''}</p>
+        <p className="muted small">עשרת מבקרי הניסיון האחרונים מקבלים הודעות. בראש כל הודעה כתוב למי היא הייתה יוצאת.{hasWa(ctx) ? ' בוואטסאפ זה יוצא רק כשהוא מחובר.' : ''}</p>
       </>}
     </section>
   );
