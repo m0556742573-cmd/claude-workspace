@@ -42,7 +42,7 @@ export type Theme = 'forest' | 'snow';
 export const themeNow = (): Theme => (document.documentElement.dataset.theme === 'snow' ? 'snow' : 'forest');
 export function setTheme(t: Theme) {
   if (t === 'snow') document.documentElement.dataset.theme = 'snow'; else delete document.documentElement.dataset.theme;
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content', t === 'snow' ? '#F4F6F1' : '#0B1A13');
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#0B1A13'); // both themes: the top bar is forest
   try { localStorage.setItem('expo-theme', t); } catch { /* the device may not keep it */ }
 }
 

@@ -1,7 +1,7 @@
 /* אקספומקס (design system TE84PqgQbuB8QQnXRFEJWw, 30/10; the whole system moved to it on 31/10).
    Two full themes, set by data-theme on <html>: forest (dark, the default) and snow (light). One loud colour, the expo
-   orange: the top chevron, "מקס", the primary button. Points of light, not surfaces. On snow, orange text is always the
-   deep orange (accent-text); plain orange there is decoration only. Every value below is the design system's token. */
+   orange: the top chevron, "מקס", the primary button (orange with forest words, in both themes). Points of light, not
+   surfaces. Snow (recalculated 1/11): sand paper, a forest frame; orange text there is always the deep orange (accent-text). Every value below is the design system's token. */
 :root, :root[data-theme="forest"] {
   --brand-forest: #0B1A13; --brand-moss: #1D3A2C; --brand-sage: #7F9488; --brand-snow: #F2F5EE; --brand-orange: #F8AC00; --brand-orange-deep: #B36F00; --yhm-leaf: #C9F26B;
   --surface-page: #0B1A13; --surface-raised: #12261C; --surface-sunken: #07110C; --surface-moss: #1D3A2C; --hover: #183224;
@@ -18,18 +18,30 @@
   color-scheme: dark;
 }
 :root[data-theme="snow"] {
-  --surface-page: #F4F6F1; --surface-raised: #FFFFFF; --surface-sunken: #E8EDE4; --surface-moss: #DCE5D8; --hover: #EEF2EB;
-  --line: #D3DCCF; --line-strong: #6F8377;
-  --ink: #0B1A13; --ink-muted: #405247; --ink-subtle: #5A6D61;
-  --lit: #F8AC00; --loose: #7F9488; --accent-text: #B36F00;
-  --action: #0B1A13; --on-action: #F8AC00; --action-hover: #1D3A2C; --accent-soft: #FDEBC4;
+  --surface-page: #EEE8DB; --surface-raised: #FBF9F4; --surface-sunken: #E4DCCB; --surface-moss: #DDE2D4; --hover: #F3EFE6;
+  --line: #D9D0BD; --line-strong: #6E7E74;
+  --ink: #0B1A13; --ink-muted: #3A4A41; --ink-subtle: #4F5F56;
+  --lit: #F8AC00; --loose: #7F9488; --accent-text: #9E5700;
+  --action: #F8AC00; --on-action: #0B1A13; --action-hover: #EDA200; --accent-soft: #FFEBC0;
   --positive: #3F6B12; --positive-soft: #E3F1D6; --caution: #6E5600; --caution-soft: #F4EDCF;
-  --critical: #B3361B; --critical-soft: #FADAD2; --info: #0B1A13; --info-soft: #E2E8DF;
+  --critical: #B3361B; --critical-soft: #FADAD2; --info: #0B1A13; --info-soft: #E3E3D6;
   --shadow-1: 0 1px 2px rgba(11,26,19,0.06), 0 16px 32px -22px rgba(11,26,19,0.28);
   --shadow-2: 0 2px 4px rgba(11,26,19,0.06), 0 36px 60px -32px rgba(11,26,19,0.35);
-  --focus-ring: 0 0 0 2px #F4F6F1, 0 0 0 4px #0B1A13;
+  --focus-ring: 0 0 0 2px #FBF9F4, 0 0 0 4px #0B1A13;
   --scrim: rgba(11, 26, 19, .45);
+  --logo-max: #B36F00; /* "מקס" on light, as in the logo files; text orange is accent-text */
   color-scheme: light;
+}
+/* snow keeps a forest frame (1/11): the menu and the top bar are the dark theme, so the logo and "where you are" keep
+   their own colours. The aliases below resolve where they are declared, so they are declared again inside the frame. */
+:root[data-theme="snow"] :is(.side, .thead, .gate-top, .adm-side) {
+  --surface-page: #0B1A13; --surface-raised: #0B1A13; --surface-sunken: #07110C; --surface-moss: #1D3A2C; --hover: #183224;
+  --line: #23402F; --line-strong: #557A66; --ink: #F2F5EE; --ink-muted: #A9B7AE; --ink-subtle: #7F9488;
+  --accent-text: #F8AC00; --logo-max: #F8AC00; --accent-soft: #33270A; --action-hover: #FFC23D; --focus-ring: 0 0 0 2px #0B1A13, 0 0 0 4px #F8AC00;
+  --bg: var(--surface-page); --surface: var(--surface-raised); --surface-2: var(--surface-sunken); --surface-3: var(--line);
+  --ink-2: var(--ink-muted); --muted: var(--ink-muted); --faint: var(--ink-subtle); --selected: var(--surface-moss);
+  --accent: var(--action); --accent-ink: var(--on-action); --ai: var(--accent-text); --ai-soft: var(--accent-soft); --ring: var(--focus-ring);
+  background: #0B1A13; color: var(--ink); border-color: #0B1A13;
 }
 :root {
   --radius-xs: 4px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 18px; --radius-xl: 24px; --radius-pill: 999px;
@@ -701,13 +713,13 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 
 /* =================== The ExpoMax look (31/10): the design system's components over the screens above ===================
    Its bundle.css, mapped onto these screens' own classes. Cards are raised with a hairline and a soft shadow; buttons are
-   pills, one primary (the orange on forest, forest on snow) per screen; fields are sunken wells; a selected thing is moss,
+   pills, one primary (the orange, forest words) per screen; fields are sunken wells; a selected thing is moss,
    and the orange marks only where you are (a short lit piece) and what arrived. */
 body { font-family: var(--font-sans); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* the logo */
-.x-logo { display: inline-flex; direction: rtl; align-items: center; flex: none; line-height: 1; gap: calc(var(--xl-h) * .2); --xl-ink: var(--ink); --xl-max: var(--accent-text); }
+.x-logo { display: inline-flex; direction: rtl; align-items: center; flex: none; line-height: 1; gap: calc(var(--xl-h) * .2); --xl-ink: var(--ink); --xl-max: var(--logo-max, var(--accent-text)); }
 .x-logo--stacked { flex-direction: column; gap: calc(var(--xl-h) * .18); }
 .x-logo__sym, .x-sym, .x-yhm { display: block; flex: none; }
 .x-sym__loose { fill: var(--loose); }
@@ -763,6 +775,7 @@ a, .text-btn, .link { color: var(--ink); text-underline-offset: 4px; }
 .chip:hover { border-color: var(--ink); color: var(--ink); }
 .sheet .chip { background: transparent; }
 .chip[aria-pressed="true"], .btn[aria-pressed="true"], .tool[aria-pressed="true"], .sheet .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--lit); color: var(--ink); font-weight: 700; }
+:root[data-theme="snow"] :is(.chip, .btn, .tool)[aria-pressed="true"] { border-color: var(--accent-text); }
 .tool { border: 1.5px solid var(--line-strong); background: transparent; border-radius: var(--radius-md); color: var(--ink); }
 .seg { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line); }
 .seg button { color: var(--ink-muted); }
