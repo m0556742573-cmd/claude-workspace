@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { PageHead } from '../ui.tsx';
 import { adminKeys, adminMailTest, adminSetKey, type AdminKeys } from '../lib/wa.ts';
+import { MailInput, mailProblem } from '../mail.tsx';
 
 type Field = [name: string, label: string, secret: boolean, hint?: string];
 const GROUPS: { title: string; about: string; fields: Field[]; when?: (k: AdminKeys['keys']) => boolean }[] = [
@@ -82,8 +83,8 @@ function MailTest() {
   }
   return (
     <div className="row">
-      <input className="input" dir="ltr" type="email" placeholder="כתובת לבדיקה" value={to} onChange={(e) => setTo(e.target.value)} />
-      <button type="button" className="btn" disabled={busy || !to.includes('@')} onClick={run}>מייל בדיקה</button>
+      <MailInput className="input" placeholder="כתובת לבדיקה" value={to} onValue={setTo} />
+      <button type="button" className="btn" disabled={busy || !to.trim() || !!mailProblem(to)} onClick={run}>מייל בדיקה</button>
       {msg && <span className="muted small">{msg}</span>}
     </div>
   );

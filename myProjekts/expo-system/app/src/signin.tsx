@@ -3,6 +3,7 @@
 // sender (Supabase Auth over Cloudflare's SMTP), not through the WhatsApp server.
 import { useEffect, useState } from 'react';
 import { sendMailCode, verifyMailCode } from './lib/backend.ts';
+import { MailInput, mailHints, mailProblem } from './mail.tsx';
 
 /** newUsers: the booth lets a new exhibitor in (he waits for approval as with Google); the admin platform does not. */
 export function MailCode({ newUsers }: { newUsers: boolean }) {
@@ -15,7 +16,9 @@ export function MailCode({ newUsers }: { newUsers: boolean }) {
   useEffect(() => { if (wait > 0) { const t = setTimeout(() => setWait(wait - 1), 1000); return () => clearTimeout(t); } }, [wait]);
 
   const mail = email.trim().toLowerCase();
-  const mailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail);
+  const mailWrong = mailProblem(mail);
+  const mailOk = !!mail && !mailWrong;
+  const [mailLeft, setMailLeft] = useState(false);
   const digits = code.replace(/\D/g, '');
 
   async function send() {
@@ -35,9 +38,10 @@ export function MailCode({ newUsers }: { newUsers: boolean }) {
       <form className="mail-code" onSubmit={(e) => { e.preventDefault(); if (mailOk && !busy) send(); }}>
         <label className="label" htmlFor="mc-mail">או עם קוד למייל</label>
         <div className="row">
-          <input id="mc-mail" className="input" type="email" dir="ltr" autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <MailInput id="mc-mail" className="input" autoComplete="email" placeholder="name@example.com" value={email} onValue={setEmail} onBlur={() => setMailLeft(true)} />
           <button type="submit" className="btn" disabled={!mailOk || busy}>לשלוח לי קוד</button>
         </div>
+        {mailWrong && mailLeft && !mailHints(mail).options.length && <p className="muted small" role="alert">{mailWrong}</p>}
         {msg && <p className="muted small" role="alert">{msg}</p>}
       </form>
     );

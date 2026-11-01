@@ -5,6 +5,7 @@ import { Logo } from './brand.tsx';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import qrcode from 'qrcode-generator';
 import { fileUrl, joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
+import { MailInput, mailHints, mailProblem } from './mail.tsx';
 
 const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 /** On the visitor's page a button reads without the "(מתי?)" the exhibitor sees; a date field opens instead. */
@@ -17,6 +18,7 @@ export const joinUrl = (code: string) => `${PUBLIC}/#join/${code}`;
 export function Join({ code }: { code: string }) {
   const [info, setInfo] = useState<JoinInfo | null | undefined>(undefined);
   const [f, setF] = useState({ name: '', phone: '', email: '' });
+  const [mailLeft, setMailLeft] = useState(false);
   const [taps, setTaps] = useState<string[]>([]);
   const [date, setDate] = useState('');
   const [consent, setConsent] = useState(false);
@@ -36,7 +38,8 @@ export function Join({ code }: { code: string }) {
   const who = info.business || info.name;
   const wantsDate = taps.some((t) => ASKS_DATE.test(t));
   const phoneOk = f.phone.replace(/\D/g, '').replace(/^972/, '0').length >= 9;
-  const ready = f.name.trim().length >= 2 && phoneOk;
+  const mailWrong = mailProblem(f.email);
+  const ready = f.name.trim().length >= 2 && phoneOk && !mailWrong;
   const toggle = (label: string) => setTaps(taps.includes(label) ? taps.filter((t) => t !== label) : [...taps, label]);
 
   async function send() {
@@ -62,7 +65,7 @@ export function Join({ code }: { code: string }) {
       <JoinBox title={`תודה, ${first}`} by={who} logo={info.logo}>
         <p>{state === 'again' ? 'כבר היית רשום היום. הוספנו את מה שסימנת עכשיו.' : `נרשמת אצל ${who}.`}</p>
         <p className="muted">{info.sensitive && !consent ? 'נחזור אליך רק אם יהיה צורך.' : 'נחזור אליך על מה שסימנת.'} אפשר לבקש להסיר בכל רגע.</p>
-        <button type="button" className="text-btn" onClick={() => { setF({ name: '', phone: '', email: '' }); setTaps([]); setDate(''); setConsent(false); setState(''); }}>לרשום עוד מישהו</button>
+        <button type="button" className="text-btn" onClick={() => { setF({ name: '', phone: '', email: '' }); setMailLeft(false); setTaps([]); setDate(''); setConsent(false); setState(''); }}>לרשום עוד מישהו</button>
       </JoinBox>
     );
   }
@@ -75,7 +78,8 @@ export function Join({ code }: { code: string }) {
         <div className="typed">
           <label className="field" htmlFor="j-name">שם מלא<input id="j-name" className="input" autoComplete="name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
           <label className="field" htmlFor="j-phone">טלפון<input id="j-phone" className="input" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" style={{ textAlign: 'right' }} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
-          <label className="field" htmlFor="j-email">מייל (לא חובה)<input id="j-email" className="input" type="email" inputMode="email" autoComplete="email" dir="ltr" style={{ textAlign: 'right' }} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+          <label className="field" htmlFor="j-email">מייל (לא חובה)<MailInput id="j-email" className="input" autoComplete="email" style={{ textAlign: 'right' }} value={f.email} onValue={(email) => setF({ ...f, email })} onBlur={() => setMailLeft(true)} /></label>
+          {mailWrong && mailLeft && !mailHints(f.email).options.length && <p className="err small" role="alert">{mailWrong} אפשר גם להשאיר אותו ריק.</p>}
         </div>
         {questions.filter(([, items]) => items.length).map(([q, items]) => (
           <div className="q-block" key={q}>

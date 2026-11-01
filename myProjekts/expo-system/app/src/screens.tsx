@@ -17,6 +17,7 @@ import { adminMailTest, forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, t
 import { prepareLogo } from './lib/logo.ts';
 import { Consultant } from './consult.tsx';
 import { destinationOf, maskDestination, showDestination } from './lib/destination.ts';
+import { MailInput, mailProblem } from './mail.tsx';
 import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
@@ -913,6 +914,8 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
     onChange();
   }
   async function add() {
+    const mailWrong = typed.includes('@') ? mailProblem(typed) : null;
+    if (mailWrong) { setErr(mailWrong); return; }
     const d = destinationOf(typed);
     if (!d) { setErr('זה לא נראה כמו טלפון או מייל'); return; }
     if (list?.some((x) => x.kind === d.kind && x.value === d.value)) { setErr('כבר ברשימה'); return; }
@@ -925,6 +928,8 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
   async function drop(d: Destination) { await removeDestination(d.id!).catch(() => {}); load(); onChange(); }
   async function fix() {
     if (!fixing) return;
+    const mailWrong = fixing.kind === 'email' ? mailProblem(fixing.text) : null;
+    if (mailWrong) { setErr(mailWrong); return; }
     const d = destinationOf(fixing.text);
     if (!d || d.kind !== fixing.kind) { setErr(fixing.kind === 'phone' ? 'זה לא נראה כמו מספר טלפון' : 'זה לא נראה כמו מייל'); return; }
     if (list?.some((x) => x.own && x.kind === d.kind && x.value === d.value)) { setFixing(null); setErr(''); return; }
@@ -953,8 +958,13 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
           </span>
           {fixing && d.own && fixing.kind === d.kind && (
             <form className="dest-add" onSubmit={(e) => { e.preventDefault(); fix(); }}>
-              <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={d.kind === 'phone' ? 'tel' : 'email'} aria-label={d.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'} placeholder={maskDestination(d.value)}
-                value={fixing.text} onChange={(e) => { setFixing({ ...fixing, text: e.target.value }); setErr(''); }} />
+              {d.kind === 'phone' ? (
+                <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode="tel" aria-label="הטלפון הנכון" placeholder={maskDestination(d.value)}
+                  value={fixing.text} onChange={(e) => { setFixing({ ...fixing, text: e.target.value }); setErr(''); }} />
+              ) : (
+                <MailInput className="input" autoFocus style={{ textAlign: 'right' }} aria-label="המייל הנכון" placeholder={maskDestination(d.value)}
+                  value={fixing.text} onValue={(text) => { setFixing({ ...fixing, text }); setErr(''); }} />
+              )}
               <button type="submit" className="btn" disabled={!fixing.text.trim()}>לשמור</button>
               <button type="button" className="btn ghost" onClick={() => { setFixing(null); setErr(''); }}>ביטול</button>
             </form>
@@ -963,7 +973,7 @@ function Destinations({ ctx, leadId, onChange }: { ctx: Ctx; leadId: string; onC
       ))}
       {!!list?.length && <p className="faint small">מי שהמתג שלו דלוק מקבל את כל ההודעות. תשובה או "הסר" מכל אחד מהם נחשבים שלו.</p>}
       <form className="dest-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
-        <input className="input" dir="auto" aria-label="טלפון או מייל נוסף" placeholder="טלפון או מייל נוסף" value={typed} onChange={(e) => { setTyped(e.target.value); setErr(''); }} />
+        <MailInput className="input" mixed dir="auto" aria-label="טלפון או מייל נוסף" placeholder="טלפון או מייל נוסף" value={typed} onValue={(v) => { setTyped(v); setErr(''); }} />
         <input className="input" aria-label="של מי (לא חובה)" placeholder="של מי? (לא חובה)" value={whose} onChange={(e) => setWhose(e.target.value)} />
         <button type="submit" className="btn" disabled={!typed.trim()}>להוסיף</button>
       </form>
@@ -1386,14 +1396,15 @@ function WaLink({ ctx }: { ctx: Ctx }) {
 function Trial({ ctx }: { ctx: Ctx }) {
   const e = ctx.exhibitor;
   const [typed, setTyped] = useState('');
-  const [bad, setBad] = useState(false);
+  const [bad, setBad] = useState<string | boolean>(false);
   const set = async (patch: Partial<Pick<Exhibitor, 'trial_send' | 'trial_fast' | 'trial_to'>>) => {
     ctx.setExhibitor({ ...e, ...patch });
     await setWaOptions(e.id, patch).catch(() => ctx.setExhibitor(e));
   };
   function add() {
-    const d = destinationOf(typed);
-    if (!d) { setBad(true); return; }
+    const mailWrong = typed.includes('@') ? mailProblem(typed) : null;
+    const d = mailWrong ? null : destinationOf(typed);
+    if (!d) { setBad(mailWrong ?? true); return; }
     if (!e.trial_to.includes(d.value)) set({ trial_to: [...e.trial_to, d.value] });
     setTyped(''); setBad(false);
   }
@@ -1417,11 +1428,11 @@ function Trial({ ctx }: { ctx: Ctx }) {
           ))}
         </div>
         <div className="row">
-          <input className="input" dir="auto" aria-label="עוד מספר או מייל לניסיון" placeholder="עוד מספר או מייל" value={typed}
-            onChange={(ev) => { setTyped(ev.target.value); setBad(false); }} onKeyDown={(ev) => { if (ev.key === 'Enter') add(); }} />
+          <MailInput className="input" mixed dir="auto" aria-label="עוד מספר או מייל לניסיון" placeholder="עוד מספר או מייל" value={typed}
+            onValue={(v) => { setTyped(v); setBad(false); }} onKeyDown={(ev) => { if (ev.key === 'Enter') add(); }} />
           <button type="button" className="btn" disabled={!typed.trim()} onClick={add}>להוסיף</button>
         </div>
-        {bad && <p className="err small">זה לא נראה כמו מספר טלפון או מייל.</p>}
+        {bad && <p className="err small">{typeof bad === 'string' ? bad : 'זה לא נראה כמו מספר טלפון או מייל.'}</p>}
         <div className="switchrow">
           <span>יום עובר בדקה <span className="faint small">· מסלול של שבועיים נגמר בפחות מחצי שעה. כל המבקרים מתחילים מהרגע שמדליקים.</span></span>
           <button type="button" className="switch" role="switch" aria-checked={e.trial_fast} aria-label="יום עובר בדקה" onClick={() => set({ trial_fast: !e.trial_fast })} />

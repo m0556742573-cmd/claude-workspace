@@ -9,6 +9,7 @@ import { clock, describe, today } from '../lib/words.ts';
 import { Icon } from '../ui.tsx';
 import { Qr, joinUrl } from '../join.tsx';
 import { destinationOf, maskDestination } from '../lib/destination.ts';
+import { MailInput, mailHints, mailProblem } from '../mail.tsx';
 
 type Checked = { num: string; own: boolean; wa: boolean | null };
 
@@ -55,6 +56,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [showCode, setShowCode] = useState(false);
   const [query, setQuery] = useState('');
   const [typing, setTyping] = useState<{ name: string; phone: string; email: string } | null>(null);
+  // What is wrong with the mail is said once he leaves the field, not while he is still typing it.
+  const [mailLeft, setMailLeft] = useState(false);
   const [current, setCurrent] = useState<LocalLead | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -92,7 +95,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const results = useMemo(() => (typing ? [] : search(query)), [query, typing, search]);
   const typedDigits = typing ? typing.phone.replace(/\D/g, '').replace(/^972/, '0') : '';
   const typedPhoneBad = !!typing?.phone.trim() && !/^0\d{8,9}$/.test(typedDigits);
-  const typedMailBad = !!typing?.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(typing.email.trim());
+  const typedMailBad = !!typing && !!mailProblem(typing.email);
   const byPerson = useMemo(() => new Map(todays.filter((l) => l.personId).map((l) => [l.personId!, l])), [todays]);
   const myNotes = current ? notes.filter((n) => n.leadId === current.id) : [];
   const wantsDate = !!current && current.taps.some((t) => t.includes('מתי?'));
@@ -112,7 +115,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   /** Someone who is not on the list: a name and a phone, typed. */
   function newOne() {
     stopRecording();
-    setCurrent(null); setTyping({ name: query.trim(), phone: '', email: '' });
+    setCurrent(null); setTyping({ name: query.trim(), phone: '', email: '' }); setMailLeft(false);
   }
 
   async function capture(who: { person?: Person; name?: string; phone?: string; email?: string }) {
@@ -255,8 +258,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           {typedPhoneBad && <p className="faint small" role="alert">המספר לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
           {/* The mail is asked of every typed visitor (יצחק, 1/11), not only when the exhibitor has no WhatsApp. */}
           <label className="label" htmlFor="typed-email">מייל</label>
-          <input id="typed-email" className="input" type="email" inputMode="email" dir="ltr" style={{ textAlign: 'right' }} value={typing.email} onChange={(e) => setTyping({ ...typing, email: e.target.value })} />
-          {typedMailBad && <p className="faint small" role="alert">המייל לא נראה שלם. כדאי לבדוק אותו איתו.</p>}
+          <MailInput id="typed-email" className="input" style={{ textAlign: 'right' }} value={typing.email} onValue={(email) => setTyping({ ...typing, email })} onBlur={() => setMailLeft(true)} />
+          {typedMailBad && mailLeft && !mailHints(typing.email).options.length && <p className="faint small" role="alert">{mailProblem(typing.email)} כדאי לבדוק אותו איתו.</p>}
           {typing.name.trim() && (!typing.phone.trim() && !typing.email.trim() ? <p className="faint small">בלי טלפון ובלי מייל לא יוצאות אליו הודעות.</p>
             : wa && !typing.phone.trim() ? <p className="faint small">בלי טלפון ההודעות יוצאות אליו רק במייל.</p>
             : !wa && !typing.email.trim() ? <p className="faint small">בלי מייל לא יוצאות אליו הודעות.</p> : null)}
@@ -495,8 +498,10 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
 
   function save() {
     if (!editing) return;
-    const d = destinationOf(editing.text);
     const want = editing.kind === 'add' ? null : editing.kind;
+    const mailWrong = want === 'email' || (!want && editing.text.includes('@')) ? mailProblem(editing.text) : null;
+    if (mailWrong) { setBad(mailWrong); return; }
+    const d = destinationOf(editing.text);
     if (!d || (want && d.kind !== want)) { setBad(want === 'email' ? 'זה לא נראה כמו מייל' : want === 'phone' ? 'זה לא נראה כמו מספר טלפון' : 'זה לא נראה כמו טלפון או מייל'); return; }
     const kind = d.kind;
     const typedOwn = (): Pick<LocalLead, 'typedPhone' | 'typedEmail'> => (kind === 'phone' ? { typedPhone: d.value } : { typedEmail: d.value });
@@ -575,9 +580,14 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
       {!waiting && !own.phone && !own.email && !extra.length && <p className="faint small">אין לו עדיין טלפון או מייל. בלי אחד מהם לא יוצאות אליו הודעות.</p>}
       {editing ? (
         <form className="extra-add" onSubmit={(e) => { e.preventDefault(); save(); }}>
-          <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode={editing.kind === 'email' ? 'email' : editing.kind === 'phone' ? 'tel' : 'text'}
-            aria-label={editing.kind === 'add' ? 'טלפון או מייל נוסף, למשל של אשתו' : editing.kind === 'phone' ? 'הטלפון הנכון' : 'המייל הנכון'}
-            placeholder={editing.kind === 'add' ? 'טלפון או מייל' : editing.was} value={editing.text} onChange={(e) => { setEditing({ ...editing, text: e.target.value }); setBad(''); }} />
+          {editing.kind === 'phone' ? (
+            <input className="input" autoFocus dir="ltr" style={{ textAlign: 'right' }} inputMode="tel" aria-label="הטלפון הנכון"
+              placeholder={editing.was} value={editing.text} onChange={(e) => { setEditing({ ...editing, text: e.target.value }); setBad(''); }} />
+          ) : (
+            <MailInput className="input" autoFocus style={{ textAlign: 'right' }} mixed={editing.kind === 'add'}
+              aria-label={editing.kind === 'add' ? 'טלפון או מייל נוסף, למשל של אשתו' : 'המייל הנכון'}
+              placeholder={editing.kind === 'add' ? 'טלפון או מייל' : editing.was} value={editing.text} onValue={(text) => { setEditing({ ...editing, text }); setBad(''); }} />
+          )}
           <button type="submit" className="btn" disabled={!editing.text.trim()}>{editing.kind === 'add' ? 'להוסיף' : 'לשמור'}</button>
           <button type="button" className="btn ghost" onClick={() => { setEditing(null); setBad(''); }}>ביטול</button>
           {bad && <span className="err small">{bad}</span>}

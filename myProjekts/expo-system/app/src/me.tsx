@@ -3,6 +3,7 @@
 // no WhatsApp anywhere, and the messages go by mail only.
 import { useState } from 'react';
 import { updateMe, type Exhibitor } from './lib/backend.ts';
+import { MailInput, mailHints, mailProblem } from './mail.tsx';
 
 export function MeForm({ exhibitor: e, onSaved, submit, welcome }: { exhibitor: Exhibitor; onSaved: (e: Exhibitor) => void; submit: string; welcome?: boolean }) {
   const [f, setF] = useState({ name: e.name, business: e.business, phone: e.phone ?? '', email: e.email ?? '' });
@@ -11,13 +12,15 @@ export function MeForm({ exhibitor: e, onSaved, submit, welcome }: { exhibitor: 
   const [same, setSame] = useState(!e.whatsapp || e.whatsapp === e.phone);
   const [waNum, setWaNum] = useState(e.whatsapp && e.whatsapp !== e.phone ? e.whatsapp : '');
   const [state, setState] = useState('');
+  const [mailLeft, setMailLeft] = useState(false);
 
   const whatsapp = wa === 'yes' ? (same ? f.phone.trim() : waNum.trim()) || null : null;
   const next = {
     name: f.name.trim(), business: f.business.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null,
     whatsapp, whatsapp_kind: whatsapp ? kind : null, onboarded: true,
   };
-  const complete = !!(next.name && next.business && next.phone && wa && (wa === 'no' || whatsapp));
+  const mailWrong = mailProblem(f.email);
+  const complete = !!(next.name && next.business && next.phone && !mailWrong && wa && (wa === 'no' || whatsapp));
   const changed = welcome || JSON.stringify(next) !== JSON.stringify({
     name: e.name, business: e.business, phone: e.phone, email: e.email, whatsapp: e.whatsapp, whatsapp_kind: e.whatsapp ? e.whatsapp_kind : null, onboarded: true,
   });
@@ -38,7 +41,10 @@ export function MeForm({ exhibitor: e, onSaved, submit, welcome }: { exhibitor: 
         {field('name', 'השם שלך')}
         {field('business', 'שם העסק')}
         {field('phone', 'טלפון', { inputMode: 'tel', ...ltr })}
-        {field('email', 'מייל (לא חובה)', { inputMode: 'email', ...ltr })}
+        <label className="field" htmlFor="me-email">מייל (לא חובה)
+          <MailInput id="me-email" className="input" style={{ textAlign: 'right' }} value={f.email} onValue={(email) => { setF({ ...f, email }); setState(''); }} onBlur={() => setMailLeft(true)} />
+        </label>
+        {mailWrong && mailLeft && !mailHints(f.email).options.length && <p className="err small" role="alert">{mailWrong}</p>}
       </div>
       <div className="q-block">
         <span className="sec">יש לך וואטסאפ?</span>
