@@ -30,6 +30,8 @@ import {
 const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר' };
 /** For a step that is not a talk, "noAnswer" means only "done, the path goes on". */
 const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
+/** The messages sent beside the path (1/11), in his history by name. */
+const BESIDE: Record<string, string> = { 'x:offer': 'נשלח לו מבצע האקספו', 'x:offer-reminder': 'נשלחה לו תזכורת על המבצע', 'x:order-check': 'נשאל אם ההזמנה הגיעה' };
 
 export interface Ctx {
   exhibitor: Exhibitor; setup: Setup; directory: Person[]; setSetup: (s: Setup) => void; setExhibitor: (e: Exhibitor) => void;
@@ -877,7 +879,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
             <ul className="log timeline">
               <li><span className="when">{dayLabel(row.captured_on)}</span>ביקר בדוכן</li>
               {book.replies.filter((r) => r.lead_id === row.id).map((r) => <li key={r.at} className="tl-reply"><span className="when">{dayLabel(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(r.at)))}</span>{r.optout ? (r.body.includes('במייל') ? 'ביקש להסיר (בקישור במייל)' : hasWa(ctx) ? 'ביקש להסיר (בוואטסאפ)' : 'ביקש להסיר') : <>ענה: <b>{r.body}</b></>}</li>)}
-              {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{(x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
+              {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{BESIDE[x.step_id] ?? (x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
               {manual.filter((m) => !steps.some((x) => x.step_id === `m:${m.id}`)).map((m) => <li key={m.id}><span className="when">{dayLabel(m.due_on)}</span>נקבע: {ACT[m.action]}</li>)}
             </ul>
           </section>
@@ -1694,9 +1696,14 @@ export function OfferEdit({ ctx }: { ctx: Ctx }) {
   return (
     <section className="panel-w">
       <h2>מבצע אקספו</h2>
-      <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה. תשלום, מלאי וחשבונית נשארים אצלך.</p>
+      <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה, ושבוע אחרי זה שאלה אם הכל הגיע בסדר. תשלום, מלאי וחשבונית נשארים אצלך.</p>
       <label className="field">שם המבצע<input className="input" value={o.name} onChange={(e) => setO({ ...o, name: e.target.value })} /></label>
       <label className="field" style={{ maxWidth: 200 }}>עד מתי<input className="input" type="date" value={o.until} onChange={(e) => setO({ ...o, until: e.target.value })} /></label>
+      {/* After the fair, to whoever did not order (1/11, model §14א): on unless he keeps it at the booth. */}
+      <div className="switchrow">
+        <span>לשלוח את המבצע למי שלא הזמין <span className="faint small">· יום אחרי האקספו, ותזכורת יום לפני שהמבצע נגמר. מבצע של יום האקספו בלבד לא נשלח.</span></span>
+        <button type="button" className="switch" role="switch" aria-checked={o.send !== false} aria-label="לשלוח את המבצע למי שלא הזמין" onClick={() => setO({ ...o, send: o.send === false })} />
+      </div>
       {o.items.map((i, n) => (
         <div key={i.id} className="row offer-item">
           <input className="input" placeholder="הפריט" aria-label="הפריט" value={i.name} onChange={(e) => item(n, { name: e.target.value })} />

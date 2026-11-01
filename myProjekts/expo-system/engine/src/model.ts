@@ -102,8 +102,9 @@ export interface ManualStep {
   message?: string;
 }
 
-/** The expo offer (יצחק 23/10, model §14א): items at an expo price, until a date. */
-export interface Offer { name: string; until: LocalDate; items: { id: string; name: string; price: number; expoPrice: number }[] }
+/** The expo offer (יצחק 23/10, model §14א): items at an expo price, until a date (its last day).
+ *  send: false keeps it at the booth only; otherwise a visitor who did not order gets it, and a reminder (1/11). */
+export interface Offer { name: string; until: LocalDate; items: { id: string; name: string; price: number; expoPrice: number }[]; send?: boolean }
 /** What a visitor ordered from the offer at the booth: it makes him a deal, and he gets its summary. */
 export interface Order { offer: string; items: { id: string; name: string; qty: number; price: number }[]; total: number }
 
@@ -130,3 +131,9 @@ export const manualId = (id: string) => `m:${id}`;
 export const BOOTH_STEP = 'booth';
 /** Answering a reply is recorded under this id. */
 export const replyId = (day: LocalDate) => `reply:${day}`;
+/**
+ * The messages the system sends beside the path (1/11): the expo offer, its reminder, the check after an order. They are
+ * recorded like the path's own steps, so each goes once, but the path does not count them: its timing is unmoved.
+ */
+export const EXTRA = { offer: 'x:offer', reminder: 'x:offer-reminder', orderCheck: 'x:order-check' } as const;
+export const isExtra = (stepId: string) => stepId.startsWith('x:');

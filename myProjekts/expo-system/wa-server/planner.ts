@@ -4,7 +4,7 @@
 // days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
 // one of his destinations can get it (a number with WhatsApp when his WhatsApp is linked, a mail when mail is set on
 // the server); and the filled text has no hole left in it. The database queues it to each.
-import { addDays, filesIn, fill, holes, nextTask, orderSummary, textOf, type Approved, type Lead, type ManualStep, type Me, type Order, type Setup } from '../engine/src/index.ts';
+import { EXTRA, addDays, filesIn, fill, holes, isExtra, nextTask, offerText, orderCheckText, orderSummary, textOf, type Approved, type Lead, type LocalDate, type ManualStep, type Me, type Offer, type Order, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
@@ -31,6 +31,8 @@ export interface Plan {
   manual: { id: string; lead_id: string; action: ManualStep['action']; who: ManualStep['who']; due_on: string; message: string | null }[];
   replies: { lead_id: string; at: string; optout: boolean }[];
   planned: string[];
+  /** His expo offer, if he has one (model §14א). */
+  offer?: Offer | null;
 }
 /** files: "path#name" for each file the message carries (a detail written once as a file).
  *  virtual: on the trial's fast clock, the day the step is done on, as the path sees it. */
@@ -58,14 +60,6 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     if (!l.settled || !((wa ? l.targets : 0) + (ch.mail ? l.mails : 0))) continue;
     const replies = plan.replies.filter((r) => r.lead_id === l.id);
     if (replies.some((r) => r.optout)) continue;
-    // An order at the booth: the visitor gets its summary, once; the order closed his path (0040).
-    if (l.booth_order) {
-      if (!planned.has(`${l.id}|order`)) {
-        const body = fill(orderSummary(l.booth_order), plan.me, l.name ?? '');
-        if (!holes(body).length) out.push({ lead: l.id, step: 'order', template: 'סיכום הזמנה', body, files: [], style: 'letter' });
-      }
-      continue;
-    }
     const setup = (l.setup_version !== null && versions.get(l.setup_version)) || active;
     const said = replies.filter((r) => !r.optout);
     const day = fast && l.captured_at
@@ -78,7 +72,29 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
     };
+    const beside = (step: string, template: string, text: string): Due | null => {
+      const body = fill(text, plan.me, l.name ?? '');
+      return holes(body).length ? null : { lead: l.id, step, template, body, files: [], ...(fast ? { virtual: day } : {}), style: 'letter' };
+    };
+    // An order at the booth: the visitor gets its summary, once; the order closed his path (0040). A week on, a check.
+    if (l.booth_order) {
+      if (!planned.has(`${l.id}|order`)) {
+        const body = fill(orderSummary(l.booth_order), plan.me, l.name ?? '');
+        if (!holes(body).length) out.push({ lead: l.id, step: 'order', template: 'סיכום הזמנה', body, files: [], style: 'letter' });
+      } else if (orderCheckDue(l, lead, day, (s) => planned.has(`${l.id}|${s}`))) {
+        const d = beside(EXTRA.orderCheck, 'בדיקה אחרי הזמנה', orderCheckText());
+        if (d) out.push(d);
+      }
+      continue;
+    }
     const n = nextTask(setup, lead, day);
+    // The path's message, when one goes today; the offer never goes on the same day as it.
+    const goes = n.kind === 'task' && n.who === 'auto' && !!n.message && !(n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) && n.dueOn <= day;
+    const offer = offerDue(plan.offer, l, lead, day, goes, (s) => planned.has(`${l.id}|${s}`));
+    if (offer) {
+      const d = beside(offer.step, offer.step === EXTRA.offer ? 'מבצע התערוכה' : 'תזכורת על המבצע', offerText(plan.offer!, offer.step === EXTRA.reminder));
+      if (d) out.push(d);
+    }
     // A message a day late still goes (יצחק, 30/10: a visitor registered on the fair's evening, a server down for a day);
     // more than that is left to the exhibitor.
     if (n.kind !== 'task' || n.who !== 'auto' || !n.message || (n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) || n.dueOn > day) continue;
@@ -92,4 +108,28 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     out.push({ lead: l.id, step: n.stepId, template: n.message, body, files, ...(fast ? { virtual: day } : {}), style: timed === 'calendar' ? 'newsletter' : 'letter' });
   }
   return out;
+}
+
+/** A message already went to him that day (by the path or beside it): one a day is enough. */
+const gotToday = (lead: Lead, day: LocalDate) => lead.history.some((h) => h.doneOn === day && h.outcome === 'noAnswer');
+
+/**
+ * The expo offer to a visitor who did not order (model §14א; my choice 1/11, not yet his): from the day after his visit,
+ * on a day the path sends him nothing, while it lasts; and a reminder on its last day but one, two days or more after
+ * it. Not after he wrote back, talked, closed, or was marked not relevant; not when the exhibitor keeps it at the booth.
+ */
+export function offerDue(o: Offer | null | undefined, l: PlanLead, lead: Lead, day: LocalDate, pathGoes: boolean, planned: (step: string) => boolean): { step: string } | null {
+  if (!o || o.send === false || !o.items.length || lead.repliedOn || pathGoes || gotToday(lead, day)) return null;
+  const last = lead.history.filter((h) => !isExtra(h.stepId)).at(-1);
+  if (last && last.outcome !== 'noAnswer') return null;
+  if (!planned(EXTRA.offer)) return day >= addDays(l.captured_on, 1) && day <= o.until ? { step: EXTRA.offer } : null;
+  const sent = lead.history.find((h) => h.stepId === EXTRA.offer);
+  return sent && sent.doneOn < addDays(day, -1) && day === addDays(o.until, -1) && !planned(EXTRA.reminder) ? { step: EXTRA.reminder } : null;
+}
+
+/** A week after the order, up to three days late, once; not if he wrote back since the order, nor on a day he got another. */
+export function orderCheckDue(l: PlanLead, lead: Lead, day: LocalDate, planned: (step: string) => boolean): boolean {
+  const ordered = lead.history.find((h) => h.stepId === 'order')?.doneOn ?? l.captured_on;
+  const on = addDays(ordered, 7);
+  return !planned(EXTRA.orderCheck) && day >= on && day <= addDays(on, 3) && !(lead.repliedOn && lead.repliedOn >= ordered) && !gotToday(lead, day);
 }

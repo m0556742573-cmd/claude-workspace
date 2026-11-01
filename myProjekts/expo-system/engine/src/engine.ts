@@ -1,7 +1,7 @@
 // The engine: given an exhibitor's setup and one lead, which path applies and what the next task is.
 // It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
 import { addDays, isRestDay, nextOccurrence, weekday } from './calendar.ts';
-import { BOOTH_STEP, manualId, replyId } from './model.ts';
+import { BOOTH_STEP, isExtra, manualId, replyId } from './model.ts';
 import type { Action, Condition, Lead, LocalDate, NeedPath, Path, Setup, Step, Timing, Who } from './model.ts';
 
 /** What the path would do next if he had not answered — the likely next step to offer after a talk. */
@@ -10,6 +10,9 @@ export function pathAhead(setup: Setup, lead: Lead): Step | undefined {
   const recorded = new Set(lead.history.map((h) => h.stepId));
   return path.steps.filter((s) => matches(s.onlyIf, lead.taps)).find((s) => !recorded.has(s.id));
 }
+
+/** The lead as the path sees it: without the messages sent beside it (EXTRA), which move none of its dates. */
+const onPath = (lead: Lead): Lead => (lead.history.some((h) => isExtra(h.stepId)) ? { ...lead, history: lead.history.filter((h) => !isExtra(h.stepId)) } : lead);
 
 export function matches(c: Condition | undefined, taps: string[]): boolean {
   if (!c) return true;
@@ -54,7 +57,8 @@ export type Next =
   | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' };
 
 /** The next thing to do for this lead, or why there is nothing. `today` is when the question is asked. */
-export function nextTask(setup: Setup, lead: Lead, today: LocalDate): Next {
+export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
+  const lead = onPath(all);
   const last = lead.history[lead.history.length - 1];
   // A deal, "not relevant" or "remove me" ends everything, manual steps included.
   if (last && (last.outcome === 'closed' || last.outcome === 'notRelevant' || last.outcome === 'optOut')) return { kind: 'end', reason: last.outcome };

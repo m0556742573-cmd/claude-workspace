@@ -3,7 +3,7 @@
 // the exhibitor's own edit (table message_templates) replaces them. Every other detail in square brackets ([כתובת],
 // [שעות]) the exhibitor writes once, and it is filled into every message it appears in (יצחק, 29/10). Whatever is still
 // left in square brackets is a hole: a message with a hole is not sent.
-import type { Order, Path, Setup } from './model.ts';
+import type { LocalDate, Offer, Order, Path, Setup } from './model.ts';
 import { fixtures } from '../fixtures/businesses.ts';
 
 export interface Me {
@@ -83,6 +83,23 @@ const money = (n: number) => `${Math.round(n * 100) / 100} ₪`;
 export function orderSummary(order: Order): string {
   const lines = order.items.filter((i) => i.qty > 0).map((i) => `• ${i.qty} × ${i.name} · ${money(i.qty * i.price)}`);
   return [`שלום [שם],`, `תודה על ההזמנה בתערוכה${order.offer ? `, במבצע "${order.offer}"` : ''}:`, ...lines, `סה"כ: ${money(order.total)}`, SIGN].join('\n');
+}
+
+const dayMonth = (d: LocalDate) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`;
+/**
+ * The expo offer to a visitor who did not order at the booth (model §14א; my choice 1/11, not yet his): the items at
+ * their expo price, until when, and how to order. The reminder goes the day before it ends.
+ */
+export function offerText(offer: Offer, reminder: boolean): string {
+  const what = offer.name ? `המבצע "${offer.name}"` : 'המבצע';
+  const lines = offer.items.map((i) => `• ${i.name} · ${money(i.expoPrice)}${i.price > i.expoPrice ? ` במקום ${money(i.price)}` : ''}`);
+  const head = reminder ? `להזכיר, ${what} מהתערוכה בתוקף רק עד מחר:` : `${what} מהתערוכה בתוקף עד ${dayMonth(offer.until)}:`;
+  return ['שלום [שם],', head, ...lines, 'להזמנה אפשר לענות להודעה הזו.', SIGN].join('\n');
+}
+
+/** A week after an order at the booth (my choice 1/11, not yet his): did it arrive, and is all well. */
+export function orderCheckText(): string {
+  return ['שלום [שם],', 'רציתי לוודא שההזמנה מהתערוכה הגיעה, ושהכל בסדר. אם משהו חסר או לא מסתדר, אפשר לענות כאן.', SIGN].join('\n');
 }
 
 /** The text as the visitor gets it: his name, the exhibitor's signature and greeting. Holes stay as they are. */

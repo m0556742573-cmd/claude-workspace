@@ -265,3 +265,16 @@ test('an exhibitor without WhatsApp: the suggested text says nothing of it (31/1
   assert.equal(withoutWa('אפשר לשלוח צילום בוואטסאפ. כשיגיעו — נתקשר.'), 'אפשר לשלוח צילום במייל. כשיגיעו — נתקשר.');
   assert.equal(withoutWa('שלום [שם],\nתודה.'), 'שלום [שם],\nתודה.');
 });
+
+// ---- the messages beside the path (1/11): the offer, its reminder, the check after an order
+
+test('a message sent beside the path moves none of its dates', () => {
+  const s = setup({ defaults: { business: list, private: { steps: [
+    { id: 'hi', action: 'send', who: 'auto', timing: { kind: 'after', days: 0 }, message: 'שלום' },
+    { id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 3 } },
+  ], end: { kind: 'list' } } } });
+  const plain = nextTask(s, lead([], { history: [rec('hi', EXPO)] }), '2026-11-17');
+  const offered = nextTask(s, lead([], { history: [rec('hi', EXPO), rec('x:offer', '2026-11-17')] }), '2026-11-17');
+  assert.deepEqual(offered, plain);
+  assert.equal(offered.kind === 'task' && offered.dueOn, '2026-11-19');
+});
