@@ -459,7 +459,15 @@ async function consultLoad(exhibitor: string, session?: string): Promise<Saved> 
   return { id: r.id, turns: r.turns ?? [], draft: cleanDraft(r.draft, EMPTY), built: r.built ?? null };
 }
 const shown = (s: Saved) => ({ id: s.id, turns: s.turns, draft: s.draft, checks: checks(s.draft), built: s.built });
-async function consultRoute(pathname: string, req: http.IncomingMessage, exhibitor: string, send: (code: number, body: unknown) => void): Promise<void> {
+/** He said he has no WhatsApp (as the app reads it: answered the welcome, and left the number empty), so the consultant
+ *  does not mention it (31/10). Read with his own sign-in. */
+async function noWhatsApp(token: string): Promise<boolean> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/exhibitors?select=whatsapp,onboarded&limit=1`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
+  const row = r.ok ? ((await r.json()) as { whatsapp: string | null; onboarded: boolean }[])[0] : undefined;
+  return !!row?.onboarded && !row.whatsapp;
+}
+
+async function consultRoute(pathname: string, req: http.IncomingMessage, exhibitor: string, token: string, send: (code: number, body: unknown) => void): Promise<void> {
   if (pathname === '/ai/session' && req.method === 'GET') return send(200, shown(await consultLoad(exhibitor)));
   if (pathname === '/ai/new' && req.method === 'POST') return send(200, shown({ id: null, turns: [{ role: 'assistant', text: GREETING, quick: [] }], draft: EMPTY, built: null }));
   const key = keys.anthropic_key;
@@ -473,7 +481,7 @@ async function consultRoute(pathname: string, req: http.IncomingMessage, exhibit
     const s = session ? await consultLoad(exhibitor, session) : await consultLoad(exhibitor).then((x) => (x.id ? { ...x, id: null, turns: [{ role: 'assistant' as const, text: GREETING, quick: [] }], draft: EMPTY, built: null } : x));
     const turns: Turn[] = [...s.turns, { role: 'user', text }];
     try {
-      const r = await converse(key, turns, s.draft);
+      const r = await converse(key, turns, s.draft, await noWhatsApp(token));
       turns.push({ role: 'assistant', text: r.reply, quick: r.quick });
       const saved = await rpc<{ id: string }>('consult_save', { exhibitor, session: s.id, turns, draft: r.draft, built: null, tin: r.usage.input + r.usage.cacheRead, tout: r.usage.output });
       return send(200, shown({ id: saved.id, turns, draft: r.draft, built: s.built }));
@@ -487,7 +495,7 @@ async function consultRoute(pathname: string, req: http.IncomingMessage, exhibit
     const s = await consultLoad(exhibitor, session);
     if (!s.id) return send(404, { error: 'session' });
     try {
-      const r = await build(key, s.draft, s.turns);
+      const r = await build(key, s.draft, s.turns, await noWhatsApp(token));
       await rpc('consult_save', { exhibitor, session: s.id, turns: s.turns, draft: s.draft, built: { setup: r.setup, texts: r.texts }, tin: r.usage.input + r.usage.cacheRead, tout: r.usage.output });
       return send(200, { setup: r.setup, texts: r.texts });
     } catch (err) {
@@ -586,7 +594,7 @@ const server = http.createServer(async (req, res) => {
     }
     const id = await exhibitorOf(token);
     if (!id) return send(403, { error: 'not an approved exhibitor' });
-    if (url.pathname.startsWith('/ai/')) return await consultRoute(url.pathname, req, id, send);
+    if (url.pathname.startsWith('/ai/')) return await consultRoute(url.pathname, req, id, token, send);
     if (url.pathname === '/wa/status' && req.method === 'GET') return send(200, view(sessions.get(id)));
     if (url.pathname === '/wa/link' && req.method === 'POST') {
       const s = sessions.get(id);

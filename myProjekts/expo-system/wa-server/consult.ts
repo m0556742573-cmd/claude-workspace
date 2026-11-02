@@ -68,11 +68,28 @@ export function cleanDraft(x: unknown, prev: Draft): Draft {
 
 /** A reply that is not clean JSON is read leniently: the object inside it, then without trailing commas; plain text is
  *  still his message. */
-function lenient(raw: string): Record<string, unknown> | null {
+/** The first whole {…} in the text, read with its strings, when all that follows it is stray closing brackets (2/11: the
+ *  answer ended "]}}}", one too many, now and then). Anything else after it, and it is not taken: no cutting midway. */
+function wholeFirst(s: string): string | null {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === '{' || ch === '[') depth++;
+    else if ((ch === '}' || ch === ']') && --depth === 0) return /^[\s}\]]*$/.test(s.slice(i + 1)) ? s.slice(0, i + 1) : null;
+  }
+  return null;
+}
+export function lenient(raw: string): Record<string, unknown> | null {
   const a = raw.indexOf('{'), z = raw.lastIndexOf('}');
   if (a >= 0 && z > a) {
     const body = raw.slice(a, z + 1);
-    for (const s of [body, body.replace(/,\s*([}\]])/g, '$1')]) { try { return JSON.parse(s); } catch { /* next */ } }
+    // A " between two Hebrew letters is always gershayim (בס"ד, ש"ח), never JSON's: written plain, it breaks the answer
+    // (2/11, the server test), so it becomes ״.
+    const tidy = body.replace(/,\s*([}\]])/g, '$1');
+    const heb = tidy.replace(/([א-ת])"(?=[א-ת])/g, '$1״');
+    for (const s of [body, tidy, heb, wholeFirst(heb)]) { if (s) try { return JSON.parse(s); } catch { /* next */ } }
   }
   return raw.trim() && a < 0 ? { reply: raw.trim() } : null;
 }
@@ -98,26 +115,45 @@ const textOf = (m: { content: { type: string; text?: string }[] }) => m.content.
 const usageOf = (m: { usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null } }): Usage =>
   ({ input: m.usage.input_tokens, output: m.usage.output_tokens, cacheRead: m.usage.cache_read_input_tokens ?? 0 });
 
+// An exhibitor without WhatsApp hears no word of it, from the consultant too (יצחק, 31/10). Beside his words, not in
+// the rules, so the rules stay in the cache.
+const NO_WA = 'THIS EXHIBITOR HAS NO WHATSAPP. Never mention WhatsApp: not in your messages, not in quick replies, not in any message text. Every message to his visitors goes by email, and he calls them himself.';
+
 /** One turn: the rules (kept in Anthropic's cache), the conversation so far, and, beside his last words, the structure as
  *  it stands and what the checklist still misses. Returns his next message, quick replies, and the updated structure. */
-export async function converse(key: string, turns: Turn[], draft: Draft): Promise<{ reply: string; quick: string[]; draft: Draft; usage: Usage }> {
+export async function converse(key: string, turns: Turn[], draft: Draft, noWa = false): Promise<{ reply: string; quick: string[]; draft: Draft; usage: Usage }> {
   const gaps = checks(draft).filter(([, ok]) => !ok).map(([t]) => '- ' + t);
-  const state = `CURRENT SETUP:\n${JSON.stringify(draft)}\n\nCHECKLIST ITEMS STILL FAILING:\n${gaps.join('\n') || '(none — the setup passes; summarize once, then help with changes)'}`;
+  const state = `${noWa ? NO_WA + '\n\n' : ''}CURRENT SETUP:\n${JSON.stringify(draft)}\n\nCHECKLIST ITEMS STILL FAILING:\n${gaps.join('\n') || '(none — the setup passes; summarize once, then help with changes)'}`;
   const msgs: Anthropic.MessageParam[] = turns.slice(-30).map((t) => ({ role: t.role, content: t.text }));
   while (msgs.length && msgs[0]!.role === 'assistant') msgs.shift();
   const last = msgs[msgs.length - 1];
   if (!last || last.role !== 'user') throw new Error('no question');
   last.content = [{ type: 'text', text: String(last.content) }, { type: 'text', text: state }];
-  const m = await ask(key, {
-    model: MODEL, max_tokens: 8000,
+  const once = () => ask(key, {
+    // Room for the reply with the whole structure in it, which grows every turn.
+    model: MODEL, max_tokens: 20000,
     output_config: { effort: 'medium' },
     system: [{ type: 'text', text: RULES, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: `(The exhibitor opened the setup. Your greeting was:)\n${GREETING}` }, { role: 'assistant', content: GREETING }, ...msgs],
   });
+  // An answer that cannot be read is asked once more (2/11: on the server test, one turn in about ten could not be read,
+  // and the same turn asked again could), so the exhibitor does not see "היועץ לא ענה" for it.
+  let m = await once();
   if (m.stop_reason === 'refusal') throw new Error('refusal');
-  const r = lenient(textOf(m));
+  let raw = textOf(m);
+  let r = lenient(raw);
+  if (!(r && typeof r.reply === 'string' && r.reply.trim())) {
+    const first = m.usage;
+    m = await once();
+    if (m.stop_reason === 'refusal') throw new Error('refusal');
+    m.usage = { ...m.usage, input_tokens: m.usage.input_tokens + first.input_tokens, output_tokens: m.usage.output_tokens + first.output_tokens,
+      cache_read_input_tokens: (m.usage.cache_read_input_tokens ?? 0) + (first.cache_read_input_tokens ?? 0) };
+    raw = textOf(m);
+    r = lenient(raw);
+  }
   const reply = r && typeof r.reply === 'string' ? r.reply.trim() : '';
-  if (!reply) throw new Error('no reply');
+  // Why, for the log: cut off (max_tokens), or an answer not in the agreed shape.
+  if (!reply) throw new Error(`no reply (stop: ${m.stop_reason}, ${raw.length} chars, ${m.usage.output_tokens} tokens out)`);
   return { reply, quick: arr(r!.quick).map((v) => str(v, 80)).filter(Boolean).slice(0, 4), draft: r!.setup ? cleanDraft(r!.setup, draft) : draft, usage: usageOf(m) };
 }
 
@@ -174,7 +210,7 @@ const BUILD = `You turn an exhibitor's agreed setup (a structure in Hebrew words
 /** The structure, built into a setup and its message texts. The shape is given as a JSON Schema in the instructions (as a
  *  strict output format it is too large for the API), and checked here: a result the engine cannot run is sent back once
  *  with what is wrong in it. */
-export async function build(key: string, draft: Draft, turns: Turn[]): Promise<{ setup: Setup; texts: Record<string, string>; usage: Usage }> {
+export async function build(key: string, draft: Draft, turns: Turn[], noWa = false): Promise<{ setup: Setup; texts: Record<string, string>; usage: Usage; problems: string[] }> {
   const said = turns.filter((t) => t.role === 'user').map((t) => '- ' + t.text).join('\n').slice(-6000);
   const attempt = async (extra: string) => {
     const m = await ask(key, {
@@ -184,7 +220,7 @@ export async function build(key: string, draft: Draft, turns: Turn[]): Promise<{
 
 REPLY with ONLY one JSON object, no Markdown and no text around it, in exactly this shape (JSON Schema):
 ${JSON.stringify(SCHEMA)}`,
-      messages: [{ role: 'user', content: `THE AGREED SETUP:\n${JSON.stringify(draft)}\n\nWHAT HE SAID IN THE CONVERSATION (his words, for the details):\n${said}${extra}` }],
+      messages: [{ role: 'user', content: `${noWa ? NO_WA + '\n\n' : ''}THE AGREED SETUP:\n${JSON.stringify(draft)}\n\nWHAT HE SAID IN THE CONVERSATION (his words, for the details):\n${said}${extra}` }],
     });
     if (m.stop_reason === 'refusal') throw new Error('refusal');
     const raw = lenient(textOf(m));
@@ -198,7 +234,8 @@ ${JSON.stringify(SCHEMA)}`,
     usage = { input: usage.input + again.usage.input, output: usage.output + again.usage.output, cacheRead: usage.cacheRead + again.usage.cacheRead };
     made = toSetup(again.raw);
   }
-  return { setup: made.setup, texts: made.texts, usage };
+  // What still would not run after the second try (the review in the app shows him the rest); the test reads it.
+  return { setup: made.setup, texts: made.texts, usage, problems: made.problems };
 }
 
 type Raw = Record<string, unknown>;

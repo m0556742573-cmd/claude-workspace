@@ -19,9 +19,10 @@ ssh_run 'mkdir -p /opt/expo-wa/data && chmod 700 /opt/expo-wa/data'
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/wa-server" "$STAGE/engine" "$STAGE/consultant-rounds"
 cp package.json package-lock.json Dockerfile .dockerignore "$STAGE/"
-cp server.ts limits.ts planner.ts mail.ts consult.ts consult-rules.ts "$STAGE/wa-server/"
+cp server.ts limits.ts planner.ts mail.ts consult.ts consult-rules.ts consult-autotest.ts "$STAGE/wa-server/"
 cp -r ../engine/src ../engine/fixtures "$STAGE/engine/"
-cp ../consultant-rounds/messages-approved.json "$STAGE/consultant-rounds/"
+# The consultant's automatic test (consult-autotest.ts) runs on the server, with the key kept there, on the lab's cases.
+cp ../consultant-rounds/messages-approved.json ../consultant-rounds/autotest-cases.json "$STAGE/consultant-rounds/"
 ssh_run 'cd /opt/expo-wa && rm -rf wa-server engine consultant-rounds server.ts limits.ts'
 scp -i "$KEY" -q -r "$STAGE"/. "$HOST:/opt/expo-wa/"
 printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\nSESSIONS_DIR=/data/sessions\n' "$VITE_SUPABASE_URL" "$VITE_SUPABASE_KEY" | ssh_run 'umask 077; cat > /opt/expo-wa/.env'
