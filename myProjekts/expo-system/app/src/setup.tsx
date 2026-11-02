@@ -13,7 +13,7 @@ import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
 import { StepAdvisor } from './consult.tsx';
 import { Icon } from './ui.tsx';
 
-const EMPTY: Setup = {
+export const EMPTY: Setup = {
   business: '', anchor: { goal: '', success: '' }, needs: [], when: [], who: [],
   defaults: { business: { steps: [], end: { kind: 'list' } }, private: { steps: [], end: { kind: 'list' } } }, sensitive: false,
 };
@@ -27,11 +27,27 @@ const forms = (w: string) => (/^[והבלמש]/.test(w) && w.length >= 4 ? [w, w
 /** Two words alike: the same first three letters, in any of their forms. */
 const alike = (a: string, b: string) => forms(a).some((x) => forms(b).some((y) => x.slice(0, 3) === y.slice(0, 3)));
 /** Up to three of the rounds' businesses that share a word (or its start) with what he wrote. */
-function similar(business: string) {
+export function similar(business: string) {
   const mine = words(business);
   if (!mine.length) return [];
   return fixtures.map((f) => ({ f, n: words(f.name).filter((w) => mine.some((m) => alike(m, w))).length }))
     .filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 3).map((x) => x.f);
+}
+
+/** What the card's own rules find in a setup (26/10, round 4): no primary goal, a "מה הוא צריך" button without a path,
+ *  a "מתי" or "מי הוא" button that changes nothing, a question with one button. For the setup's booth screen. */
+export function cardIssues(s: Setup): string[] {
+  const named = new Set<string>();
+  const walk = (c: unknown) => { if (!c || typeof c !== 'object') return; const o = c as Record<string, unknown>; if (typeof o.tapped === 'string') named.add(o.tapped); for (const v of Object.values(o)) if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') walk(v); };
+  for (const n of s.needs) for (const v of n.variants) { walk(v.if); for (const st of v.path.steps) walk(st.onlyIf); }
+  const idle = [...s.when, ...s.who].filter((b) => !named.has(b.label) && !/\(מתי\?\)\s*$/.test(b.label)).map((b) => b.label);
+  const lone = ([['מה הוא צריך', s.needs.length], ['מתי', s.when.length], ['מי הוא', s.who.length]] as const).filter(([, n]) => n === 1).map(([q]) => q);
+  return [
+    ...(s.needs.length && !s.needs.some((n) => n.goal === 'primary') ? ['אף כפתור לא מסומן כמטרה הראשית (★).'] : []),
+    ...(s.needs.some((n) => !n.variants.length) ? ['יש כפתור ב"מה הוא צריך" שאין לו מסלול אחרי האקספו.'] : []),
+    ...(idle.length ? [`${idle.join(', ')}: ${idle.length === 1 ? 'הכפתור הזה לא משנה' : 'הכפתורים האלה לא משנים'} כלום במה שקורה אחרי. כדאי לחבר למסלול, או להוציא מהכרטיס.`] : []),
+    ...(lone.length ? [`בשאלה "${lone.join('", "')}" יש כפתור אחד בלבד. כדאי להוסיף עוד אחד, או להוציא אותה.`] : []),
+  ];
 }
 
 export function SetupSteps({ start, business, onSave, onCancel, texts: given, advisor }: {

@@ -6,12 +6,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
-import { MeForm } from './me.tsx';
 import { Join } from './join.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Booth, type Stuck } from './booth/Booth.tsx';
 import { Dashboard, Home, Leads, Messages, Snapshot, Tasks, type Ctx } from './screens.tsx';
-import { Settings, type Review } from './settings.tsx';
+import { Settings, TrialBar, TrialPanel, type Review } from './settings.tsx';
+import { FlowBooth, FlowDetails, FlowMessages, FlowStart, flowOf, keepFlow, type Flow } from './onboard.tsx';
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
@@ -19,7 +19,7 @@ import { EXPO_DAY, LIST_CLOSES, today } from './lib/words.ts';
 import { Icon, SavedToast, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
-  activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, leadContact, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase, uploadTrouble,
+  activeSetup, fileUrl, flush, isAdmin, keptSession, leadContact, loadPhase, type Phase, pullSelf, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase, uploadTrouble,
   type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
@@ -93,7 +93,7 @@ type View = 'booth' | 'snapshot' | 'home' | 'tasks' | 'leads' | 'dash' | 'messag
 type Part = 'day' | 'crm';
 /** ai: the consultant: a round floating button everywhere in the system but the booth (יצחק, 2/11: "בכל המערכת הוא
  *  נמצא ככפתור צף מלבד ביום האקספו בדוכן"; on a computer too, in place of "סוכן AI" in the menu of 20/10). */
-type Panel = 'menu' | 'help' | 'support' | 'ai' | null;
+type Panel = 'menu' | 'help' | 'support' | 'ai' | 'trial' | null;
 const DAY: [View, string, IconName][] = [['booth', 'הדוכן', 'search'], ['snapshot', 'תמונת מצב', 'check']];
 const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['leads', 'לידים', 'leads'], ['tasks', 'משימות', 'tasks'], ['dash', 'דשבורד', 'bars'], ['messages', 'הודעות', 'mail']];
 const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings'));
@@ -124,6 +124,10 @@ function Live() {
   const [admin, setAdmin] = useState(false);
   const [newVisitor, setNewVisitor] = useState(0);
   const [phase, setPhase] = useState<Phase>('practice');
+  // The setup's own screens, until "סיימתי להגדיר" (onboard.tsx); kept on this device.
+  const [flow, setFlowState] = useState<Flow | null>(null);
+  const setFlow = (f: Flow | null) => { setFlowState(f); if (exhibitor) keepFlow(exhibitor.id, f); };
+  useEffect(() => { if (exhibitor?.id) setFlowState(flowOf(exhibitor.id)); }, [exhibitor?.id]);
   // A setup the consultant built, waiting for review in the settings (2/11).
   const [review, setReview] = useState<Review | null>(null);
   // While the setup's steps are open they have their own consultant beside them (setup.tsx), and this button steps aside.
@@ -244,19 +248,15 @@ function Live() {
       </Gate>
     );
   }
-  if (!exhibitor.onboarded) {
-    return (
-      <Gate title="ברוכים הבאים">
-        <p className="muted">לפני הכל, כמה פרטים שלך. הם נכנסים לחתימה של כל הודעה שתצא למבקרים, ואפשר לשנות אותם אחר כך בהגדרות.</p>
-        <MeForm exhibitor={exhibitor} onSaved={setExhibitor} submit="נתחיל" welcome />
-      </Gate>
-    );
-  }
+  // The setup, right after signing up (onboard.tsx): his details, the conversation, the booth, the messages.
+  if (!exhibitor.onboarded) return <FlowDetails exhibitor={exhibitor} onSaved={setExhibitor} />;
   if (setup === undefined) return <Gate title="טוען…" />;
-  if (!setup) return <NewBooth exhibitor={exhibitor} onSaved={setSetup} />;
+  if (!setup) return <FlowStart exhibitor={exhibitor} onBuilt={(s, via) => { setFlow({ step: 'booth', via }); setSetup(s); }} />;
 
   setNoWa(!exhibitor.whatsapp);
   const ctx: Ctx = { exhibitor, setup, directory, setSetup, setExhibitor, admin, phase, go: (v) => go(v as View) };
+  if (flow?.step === 'booth') return <FlowBooth ctx={ctx} via={flow.via} onNext={() => { setFlow({ ...flow, step: 'messages' }); scrollTo(0, 0); }} />;
+  if (flow?.step === 'messages') return <FlowMessages ctx={ctx} desk={desk} onBack={() => { setFlow({ ...flow, step: 'booth' }); scrollTo(0, 0); }} onDone={() => { setFlow(null); go('home'); }} />;
   const biz = exhibitor.business || exhibitor.name;
   // His own logo heads the booth when he uploaded one (30/10); otherwise the system's mark.
   const mark = exhibitor.logo ? <img className="mark logo" src={fileUrl(exhibitor.logo)} alt="" /> : <span className="mark" aria-hidden="true">{biz.trim().slice(0, 1)}</span>;
@@ -310,6 +310,7 @@ function Live() {
       )}
 
       <main>
+        {view === 'home' && <TrialBar ctx={ctx} onChange={() => setPanel('trial')} />}
         {view === 'booth' && (
           <Booth
             setup={setup}
@@ -335,6 +336,7 @@ function Live() {
             offer={exhibitor.offer}
             ownOf={leadContact}
             listClosed={!admin && today() >= LIST_CLOSES}
+            onTrialChange={() => setPanel('trial')}
           />
         )}
         {view === 'snapshot' && <Snapshot setup={setup} todays={todays} notes={notes} waiting={waiting} eyebrow={desk ? 'יום האקספו' : undefined} onCrm={() => go('home')} onBooth={() => go('booth')} />}
@@ -369,7 +371,16 @@ function Live() {
         <button type="button" className="ai-fab" aria-label="היועץ" title="היועץ" onClick={() => setPanel('ai')}><Icon name="spark" size={26} stroke={1.9} /></button>
       )}
       {panel && !desk && <button type="button" className="scrim" aria-label="סגירה" onClick={() => setPanel(null)} />}
-      {panel && panel !== 'ai' && <HelpPanel kind={panel} desk={desk} view={view} onPick={setPanel} onClose={() => setPanel(null)} />}
+      {panel && panel !== 'ai' && panel !== 'trial' && <HelpPanel kind={panel} desk={desk} view={view} onPick={setPanel} onClose={() => setPanel(null)} />}
+      {panel === 'trial' && (
+        <div className={'pnl ' + (desk ? 'side-p' : 'dialog')} role="dialog" aria-label="ניסיון לפני האקספו">
+          <div className="p-head">
+            <h2>ניסיון לפני האקספו</h2>
+            <button type="button" className="sq" aria-label="סגירה" onClick={() => setPanel(null)}><Icon name="close" /></button>
+          </div>
+          <div className="p-body"><TrialPanel ctx={ctx} /></div>
+        </div>
+      )}
       {panel === 'ai' && (
         <div className={'pnl ai-pnl ' + (desk ? 'side-p' : 'dialog')} role="dialog" aria-label="היועץ">
           <div className="p-head">
@@ -461,29 +472,6 @@ function TrySetup() {
     <div className="setup-gate">
       <div className="brand"><Logo height={26} /><span className="biz muted">הקמה · הדגמה</span></div>
       <SetupSteps start={null} onSave={async (s) => setDone(s)} />
-    </div>
-  );
-}
-
-/**
- * A new booth (30/10): with the consultant (a conversation that builds the setup, which he then reviews step by step),
- * or step by step on his own.
- */
-function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: Setup) => void }) {
-  const [mode, setMode] = useState<'consult' | 'steps'>('consult');
-  const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
-  async function save(s: Setup, _renames: [string, string][], texts: Record<string, string>) {
-    await startFromTemplate(exhibitor.id, s);
-    // The texts he wrote in the messages step (the consultant's among them) become his own; he can change them in הודעות.
-    for (const [id, body] of Object.entries(texts)) await saveText(exhibitor.id, id, body).catch(() => {});
-    onSaved(s);
-  }
-  return (
-    <div className="setup-gate">
-      <div className="brand"><Logo height={26} /><span className="biz muted">בוא נקים את הדוכן</span></div>
-      {mode === 'consult' && <p className="muted new-booth">היועץ שואל כמה שאלות על העסק שלך, ובונה איתך את הדוכן: הכרטיס, מה קורה אחרי, וההודעות. אחר כך עוברים על הכל יחד, והוא נשאר לידך.</p>}
-      {mode === 'consult' && <Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setMode('steps'); }} onSteps={() => setMode('steps')} />}
-      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} texts={built?.texts} business={exhibitor.business} onSave={save} onCancel={() => setMode('consult')} advisor />}
     </div>
   );
 }

@@ -906,23 +906,6 @@ a, .text-btn, .link { color: var(--ink); text-underline-offset: 4px; }
 .rpill.r-miss { background: var(--caution-soft); color: var(--caution); }
 .rpill.r-opt, .rpill.r-soon { background: var(--surface-2); color: var(--muted); }
 
-.set-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
-.set-split .set-list { position: sticky; top: 16px; }
-.set-list { display: grid; gap: 14px; }
-.set-grp { display: grid; gap: 6px; }
-.set-grp-h { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-subtle); padding-inline: 4px; }
-.set-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 16px; border: 0; background: none; color: var(--ink); text-align: start; font: inherit; }
-.set-row:hover { background: var(--hover); }
-.set-row[aria-current="true"] { background: var(--selected, var(--accent-soft)); font-weight: 700; }
-.set-row-l { flex: 1; min-width: 0; font-size: 15.5px; }
-.set-row-v { color: var(--ink-subtle); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
-.set-row-v.warn { color: var(--caution); font-weight: 700; }
-.set-row .chev { color: var(--ink-subtle); font-size: 20px; line-height: 1; }
-.is-desk .set-row .chev { display: none; }
-.set-detail { min-width: 0; }
-.set-back { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; gap: 14px; margin-top: -24px; padding: 12px 0; background: var(--surface-page, var(--bg)); border-bottom: 1px solid var(--line); }
-.set-back .text-btn { font-weight: 700; min-height: 40px; }
-.set-back b { font-size: 17px; }
 
 .ai-fab { position: fixed; z-index: 31; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(var(--bar-h) + 18px + env(safe-area-inset-bottom, 0px));
   width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--lit); color: var(--on-action); display: grid; place-items: center; box-shadow: var(--shadow-lg); }
@@ -959,3 +942,28 @@ a, .text-btn, .link { color: var(--ink); text-underline-offset: 4px; }
   .setup-ai-close { justify-self: start; font-weight: 700; min-height: 40px; }
   .setup-gate .setup-ai-fab { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- The setup (2/11, onboard.tsx): a head with the logo and the four steps, one column of content, and the
+   consultant beside it (a column on a computer, the round button on a tablet). The trial's line on the home page; the
+   self-registration folded under the card, as an extra. */
+.flow { min-height: 100dvh; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 20px; align-content: start; justify-items: center; }
+.flow-head { width: min(1160px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-block: 18px 6px; border-bottom: 1px solid var(--line); }
+.flow-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.flow-steps li { display: flex; align-items: center; gap: 6px; }
+.flow-steps li span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.flow-steps li.on { color: var(--ink); font-weight: 700; }
+.flow-steps li.on span { background: var(--lit); color: var(--on-action); }
+.flow-steps li.done span { background: var(--positive-soft); color: var(--positive); }
+.flow-body { width: min(760px, 100%); }
+.flow-body.narrow { width: min(560px, 100%); }
+.flow-body h1 { font-size: 26px; font-weight: 800; text-wrap: balance; }
+.flow-body .lead { font-size: 16.5px; color: var(--muted); max-width: 62ch; }
+.flow .setup-wrap { width: min(1160px, 100%); }
+.flow-nav { margin-top: 6px; align-items: center; }
+.flow .setup-ai-fab { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+.issues { margin: 6px 0 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+.trial-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 14px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--ink); font-size: 14.5px; margin-bottom: 16px; }
+.trial-bar .text-btn { font-weight: 700; min-height: 36px; }
+details.extra { border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 10px 16px; }
+details.extra > summary { cursor: pointer; font-weight: 600; color: var(--muted); min-height: 32px; display: flex; align-items: center; }
+details.extra[open] > summary { margin-bottom: 10px; }

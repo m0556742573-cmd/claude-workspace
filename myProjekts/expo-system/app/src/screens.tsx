@@ -207,7 +207,7 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
       {/* Until the expo: what is still missing to be ready, each with the one thing to do (2/11). */}
-      <Ready ctx={ctx} open={(p) => openSettings(ctx, p)} compact />
+      <Ready ctx={ctx} open={(p) => openSettings(ctx, p)} />
       {ctx.exhibitor.wa_blocked_at && hasWa(ctx) && <p className="offline-line">החיבור לוואטסאפ שלך נעצר ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}), ושום הודעה לא יוצאת ממנו. <button type="button" className="text-btn" onClick={() => ctx.go('settings')}>להגדרות</button></p>}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
       <div className="ov-grid">
@@ -1059,7 +1059,8 @@ export function useMe(ctx: Ctx): Me {
 }
 export const SAMPLE = 'ישראל ישראלי';
 
-export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
+/** bare: inside the settings or the setup, under their own title. */
+export function Messages({ ctx, desk, bare }: { ctx: Ctx; desk: boolean; bare?: boolean }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [open, setOpen] = useState<string | null>(null);
@@ -1075,8 +1076,8 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const toFill = !texts ? 0 : list.filter((m) => holes(fill(textOf(m.setup, texts, m.id), me, SAMPLE)).length).length;
   return (
     <div className="page">
-      <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
-        tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. פרט בסוגריים מרובעים (כתובת, שעות) ממלאים פעם אחת ב'פרטים להודעות', והוא נכנס לכל ההודעות. הודעה עם פרט ריק לא יוצאת." />
+      {!bare && <PageHead title="הודעות" eyebrow={eyebrowOf(desk)} sub={toFill ? `${toFill} מתוך ${list.length} עוד צריכות השלמה` : undefined}
+        tip="הנוסח של כל הודעה, כמו שהמבקר יקבל אותה. פרט בסוגריים מרובעים (כתובת, שעות) ממלאים פעם אחת ב'פרטים להודעות', והוא נכנס לכל ההודעות. הודעה עם פרט ריק לא יוצאת." />}
       <div className="two-col msgs">
       <section className="card">
       <h2>ההודעות</h2>

@@ -54,11 +54,13 @@ export interface BoothProps {
   ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
   /** The community list closed two days after the fair (1/11): a new visitor is typed. */
   listClosed?: boolean;
+  /** Changing how the trial goes (2/11): its choice moved from the settings to the booth's own line. */
+  onTrialChange?: () => void;
 }
 
 interface Recording { leadId: string; recorder: MediaRecorder; started: number }
 
-export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, stuck, onRetry, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf, listClosed }: BoothProps) {
+export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, removeLead, saveNote, todays, notes, waiting, stuck, onRetry, online, joinCode, phase = 'live', boothDefault, checkWa, trialSend, offer, wa = true, ownOf, listClosed, onTrialChange }: BoothProps) {
   const practice = phase === 'practice';
   const [picking, setPicking] = useState(false);
   const messages = useMemo(() => messagesOf(setup).map((m) => m.id), [setup]);
@@ -251,6 +253,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
       {practice && (
         <div className="practice-banner">
           <b>דוכן לניסיון.</b> השמות כאן לדוגמה{trialSend ? ', וההודעות מגיעות אליך ולא למבקר.' : ', ושום הודעה לא נשלחת.'} מה שנרשם עכשיו יימחק כשהמערכת עוברת למצב אמיתי, לפני האקספו.
+          {onTrialChange && <> <button type="button" className="text-btn" onClick={onTrialChange}>לשנות</button></>}
         </div>
       )}
       {!online && <p className="offline-line">בלי רשת. כל מי שנרשם נשמר בטלפון ויעלה כשתחזור הרשת.</p>}

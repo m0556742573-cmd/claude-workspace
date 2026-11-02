@@ -60,7 +60,7 @@ export function Consultant({ onBuilt, onSteps }: { onBuilt: (setup: Setup, texts
         </form>
         {err && <p className="muted small" role="alert">{err}</p>}
         <div className="row">
-          {onSteps && <button type="button" className="text-btn" disabled={!!busy} onClick={onSteps}>להקים לבד, שלב אחר שלב</button>}
+          {onSteps && <button type="button" className="text-btn" disabled={!!busy} onClick={onSteps}>מעדיף להקים לבד</button>}
           <button type="button" className="text-btn" disabled={!!busy} onClick={fresh}>שיחה חדשה</button>
         </div>
       </section>
@@ -84,8 +84,8 @@ export function Consultant({ onBuilt, onSteps }: { onBuilt: (setup: Setup, texts
 
 function why(e: unknown): string {
   const m = String((e as Error)?.message ?? e);
-  if (m === 'no_key') return 'היועץ עוד לא מחובר במערכת. בינתיים אפשר להקים שלב אחר שלב.';
-  if (m === 'limit') return 'היום כבר דיברת הרבה עם היועץ. אפשר להמשיך מחר, או להשלים לבד שלב אחר שלב.';
+  if (m === 'no_key') return 'היועץ עוד לא מחובר. בינתיים אפשר להקים לבד.';
+  if (m === 'limit') return 'היום כבר דיברת הרבה עם היועץ. אפשר להמשיך מחר, או להשלים לבד.';
   if (m === 'claude') return 'היועץ לא ענה הפעם. אפשר לנסות שוב.';
   return 'אין חיבור כרגע. אפשר לנסות שוב.';
 }
@@ -98,6 +98,7 @@ type Group = 'needs' | 'when' | 'who';
 const EXAMPLES: Record<string, string[]> = {
   'העסק והמטרה': ['איך לכתוב מה תהיה הצלחה?', 'זה עסק רגיש?'],
   'הכרטיס': ['מה לשים ב"מתי"?', 'מה לשים ב"מי הוא"?'],
+  'הדוכן': ['מה לשים ב"מתי"?', 'כמה ימים לחכות לפני שאני מתקשר?', 'מה עושים עם מי שלא ענה?'],
   'מה קורה אחרי': ['כמה ימים לחכות לפני שאני מתקשר?', 'מה עושים עם מי שלא ענה?'],
   'ההודעות': ['תנסח לי הודעת תודה קצרה', 'מה לכתוב ב[כתובת]?'],
   'בדיקה ושמירה': ['מה עוד חסר לי?', 'יש לי מספיק זמן למעקב?'],

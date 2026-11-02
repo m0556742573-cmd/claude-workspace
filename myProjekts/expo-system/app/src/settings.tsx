@@ -1,38 +1,35 @@
-// The settings (2/11, his "תיישם" to the UX proposal, artifact Tgxo1p6…): one list in five groups, by what the
-// exhibitor does and when — his booth, before the expo, on the day, how the messages go out, his account — each row
-// showing its state, under a "מוכן לאקספו" board until the day. On a computer the page opens beside the list; on a
-// tablet held upright the list and the page are two screens, and "→ הגדרות" stays in sight. The pages are the same
-// pieces as before (screens.tsx), set in their place; nothing has a save button but a change to the card or the paths,
-// which still asks whom it applies to.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+// The settings (2/11, יצחק): "כל מה שהוגדר בהקמה, מסודר לא כתהליך אלא כהגדרות לשינויים". The prototype's two parts,
+// reconsidered: "הדוכן שלי" first — what the visitor sees and what happens after, the part changed most — and "פרטים
+// וחיבורים" — him, and how the messages reach the visitors. Up to five chips in each, in his words, the most used first.
+// The same pages are the setup's (onboard.tsx), so there is one editor. The consultant floats beside them (App.tsx).
+// Nothing has a save button but a change to the card or the paths, which still asks whom it applies to.
+import { useEffect, useState } from 'react';
 import type { Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { add, remove, rename, setDays, setGoal } from './lib/edit.ts';
 import * as text from './lib/describe.ts';
 import { EXPO_DAY, today } from './lib/words.ts';
-import { signPrinted } from './lib/ready.ts';
 import { Icon, PageHead, notifySaved, setTheme, setTipsOn, themeNow, tipsOn, type Theme } from './ui.tsx';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
-import { SetupSteps } from './setup.tsx';
 import { fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import { waStatus } from './lib/wa.ts';
 import { changeTemplate, leadCount, loadTexts, myGreeting, pinLeads, renameTaps, saveText, setGreeting, waOpenState } from './lib/backend.ts';
-import { BoothDefault, Brand, MailChoice, Morning, OfferEdit, SAMPLE, SelfSign, Signature, Soon, Trial, Versions, WaLink, hasWa, useMe, type Ctx } from './screens.tsx';
+import { BoothDefault, Brand, MailChoice, Messages, Morning, OfferEdit, SAMPLE, SelfSign, Signature, Soon, Trial, Versions, WaLink, hasWa, useMe, type Ctx } from './screens.tsx';
 
-export type SetPage = 'card' | 'after' | 'rebuild' | 'trial' | 'sign' | 'offer' | 'boothmsg' | 'wa' | 'mymail' | 'visitormail' | 'me' | 'morning' | 'look';
-const TITLE: Record<SetPage, string> = {
-  card: 'הכרטיס בדוכן', after: 'אחרי האקספו', rebuild: 'להקים מחדש', trial: 'ניסיון', sign: 'שלט והרשמה עצמית', offer: 'מבצע אקספו',
-  boothmsg: 'הודעה בדוכן', wa: 'וואטסאפ', mymail: 'המייל שלך', visitormail: 'המייל של המבקר', me: 'הפרטים שלי', morning: 'הודעת הבוקר', look: 'מראה ועזרה',
-};
+type Part = 'booth' | 'details';
+export type SetPage = 'card' | 'after' | 'messages' | 'offer' | 'rebuild' | 'me' | 'wa' | 'mail' | 'morning' | 'look';
+const BOOTH: [SetPage, string][] = [['card', 'הכרטיס'], ['after', 'אחרי האקספו'], ['messages', 'ההודעות'], ['offer', 'מבצע'], ['rebuild', 'להקים מחדש']];
+const DETAILS: [SetPage, string][] = [['me', 'הפרטים שלך'], ['wa', 'וואטסאפ'], ['mail', 'המייל'], ['morning', 'הודעת הבוקר'], ['look', 'מראה']];
+const partOf = (p: SetPage): Part => (BOOTH.some(([k]) => k === p) ? 'booth' : 'details');
 
 /** A page another screen asked for (the home page's board), opened when the settings open. */
 let asked: SetPage | null = null;
 export function openSettings(ctx: Ctx, page: SetPage) { asked = page; ctx.go('settings'); }
 
-/** A setup the consultant built (or "להקים לבד" from it), to review in the steps. */
+/** A setup the consultant built from the floating button, to look at before it replaces his. null: start from a similar business. */
 export type Review = { setup: Setup | null; texts?: Record<string, string> };
 
-// ---------- what the rows and the board know: his WhatsApp, his visitors so far, the messages still missing a detail
+// ---------- what the board knows: his WhatsApp, his visitors so far, the messages still missing a detail
 
 type WaNow = { open: boolean | null; available: boolean };
 function useWaNow(ctx: Ctx): WaNow {
@@ -54,11 +51,12 @@ function missingIn(ctx: Ctx, texts: Record<string, string> | null, me: Me) {
   return { count: per.length, details: [...new Set(per.flat())] };
 }
 
-// ---------- "מוכן לאקספו": until the day, what is ready and what is left, each with the one thing to do
+// ---------- "מוכן לאקספו", on the home page until the day: only what is still missing, each with the one thing to do.
+// The sign is not on it (יצחק, 2/11: "השלט לא קשור").
 
 interface Item { id: string; label: string; hint: string; state: 'ok' | 'miss' | 'opt' | 'soon'; act?: [string, () => void] }
 
-export function Ready({ ctx, open, compact }: { ctx: Ctx; open: (p: SetPage) => void; compact?: boolean }) {
+export function Ready({ ctx, open }: { ctx: Ctx; open: (p: SetPage) => void }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const wa = useWaNow(ctx);
@@ -68,32 +66,32 @@ export function Ready({ ctx, open, compact }: { ctx: Ctx; open: (p: SetPage) => 
   const e = ctx.exhibitor;
   const miss = missingIn(ctx, texts, me);
   const items: Item[] = [
-    { id: 'me', label: 'הפרטים שלך', hint: 'השם, העסק והטלפון שבחתימה של כל הודעה', state: e.name && e.business && e.phone ? 'ok' : 'miss', act: ['להשלים', () => open('me')] },
-    { id: 'booth', label: 'הדוכן', hint: 'הכרטיס והמסלולים', state: 'ok' },
-    { id: 'msgs', label: 'ההודעות', hint: miss.count ? `${miss.count === 1 ? 'הודעה אחת לא תצא' : `${miss.count} הודעות לא ייצאו`} עד שתמלא ${miss.details.join(', ')}` : 'כל ההודעות מוכנות לצאת', state: miss.count ? 'miss' : 'ok', act: ['להשלים', () => ctx.go('messages')] },
+    { id: 'me', label: 'הפרטים שלך', hint: 'השם, העסק והטלפון שבסוף כל הודעה', state: e.name && e.business && e.phone ? 'ok' : 'miss', act: ['להשלים', () => open('me')] },
+    { id: 'booth', label: 'הדוכן', hint: 'הכרטיס, ומה קורה אחרי', state: 'ok' },
+    { id: 'msgs', label: 'ההודעות', hint: miss.count ? `${miss.count === 1 ? 'הודעה אחת לא תצא' : `${miss.count} הודעות לא ייצאו`} עד שתכתוב ${miss.details.join(', ')}` : 'כל ההודעות מוכנות', state: miss.count ? 'miss' : 'ok', act: ['להשלים', () => open('messages')] },
     ...(hasWa(ctx) ? [{ id: 'wa', label: 'הוואטסאפ שלך', hint: !wa.available ? 'החיבור ייפתח בקרוב' : 'כדי שההודעות ייצאו לבד, מהמספר שלך', state: !wa.available ? 'soon' : wa.open ? 'ok' : 'miss', act: ['לחבר', () => open('wa')] } as Item] : []),
     ...(ctx.phase === 'practice' ? [{ id: 'trial', label: 'ניסיון', hint: 'לרשום בדוכן מבקר לדוגמה, ולראות מה הוא מקבל', state: visitors ? 'ok' : 'miss', act: ['לנסות', () => ctx.go('booth')] } as Item] : []),
-    { id: 'sign', label: 'שלט לדוכן', hint: 'קוד QR להרשמה עצמית כשיש תור', state: signPrinted() ? 'ok' : 'miss', act: ['להדפיס', () => open('sign')] },
-    { id: 'logo', label: 'הלוגו שלך', hint: 'בראש כל מייל ועל השלט', state: e.logo ? 'ok' : 'opt', act: ['להעלות', () => open('mymail')] },
+    { id: 'logo', label: 'הלוגו שלך', hint: 'בראש כל מייל שיוצא ממך', state: e.logo ? 'ok' : 'opt', act: ['להעלות', () => open('mail')] },
   ];
   const counted = items.filter((i) => i.state === 'ok' || i.state === 'miss');
   const done = counted.filter((i) => i.state === 'ok').length;
   const days = Math.round((Date.parse(EXPO_DAY) - Date.parse(today())) / 86400000);
-  const shown = compact ? items.filter((i) => i.state === 'miss' || i.state === 'soon') : items;
+  const shown = items.filter((i) => i.state === 'miss' || i.state === 'soon');
+  if (!shown.length) return null;
   return (
     <section className="ready" aria-label="מוכן לאקספו">
       <div className="ready-head">
-        <h2>{done === counted.length ? 'מוכן לאקספו ✓' : `מוכן לאקספו · ${done} מתוך ${counted.length}`}</h2>
+        <h2>{`מוכן לאקספו · ${done} מתוך ${counted.length}`}</h2>
         <span className="muted small">{days > 1 ? `עוד ${days} ימים` : days === 1 ? 'מחר' : 'היום'}</span>
       </div>
       <div className="ready-bar" aria-hidden="true"><i style={{ width: `${Math.round((done / Math.max(1, counted.length)) * 100)}%` }} /></div>
-      {compact && done > 0 && <p className="ready-done">{done === 1 ? 'אחד מוכן ✓' : `${done} מוכנים ✓`}</p>}
       <ul className="ready-list">
         {shown.map((i) => (
           <li key={i.id}>
             <span className="r-t">{i.label}<small>{i.hint}</small></span>
-            <span className={'rpill r-' + i.state}>{i.state === 'ok' ? '✓ מוכן' : i.state === 'opt' ? 'לא חובה' : i.state === 'soon' ? 'בקרוב' : 'חסר'}</span>
-            {i.act && i.state !== 'ok' && i.state !== 'soon' && <button type="button" className={'btn' + (i.state === 'miss' ? ' primary' : '')} onClick={i.act[1]}>{i.act[0]}</button>}
+            {i.act && i.state === 'miss'
+              ? <button type="button" className="btn primary" onClick={i.act[1]}>{i.act[0]}</button>
+              : <span className={'rpill r-' + i.state}>{i.state === 'soon' ? 'בקרוב' : 'לא חובה'}</span>}
           </li>
         ))}
       </ul>
@@ -101,116 +99,83 @@ export function Ready({ ctx, open, compact }: { ctx: Ctx; open: (p: SetPage) => 
   );
 }
 
-// ---------- the list
+// ---------- trying the booth before the expo is the booth itself, not a setting (the prototype, 17/10): a thin line at
+// the head of the booth and the home page, and "לשנות" opens the choice (App.tsx)
 
-interface Row { id: SetPage | 'messages'; group: string; label: string; value: ReactNode; warn?: boolean }
-const GROUP_ORDER = ['הדוכן שלי', 'לפני האקספו', 'ביום האקספו', 'איך ההודעות יוצאות', 'החשבון שלי'];
+export function TrialBar({ ctx, onChange }: { ctx: Ctx; onChange: () => void }) {
+  if (ctx.phase !== 'practice') return null;
+  const e = ctx.exhibitor;
+  return (
+    <div className="trial-bar" role="status">
+      <span><b>לפני האקספו</b> · {e.trial_send ? 'כל הודעה מגיעה אליך, ולא למבקר' : 'שום הודעה לא יוצאת'}{e.trial_send && e.trial_fast ? ' · יום עובר בדקה' : ''}</span>
+      <button type="button" className="text-btn" onClick={onChange}>לשנות</button>
+    </div>
+  );
+}
+export function TrialPanel({ ctx }: { ctx: Ctx }) { return <Trial ctx={ctx} />; }
+
+// ---------- the settings
 
 export function Settings({ ctx, desk, onSignOut, review, onReviewed, onConsult }: {
   ctx: Ctx; desk: boolean; onSignOut: () => void;
-  /** A setup from the consultant to review here, in the steps; cleared when it is saved or dropped. */
   review: Review | null; onReviewed: () => void;
   /** Opens the consultant (the floating button's panel). */
   onConsult: () => void;
 }) {
-  const [page, setPage] = useState<SetPage | null>(() => { const p = asked; asked = null; return p ?? (review ? 'rebuild' : desk ? 'card' : null); });
+  const [page, setPage] = useState<SetPage>(() => { const p = asked; asked = null; return p ?? (review ? 'rebuild' : 'card'); });
   useEffect(() => { if (review) setPage('rebuild'); }, [review]);
-  const texts = useTexts();
-  const me = useMe(ctx);
-  const wa = useWaNow(ctx);
-  const e = ctx.exhibitor;
-  const s = ctx.setup;
-  const miss = missingIn(ctx, texts, me);
-  const msgs = messagesOf(s).length;
-  const questions = [s.needs.length, s.when.length, s.who.length].filter((n) => n > 0).length;
-  const rows: Row[] = [
-    { id: 'card', group: 'הדוכן שלי', label: 'הכרטיס בדוכן', value: questions ? `${questions === 1 ? 'שאלה אחת' : `${questions} שאלות`}` : 'שם בלבד' },
-    { id: 'after', group: 'הדוכן שלי', label: 'אחרי האקספו', value: s.needs.length === 1 ? 'מסלול אחד' : `${s.needs.length} מסלולים` },
-    { id: 'messages', group: 'הדוכן שלי', label: 'ההודעות', value: miss.count ? `${miss.count} להשלים` : msgs ? `${msgs} הודעות` : 'אין הודעות', warn: miss.count > 0 },
-    { id: 'rebuild', group: 'הדוכן שלי', label: 'להקים מחדש', value: 'עם היועץ או לבד' },
-    ...(ctx.phase === 'practice' ? [{ id: 'trial', group: 'לפני האקספו', label: 'ניסיון', value: e.trial_send ? 'ההודעות אליי' : 'בלי שליחה' } as Row] : []),
-    { id: 'sign', group: 'לפני האקספו', label: 'שלט והרשמה עצמית', value: signPrinted() ? 'הודפס' : '' },
-    { id: 'offer', group: 'ביום האקספו', label: 'מבצע אקספו', value: e.offer ? (e.offer.items.length === 1 ? 'פריט אחד' : `${e.offer.items.length} פריטים`) : 'אין' },
-    ...(msgs ? [{ id: 'boothmsg', group: 'ביום האקספו', label: 'הודעה בדוכן', value: e.booth_default ?? 'בלי' } as Row] : []),
-    ...(hasWa(ctx) ? [{ id: 'wa', group: 'איך ההודעות יוצאות', label: 'וואטסאפ', value: !wa.available ? 'בקרוב' : wa.open === null ? '' : wa.open ? 'מחובר' : 'לא מחובר', warn: wa.available && wa.open === false } as Row] : []),
-    { id: 'mymail', group: 'איך ההודעות יוצאות', label: 'המייל שלך', value: e.logo ? 'עם לוגו' : 'בלי לוגו' },
-    ...(hasWa(ctx) ? [{ id: 'visitormail', group: 'איך ההודעות יוצאות', label: 'המייל של המבקר', value: e.mail_always ? 'תמיד' : 'כשאין וואטסאפ' } as Row] : []),
-    { id: 'me', group: 'החשבון שלי', label: 'הפרטים שלי', value: e.name },
-    { id: 'morning', group: 'החשבון שלי', label: 'הודעת הבוקר', value: e.morning_mail || e.morning_wa ? `${(e.morning_at ?? '08:00').slice(0, 5)}` : 'כבויה' },
-    { id: 'look', group: 'החשבון שלי', label: 'מראה ועזרה', value: themeNow() === 'snow' ? 'בהיר' : 'כהה' },
-  ];
-  const open = (p: SetPage) => { setPage(p); if (!desk) scrollTo(0, 0); };
-  const list = (
-    <nav className="set-list" aria-label="ההגדרות">
-      {GROUP_ORDER.map((g) => {
-        const mine = rows.filter((r) => r.group === g);
-        if (!mine.length) return null;
-        return (
-          <div key={g} className="set-grp">
-            <div className="set-grp-h">{g}</div>
-            <ul className="list">
-              {mine.map((r) => (
-                <li key={r.id}>
-                  <button type="button" className="set-row" aria-current={page === r.id ? 'true' : undefined} onClick={() => (r.id === 'messages' ? ctx.go('messages') : open(r.id))}>
-                    <span className="set-row-l">{r.label}</span>
-                    <span className={'set-row-v' + (r.warn ? ' warn' : '')}>{r.value}</span>
-                    <span className="chev" aria-hidden="true">‹</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </nav>
-  );
-  const body = page && <SetPageBody page={page} ctx={ctx} onSignOut={onSignOut} review={review} onReviewed={onReviewed} onConsult={onConsult} />;
-  if (!desk && page) {
-    return (
-      <div className="page settings">
-        <div className="set-back">
-          <button type="button" className="text-btn" onClick={() => setPage(null)}>→ הגדרות</button>
-          <b>{TITLE[page]}</b>
-        </div>
-        <div className="subview">{body}</div>
-      </div>
-    );
-  }
+  const part = partOf(page);
+  const chips = part === 'booth' ? BOOTH : DETAILS.filter(([k]) => k !== 'wa' || hasWa(ctx));
   return (
     <div className="page settings">
-      <PageHead title="הגדרות" tip="כל ההגדרות ברשימה אחת, לפי מה שעושים: הדוכן, מה שלפני האקספו, היום עצמו, איך ההודעות יוצאות, והחשבון שלך. כל שינוי נשמר מיד." />
-      <Ready ctx={ctx} open={open} compact />
-      {desk ? <div className="set-split">{list}<div className="subview set-detail">{body}</div></div> : list}
+      <div className="set-head">
+        <PageHead title="הגדרות" tip="כל מה שקבעת בהקמה, מסודר לשינויים. ב'הדוכן שלי': מה שהמבקר רואה, ומה שקורה איתו אחרי האקספו. ב'פרטים וחיבורים': הפרטים שלך, ואיך ההודעות מגיעות למבקרים." />
+        <div className="seg" role="group" aria-label="חלק בהגדרות">
+          <button type="button" aria-pressed={part === 'booth'} onClick={() => setPage('card')}>הדוכן שלי</button>
+          <button type="button" aria-pressed={part === 'details'} onClick={() => setPage('me')}>פרטים וחיבורים</button>
+        </div>
+      </div>
+      <p className="muted set-intro">{part === 'booth'
+        ? <><b>הדוכן שלך:</b> מה שהמבקר רואה בכרטיס, ומה שקורה איתו אחרי האקספו. אפשר לשנות כל דבר, גם באמצע.</>
+        : <><b>אתה, ואיך ההודעות מגיעות למבקרים.</b> כל שינוי נשמר מיד.</>}</p>
+      <nav className="subtabs chips" aria-label={part === 'booth' ? 'הדוכן שלי' : 'פרטים וחיבורים'}>
+        {chips.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={page === k} onClick={() => setPage(k)}>{l}</button>)}
+      </nav>
+      <div className="subview">
+        {page === 'card' && <><CardPage ctx={ctx} /><BoothDefault ctx={ctx} /><SelfRegistration ctx={ctx} /></>}
+        {page === 'after' && <AfterPage ctx={ctx} />}
+        {page === 'messages' && <Messages ctx={ctx} desk={desk} bare />}
+        {page === 'offer' && <OfferEdit ctx={ctx} />}
+        {page === 'rebuild' && <RebuildPage ctx={ctx} review={review} onReviewed={onReviewed} onConsult={onConsult} />}
+        {page === 'me' && <Signature ctx={ctx} />}
+        {page === 'wa' && <WaPage ctx={ctx} />}
+        {page === 'mail' && <><Greeting ctx={ctx} /><Brand ctx={ctx} />{hasWa(ctx) && <MailChoice ctx={ctx} />}</>}
+        {page === 'morning' && <Morning ctx={ctx} />}
+        {page === 'look' && <LookPage ctx={ctx} onSignOut={onSignOut} />}
+      </div>
     </div>
   );
 }
 
-function SetPageBody({ page, ctx, onSignOut, review, onReviewed, onConsult }: { page: SetPage; ctx: Ctx; onSignOut: () => void; review: Review | null; onReviewed: () => void; onConsult: () => void }) {
-  switch (page) {
-    case 'card': return <CardPage ctx={ctx} />;
-    case 'after': return <AfterPage ctx={ctx} />;
-    case 'rebuild': return <RebuildPage ctx={ctx} review={review} onReviewed={onReviewed} onConsult={onConsult} />;
-    case 'trial': return ctx.phase === 'practice' ? <Trial ctx={ctx} /> : <p className="muted">הניסיון נגמר כשהאקספו התחיל.</p>;
-    case 'sign': return <SelfSign ctx={ctx} />;
-    case 'offer': return <OfferEdit ctx={ctx} />;
-    case 'boothmsg': return <BoothDefault ctx={ctx} />;
-    case 'wa': return <WaPage ctx={ctx} />;
-    case 'mymail': return <><Greeting ctx={ctx} /><Brand ctx={ctx} /><p className="muted small">החתימה של כל הודעה, השם, העסק והטלפון, נמצאת ב"הפרטים שלי".</p></>;
-    case 'visitormail': return <MailChoice ctx={ctx} />;
-    case 'me': return <Signature ctx={ctx} />;
-    case 'morning': return <Morning ctx={ctx} />;
-    case 'look': return <LookPage ctx={ctx} onSignOut={onSignOut} />;
-  }
+/** Registering on their own at the booth, when there is a queue: an extra, folded under the card (יצחק, 2/11: "אפשר
+ *  אולי שיהיה שם כאפשרות נוספת אבל לא יותר"). */
+function SelfRegistration({ ctx }: { ctx: Ctx }) {
+  return (
+    <details className="extra">
+      <summary>אפשרות נוספת: מבקרים נרשמים לבד כשיש תור</summary>
+      <SelfSign ctx={ctx} />
+    </details>
+  );
 }
 
-// ---------- the pages that are new here
+// ---------- the pages of "פרטים וחיבורים"
 
 function WaPage({ ctx }: { ctx: Ctx }) {
   const wa = useWaNow(ctx);
   return (
     <>
       {(ctx.admin || wa.available) && <WaLink ctx={ctx} />}
-      {!ctx.admin && !wa.available && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
+      {!ctx.admin && !wa.available && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. החיבור ייפתח בקרוב.</Soon>}
     </>
   );
 }
@@ -221,7 +186,8 @@ function Greeting({ ctx }: { ctx: Ctx }) {
   async function choose(x: 'shalom' | 'kavod') { setG(x); await setGreeting(ctx.exhibitor.id, x).catch(() => {}); dispatchEvent(new Event('expo-greeting')); }
   return (
     <section className="panel-w">
-      <h2>איך ההודעות שלך פונות לאנשים</h2>
+      <h2>איך אתה פונה למבקרים</h2>
+      <p className="muted small">השורה הראשונה בכל הודעה.</p>
       <div className="chips">
         <button type="button" className="chip" aria-pressed={g === 'shalom'} onClick={() => choose('shalom')}>שלום [שם]</button>
         <button type="button" className="chip" aria-pressed={g === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
@@ -243,10 +209,10 @@ function LookPage({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
           <button type="button" className="chip" aria-pressed={t === 'forest'} onClick={() => pick('forest')}>כהה</button>
           <button type="button" className="chip" aria-pressed={t === 'snow'} onClick={() => pick('snow')}>בהיר</button>
         </div>
-        <p className="muted small">נשמר במכשיר הזה.</p>
+        <p className="muted small">הבחירה נשמרת במכשיר הזה בלבד.</p>
         <div className="switchrow">
-          <span>להציג הסבר ליד כל מסך</span>
-          <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="להציג הסבר ליד כל מסך" onClick={() => { setTips(!tips); setTipsOn(!tips); notifySaved(); }} />
+          <span>סימן שאלה ליד כל כותרת, עם הסבר קצר</span>
+          <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="סימן שאלה ליד כל כותרת" onClick={() => { setTips(!tips); setTipsOn(!tips); notifySaved(); }} />
         </div>
       </section>
       <section className="panel-w">
@@ -262,9 +228,9 @@ function LookPage({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
 }
 
 // ---------- the booth: the card, the paths, and setting up again. A change with visitors already registered asks
-// whether it applies to them too (model, section 13).
+// whether it applies to them too (model, section 13). Used by the settings and by the setup (onboard.tsx).
 
-function useApply(ctx: Ctx) {
+export function useApply(ctx: Ctx) {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState('');
   const [ask, setAsk] = useState<{ count: number; setup: Setup; renames: [string, string][]; then?: () => void } | null>(null);
@@ -281,18 +247,17 @@ function useApply(ctx: Ctx) {
       if (scope !== 'new') for (const [from, to] of names) await renameTaps(from, to);
       ctx.setSetup(next); setAsk(null); then?.();
       notifySaved();
-      setSaved(scope === 'new'
-        ? 'השינוי חל רק על מבקרים שיירשמו מעכשיו; מי שכבר נרשם ממשיך במסלול שהיה לו. הגרסה הקודמת שמורה.'
-        : 'השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.');
+      setSaved(scope === 'new' ? 'השינוי חל על מבקרים שיירשמו מעכשיו. מי שכבר נרשם ממשיך כמו שהיה. הגרסה הקודמת שמורה.'
+        : scope === 'all' ? 'השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.' : '');
     } catch (e) { setSaved('לא נשמר: ' + String((e as Error).message ?? e)); }
     finally { setBusy(false); }
   }
   const question = ask && (
     <section className="held" aria-label="על מי חל השינוי">
-      <h2>כבר נרשמו אצלך {ask.count} מבקרים. על מי יחול השינוי?</h2>
+      <h2>{ask.count === 1 ? 'כבר נרשם אצלך מבקר אחד' : `כבר נרשמו אצלך ${ask.count} מבקרים`}. על מי יחול השינוי?</h2>
       <div className="choices">
         <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, ask.then, 'all')}><b>גם עליהם</b><small>מהצעד הבא של כל אחד</small></button>
-        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, ask.then, 'new')}><b>רק על החדשים</b><small>מי שכבר נרשם ממשיך במסלול שהיה לו</small></button>
+        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, ask.then, 'new')}><b>רק על החדשים</b><small>מי שכבר נרשם ממשיך כמו שהיה</small></button>
       </div>
       <button type="button" className="text-btn" disabled={busy} onClick={() => setAsk(null)}>חזרה, בלי לשמור</button>
     </section>
@@ -303,18 +268,20 @@ function useApply(ctx: Ctx) {
 function EditBar({ busy, changed, onSave, onCancel }: { busy: boolean; changed: boolean; onSave: () => void; onCancel: () => void }) {
   return (
     <div className="row">
-      <button type="button" className="btn primary tall" disabled={busy || !changed} onClick={onSave}>שמירת השינויים</button>
+      <button type="button" className="btn primary tall" disabled={busy || !changed} onClick={onSave}>לשמור את השינויים</button>
       <button type="button" className="btn tall" disabled={busy} onClick={onCancel}>ביטול</button>
     </div>
   );
 }
 
-function CardPage({ ctx }: { ctx: Ctx }) {
+/** The card as the booth shows it: the three questions with their buttons; "עריכה" opens them for change. */
+export function CardPage({ ctx }: { ctx: Ctx }) {
   const ap = useApply(ctx);
   const [draft, setDraft] = useState<Setup | null>(null);
   const [renames, setRenames] = useState<[string, string][]>([]);
   const s = draft ?? ctx.setup;
   const done = () => { setDraft(null); setRenames([]); };
+  const empty = !s.needs.length && !s.when.length && !s.who.length;
   return (
     <>
       <section className={draft ? 'held' : 'panel-w'}>
@@ -322,27 +289,27 @@ function CardPage({ ctx }: { ctx: Ctx }) {
           <h2>הכרטיס בדוכן</h2>
           {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); ap.setSaved(''); }}><Icon name="pen" />עריכה</button>}
         </div>
-        {draft && <p className="muted small">נגיעה בשם משנה אותו, ✕ מוציא אותו מהכרטיס. שם שמשתנה משתנה גם אצל מי שכבר סומן בו.</p>}
+        <p className="muted small">{draft ? 'נגיעה בכפתור משנה את השם שלו, ✕ מוציא אותו. ★ מסמן את המטרה הראשית.' : 'מה שאתה מסמן בדוכן על כל מבקר. מה שסומן קובע מה קורה איתו אחרי.'}</p>
         {GROUPS.map(([g, q]) => {
-          const items = g === 'needs' ? s.needs.map((n) => ({ label: n.label, effect: n.goal === 'primary' ? 'המטרה הראשית' : '' })) : s[g];
+          const items = g === 'needs' ? s.needs.map((n) => ({ label: n.label, primary: n.goal === 'primary' })) : s[g].map((b) => ({ label: b.label, primary: false }));
           if (!items.length && !draft) return null;
           return (
             <div key={g} className="q-block"><span className="sec">{q}</span>
               {draft ? (
                 <div className="chips">
-                  {items.map((b) => <EditChip key={b.label} label={b.label} primary={g === 'needs' && b.effect === 'המטרה הראשית'}
+                  {items.map((b) => <EditChip key={b.label} label={b.label} primary={b.primary}
                     onRename={(to) => { const next = rename(draft, b.label, to); if (next !== draft) { setDraft(next); setRenames([...renames, [b.label, to.trim()]]); } }}
                     onRemove={() => setDraft(remove(draft, g, b.label))}
                     onPrimary={g === 'needs' && draft.needs.length > 1 ? () => setDraft(setGoal(draft, b.label)) : undefined} />)}
                   <AddChip onAdd={(l) => setDraft(add(draft, g, l))} />
                 </div>
               ) : (
-                <ul className="history">{items.map((b) => <li key={b.label}><b style={{ color: 'var(--ink)' }}>{b.label}</b>{b.effect ? ` — ${b.effect}` : null}</li>)}</ul>
+                <div className="chips">{items.map((b) => <span key={b.label} className={'chip' + (b.primary ? ' on' : '')}>{b.primary ? '★ ' : ''}{b.label}</span>)}</div>
               )}
             </div>
           );
         })}
-        {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
+        {!draft && empty && <p className="muted">בכרטיס רק השם של המבקר. אפשר להוסיף שאלות ב"עריכה".</p>}
       </section>
       {draft && <EditBar busy={ap.busy} changed={JSON.stringify(draft) !== JSON.stringify(ctx.setup)} onSave={() => ap.apply(draft, renames, done)} onCancel={done} />}
       {ap.question}
@@ -351,7 +318,8 @@ function CardPage({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function AfterPage({ ctx }: { ctx: Ctx }) {
+/** What happens with each visitor after the expo, by what was tapped on his card; "עריכה" opens the days. */
+export function AfterPage({ ctx }: { ctx: Ctx }) {
   const ap = useApply(ctx);
   const [draft, setDraft] = useState<Setup | null>(null);
   const s = draft ?? ctx.setup;
@@ -363,7 +331,7 @@ function AfterPage({ ctx }: { ctx: Ctx }) {
           <h2>מה קורה אחרי האקספו</h2>
           {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); ap.setSaved(''); }}><Icon name="pen" />עריכה</button>}
         </div>
-        {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי האקספו.</p>}
+        <p className="muted small">{draft ? 'אפשר לשנות כמה ימים עוברים בין צעד לצעד.' : 'לכל כפתור, מה קורה עם המבקר: מתי אתה מתקשר, ואיזו הודעה יוצאת לבד.'}</p>
         {s.needs.map((n, ni) => (
           <div key={n.label} className="q-block">
             <span className="sec">{n.label}</span>
@@ -377,7 +345,7 @@ function AfterPage({ ctx }: { ctx: Ctx }) {
         ))}
         <div className="q-block"><span className="sec">מבקר שלא סומן אצלו כלום</span>
           <div><span className="muted small">בעל עסק:</span><PathLines path={s.defaults.business} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'business' }, i, d)) : undefined} /></div>
-          <div><span className="muted small">פרטי:</span><PathLines path={s.defaults.private} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'private' }, i, d)) : undefined} /></div>
+          <div><span className="muted small">כל השאר:</span><PathLines path={s.defaults.private} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'private' }, i, d)) : undefined} /></div>
         </div>
       </section>
       {draft && <EditBar busy={ap.busy} changed={JSON.stringify(draft) !== JSON.stringify(ctx.setup)} onSave={() => ap.apply(draft, [], done)} onCancel={done} />}
@@ -387,46 +355,42 @@ function AfterPage({ ctx }: { ctx: Ctx }) {
   );
 }
 
-/** Setting up again: with the consultant (in its panel), step by step, or from a similar business; and the versions. */
+/** Setting up again: a new conversation with the consultant (its panel), or a similar business; and the earlier versions.
+ *  A setup the consultant built from the floating button shows here first, and replaces his only when he says so. */
 function RebuildPage({ ctx, review, onReviewed, onConsult }: { ctx: Ctx; review: Review | null; onReviewed: () => void; onConsult: () => void }) {
   const ap = useApply(ctx);
-  const [steps, setSteps] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(!!review && !review.setup);
   const s = ctx.setup;
-  const reviewing = !!review;
-  const close = () => { setSteps(false); onReviewed(); };
-  const first = useMemo(() => review?.setup ?? s, [review, s]);
-  if (steps || reviewing) {
-    // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
-    return (
-      <>
-        {review?.setup && <p className="note">היועץ בנה את ההקמה הזאת. כדאי לעבור על כל שלב, ושום דבר לא נשמר לפני "שמירת ההקמה".</p>}
-        <SetupSteps key={review?.setup ? 'built' : 'mine'} start={first} texts={review?.texts} business={ctx.exhibitor.business} onCancel={close} advisor
-          onSave={async (next, names, texts) => {
-            await ap.apply(next, names, close);
-            for (const [id, body] of Object.entries(texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {});
-            if (Object.keys(texts).length) loadTexts().then(setTexts).catch(() => {});
-          }} />
-        {ap.question}
-      </>
-    );
+  const built = review?.setup ?? null;
+  async function take(next: Setup, texts: Record<string, string> = {}) {
+    await ap.apply(next, [], () => { onReviewed(); setPicking(false); });
+    for (const [id, body] of Object.entries(texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {});
+    if (Object.keys(texts).length) loadTexts().then(setTexts).catch(() => {});
   }
   return (
     <>
+      {built && (
+        <section className="held">
+          <h2>היועץ בנה לך דוכן חדש</h2>
+          <p className="muted">{built.needs.length ? `בכרטיס: ${built.needs.map((n) => n.label).join(' · ')}.` : 'בכרטיס רק השם של המבקר.'} אם תחליף, הדוכן הנוכחי נשמר בשינויים הקודמים, ואפשר לחזור אליו.</p>
+          <div className="row">
+            <button type="button" className="btn primary tall" disabled={ap.busy} onClick={() => take(built, review?.texts)}>להחליף לדוכן החדש</button>
+            <button type="button" className="btn tall" disabled={ap.busy} onClick={onReviewed}>להשאיר את מה שיש</button>
+          </div>
+        </section>
+      )}
       <section className="panel-w">
-        <h2>איך מקימים</h2>
+        <h2>להקים מחדש</h2>
         <ul className="list" style={{ background: 'var(--surface-2)' }}>
-          <li><button type="button" className="list-row" onClick={onConsult}><div className="row-name">שיחה עם היועץ</div><div className="row-step">היועץ שואל על העסק ובונה הקמה. היא נפתחת כאן לבדיקה, ונשמרת רק כשתאשר. השיחה נשמרת, ואפשר לחזור אליה.</div></button></li>
-          <li><button type="button" className="list-row" onClick={() => { setSteps(true); ap.setSaved(''); scrollTo(0, 0); }}><div className="row-name">לבד, שלב אחר שלב</div><div className="row-step">חמישה שלבים קצרים: העסק והמטרה, הכרטיס, מה קורה אחרי, ההודעות, ובדיקה.</div></button></li>
-          <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">להתחיל מעסק דומה</div><div className="row-step">הכרטיס והמסלולים של עסק מהסבבים, במקום שלך.</div></button></li>
+          <li><button type="button" className="list-row" onClick={onConsult}><div className="row-name">שיחה חדשה עם היועץ</div><div className="row-step">מספרים לו מה השתנה, והוא בונה דוכן חדש. הדוכן שלך לא משתנה עד שתבחר להחליף.</div></button></li>
+          <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">להתחיל מעסק דומה</div><div className="row-step">הכרטיס והמסלולים של עסק דומה, במקום שלך. מה שכתבת על העסק והמטרה נשאר.</div></button></li>
         </ul>
         {picking && (
           // A template replaces the card and the paths, but keeps what he wrote about himself (his business, his goal,
           // sensitivity, his time), and goes through the same "גם עליהם / רק על החדשים" question as any change (30/10).
           <div className="chips">{fixtures.map((f) => <button key={f.id} type="button" className="chip" disabled={ap.busy} onClick={() => {
-            if (!confirm(`להחליף את הכרטיס והמסלולים בתבנית "${f.name}"? הגרסה הנוכחית נשמרת, ואפשר לחזור אליה.`)) return;
-            setPicking(false);
-            ap.apply({ ...f.setup, template: f.id, business: s.business, anchor: s.anchor, sensitive: s.sensitive, capacity: s.capacity }, []);
+            if (!confirm(`להחליף את הכרטיס והמסלולים בשל "${f.name}"? הנוכחיים נשמרים בשינויים הקודמים.`)) return;
+            take({ ...f.setup, template: f.id, business: s.business, anchor: s.anchor, sensitive: s.sensitive, capacity: s.capacity });
           }}>{f.name}</button>)}</div>
         )}
       </section>
