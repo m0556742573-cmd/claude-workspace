@@ -4,7 +4,8 @@
 // conversation is kept, and he can come back to it.
 import { useEffect, useRef, useState } from 'react';
 import type { Setup } from '@expo/engine';
-import { consultBuild, consultNew, consultSay, consultSession, type ConsultState } from './lib/wa.ts';
+import { consultBuild, consultNew, consultSay, consultSession, consultStep, type ConsultState, type StepAnswer } from './lib/wa.ts';
+import { Icon } from './ui.tsx';
 
 export function Consultant({ onBuilt, onSteps }: { onBuilt: (setup: Setup, texts: Record<string, string>) => void; onSteps?: () => void }) {
   const [st, setSt] = useState<ConsultState | null>(null);
@@ -87,4 +88,73 @@ function why(e: unknown): string {
   if (m === 'limit') return 'היום כבר דיברת הרבה עם היועץ. אפשר להמשיך מחר, או להשלים לבד שלב אחר שלב.';
   if (m === 'claude') return 'היועץ לא ענה הפעם. אפשר לנסות שוב.';
   return 'אין חיבור כרגע. אפשר לנסות שוב.';
+}
+
+// ---------- beside the steps (2/11, יצחק: "היועץ הקמה צריך להיות בכל החלק של ההקמה, הוא המרכז"): he asks about the step
+// he is on; the consultant sees the step and the setup as it runs now. Buttons it proposes for the card come apart, and
+// go in only with "להוסיף לכרטיס". Each step starts its own short exchange; nothing of it is kept.
+
+type Group = 'needs' | 'when' | 'who';
+const EXAMPLES: Record<string, string[]> = {
+  'העסק והמטרה': ['איך לכתוב מה תהיה הצלחה?', 'זה עסק רגיש?'],
+  'הכרטיס': ['מה לשים ב"מתי"?', 'מה לשים ב"מי הוא"?'],
+  'מה קורה אחרי': ['כמה ימים לחכות לפני שאני מתקשר?', 'מה עושים עם מי שלא ענה?'],
+  'ההודעות': ['תנסח לי הודעת תודה קצרה', 'מה לכתוב ב[כתובת]?'],
+  'בדיקה ושמירה': ['מה עוד חסר לי?', 'יש לי מספיק זמן למעקב?'],
+};
+const GROUP_NAME: Record<Group, string> = { needs: 'מה הוא צריך', when: 'מתי', who: 'מי הוא' };
+
+export function StepAdvisor({ step, setup, onAdd }: { step: string; setup: Setup; onAdd: (group: Group, labels: string[]) => void }) {
+  const [turns, setTurns] = useState<{ role: 'assistant' | 'user'; text: string; add?: StepAnswer['add']; added?: boolean }[]>([]);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const log = useRef<HTMLDivElement>(null);
+  useEffect(() => { setTurns([]); setErr(''); setText(''); }, [step]);
+  useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight }); }, [turns, busy]);
+  async function ask(t: string) {
+    const msg = t.trim();
+    if (!msg || busy) return;
+    const next = [...turns, { role: 'user' as const, text: msg }];
+    setTurns(next); setText(''); setBusy(true); setErr('');
+    try {
+      const r = await consultStep(step, setup, next.map(({ role, text: x }) => ({ role, text: x })));
+      setTurns([...next, { role: 'assistant', text: r.reply, add: r.add }]);
+    } catch (e) { setErr(why(e)); setText(msg); setTurns(turns); }
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="panel-w step-ai" aria-label="היועץ">
+      <div className="step-ai-head"><Icon name="spark" size={20} /><b>היועץ</b><span className="muted small">אתה בשלב: {step}</span></div>
+      {!turns.length && (
+        <>
+          <p className="muted small">אפשר לשאול אותי על השלב הזה, ואני רואה מה כבר בדוכן שלך. למשל:</p>
+          <div className="chips">{(EXAMPLES[step] ?? []).map((q) => <button key={q} type="button" className="chip" disabled={busy} onClick={() => ask(q)}>{q}</button>)}</div>
+        </>
+      )}
+      {turns.length > 0 && (
+        <div className="consult-log" ref={log} aria-live="polite">
+          {turns.map((t, i) => (
+            <div key={i} className={'bubble ' + (t.role === 'assistant' ? 'ai' : 'me')}>
+              {t.text}
+              {t.add && (
+                <div className="step-ai-add">
+                  <span className="small">ל"{GROUP_NAME[t.add.group]}": {t.add.labels.join(' · ')}</span>
+                  {t.added ? <span className="small">נוסף לכרטיס ✓</span>
+                    : <button type="button" className="btn primary" onClick={() => { onAdd(t.add!.group, t.add!.labels); setTurns(turns.map((x, j) => (j === i ? { ...x, added: true } : x))); }}>להוסיף לכרטיס</button>}
+                </div>
+              )}
+            </div>
+          ))}
+          {busy && <div className="bubble ai thinking">חושב…</div>}
+        </div>
+      )}
+      <form className="consult-form" onSubmit={(e) => { e.preventDefault(); ask(text); }}>
+        <textarea className="area" rows={2} value={text} placeholder="לשאול על השלב הזה" aria-label="השאלה שלך"
+          onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(text); } }} />
+        <button type="submit" className="btn primary" disabled={busy || !text.trim()}>לשאול</button>
+      </form>
+      {err && <p className="muted small" role="alert">{err}</p>}
+    </section>
+  );
 }

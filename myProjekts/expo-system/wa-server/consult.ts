@@ -319,3 +319,42 @@ export function toSetup(r: Raw): { setup: Setup; texts: Record<string, string>; 
   };
   return { setup, texts, problems };
 }
+
+// ---------- beside the steps (2/11, his words: "היועץ הקמה צריך להיות בכל החלק של ההקמה, הוא המרכז"): while he goes over
+// the setup step by step, he asks about the step he is on; the consultant sees that step and the setup as it runs, and
+// answers in a few sentences. When the answer is buttons for the card, they come apart, for him to add with one tap —
+// nothing changes in his setup unless he does.
+
+const STEP_HELP = `STEP HELP MODE. The exhibitor is now going over his setup step by step in the app (the interview may be over, or he
+may have chosen to set up on his own). He is at the step named below and asks you about it. You see the setup exactly as
+the system runs it (JSON), his goal in it, and the short exchange so far in this step.
+- Answer in Hebrew, in 2 to 4 short plain sentences, about THIS step and THIS business. Give the reason from what he told
+  you or from the setup ("כי כתבת ש..."). One question back at most, and only when you cannot answer without it.
+- Never invent facts about his business, his prices or his customers.
+- When your answer is buttons for the card (מה הוא צריך / מתי / מי הוא), also give them in "add": the group ("needs",
+  "when" or "who") and up to 4 labels, each at most 3 words, written for the visitor's eyes, not already on the card.
+  Otherwise "add" is null. Remember the card's rules: every "מתי" and "מי הוא" button must change something, and a
+  question with one button is not a question.
+- A sensitive business: nothing that names the sensitive matter on the card or in messages.
+REPLY with ONLY a compact JSON object: {"reply":"...","add":{"group":"when","labels":["..."]} or null}`;
+
+export interface StepTurn { role: 'assistant' | 'user'; text: string }
+export async function stepHelp(key: string, step: string, setup: unknown, turns: StepTurn[], noWa = false): Promise<{ reply: string; add: { group: 'needs' | 'when' | 'who'; labels: string[] } | null; usage: Usage }> {
+  const said = turns.slice(-12).map((t) => (t.role === 'user' ? 'HE: ' : 'YOU: ') + t.text).join('\n');
+  const last = turns[turns.length - 1];
+  if (!last || last.role !== 'user') throw new Error('no question');
+  const m = await ask(key, {
+    model: MODEL, max_tokens: 4000,
+    output_config: { effort: 'low' },
+    system: [{ type: 'text', text: RULES, cache_control: { type: 'ephemeral' } }, { type: 'text', text: STEP_HELP }],
+    messages: [{ role: 'user', content: `${noWa ? NO_WA + '\n\n' : ''}THE STEP: ${step}\n\nTHE SETUP NOW:\n${JSON.stringify(setup).slice(0, 24000)}\n\nTHIS STEP SO FAR:\n${said}` }],
+  });
+  if (m.stop_reason === 'refusal') throw new Error('refusal');
+  const r = lenient(textOf(m));
+  const reply = r && typeof r.reply === 'string' ? r.reply.trim() : '';
+  if (!reply) throw new Error('no reply');
+  const a = obj(r!.add);
+  const group = a.group === 'needs' || a.group === 'when' || a.group === 'who' ? a.group : null;
+  const labels = arr(a.labels).map((v) => str(v, 40).trim()).filter(Boolean).slice(0, 4);
+  return { reply, add: group && labels.length ? { group, labels } : null, usage: usageOf(m) };
+}

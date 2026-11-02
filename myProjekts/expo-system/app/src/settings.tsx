@@ -401,7 +401,7 @@ function RebuildPage({ ctx, review, onReviewed, onConsult }: { ctx: Ctx; review:
     return (
       <>
         {review?.setup && <p className="note">היועץ בנה את ההקמה הזאת. כדאי לעבור על כל שלב, ושום דבר לא נשמר לפני "שמירת ההקמה".</p>}
-        <SetupSteps key={review?.setup ? 'built' : 'mine'} start={first} texts={review?.texts} business={ctx.exhibitor.business} onCancel={close}
+        <SetupSteps key={review?.setup ? 'built' : 'mine'} start={first} texts={review?.texts} business={ctx.exhibitor.business} onCancel={close} advisor
           onSave={async (next, names, texts) => {
             await ap.apply(next, names, close);
             for (const [id, body] of Object.entries(texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {});

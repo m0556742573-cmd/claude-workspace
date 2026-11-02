@@ -2,7 +2,7 @@
 // (2/11, the UX proposal; seven until then) — the business and the goal with a similar business to start from, the card,
 // what happens after, the messages, and a check before saving that also asks his time. Every "!" in the check leads to
 // the step that fixes it. It opens for a new booth, and from the settings to set up again.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Holiday, NeedPath, Path, Setup } from '@expo/engine';
 import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import { add, remove, rename, setDays, setGoal, type At } from './lib/edit.ts';
@@ -10,6 +10,8 @@ import { HOLIDAY, variantTitle } from './lib/describe.ts';
 import { fill, holes, messagesOf, textOf, useTexts } from './lib/messages.ts';
 import { PATTERNS, minutesIn14, needFrom, patternOf, recognise } from './lib/patterns.ts';
 import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
+import { StepAdvisor } from './consult.tsx';
+import { Icon } from './ui.tsx';
 
 const EMPTY: Setup = {
   business: '', anchor: { goal: '', success: '' }, needs: [], when: [], who: [],
@@ -32,7 +34,7 @@ function similar(business: string) {
     .filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 3).map((x) => x.f);
 }
 
-export function SetupSteps({ start, business, onSave, onCancel, texts: given }: {
+export function SetupSteps({ start, business, onSave, onCancel, texts: given, advisor }: {
   start: Setup | null;
   /** The business he gave at sign-up: the first answer until he writes another. */
   business?: string;
@@ -41,6 +43,8 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
   onCancel?: () => void;
   /** Texts that come with the setup (the consultant's), shown in the messages step and saved with it. */
   texts?: Record<string, string>;
+  /** The consultant beside the steps (2/11): a column on a computer, the round button on a tablet. Not in the demo. */
+  advisor?: boolean;
 }) {
   const own = useTexts();
   const [edits, setEdits] = useState<Record<string, string>>(given ?? {});
@@ -56,6 +60,23 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
   const [state, setState] = useState('');
   const capacity = s.capacity ?? 30;
   const edit = (next: Setup) => { setS(next); setTouched(true); };
+  const [aiOpen, setAiOpen] = useState(false);
+  // While the steps have their own consultant, the shell's floating button steps aside.
+  useEffect(() => {
+    if (!advisor) return;
+    dispatchEvent(new CustomEvent('expo-setup', { detail: true }));
+    return () => { dispatchEvent(new CustomEvent('expo-setup', { detail: false })); };
+  }, [advisor]);
+  /** The consultant's buttons, added to the card (those not on it yet); a first "מה הוא צריך" is the primary goal. */
+  function addFromAi(g: 'needs' | 'when' | 'who', labels: string[]) {
+    let next = s;
+    for (const l of labels) {
+      const have = g === 'needs' ? next.needs.some((n) => n.label === l) : next[g].some((b) => b.label === l);
+      if (!have) next = add(next, g, l);
+    }
+    if (g === 'needs' && next.needs.length && !next.needs.some((n) => n.goal === 'primary')) next = setGoal(next, next.needs[0]!.label);
+    edit(next);
+  }
 
   /** A starting point keeps what he already wrote about himself: the business, the goal, sensitivity. */
   function startFrom(f: number | 'empty' | 'mine') {
@@ -105,7 +126,7 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
   }
   const can = at === 0 ? !!s.anchor.goal.trim() : true;
 
-  return (
+  const steps = (
     <div className="setup-steps stack">
       <div className="steps-head">
         <span className="sec">שלב {at + 1} מתוך {STEPS.length}</span>
@@ -230,6 +251,17 @@ export function SetupSteps({ start, business, onSave, onCancel, texts: given }: 
         {onCancel && <button type="button" className="text-btn" onClick={onCancel}>ביטול</button>}
       </div>
       {state && state !== 'busy' && <p className="err">{state}</p>}
+    </div>
+  );
+  if (!advisor) return steps;
+  return (
+    <div className={'setup-wrap' + (aiOpen ? ' ai-open' : '')}>
+      {steps}
+      <aside className="setup-ai">
+        <button type="button" className="text-btn setup-ai-close" onClick={() => setAiOpen(false)}>→ חזרה לשלב</button>
+        <StepAdvisor step={STEPS[at]!} setup={s} onAdd={addFromAi} />
+      </aside>
+      {!aiOpen && <button type="button" className="ai-fab setup-ai-fab" aria-label="היועץ" title="היועץ" onClick={() => setAiOpen(true)}><Icon name="spark" size={26} stroke={1.9} /></button>}
     </div>
   );
 }

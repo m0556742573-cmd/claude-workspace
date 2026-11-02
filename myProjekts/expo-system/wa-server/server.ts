@@ -18,7 +18,7 @@ import pino from 'pino';
 import { firstLeft, gapMs, restDay, sendingHours, typingMs } from './limits.ts';
 import { due, israelDay, type Plan } from './planner.ts';
 import { buildMail, buildMorning, providerFrom, type MailRow, type MorningTask } from './mail.ts';
-import { EMPTY, GREETING, build, checks, cleanDraft, converse, type Draft, type Turn } from './consult.ts';
+import { EMPTY, GREETING, build, checks, cleanDraft, converse, stepHelp, type Draft, type StepTurn, type Turn } from './consult.ts';
 import type { Approved } from '../engine/src/index.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -451,7 +451,8 @@ async function inbound(exhibitorId: string, messages: Incoming[]): Promise<void>
 
 // ---------- the setup consultant (30/10): his conversation with Claude, kept in the database; the key stays here
 
-const CONSULT_DAY_LIMIT = 240; // turns a day per booth: a conversation that runs away is stopped, not billed
+const CONSULT_DAY_LIMIT = 240;
+const stepUse = new Map<string, { day: string; n: number }>(); // turns a day per booth: a conversation that runs away is stopped, not billed
 interface Saved { id: string | null; turns: Turn[]; draft: Draft; built: unknown }
 async function consultLoad(exhibitor: string, session?: string): Promise<Saved> {
   const r = await rpc<{ id: string | null; turns: Turn[]; draft: Draft; built: unknown } | null>('consult_get', { exhibitor, session: session ?? null });
@@ -472,7 +473,7 @@ async function consultRoute(pathname: string, req: http.IncomingMessage, exhibit
   if (pathname === '/ai/new' && req.method === 'POST') return send(200, shown({ id: null, turns: [{ role: 'assistant', text: GREETING, quick: [] }], draft: EMPTY, built: null }));
   const key = keys.anthropic_key;
   if (!key) return send(409, { error: 'no_key' });
-  const b = await readJson(req, 16384);
+  const b = await readJson(req, 65536);
   const session = typeof b.session === 'string' && /^[0-9a-f-]{36}$/.test(b.session) ? b.session : undefined;
   if (pathname === '/ai/say' && req.method === 'POST') {
     const text = String(b.text ?? '').trim().slice(0, 2000);
@@ -487,6 +488,26 @@ async function consultRoute(pathname: string, req: http.IncomingMessage, exhibit
       return send(200, shown({ id: saved.id, turns, draft: r.draft, built: s.built }));
     } catch (err) {
       logger.error({ err }, 'consultant turn failed');
+      return send(502, { error: 'claude' });
+    }
+  }
+  // A question about the step he is on, beside the steps (2/11): not kept, and counted per booth per day in memory.
+  if (pathname === '/ai/step' && req.method === 'POST') {
+    const day = new Date().toISOString().slice(0, 10);
+    const used = stepUse.get(exhibitor);
+    const n = used && used.day === day ? used.n : 0;
+    if (n >= CONSULT_DAY_LIMIT) return send(429, { error: 'limit' });
+    stepUse.set(exhibitor, { day, n: n + 1 });
+    const step = String(b.step ?? '').slice(0, 60);
+    const turns: StepTurn[] = (Array.isArray(b.turns) ? b.turns : []).slice(-12)
+      .map((t: { role?: unknown; text?: unknown }) => ({ role: t.role === 'assistant' ? 'assistant' as const : 'user' as const, text: String(t.text ?? '').slice(0, 2000) }))
+      .filter((t: StepTurn) => t.text.trim());
+    if (!step || !turns.length) return send(400, { error: 'text' });
+    try {
+      const r = await stepHelp(key, step, b.setup ?? null, turns, await noWhatsApp(token));
+      return send(200, { reply: r.reply, add: r.add });
+    } catch (err) {
+      logger.error({ err }, 'consultant step help failed');
       return send(502, { error: 'claude' });
     }
   }

@@ -51,3 +51,6 @@ export const consultSession = () => call<ConsultState>('/ai/session');
 export const consultNew = () => call<ConsultState>('/ai/new', 'POST');
 export const consultSay = (session: string | null, text: string) => call<ConsultState>('/ai/say', 'POST', { session, text });
 export const consultBuild = (session: string) => call<{ setup: unknown; texts: Record<string, string> }>('/ai/build', 'POST', { session });
+/** A question about the setup step he is on (2/11): the step, the setup as it runs now, and this step's exchange. */
+export interface StepAnswer { reply: string; add: { group: 'needs' | 'when' | 'who'; labels: string[] } | null }
+export const consultStep = (step: string, setup: unknown, turns: { role: 'assistant' | 'user'; text: string }[]) => call<StepAnswer>('/ai/step', 'POST', { step, setup, turns });

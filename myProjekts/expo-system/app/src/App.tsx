@@ -91,8 +91,8 @@ function Gate({ title, children, hero }: { title: string; children?: ReactNode; 
 
 type View = 'booth' | 'snapshot' | 'home' | 'tasks' | 'leads' | 'dash' | 'messages' | 'settings';
 type Part = 'day' | 'crm';
-/** ai: the consultant (17/10 and 20/10): a round floating button on the tablet, "סוכן AI" at the foot of the menu on a
- *  computer, opening its panel; hidden at the booth. */
+/** ai: the consultant: a round floating button everywhere in the system but the booth (יצחק, 2/11: "בכל המערכת הוא
+ *  נמצא ככפתור צף מלבד ביום האקספו בדוכן"; on a computer too, in place of "סוכן AI" in the menu of 20/10). */
 type Panel = 'menu' | 'help' | 'support' | 'ai' | null;
 const DAY: [View, string, IconName][] = [['booth', 'הדוכן', 'search'], ['snapshot', 'תמונת מצב', 'check']];
 const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['leads', 'לידים', 'leads'], ['tasks', 'משימות', 'tasks'], ['dash', 'דשבורד', 'bars'], ['messages', 'הודעות', 'mail']];
@@ -126,6 +126,13 @@ function Live() {
   const [phase, setPhase] = useState<Phase>('practice');
   // A setup the consultant built, waiting for review in the settings (2/11).
   const [review, setReview] = useState<Review | null>(null);
+  // While the setup's steps are open they have their own consultant beside them (setup.tsx), and this button steps aside.
+  const [inSetup, setInSetup] = useState(false);
+  useEffect(() => {
+    const f = (e: Event) => setInSetup(!!(e as CustomEvent<boolean>).detail);
+    addEventListener('expo-setup', f);
+    return () => removeEventListener('expo-setup', f);
+  }, []);
 
   const go = useCallback((v: View) => { setView(v); setPanel(null); const p = partOf(v); if (p) setPart(p); scrollTo(0, 0); }, []);
   useEffect(() => { history.replaceState(null, '', location.search + '#' + view); }, [view]);
@@ -287,7 +294,6 @@ function Live() {
           <div className="side-foot">
             {nv('עזרה', 'help', panel === 'help', () => openPanel('help'), 'סרטונים')}
             {nv('תמיכה', 'phone', panel === 'support', () => openPanel('support'), 'פנייה')}
-            {nv('סוכן AI', 'spark', panel === 'ai', () => openPanel('ai'), 'היועץ')}
             {nv('הגדרות', 'gear', view === 'settings', () => go('settings'))}
             <button type="button" className="nv fold" aria-expanded={!slim} title={slim ? 'להרחיב את התפריט' : 'לכווץ את התפריט'} aria-label={slim ? 'להרחיב את התפריט' : 'לכווץ את התפריט'}
               onClick={() => { if (slim) { setFolded(false); setPanel(null); } else setFolded(true); }}>
@@ -359,7 +365,7 @@ function Live() {
         </nav>
       )}
 
-      {!desk && view !== 'booth' && !panel && (
+      {view !== 'booth' && !panel && !inSetup && (
         <button type="button" className="ai-fab" aria-label="היועץ" title="היועץ" onClick={() => setPanel('ai')}><Icon name="spark" size={26} stroke={1.9} /></button>
       )}
       {panel && !desk && <button type="button" className="scrim" aria-label="סגירה" onClick={() => setPanel(null)} />}
@@ -464,7 +470,7 @@ function TrySetup() {
  * or step by step on his own.
  */
 function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: Setup) => void }) {
-  const [mode, setMode] = useState<'choose' | 'consult' | 'steps'>('choose');
+  const [mode, setMode] = useState<'consult' | 'steps'>('consult');
   const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
   async function save(s: Setup, _renames: [string, string][], texts: Record<string, string>) {
     await startFromTemplate(exhibitor.id, s);
@@ -475,16 +481,9 @@ function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: S
   return (
     <div className="setup-gate">
       <div className="brand"><Logo height={26} /><span className="biz muted">בוא נקים את הדוכן</span></div>
-      {mode === 'choose' && (
-        <section className="panel-w new-booth">
-          <h2>בוא נקים את הדוכן</h2>
-          <p className="muted">היועץ שואל כמה שאלות על העסק שלך, ובונה מהן את הכרטיס, המסלולים וההודעות. אחר כך עוברים על הכל, ומשנים מה שרוצים.</p>
-          <button type="button" className="btn primary tall" onClick={() => setMode('consult')}><Icon name="spark" size={20} />להקים עם היועץ</button>
-          <button type="button" className="text-btn" onClick={() => setMode('steps')}>או לבד, שלב אחר שלב: חמישה שלבים קצרים</button>
-        </section>
-      )}
+      {mode === 'consult' && <p className="muted new-booth">היועץ שואל כמה שאלות על העסק שלך, ובונה איתך את הדוכן: הכרטיס, מה קורה אחרי, וההודעות. אחר כך עוברים על הכל יחד, והוא נשאר לידך.</p>}
       {mode === 'consult' && <Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setMode('steps'); }} onSteps={() => setMode('steps')} />}
-      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} texts={built?.texts} business={exhibitor.business} onSave={save} onCancel={() => setMode(built ? 'consult' : 'choose')} />}
+      {mode === 'steps' && <SetupSteps start={built?.setup ?? null} texts={built?.texts} business={exhibitor.business} onSave={save} onCancel={() => setMode('consult')} advisor />}
     </div>
   );
 }
