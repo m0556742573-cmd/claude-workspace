@@ -2,6 +2,7 @@
 // line with round caps; where the design system draws an icon (check, phone, mail, plus) its drawing is used.
 // One title per screen with a "?" beside it; small section labels.
 import { useEffect, useState, type ReactNode } from 'react';
+import { SAVED } from './lib/saved.ts';
 
 const PATHS = {
   search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z M16 16l5 5',
@@ -26,6 +27,8 @@ const PATHS = {
   mic: 'M9 3h6v10H9Z M5 11a7 7 0 0 0 14 0 M12 18v3 M8 21h8',
   pen: 'M4 20h4L19 9l-4-4L4 16Z M13 7l4 4',
   close: 'M6 6l12 12 M18 6L6 18',
+  // The consultant (2/11): a spark, in the same line.
+  spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7Z',
 } as const;
 export type IconName = keyof typeof PATHS;
 
@@ -44,6 +47,19 @@ export function setTheme(t: Theme) {
   if (t === 'snow') document.documentElement.dataset.theme = 'snow'; else delete document.documentElement.dataset.theme;
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#0B1A13'); // both themes: the top bar is forest
   try { localStorage.setItem('expo-theme', t); } catch { /* the device may not keep it */ }
+}
+
+// One way to save (2/11, the UX proposal): every change is kept at once (lib/saved.ts), and this says so for two seconds.
+export { notifySaved } from './lib/saved.ts';
+export function SavedToast() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const f = () => { setOn(true); clearTimeout(t); t = setTimeout(() => setOn(false), 2000); };
+    addEventListener(SAVED, f);
+    return () => { removeEventListener(SAVED, f); clearTimeout(t); };
+  }, []);
+  return on ? <div className="saved-toast" role="status">נשמר ✓</div> : null;
 }
 
 // The "?" beside each title. There are no videos yet, so it opens a few words about the screen;

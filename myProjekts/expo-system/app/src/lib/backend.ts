@@ -1,5 +1,6 @@
 // The app's connection to the database. Every lead and note is written to the phone first and to Supabase at once;
 // without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
+import { notifySaved } from './saved.ts';
 import { createClient, type Session } from '@supabase/supabase-js';
 import { nextTask, type Action, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, getLead, nextRev, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
@@ -533,6 +534,7 @@ export async function myGreeting(): Promise<'shalom' | 'kavod'> {
 export async function setGreeting(exhibitorId: string, greeting: 'shalom' | 'kavod') {
   const { error } = await supabase.from('exhibitors').update({ greeting }).eq('id', exhibitorId);
   if (error) throw error;
+  notifySaved();
 }
 
 /** The system's phase, one for all booths (migration 0019): practice before the fair, live, after the fair. */
@@ -627,6 +629,7 @@ export async function uploadLogo(exhibitorId: string, png: Blob): Promise<string
 export async function setBrand(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color' | 'mail_name' | 'offer'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
+  notifySaved();
 }
 /** Whether no other exhibitor has chosen this name before the @. */
 export async function mailNameFree(name: string): Promise<boolean> {
@@ -688,6 +691,7 @@ export async function queuedFor(leadId: string): Promise<{ status: string; error
 export async function setWaOptions(exhibitorId: string, patch: Partial<Pick<Exhibitor, 'wa_read_replies' | 'wa_save_contacts' | 'wa_blocked_at' | 'wa_blocked_reason' | 'booth_default' | 'mail_always' | 'trial_send' | 'trial_fast' | 'trial_to' | 'morning_mail' | 'morning_wa' | 'morning_at' | 'morning_email' | 'morning_phone'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(patch).eq('id', exhibitorId);
   if (error) throw error;
+  notifySaved();
 }
 
 export async function recordSent(exhibitorId: string, leadId: string, channel: 'whatsapp' | 'email', templateId: string, body: string): Promise<void> {
@@ -712,6 +716,7 @@ export async function recordSkip(exhibitorId: string, leadId: string, templateId
 export async function updateMe(exhibitorId: string, me: Partial<Omit<Exhibitor, 'id' | 'approved'>>): Promise<void> {
   const { error } = await supabase.from('exhibitors').update(me).eq('id', exhibitorId);
   if (error) throw error;
+  notifySaved();
 }
 
 /** The phone and mail of all his leads, for the export. */

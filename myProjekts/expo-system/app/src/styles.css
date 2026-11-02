@@ -886,3 +886,50 @@ a, .text-btn, .link { color: var(--ink); text-underline-offset: 4px; }
 .toast { border-radius: var(--radius-md); }
 
 @media (prefers-reduced-motion: reduce) { .btn, .chip { transition: none; } }
+
+/* ---------- The settings as one list (2/11, the UX proposal): a "מוכן לאקספו" board until the day; the list in five
+   groups, each row with its state; on a computer the page beside it, on an upright tablet two screens with the way back
+   kept in sight. The consultant floats on the tablet (17/10, 20/10): a round button on the left, above the bar. */
+.ready { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 10px; }
+.ready-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ready-head h2 { font-size: 17px; font-weight: 700; }
+.ready-bar { height: 6px; border-radius: var(--pill); background: var(--surface-2); overflow: hidden; }
+.ready-bar i { display: block; height: 100%; background: var(--lit); border-radius: var(--pill); transition: width var(--duration-base) var(--ease-out); }
+.ready-done { color: var(--positive); font-size: 13.5px; font-weight: 700; }
+.ready-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ready-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid var(--line); }
+.ready-list .r-t { flex: 1 1 200px; min-width: 0; font-weight: 600; }
+.ready-list .r-t small { display: block; font-weight: 400; color: var(--muted); font-size: 13.5px; }
+.ready-list .btn { min-height: 38px; }
+.rpill { font-size: 12.5px; font-weight: 700; padding: 2px 10px; border-radius: var(--pill); white-space: nowrap; }
+.rpill.r-ok { background: var(--positive-soft); color: var(--positive); }
+.rpill.r-miss { background: var(--caution-soft); color: var(--caution); }
+.rpill.r-opt, .rpill.r-soon { background: var(--surface-2); color: var(--muted); }
+
+.set-split { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.set-split .set-list { position: sticky; top: 16px; }
+.set-list { display: grid; gap: 14px; }
+.set-grp { display: grid; gap: 6px; }
+.set-grp-h { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-subtle); padding-inline: 4px; }
+.set-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0 16px; border: 0; background: none; color: var(--ink); text-align: start; font: inherit; }
+.set-row:hover { background: var(--hover); }
+.set-row[aria-current="true"] { background: var(--selected, var(--accent-soft)); font-weight: 700; }
+.set-row-l { flex: 1; min-width: 0; font-size: 15.5px; }
+.set-row-v { color: var(--ink-subtle); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.set-row-v.warn { color: var(--caution); font-weight: 700; }
+.set-row .chev { color: var(--ink-subtle); font-size: 20px; line-height: 1; }
+.is-desk .set-row .chev { display: none; }
+.set-detail { min-width: 0; }
+.set-back { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; gap: 14px; margin-top: -24px; padding: 12px 0; background: var(--surface-page, var(--bg)); border-bottom: 1px solid var(--line); }
+.set-back .text-btn { font-weight: 700; min-height: 40px; }
+.set-back b { font-size: 17px; }
+
+.ai-fab { position: fixed; z-index: 31; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(var(--bar-h) + 18px + env(safe-area-inset-bottom, 0px));
+  width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--lit); color: var(--on-action); display: grid; place-items: center; box-shadow: var(--shadow-lg); }
+.ai-fab:focus-visible { outline: 3px solid var(--focus-ring, var(--ink)); outline-offset: 3px; }
+.ai-pnl .consult { grid-template-columns: 1fr; }
+.ai-pnl .consult-log { max-height: 46vh; }
+.saved-toast { position: fixed; z-index: 45; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: var(--pill);
+  background: var(--positive-soft); color: var(--positive); font-weight: 700; font-size: 14px; box-shadow: var(--shadow); }
+.new-booth { max-width: 560px; justify-items: start; }
+.new-booth .btn.tall { gap: 8px; }

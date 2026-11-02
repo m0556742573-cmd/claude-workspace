@@ -3,27 +3,24 @@
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
-import { fixtures } from '@expo/engine/fixtures/businesses.ts';
 import * as text from './lib/describe.ts';
-import { add, remove, rename, setDays, setGoal, type Group } from './lib/edit.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
-import { Icon, PageHead, Tiles, longDate, setTheme, setTipsOn, themeNow, tipsOn, type Theme } from './ui.tsx';
+import { Icon, PageHead, Tiles, longDate } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
-import { AddChip, EditChip, GROUPS, PathLines } from './parts.tsx';
-import { SetupSteps } from './setup.tsx';
+import { markSignPrinted } from './lib/ready.ts';
+import { Ready, openSettings } from './settings.tsx';
 import { Qr, joinUrl } from './join.tsx';
 import { adminMailTest, forgetWa, waCheck, waLink, waOpen, waStatus, waUnlink, type WaState } from './lib/wa.ts';
 import { prepareLogo } from './lib/logo.ts';
-import { Consultant } from './consult.tsx';
 import { destinationOf, maskDestination, showDestination } from './lib/destination.ts';
 import { MailInput, mailProblem } from './mail.tsx';
 import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesOf, setTexts, textOf, useTexts, type Me } from './lib/messages.ts';
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, markReplied, setupVersions, leadCount, pinLeads, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, renameTaps, saveLead, adminApprove, adminExhibitors, changeTemplate, engineLead, leadContact, loadBook, markStep, myGreeting,
-  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, waOpenState, signInMail, leadDestinations, addDestination, editOwn, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, setGreeting, unmarkStep, voiceUrl,
+  addFollowNote, addManual, markReplied, setupVersions, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, saveLead, adminApprove, adminExhibitors, engineLead, leadContact, loadBook, markStep, myGreeting,
+  loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, signInMail, leadDestinations, addDestination, editOwn, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
@@ -49,7 +46,7 @@ function cityOf(l: LeadRow, directory: Person[]): string {
 function ownerOf(l: LeadRow, directory: Person[]): boolean {
   return directory.find((p) => p.id === l.person_id)?.businessOwner ?? false;
 }
-function Soon({ title, children }: { title: string; children: ReactNode }) {
+export function Soon({ title, children }: { title: string; children: ReactNode }) {
   return <section className="soon"><b>{title} <span className="tag">בבנייה</span></b><p>{children}</p></section>;
 }
 function useData<T>(load: () => Promise<T>): [T | undefined, () => void, string] {
@@ -66,7 +63,7 @@ function waNumber(phone: string): string {
 }
 const eyebrowOf = (desk: boolean) => (desk ? 'CRM' : undefined);
 /** He answered "no WhatsApp": no word of WhatsApp anywhere in the system (יצחק, 31/10). Not asked yet counts as yes. */
-const hasWa = (ctx: Ctx) => !ctx.exhibitor.onboarded || !!ctx.exhibitor.whatsapp;
+export const hasWa = (ctx: Ctx) => !ctx.exhibitor.onboarded || !!ctx.exhibitor.whatsapp;
 
 // ---------- the home page sends him to the leads with something to do there: a new lead, the export, or one lead open
 
@@ -209,6 +206,8 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
       {head}
+      {/* Until the expo: what is still missing to be ready, each with the one thing to do (2/11). */}
+      <Ready ctx={ctx} open={(p) => openSettings(ctx, p)} compact />
       {ctx.exhibitor.wa_blocked_at && hasWa(ctx) && <p className="offline-line">החיבור לוואטסאפ שלך נעצר ({ctx.exhibitor.wa_blocked_reason ?? 'בלי סיבה'}), ושום הודעה לא יוצאת ממנו. <button type="button" className="text-btn" onClick={() => ctx.go('settings')}>להגדרות</button></p>}
       <Tiles items={[[now.length, 'להיום'], [late, 'באיחור', late > 0], [week, 'השבוע'], [closed, 'עסקאות שנסגרו']]} onPick={(k) => (k === 'עסקאות שנסגרו' ? ctx.go('leads') : ctx.go('tasks'))} />
       <div className="ov-grid">
@@ -469,7 +468,7 @@ function AutoLine({ blocked, wa }: { blocked: boolean; wa: boolean }) {
   if (!wa) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, בשעות 9–20.</div>;
   if (linked === null) return null;
   if (blocked) return <div className="faint small">החיבור לוואטסאפ נעצר, אז בוואטסאפ הוא לא יוצא לבד. במייל הוא יוצא למי שהשאיר מייל.</div>;
-  if (!linked) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, ובוואטסאפ כשהוואטסאפ שלך מחובר (הגדרות › חיבורים).</div>;
+  if (!linked) return <div className="faint small">יוצא לבד במייל למי שהשאיר מייל, ובוואטסאפ כשהוואטסאפ שלך מחובר (הגדרות › וואטסאפ).</div>;
   return <div className="faint small">יוצא לבד מהוואטסאפ שלך היום, לאט, כמו שאדם שולח, בשעות 9–20 (תקרה יומית למי שעוד לא ענה).</div>;
 }
 
@@ -1048,7 +1047,7 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
 // ---------- הודעות: the text of each message, as the visitor gets it; one open at a time, in hand
 
 /** The exhibitor as his messages sign: the greeting is kept apart, and a change in the settings reaches here. */
-function useMe(ctx: Ctx): Me {
+export function useMe(ctx: Ctx): Me {
   const [greeting, setG] = useState<'shalom' | 'kavod'>('shalom');
   useEffect(() => {
     const f = () => myGreeting().then(setG).catch(() => {});
@@ -1058,7 +1057,7 @@ function useMe(ctx: Ctx): Me {
   const e = ctx.exhibitor;
   return { name: e.name, business: e.business, phone: e.phone, greeting, sensitive: e.sensitive || ctx.setup.sensitive, fills: e.fills };
 }
-const SAMPLE = 'ישראל ישראלי';
+export const SAMPLE = 'ישראל ישראלי';
 
 export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const texts = useTexts();
@@ -1106,7 +1105,7 @@ export function Messages({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
       <section className="card">
         <h2>איך הן יוצאות</h2>
         {hasWa(ctx) ? <>
-          <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › חיבורים): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
+          <p className="muted"><b>כשהוואטסאפ שלך מחובר</b> (הגדרות › וואטסאפ): ההודעות של המסלול יוצאות לבד מהמספר שלך ביום שלהן, ומה שתשלח מכרטיס המשימה נכנס לתור. הכל בקצב של אדם, בשעות 9–20, לא בשבת ובחג, ועם תקרה יומית למי שעוד לא ענה.</p>
           <p className="muted"><b>בלי חיבור:</b> בנגיעה מכרטיס המשימה. נפתח וואטסאפ או מייל עם ההודעה מוכנה, ואתה לוחץ שלח.</p>
         </> : <>
           <p className="muted"><b>במייל, לבד:</b> ההודעות של המסלול יוצאות ביום שלהן למי שהשאיר מייל, בשעות 9–20, לא בשבת ובחג.</p>
@@ -1234,114 +1233,11 @@ function MessageEdit({ ctx, me, id, after, body, own, onClose }: { ctx: Ctx; me:
 
 // ---------- הגדרות: details and connections, and the personal setup — one place, in two parts
 
-export function Settings({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
-  const [tab, setTab] = useState<'details' | 'custom'>('details');
-  return (
-    <div className="page settings">
-      <div className="set-head">
-        <PageHead title="הגדרות" tip="פרטים וחיבורים: איך ההודעות שלך פונות ויוצאות, וההרשמה העצמית. התאמה אישית: הכרטיס בדוכן ומה קורה אחרי האקספו." />
-        <div className="seg" role="group" aria-label="חלק בהגדרות">
-          <button type="button" aria-pressed={tab === 'details'} onClick={() => setTab('details')}>פרטים וחיבורים</button>
-          <button type="button" aria-pressed={tab === 'custom'} onClick={() => setTab('custom')}>התאמה אישית</button>
-        </div>
-      </div>
-      {tab === 'details' ? <Details ctx={ctx} onSignOut={onSignOut} /> : <Custom ctx={ctx} />}
-    </div>
-  );
-}
-
-/** A part's sub-tabs, as chips under its intro. */
-function SubTabs<K extends string>({ label, tabs, on, set }: { label: string; tabs: [K, string][]; on: K; set: (k: K) => void }) {
-  return (
-    <nav className="subtabs chips" aria-label={label}>
-      {tabs.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={on === k} onClick={() => set(k)}>{l}</button>)}
-    </nav>
-  );
-}
-
-/** Dark or light (the design system's forest and snow, 31/10), on this device. */
-function Look() {
-  const [t, setT] = useState<Theme>(themeNow);
-  const pick = (x: Theme) => { setTheme(x); setT(x); };
-  return (
-    <section className="panel-w">
-      <h2>מראה</h2>
-      <div className="chips">
-        <button type="button" className="chip" aria-pressed={t === 'forest'} onClick={() => pick('forest')}>כהה</button>
-        <button type="button" className="chip" aria-pressed={t === 'snow'} onClick={() => pick('snow')}>בהיר</button>
-      </div>
-      <p className="muted small">נשמר במכשיר הזה.</p>
-    </section>
-  );
-}
-
-function Details({ ctx, onSignOut }: { ctx: Ctx; onSignOut: () => void }) {
-  const [greeting, setG] = useState<'shalom' | 'kavod' | null>(null);
-  const [tips, setTips] = useState(tipsOn);
-  const [sub, setSub] = useState<'msgs' | 'self' | 'links' | 'account'>('msgs');
-  // WhatsApp linking is shown to every exhibitor once the admin opened it (30/10); until then, to the admin only.
-  const [waOpenNow, setWaOpenNow] = useState(false);
-  useEffect(() => { waOpenState().then((s) => setWaOpenNow(s.open)).catch(() => {}); }, []);
-  useEffect(() => { myGreeting().then(setG).catch(() => setG('shalom')); }, []);
-  async function choose(g: 'shalom' | 'kavod') { setG(g); await setGreeting(ctx.exhibitor.id, g).catch(() => {}); dispatchEvent(new Event('expo-greeting')); }
-  return (
-    <>
-      <p className="muted set-intro"><b>הפרטים שלך, ואיך ההודעות יוצאות.</b> כל שינוי כאן חל על כל ההודעות.</p>
-      {/* חיבורים is the WhatsApp link and reading replies: without WhatsApp there is nothing in it (31/10). */}
-      <SubTabs label="פרטים וחיבורים" on={sub} set={setSub} tabs={[['msgs', 'הודעות'], ['self', 'הרשמה עצמית'], ...(hasWa(ctx) ? [['links', 'חיבורים'] as ['links', string]] : []), ['account', 'החשבון']]} />
-      <div className="subview">
-        {sub === 'msgs' && <>
-          {ctx.phase === 'practice' && <Trial ctx={ctx} />}
-          <section className="panel-w">
-            <h2>איך ההודעות שלך פונות לאנשים</h2>
-            <div className="chips">
-              <button type="button" className="chip" aria-pressed={greeting === 'shalom'} onClick={() => choose('shalom')}>שלום [שם]</button>
-              <button type="button" className="chip" aria-pressed={greeting === 'kavod'} onClick={() => choose('kavod')}>בס"ד · לכבוד ר' [שם]</button>
-            </div>
-          </section>
-          <Morning ctx={ctx} />
-          <Brand ctx={ctx} />
-          <Signature ctx={ctx} />
-          {hasWa(ctx) && <MailChoice ctx={ctx} />}
-          <section className="panel-w">
-            <h2>הנוסח של כל הודעה</h2>
-            <p className="muted">ההודעות עצמן, כמו שהמבקר יקבל אותן, נערכות במסך ההודעות.</p>
-            <button type="button" className="btn start-sm" onClick={() => ctx.go('messages')}><Icon name="mail" size={18} />להודעות</button>
-          </section>
-        </>}
-        {sub === 'self' && <SelfSign ctx={ctx} />}
-        {sub === 'links' && hasWa(ctx) && <>
-          {(ctx.admin || waOpenNow) && <WaLink ctx={ctx} />}
-          {!ctx.admin && !waOpenNow && <Soon title="חיבור הוואטסאפ שלך">סורקים קוד QR מהטלפון, כמו בוואטסאפ ווב, וההודעות יוצאות מהמספר שלך. אפשר לנתק בכל רגע.</Soon>}
-          <Soon title="קריאת תשובות">באישורך בלבד: המערכת רואה רק תשובות של מבקרים שנרשמו אצלך, כדי לעצור את המעקב כשמישהו ענה.</Soon>
-        </>}
-        {sub === 'account' && <>
-          <Look />
-          <section className="panel-w">
-            <div className="switchrow">
-              <span>להציג הסבר ליד כל מסך</span>
-              <button type="button" className="switch" role="switch" aria-checked={tips} aria-label="להציג הסבר ליד כל מסך" onClick={() => { setTips(!tips); setTipsOn(!tips); }} />
-            </div>
-          </section>
-          <section className="panel-w">
-            <h2>החשבון</h2>
-            <p>{ctx.exhibitor.name}{ctx.exhibitor.business ? ` · ${ctx.exhibitor.business}` : ''}</p>
-            <div className="row">
-              <button type="button" className="btn" onClick={onSignOut}>יציאה</button>
-              {ctx.admin && <a className="text-btn" href="https://expo-admin.pages.dev" target="_blank" rel="noreferrer">ניהול האקספו ←</a>}
-            </div>
-          </section>
-        </>}
-      </div>
-    </>
-  );
-}
-
 /**
  * His own WhatsApp, linked as a device by scanning a QR (WhatsApp › מכשירים מקושרים). For now only the admin sees it:
  * the pilot measures how the server holds the accounts before exhibitors link theirs. Nothing is sent or read yet.
  */
-function WaLink({ ctx }: { ctx: Ctx }) {
+export function WaLink({ ctx }: { ctx: Ctx }) {
   const [st, setSt] = useState<WaState | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1395,7 +1291,7 @@ function WaLink({ ctx }: { ctx: Ctx }) {
 /** When the visitor's own mail gets messages: his choice (יצחק, 29/10). Only when his phone gets no WhatsApp (§10), or always. */
 /** Trying the booth before the fair (יצחק, 29/10): with sample names, without sending, or with every message sent to him
  *  instead of the visitor, opening with whom it would have gone to. The last 10 trial visitors get messages (0043, 1/11). */
-function Trial({ ctx }: { ctx: Ctx }) {
+export function Trial({ ctx }: { ctx: Ctx }) {
   const e = ctx.exhibitor;
   const [typed, setTyped] = useState('');
   const [bad, setBad] = useState<string | boolean>(false);
@@ -1445,7 +1341,7 @@ function Trial({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function MailChoice({ ctx }: { ctx: Ctx }) {
+export function MailChoice({ ctx }: { ctx: Ctx }) {
   const on = ctx.exhibitor.mail_always;
   const set = async (v: boolean) => { if (v === on) return; ctx.setExhibitor({ ...ctx.exhibitor, mail_always: v }); await setWaOptions(ctx.exhibitor.id, { mail_always: v }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
   return (
@@ -1461,7 +1357,7 @@ function MailChoice({ ctx }: { ctx: Ctx }) {
 }
 
 /** The booth's default message (17/10): when the path sends nothing at once, the card offers it in one tap. */
-function BoothDefault({ ctx }: { ctx: Ctx }) {
+export function BoothDefault({ ctx }: { ctx: Ctx }) {
   const list = messagesOf(ctx.setup).map((m) => m.id);
   const value = ctx.exhibitor.booth_default ?? '';
   const set = async (v: string) => { const next = { ...ctx.exhibitor, booth_default: v || null }; ctx.setExhibitor(next); await setWaOptions(ctx.exhibitor.id, { booth_default: v || null }).catch(() => ctx.setExhibitor(ctx.exhibitor)); };
@@ -1506,7 +1402,7 @@ function WaBlocked({ ctx }: { ctx: Ctx }) {
  * Self-registration: the link and its code, and a sign to print for the booth. A visitor who scans it registers
  * himself and taps what interests him; within half a minute he is in the booth's list, marked "נרשם לבד".
  */
-function SelfSign({ ctx }: { ctx: Ctx }) {
+export function SelfSign({ ctx }: { ctx: Ctx }) {
   const url = joinUrl(ctx.exhibitor.join_code);
   const biz = ctx.setup.sensitive || ctx.exhibitor.sensitive ? ctx.exhibitor.name : ctx.exhibitor.business || ctx.exhibitor.name;
   const [copied, setCopied] = useState(false);
@@ -1519,7 +1415,7 @@ function SelfSign({ ctx }: { ctx: Ctx }) {
         <div className="stack">
           <a className="link-line" href={url} target="_blank" rel="noreferrer" dir="ltr">{url.replace(/^https?:\/\//, '')}</a>
           <div className="row">
-            <button type="button" className="btn primary" onClick={() => print()}>הדפסת שלט לדוכן</button>
+            <button type="button" className="btn primary" onClick={() => { markSignPrinted(); print(); }}>הדפסת שלט לדוכן</button>
             <button type="button" className="btn" onClick={() => { navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); }).catch(() => {}); }}>{copied ? 'הועתק' : 'העתקת הקישור'}</button>
           </div>
           <p className="faint small">אפשר לנסות בעצמך: מי שתירשם דרכו יופיע בדוכן, ואפשר לבטל אותו משם.</p>
@@ -1549,7 +1445,7 @@ const inkOn = (hex: string) => {
  * His logo and colour (יצחק, 30/10): at the head of every mail he sends, on his self-registration page and on the sign.
  * Both optional; with no logo the mail shows the first letter of his business. The preview is the mail's own head.
  */
-function Brand({ ctx }: { ctx: Ctx }) {
+export function Brand({ ctx }: { ctx: Ctx }) {
   const ex = ctx.exhibitor;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -1568,7 +1464,7 @@ function Brand({ ctx }: { ctx: Ctx }) {
   const ink = inkOn(color);
   async function save(patch: Partial<Pick<Exhibitor, 'logo' | 'brand_color'>>, done: string) {
     setBusy(true); setMsg('');
-    try { await setBrand(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); setMsg(done); }
+    try { await setBrand(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); setMsg(done === 'נשמר.' ? '' : done); }
     catch (e) { setMsg('לא נשמר: ' + String((e as Error).message ?? e)); }
     finally { setBusy(false); }
   }
@@ -1638,7 +1534,7 @@ function Brand({ ctx }: { ctx: Ctx }) {
  * and WhatsApp as he ticks, at any hour, to the mail or number he picks when he has more than one. WhatsApp goes from
  * YHM's official number, and waits until that number is approved.
  */
-function Morning({ ctx }: { ctx: Ctx }) {
+export function Morning({ ctx }: { ctx: Ctx }) {
   const ex = ctx.exhibitor;
   const [signIn, setSignIn] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
@@ -1647,7 +1543,7 @@ function Morning({ ctx }: { ctx: Ctx }) {
   const at = (ex.morning_at ?? '08:00').slice(0, 5);
   async function set(patch: Partial<Pick<Exhibitor, 'morning_mail' | 'morning_wa' | 'morning_at' | 'morning_email'>>) {
     setMsg('');
-    try { await setWaOptions(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); setMsg('נשמר.'); }
+    try { await setWaOptions(ex.id, patch); ctx.setExhibitor({ ...ex, ...patch }); }
     catch { setMsg('לא נשמר: אין חיבור כרגע.'); }
   }
   return (
@@ -1677,9 +1573,14 @@ function Morning({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/** The offer sent after the fair and the check a week after an order (4f8ba66, migration 0044) wait for his yes
+ *  (b-offer-approve): until then their switch and their words are not shown. */
+const OFFER_SENDING = false;
+
 /**
  * The expo offer (יצחק, 23/10; model §14א): a name, items with the regular and the expo price, and until when. At the
  * booth, "הזמין" opens them; the visitor ordering is a deal, and gets a summary of his order. No payment or stock.
+ * Kept by itself once it is whole (2/11, one way to save), a second after he stops typing.
  */
 export function OfferEdit({ ctx }: { ctx: Ctx }) {
   const ex = ctx.exhibitor;
@@ -1689,21 +1590,26 @@ export function OfferEdit({ ctx }: { ctx: Ctx }) {
   const item = (i: number, patch: Partial<Offer['items'][number]>) => setO({ ...o, items: o.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   async function save(next: Offer | null) {
     setMsg('');
-    try { await setBrand(ex.id, { offer: next }); ctx.setExhibitor({ ...ex, offer: next }); if (!next) setO(blank); setMsg(next ? 'נשמר. בדוכן יש עכשיו כפתור "הזמין".' : 'המבצע הוסר.'); }
+    try { await setBrand(ex.id, { offer: next }); ctx.setExhibitor({ ...ex, offer: next }); if (!next) setO(blank); setMsg(next ? (ex.offer ? '' : 'בדוכן יש עכשיו כפתור "הזמין".') : 'המבצע הוסר.'); }
     catch { setMsg('לא נשמר: אין חיבור כרגע.'); }
   }
   const ok = o.name.trim() && o.items.length > 0 && o.items.every((i) => i.name.trim() && i.expoPrice > 0);
+  useEffect(() => {
+    if (!ok || JSON.stringify(o) === JSON.stringify(ex.offer)) return;
+    const t = setTimeout(() => save(o), 1000);
+    return () => clearTimeout(t);
+  }, [o]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="panel-w">
       <h2>מבצע אקספו</h2>
-      <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה, ושבוע אחרי זה שאלה אם הכל הגיע בסדר. תשלום, מלאי וחשבונית נשארים אצלך.</p>
+      <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה{OFFER_SENDING ? ', ושבוע אחרי זה שאלה אם הכל הגיע בסדר' : ''}. תשלום, מלאי וחשבונית נשארים אצלך.{!ok && o.items.length > 0 ? ' המבצע נשמר כשלכל פריט יש שם ומחיר אקספו.' : ''}</p>
       <label className="field">שם המבצע<input className="input" value={o.name} onChange={(e) => setO({ ...o, name: e.target.value })} /></label>
       <label className="field" style={{ maxWidth: 200 }}>עד מתי<input className="input" type="date" value={o.until} onChange={(e) => setO({ ...o, until: e.target.value })} /></label>
       {/* After the fair, to whoever did not order (1/11, model §14א): on unless he keeps it at the booth. */}
-      <div className="switchrow">
+      {OFFER_SENDING && <div className="switchrow">
         <span>לשלוח את המבצע למי שלא הזמין <span className="faint small">· יום אחרי האקספו, ותזכורת יום לפני שהמבצע נגמר. מבצע של יום האקספו בלבד לא נשלח.</span></span>
         <button type="button" className="switch" role="switch" aria-checked={o.send !== false} aria-label="לשלוח את המבצע למי שלא הזמין" onClick={() => setO({ ...o, send: o.send === false })} />
-      </div>
+      </div>}
       {o.items.map((i, n) => (
         <div key={i.id} className="row offer-item">
           <input className="input" placeholder="הפריט" aria-label="הפריט" value={i.name} onChange={(e) => item(n, { name: e.target.value })} />
@@ -1714,7 +1620,6 @@ export function OfferEdit({ ctx }: { ctx: Ctx }) {
       ))}
       <div className="row">
         <button type="button" className="btn" onClick={() => setO({ ...o, items: [...o.items, { id: crypto.randomUUID().slice(0, 8), name: '', price: 0, expoPrice: 0 }] })}>＋ פריט</button>
-        <button type="button" className="btn primary" disabled={!ok} onClick={() => save(o)}>שמירה</button>
         {ex.offer && <button type="button" className="text-btn" onClick={() => { if (confirm('להסיר את מבצע האקספו? הזמנות שכבר נשמרו נשארות.')) save(null); }}>להסיר את המבצע</button>}
       </div>
       {msg && <p className="muted small" role="status">{msg}</p>}
@@ -1762,7 +1667,7 @@ function MailName({ ctx }: { ctx: Ctx }) {
 }
 
 /** The details at the foot of every message: [שם המציג], [העסק] · [טלפון]; and whether he has WhatsApp. */
-function Signature({ ctx }: { ctx: Ctx }) {
+export function Signature({ ctx }: { ctx: Ctx }) {
   return (
     <section className="panel-w">
       <h2>הפרטים שלך</h2>
@@ -1772,163 +1677,8 @@ function Signature({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function Custom({ ctx }: { ctx: Ctx }) {
-  const [draft, setDraft] = useState<Setup | null>(null);
-  const [renames, setRenames] = useState<[string, string][]>([]);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState('');
-  const s = draft ?? ctx.setup;
-  const [picking, setPicking] = useState(false);
-  const [steps, setSteps] = useState(false);
-  // The consultant (30/10): its setup opens in the steps for review; its message texts are saved with it.
-  const [consulting, setConsulting] = useState(false);
-  const [built, setBuilt] = useState<{ setup: Setup; texts: Record<string, string> } | null>(null);
-  const [ask, setAsk] = useState<{ count: number; setup: Setup; renames: [string, string][] } | null>(null);
-  const [sub, setSub] = useState<'card' | 'after' | 'build'>('card');
-
-  /** A change with leads already registered asks whether it applies to them too (model, section 13). */
-  async function apply(next: Setup, names: [string, string][], scope?: 'all' | 'new') {
-    setBusy(true); setSaved('');
-    try {
-      if (!scope) {
-        const count = await leadCount();
-        if (count > 0) { setAsk({ count, setup: next, renames: names }); return; }
-      }
-      if (scope === 'new') await pinLeads(ctx.exhibitor.id);
-      await changeTemplate(ctx.exhibitor.id, next);
-      // A lead left on the old version keeps the old names of the buttons, as its old setup knows them.
-      if (scope !== 'new') for (const [from, to] of names) await renameTaps(from, to);
-      ctx.setSetup(next); setDraft(null); setRenames([]); setAsk(null); setSteps(false);
-      setSaved(scope === 'new'
-        ? 'נשמר. השינוי חל רק על מבקרים שיירשמו מעכשיו; מי שכבר נרשם ממשיך במסלול שהיה לו. הגרסה הקודמת שמורה.'
-        : 'נשמר. השינוי חל מהצעד הבא של כל מבקר, גם של מי שכבר נרשם. הגרסה הקודמת שמורה.');
-    } catch (e) { setSaved('לא נשמר: ' + String((e as Error).message ?? e)); }
-    finally { setBusy(false); }
-  }
-  const save = () => { if (draft) apply(draft, renames); };
-  const question = ask && (
-    <section className="held" aria-label="על מי חל השינוי">
-      <h2>כבר נרשמו אצלך {ask.count} מבקרים. על מי יחול השינוי?</h2>
-      <div className="choices">
-        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, 'all')}><b>גם עליהם</b><small>מהצעד הבא של כל אחד</small></button>
-        <button type="button" className="choice" disabled={busy} onClick={() => apply(ask.setup, ask.renames, 'new')}><b>רק על החדשים</b><small>מי שכבר נרשם ממשיך במסלול שהיה לו</small></button>
-      </div>
-      <button type="button" className="text-btn" disabled={busy} onClick={() => setAsk(null)}>חזרה, בלי לשמור</button>
-    </section>
-  );
-  const intro = <p className="muted set-intro"><b>כאן בונים את הדוכן שלך.</b> הכרטיס שבדוכן, ומה קורה אחרי האקספו עם כל מי שנרשם. כל דבר אפשר לשנות.</p>;
-  if (steps) {
-    // The result of saving (or the question about existing visitors) shows here too, not only outside the steps (30/10).
-    return <>{intro}{saved && <p className="muted" role="status">{saved}</p>}<SetupSteps start={built?.setup ?? ctx.setup} texts={built?.texts} business={ctx.exhibitor.business} onCancel={() => { setSteps(false); setBuilt(null); }}
-      onSave={async (next, names, texts) => {
-        await apply(next, names);
-        for (const [id, body] of Object.entries(texts)) await saveText(ctx.exhibitor.id, id, body).catch(() => {});
-        if (Object.keys(texts).length) loadTexts().then(setTexts).catch(() => {});
-        setBuilt(null);
-      }} />{question}</>;
-  }
-  if (consulting) {
-    return <>{intro}<Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setConsulting(false); setSteps(true); scrollTo(0, 0); }} onSteps={() => { setConsulting(false); setSteps(true); }} />
-      <button type="button" className="text-btn" onClick={() => setConsulting(false)}>חזרה להגדרות</button></>;
-  }
-  return (
-    <>
-      {intro}
-      <SubTabs label="התאמה אישית" on={sub} set={setSub} tabs={[['card', 'הכרטיס בדוכן'], ['after', 'מה קורה אחרי'], ['build', 'הקמה וגרסאות']]} />
-      <div className="subview">
-      {question}
-      {sub === 'build' && <>
-      <section className="panel-w">
-        <h2>איך מקימים</h2>
-        <ul className="list" style={{ background: 'var(--surface-2)' }}>
-          <li><button type="button" className="list-row" onClick={() => { setConsulting(true); setSaved(''); scrollTo(0, 0); }}><div className="row-name">שיחה עם היועץ</div><div className="row-step">היועץ שואל על העסק ובונה הקמה. היא נפתחת לבדיקה, ונשמרת רק כשתאשר. השיחה נשמרת, ואפשר לחזור אליה.</div></button></li>
-          <li><button type="button" className="list-row" onClick={() => { setSteps(true); setSaved(''); scrollTo(0, 0); }}><div className="row-name">הקמה שלב אחר שלב</div><div className="row-step">שישה שלבים קצרים: מטרה, נקודת התחלה, כרטיס, מסלולים, זמן, ובדיקה.</div></button></li>
-          <li><button type="button" className="list-row" aria-expanded={picking} onClick={() => setPicking(!picking)}><div className="row-name">החלפת תבנית</div><div className="row-step">להתחיל מעסק דומה מהסבבים.</div></button></li>
-        </ul>
-        {picking && (
-          // A template replaces the card and the paths, but keeps what he wrote about himself (his business, his goal,
-          // sensitivity, his time), and goes through the same "גם עליהם / רק על החדשים" question as any change (30/10).
-          <div className="chips">{fixtures.map((f) => <button key={f.id} type="button" className="chip" disabled={busy} onClick={() => {
-            if (!confirm(`להחליף את הכרטיס והמסלולים בתבנית "${f.name}"? הגרסה הנוכחית נשמרת, ואפשר לחזור אליה.`)) return;
-            setPicking(false);
-            apply({ ...f.setup, template: f.id, business: s.business, anchor: s.anchor, sensitive: s.sensitive, capacity: s.capacity }, []);
-          }}>{f.name}</button>)}</div>
-        )}
-      </section>
-
-      {(s.anchor.goal || s.anchor.success) && (
-        <section className="panel-w"><h2>מה תהיה הצלחה באקספו</h2><p>{s.anchor.goal}</p>{s.anchor.success && <p className="muted">{s.anchor.success}</p>}</section>
-      )}
-      {!draft && <Versions ctx={ctx} key={saved} onRestore={(old) => apply(old, [])} />}
-      </>}
-
-      {sub === 'card' && <section className={draft ? 'held' : 'panel-w'}>
-        <div className="card-top">
-          <h2>הכרטיס בדוכן</h2>
-          {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
-        </div>
-        {draft && <p className="muted small">נגיעה בשם משנה אותו, ✕ מוציא אותו מהכרטיס. שם שמשתנה משתנה גם אצל מי שכבר סומן בו.</p>}
-        {GROUPS.map(([g, q]) => {
-          const items = g === 'needs' ? s.needs.map((n) => ({ label: n.label, effect: n.goal === 'primary' ? 'המטרה הראשית' : '' })) : s[g];
-          if (!items.length && !draft) return null;
-          return (
-            <div key={g} className="q-block"><span className="sec">{q}</span>
-              {draft ? (
-                <div className="chips">
-                  {items.map((b) => <EditChip key={b.label} label={b.label} primary={g === 'needs' && b.effect === 'המטרה הראשית'}
-                    onRename={(to) => { const next = rename(draft, b.label, to); if (next !== draft) { setDraft(next); setRenames([...renames, [b.label, to.trim()]]); } }}
-                    onRemove={() => setDraft(remove(draft, g, b.label))}
-                    onPrimary={g === 'needs' && draft.needs.length > 1 ? () => setDraft(setGoal(draft, b.label)) : undefined} />)}
-                  <AddChip onAdd={(l) => setDraft(add(draft, g, l))} />
-                </div>
-              ) : (
-                <ul className="history">{items.map((b) => <li key={b.label}><b style={{ color: 'var(--ink)' }}>{b.label}</b>{b.effect ? ` — ${b.effect}` : null}</li>)}</ul>
-              )}
-            </div>
-          );
-        })}
-        {!draft && !s.needs.length && !s.when.length && !s.who.length && <p className="muted">כרטיס של שם בלבד.</p>}
-      </section>}
-      {sub === 'card' && !draft && <BoothDefault ctx={ctx} />}
-      {sub === 'card' && !draft && <OfferEdit ctx={ctx} />}
-
-      {sub === 'after' && <section className={draft ? 'held' : 'panel-w'}>
-        <div className="card-top">
-          <h2>מה קורה אחרי האקספו</h2>
-          {!draft && <button type="button" className="btn" onClick={() => { setDraft(ctx.setup); setRenames([]); setSaved(''); }}><Icon name="pen" />עריכה</button>}
-        </div>
-        {draft && <p className="muted small">אפשר לשנות כמה ימים עובר בין צעד לצעד. צעד חדש לכפתור חדש: שיחה ממך שלושה ימים אחרי האקספו.</p>}
-        {s.needs.map((n, ni) => (
-          <div key={n.label} className="q-block">
-            <span className="sec">{n.label}</span>
-            {n.variants.map((v, vi) => (
-              <div key={vi}>
-                {n.variants.length > 1 && <span className="muted small">{text.variantTitle(v)}:</span>}
-                <PathLines path={v.path} edit={draft ? (i, d) => setDraft(setDays(draft, { need: ni, variant: vi }, i, d)) : undefined} />
-              </div>
-            ))}
-          </div>
-        ))}
-        <div className="q-block"><span className="sec">מבקר שלא סומן אצלו כלום</span>
-          <div><span className="muted small">בעל עסק:</span><PathLines path={s.defaults.business} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'business' }, i, d)) : undefined} /></div>
-          <div><span className="muted small">פרטי:</span><PathLines path={s.defaults.private} edit={draft ? (i, d) => setDraft(setDays(draft, { default: 'private' }, i, d)) : undefined} /></div>
-        </div>
-      </section>}
-
-      {draft && (
-        <div className="row">
-          <button type="button" className="btn primary tall" disabled={busy || JSON.stringify(draft) === JSON.stringify(ctx.setup)} onClick={save}>שמירת השינויים</button>
-          <button type="button" className="btn tall" disabled={busy} onClick={() => { setDraft(null); setRenames([]); }}>ביטול</button>
-        </div>
-      )}
-      {saved && <p className="note">{saved}</p>}
-      </div>
-    </>
-  );
-}
-
 /** The earlier versions of the setup, newest first; one tap makes one of them the setup again. */
-function Versions({ ctx, onRestore }: { ctx: Ctx; onRestore: (s: Setup) => Promise<void> }) {
+export function Versions({ ctx, onRestore }: { ctx: Ctx; onRestore: (s: Setup) => Promise<void> }) {
   const [list, setList] = useState<import('./lib/backend.ts').SetupVersion[] | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1939,7 +1689,7 @@ function Versions({ ctx, onRestore }: { ctx: Ctx; onRestore: (s: Setup) => Promi
   return (
     <section className="panel-w">
       <div className="card-top">
-        <h2>גרסאות קודמות</h2>
+        <h2>שינויים קודמים</h2>
         <button type="button" className="text-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'להסתיר' : `${old.length} שמורות`}</button>
       </div>
       {open && (

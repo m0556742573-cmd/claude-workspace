@@ -1,0 +1,410 @@
+<title>מדריך המציג של אקספומקס</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>document.documentElement.lang = "he"; document.documentElement.dir = "rtl";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Heebo:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: one reading column in the ExpoMax look (design system TE84PqgQ…): a forest frame on top, three phases
+   (before, the day, after) in order, the booth card drawn as it looks. Forest (dark) is the default; snow is the light. */
+:root {
+  --page: #0B1A13; --raised: #12261C; --sunken: #07110C; --moss: #1D3A2C;
+  --line: #23402F; --line-strong: #557A66;
+  --ink: #F2F5EE; --ink-muted: #A9B7AE; --ink-subtle: #7F9488;
+  --lit: #F8AC00; --loose: #7F9488; --accent-text: #F8AC00; --logo-max: #F8AC00;
+  --action: #F8AC00; --on-action: #0B1A13; --accent-soft: #33270A;
+  --positive: #9BD27A; --positive-soft: #1E3317;
+  --leaf: #C9F26B;
+  --shadow-1: 0 1px 0 rgba(242,245,238,0.04) inset, 0 16px 32px -20px rgba(0,0,0,0.7);
+  --frame: #0B1A13; --frame-ink: #F2F5EE; --frame-muted: #A9B7AE; --frame-line: #23402F;
+  --font-sans: Heebo, "Arial Hebrew", system-ui, sans-serif;
+  --font-wide: Archivo, Heebo, system-ui, sans-serif;
+  --r-sm: 12px; --r: 18px; --pill: 999px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --page: #EEE8DB; --raised: #FBF9F4; --sunken: #E4DCCB; --moss: #DDE2D4;
+    --line: #D9D0BD; --line-strong: #6E7E74;
+    --ink: #0B1A13; --ink-muted: #3A4A41; --ink-subtle: #4F5F56;
+    --accent-text: #9E5700; --logo-max: #B36F00; --accent-soft: #FFEBC0;
+    --positive: #3F6B12; --positive-soft: #E3F1D6;
+    --shadow-1: 0 1px 2px rgba(11,26,19,0.06), 0 16px 32px -22px rgba(11,26,19,0.28);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --page: #EEE8DB; --raised: #FBF9F4; --sunken: #E4DCCB; --moss: #DDE2D4;
+  --line: #D9D0BD; --line-strong: #6E7E74;
+  --ink: #0B1A13; --ink-muted: #3A4A41; --ink-subtle: #4F5F56;
+  --accent-text: #9E5700; --logo-max: #B36F00; --accent-soft: #FFEBC0;
+  --positive: #3F6B12; --positive-soft: #E3F1D6;
+  --shadow-1: 0 1px 2px rgba(11,26,19,0.06), 0 16px 32px -22px rgba(11,26,19,0.28);
+  color-scheme: light;
+}
+
+html { direction: rtl; }
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--font-sans); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+a { color: var(--accent-text); }
+:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; }
+
+.wrap { max-width: 880px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* the forest frame */
+.band { background: var(--frame); color: var(--frame-ink); border-bottom: 1px solid var(--frame-line); }
+.band .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
+.logo { display: inline-flex; align-items: center; gap: 8px; line-height: 1; }
+.logo svg { display: block; flex: none; }
+.logo .name { font-weight: 500; font-size: 26px; letter-spacing: -.005em; white-space: nowrap; }
+.logo .name i { font-style: normal; color: var(--logo-max); }
+.band .logo .name { color: var(--frame-ink); }
+.band .logo .name i { color: #F8AC00; }
+.sym-loose { fill: var(--loose); }
+.sym-lit { fill: var(--lit); }
+.band-tag { font-size: 14px; color: var(--frame-muted); }
+
+/* the opening */
+.hero { padding-block: 44px 28px; }
+.eyebrow { font-size: 14px; font-weight: 500; color: var(--accent-text); margin: 0 0 8px; }
+h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.15; font-weight: 800; letter-spacing: -.015em; margin: 0 0 16px; text-wrap: balance; }
+.lead { font-size: 18px; color: var(--ink-muted); max-width: 62ch; margin: 0; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 28px 0 0; padding: 0; }
+.facts div { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; min-width: 0; }
+.facts dt { font-size: 13px; font-weight: 500; color: var(--ink-subtle); }
+.facts dd { margin: 2px 0 0; font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }
+.facts dd small { display: block; font-weight: 400; font-size: 14px; color: var(--ink-muted); }
+
+.jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
+.jump a { display: inline-block; padding: 7px 14px; border-radius: var(--pill); border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; font-size: 15px; font-weight: 500; }
+.jump a:hover { background: var(--moss); }
+
+/* sections */
+section { padding-block: 36px; border-top: 1px solid var(--line); }
+h2 { font-size: clamp(24px, 4.4vw, 30px); line-height: 1.25; font-weight: 800; letter-spacing: -.01em; margin: 0 0 10px; text-wrap: balance; }
+h3 { font-size: 18px; font-weight: 700; line-height: 1.45; margin: 0 0 6px; }
+p { margin: 0; }
+.intro { color: var(--ink-muted); max-width: 64ch; margin-bottom: 24px; }
+.where { display: inline; font-size: 14px; font-weight: 500; color: var(--accent-text); white-space: normal; }
+.muted { color: var(--ink-muted); }
+.small { font-size: 14px; }
+
+/* the real sequence: numbered steps */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; counter-reset: step; }
+.steps > li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; counter-increment: step; }
+.steps > li::before { content: counter(step); font-family: var(--font-wide); font-stretch: 115%; font-weight: 800; font-size: 17px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--moss); color: var(--ink); }
+.steps > li > div { min-width: 0; display: grid; gap: 8px; padding-top: 6px; }
+.note { font-size: 14px; color: var(--ink-muted); border-inline-start: 3px solid var(--line-strong); padding-inline-start: 10px; }
+
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.choice { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; min-width: 0; }
+.choice b { display: block; }
+.choice.rec { border-color: var(--lit); }
+.choice .tag { display: inline-block; font-size: 12px; font-weight: 700; background: var(--action); color: var(--on-action); border-radius: var(--pill); padding: 1px 9px; margin-inline-start: 6px; vertical-align: 2px; }
+
+.ways { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ways li { background: var(--sunken); border-radius: var(--r-sm); padding: 10px 14px; }
+.ways b { color: var(--ink); }
+.tip { background: var(--accent-soft); border-radius: var(--r-sm); padding: 10px 14px; font-size: 15px; }
+
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.tile { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0; box-shadow: var(--shadow-1); }
+.tile p { color: var(--ink-muted); font-size: 15px; }
+.sub-h { margin-top: 32px; }
+
+/* the booth, drawn */
+.day-grid { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.booth { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-1); overflow: hidden; }
+.booth-cap { font-size: 13px; color: var(--ink-subtle); text-align: center; margin-top: 8px; }
+.b-top { background: var(--frame); color: var(--frame-ink); padding: 10px 14px; font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+.b-top span { font-weight: 400; color: var(--frame-muted); font-size: 13px; }
+.b-body { padding: 14px; display: grid; gap: 12px; }
+.b-search { background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 9px 12px; font-size: 15px; color: var(--ink); }
+.b-search::after { content: ""; display: inline-block; width: 2px; height: 1em; background: var(--lit); margin-inline-start: 2px; vertical-align: -2px; }
+.b-hit { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; padding: 8px 10px; border-radius: var(--r-sm); background: var(--moss); }
+.b-hit b { font-size: 15px; }
+.b-hit span { font-size: 13px; color: var(--ink-muted); }
+.b-card { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 10px; }
+.b-name { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.b-name b { font-size: 19px; font-weight: 800; }
+.saved { font-size: 12px; font-weight: 700; color: var(--positive); background: var(--positive-soft); border-radius: var(--pill); padding: 2px 10px; }
+.b-contact { font-size: 13px; color: var(--ink-muted); }
+.q { display: grid; gap: 6px; }
+.q > span { font-size: 13px; font-weight: 500; color: var(--ink-subtle); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 14px; padding: 4px 12px; border-radius: var(--pill); border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.chip.on { background: var(--moss); border-color: var(--line-strong); font-weight: 700; }
+.b-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.b-tools span { font-size: 14px; padding: 6px 12px; border-radius: var(--pill); border: 1px solid var(--line-strong); }
+.b-new { margin: 0 14px 14px; text-align: center; background: var(--action); color: var(--on-action); border-radius: var(--pill); padding: 9px; font-weight: 700; font-size: 15px; }
+
+.speed { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+.speed div { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; min-width: 0; }
+.speed strong { display: block; font-family: var(--font-wide); font-stretch: 120%; font-weight: 800; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.speed strong small { font-family: var(--font-sans); font-stretch: 100%; font-weight: 500; font-size: 15px; }
+.speed span { font-size: 14px; color: var(--ink-muted); }
+
+/* the path, as a timeline */
+.path { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 18px; }
+.path li { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.path li:last-child { border-bottom: 0; }
+.path .when { font-size: 14px; font-weight: 500; color: var(--ink-subtle); }
+.who { font-size: 12px; font-weight: 700; border-radius: var(--pill); padding: 2px 10px; white-space: nowrap; }
+.who.msg { background: var(--moss); color: var(--ink); }
+.who.me { background: var(--accent-soft); color: var(--accent-text); }
+.path-cap { font-size: 14px; color: var(--ink-subtle); margin: 0 0 8px; }
+
+.screens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.screens .tile:first-child { grid-column: 1 / -1; }
+
+.rules { margin-top: 28px; background: var(--sunken); border-radius: var(--r); padding: 18px 20px; }
+.rules ul { margin: 8px 0 0; padding-inline-start: 20px; display: grid; gap: 6px; }
+
+.plain { margin: 0; padding-inline-start: 20px; display: grid; gap: 10px; max-width: 64ch; }
+
+/* questions */
+details { border-bottom: 1px solid var(--line); padding-block: 4px; }
+details:first-of-type { border-top: 1px solid var(--line); }
+summary { cursor: pointer; font-weight: 700; padding: 12px 0; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font-family: var(--font-wide); color: var(--accent-text); font-weight: 800; }
+details[open] summary::after { content: "–"; }
+details p { color: var(--ink-muted); padding-bottom: 14px; max-width: 64ch; }
+
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; }
+.by { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-muted); }
+.yhm-letters { fill: var(--ink); }
+.yhm-loose { fill: var(--loose); }
+.yhm-line { fill: var(--leaf); }
+
+@media (max-width: 760px) {
+  .day-grid { grid-template-columns: minmax(0, 1fr); }
+  .booth-col { max-width: 360px; width: 100%; margin: 0 auto; }
+}
+@media (max-width: 600px) {
+  .facts, .choices, .tiles, .screens, .speed { grid-template-columns: minmax(0, 1fr); }
+  .path li { grid-template-columns: minmax(0, 1fr) auto; }
+  .path .when { grid-column: 1 / -1; }
+  .hero { padding-block: 32px 22px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div dir="rtl" lang="he">
+
+<header class="band">
+  <div class="wrap">
+    <span class="logo" role="img" aria-label="אקספומקס">
+      <svg viewBox="51 69 154 159" width="31" height="32" aria-hidden="true">
+        <path class="sym-loose" d="M57.50 203.69 L121.50 166.74 A13 13 0 0 1 134.50 189.26 L70.50 226.21 A13 13 0 0 1 57.50 203.69 Z"/>
+        <path class="sym-loose" d="M185.50 226.21 L121.50 189.26 A13 13 0 0 1 134.50 166.74 L198.50 203.69 A13 13 0 0 1 185.50 226.21 Z"/>
+        <path class="sym-loose" d="M57.50 155.69 L121.50 118.74 A13 13 0 0 1 134.50 141.26 L70.50 178.21 A13 13 0 0 1 57.50 155.69 Z"/>
+        <path class="sym-loose" d="M185.50 178.21 L121.50 141.26 A13 13 0 0 1 134.50 118.74 L198.50 155.69 A13 13 0 0 1 185.50 178.21 Z"/>
+        <path class="sym-lit" d="M57.50 107.69 L121.50 70.74 A13 13 0 0 1 134.50 93.26 L70.50 130.21 A13 13 0 0 1 57.50 107.69 Z"/>
+        <path class="sym-lit" d="M185.50 130.21 L121.50 93.26 A13 13 0 0 1 134.50 70.74 L198.50 107.69 A13 13 0 0 1 185.50 130.21 Z"/>
+      </svg>
+      <span class="name">אקספו<i>מקס</i></span>
+    </span>
+    <span class="band-tag">מדריך למציג</span>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <p class="eyebrow">מדריך למציג</p>
+    <h1>ככה עובדים עם אקספומקס</h1>
+    <p class="lead">בדוכן רושמים כל מבקר בכמה נגיעות. מזה המערכת יודעת מה לעשות עם כל אחד: איזו הודעה לשלוח לו, מתי, ומתי אתה צריך להרים אליו טלפון. אחרי האקספו היא אומרת לך כל בוקר עם מי מדברים היום.</p>
+    <dl class="facts">
+      <div><dt>האקספו</dt><dd>יום שני, 16/11<small>ו' בכסלו</small></dd></div>
+      <div><dt>הכתובת</dt><dd><span class="ltr">expomax.y-h-m.com</span><small>בטלפון, בטאבלט או במחשב</small></dd></div>
+      <div><dt>הכניסה</dt><dd>Google, או קוד למייל<small>נכנסים פעם אחת, וממשיכים מכל מכשיר</small></dd></div>
+    </dl>
+    <ul class="jump" aria-label="בדף הזה">
+      <li><a href="#before">לפני האקספו</a></li>
+      <li><a href="#day">ביום האקספו</a></li>
+      <li><a href="#after">אחרי האקספו</a></li>
+      <li><a href="#visitor">מה המבקר מקבל</a></li>
+      <li><a href="#faq">שאלות</a></li>
+    </ul>
+  </div>
+
+  <section id="before">
+    <div class="wrap">
+      <p class="eyebrow">לפני האקספו</p>
+      <h2>מקימים פעם אחת, ומנסים כמה שרוצים</h2>
+      <p class="intro">ההקמה מתאימה את המערכת לעסק שלך: מה מופיע בכרטיס בדוכן, אילו הודעות יוצאות, ומה קורה עם כל מבקר אחרי האקספו.</p>
+
+      <ol class="steps">
+        <li><div>
+          <h3>נכנסים</h3>
+          <p>פותחים את <span class="ltr">expomax.y-h-m.com</span> ונוגעים ב"התחברות עם Google". אין לך חשבון Google? מקלידים את המייל ומקבלים קוד כניסה.</p>
+          <p class="note">אם מופיע "הדוכן שלך ממתין לאישור", המייל שלך עוד לא אצלנו. הדוכן ייפתח אחרי אישור של מנהל האקספו.</p>
+        </div></li>
+        <li><div>
+          <h3>כמה פרטים שלך</h3>
+          <p>השם שלך, שם העסק, טלפון, מייל, ועל איזה מספר הוואטסאפ שלך, אם יש. הפרטים נכנסים לחתימה של כל הודעה שיוצאת למבקרים, ואפשר לשנות אותם אחר כך בהגדרות.</p>
+        </div></li>
+        <li><div>
+          <h3>מקימים את הדוכן</h3>
+          <div class="choices">
+            <div class="choice rec"><b>בשיחה עם היועץ <span class="tag">מומלץ</span></b><p class="muted small">יועץ חכם שואל כמה שאלות על העסק שלך, ובונה מהן את הכרטיס, המסלולים וההודעות.</p></div>
+            <div class="choice"><b>לבד, שלב אחר שלב</b><p class="muted small">חמישה שלבים קצרים, מעסק דומה או מאפס.</p></div>
+          </div>
+          <p>היועץ שואל, למשל, מה יהפוך את האקספו להצלחה בשבילך, ומה הכי חשוב לך להשיג בו. בסוף עוברים על ההקמה שלב אחר שלב, והיא נשמרת רק כשאתה מאשר. כל דבר אפשר לשנות גם אחר כך, בהגדרות, תחת <span class="where">הדוכן שלי</span>. והיועץ זמין תמיד: בטאבלט בכפתור העגול שבפינה, ובמחשב ב"סוכן AI" שבתפריט.</p>
+        </div></li>
+        <li><div>
+          <h3>מנסים</h3>
+          <p>עד האקספו הדוכן עובד עם שמות לדוגמה, ואף מבקר לא מקבל הודעה. ב<span class="where">הגדרות › ניסיון</span> בוחרים איך לנסות:</p>
+          <ul class="ways">
+            <li><b>בלי שליחה.</b> רואים את הדוכן, את המסלולים ואת המשימות, בלי שום הודעה.</li>
+            <li><b>ההודעות אליי.</b> כל הודעה שהייתה יוצאת למבקר מגיעה אליך, ובראשה "ניסיון · הייתה יוצאת אל [השם]". רק עשרת מבקרי הניסיון האחרונים מקבלים הודעות.</li>
+          </ul>
+          <p class="tip">רוצה לראות מסלול שלם בישיבה אחת? מדליקים "יום עובר בדקה", ומסלול של שבועיים נגמר בפחות מחצי שעה.</p>
+        </div></li>
+      </ol>
+
+      <h3 class="sub-h">כדאי להכין גם (לא חובה)</h3>
+      <div class="tiles" style="margin-top:12px">
+        <div class="tile"><h3>לוגו וצבע</h3><p>מופיעים בראש כל מייל שיוצא ממך, בדף ההרשמה העצמית, על השלט ובראש הדוכן.</p><span class="where">הגדרות › המייל שלך</span></div>
+        <div class="tile"><h3>חיבור הוואטסאפ</h3><p>למי שיש וואטסאפ: ההודעות יוצאות מהמספר שלך, בקצב של בן אדם. זה חיבור לא רשמי, ולפני שמחברים מופיע הסבר.</p><span class="where">הגדרות › וואטסאפ</span></div>
+        <div class="tile"><h3>שלט לדוכן</h3><p>קוד שמבקרים סורקים בטלפון ונרשמים לבד, גם כשאתה באמצע שיחה.</p><span class="where">הגדרות › שלט והרשמה עצמית › "הדפסת שלט לדוכן"</span></div>
+        <div class="tile"><h3>מבצע לאקספו</h3><p>פריטים במחיר מיוחד, עם מחיר רגיל, מחיר אקספו ועד מתי.</p><span class="where">הגדרות › מבצע אקספו</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="day">
+    <div class="wrap">
+      <p class="eyebrow">ביום האקספו</p>
+      <h2>מבקר נשמר בנגיעה אחת</h2>
+      <p class="intro">את הרישום עושים בסוף השיחה, מול המבקר. לכן כל מילה בכרטיס כתובה כך שנעים לו לראות אותה.</p>
+
+      <div class="day-grid">
+        <div class="booth-col">
+          <div class="booth" role="img" aria-label="דוגמה של הדוכן: חיפוש לפי שם, וכרטיס עם שלוש שאלות">
+            <div class="b-top">הדוכן <span>דוגמה</span></div>
+            <div class="b-body">
+              <div class="b-search">כהנ</div>
+              <div class="b-hit"><b>יעקב כהן</b><span>בן ר' אברהם · ירושלים</span></div>
+              <div class="b-card">
+                <div class="b-name"><b>יעקב כהן</b><span class="saved">נשמר</span></div>
+                <div class="b-contact"><span class="ltr">052-•••••67</span> · <span class="ltr">ya•••@gmail.com</span> · לערוך ▾</div>
+                <div class="q"><span>מה הוא צריך?</span><div class="chips"><span class="chip on">מטבח</span><span class="chip">ארונות</span><span class="chip">שיתוף פעולה</span></div></div>
+                <div class="q"><span>מתי?</span><div class="chips"><span class="chip">עכשיו</span><span class="chip on">לפני פסח</span><span class="chip">רק בודק מחירים</span></div></div>
+                <div class="q"><span>מי הוא?</span><div class="chips"><span class="chip on">פרטי</span><span class="chip">קבלן</span><span class="chip">מוסד</span></div></div>
+                <div class="b-tools"><span>הערה</span><span>הקלטה</span><span>הזמין</span></div>
+              </div>
+            </div>
+            <div class="b-new">＋ מבקר חדש</div>
+          </div>
+          <p class="booth-cap">דוגמה: דוכן של מטבחים. אצלך המילים יהיו של העסק שלך.</p>
+        </div>
+
+        <div>
+          <ol class="steps">
+            <li><div><h3>מוצאים את המבקר</h3><p>מקלידים כמה אותיות מהשם, או את 4 הספרות האחרונות של הטלפון, ונוגעים בשם. המבקר נשמר מיד.</p></div></li>
+            <li><div><h3>מסמנים מה שנאמר</h3><p>שלוש שאלות: מה הוא צריך, מתי, ומי הוא. מסמנים רק מה שעלה בשיחה. כל השאר רשות, וגם כרטיס עם השם בלבד הוא כרטיס תקין.</p></div></li>
+            <li><div><h3>מוסיפים, אם צריך</h3><p>הערה, הקלטה קולית, או "הזמין" אם הגדרת מבצע: בוחרים פריטים וכמויות, והמבקר מקבל סיכום של ההזמנה.</p></div></li>
+          </ol>
+          <p class="note" style="margin-top:20px">לא מוצאים אותו? נוגעים ב"מבקר חדש" ורושמים שם, טלפון ומייל. מבקר שכבר ביקר? נגיעה בשם פותחת את הכרטיס שלו, ושום הודעה לא יוצאת אליו פעמיים.</p>
+        </div>
+      </div>
+
+      <h3 class="sub-h">כמה זמן זה לוקח</h3>
+      <div class="speed">
+        <div><strong>5 <small>שניות</small></strong><span>מבקר שנמצא בחיפוש</span></div>
+        <div><strong>10 <small>שניות</small></strong><span>מבקר ושלוש נגיעות</span></div>
+        <div><strong>20 <small>שניות</small></strong><span>מבקר חדש, עם שם, טלפון ומייל</span></div>
+      </div>
+      <p class="muted small" style="margin-top:8px">אלה היעדים שלפיהם הדוכן נבנה.</p>
+
+      <div class="tiles">
+        <div class="tile"><h3>יש תור?</h3><p>נוגעים ב"תור? קוד להרשמה עצמית". הקוד מופיע על כל המסך, והמבקרים סורקים ונרשמים לבד. תוך חצי דקה הם מופיעים בדוכן, מסומנים "נרשם לבד".</p></div>
+        <div class="tile"><h3>אין קליטה?</h3><p>הדוכן עובד גם בלי רשת. הכל נשמר במכשיר ועולה לבד כשהרשת חוזרת. אם משהו לא עולה, הדוכן אומר את זה.</p></div>
+        <div class="tile"><h3>פרטי הקשר</h3><p>הטלפון והמייל של המבקר מוצגים רק בחצי, כדי שלא יועתקו סתם. החיוג והמייל עובדים כרגיל, וליד הפרטים יש "לערוך".</p></div>
+        <div class="tile"><h3>בסוף היום</h3><p>ב"תמונת מצב" רואים מה כדאי להשלים, למשל מבקרים שלא סומן אצלם כלום. כדאי לעבור על זה כשעוד זוכרים. זה לוקח בערך דקה.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="after">
+    <div class="wrap">
+      <p class="eyebrow">אחרי האקספו</p>
+      <h2>כל בוקר יודעים עם מי מדברים</h2>
+      <p class="intro">כל מבקר נכנס למסלול משלו: איזו הודעה יוצאת אליו, מתי, ומה עושים אחריה. המסלולים נבנו בהקמה, לפי העסק שלך. כל מסלול מוצג במשפט אחד, ומשנים רק אם רוצים.</p>
+
+      <p class="path-cap">דוגמה: מבקר שסימן "מטבח", "לפני פסח" ו"פרטי"</p>
+      <ol class="path">
+        <li><span class="when">מיד אחרי הביקור</span><span>הודעת תודה, עם תיק העבודות</span><span class="who msg">הודעה</span></li>
+        <li><span class="when">אחרי שלושה ימים</span><span>לדבר איתו ולתאם מדידה</span><span class="who me">משימה שלך</span></li>
+        <li><span class="when">אחרי המדידה</span><span>להכין הצעה ולשלוח אותה</span><span class="who me">משימה שלך</span></li>
+        <li><span class="when">שבוע אחרי ההצעה</span><span>"קיבלת? יש שאלות?"</span><span class="who msg">הודעה</span></li>
+        <li><span class="when">לפני פסח</span><span>תזכורת, אם עוד לא נסגר</span><span class="who msg">הודעה</span></li>
+      </ol>
+
+      <div class="screens">
+        <div class="tile"><h3>הודעת הבוקר</h3><p>כל בוקר במייל: המשימות שלך להיום, עם קישור ישר אליהן. לא בשבת ובחג, ולא כשאין משימות.</p></div>
+        <div class="tile"><h3>דף הבית</h3><p>"הבא בתור": מי עכשיו, ולמה.</p></div>
+        <div class="tile"><h3>משימות</h3><p>מה יש היום: לדבר, להיפגש, להכין, לשלוח. ליד כל משימה ההודעה כבר מוכנה.</p></div>
+        <div class="tile"><h3>לידים</h3><p>כל המבקרים שלך, ולכל אחד דף: הפרטים, ההערות, ההקלטות והתשובות שלו. "להוריד לאקסל" מוריד הכל.</p></div>
+        <div class="tile"><h3>הודעות</h3><p>הנוסחים שלך, והפרטים שנכנסים בהם, כמו כתובת או מחירון. כותבים פעם אחת, וזה נכנס לכל ההודעות.</p></div>
+      </div>
+
+      <div class="rules">
+        <h3>מתי יוצאות הודעות</h3>
+        <ul>
+          <li>בין 9:00 ל-20:00. ביום שישי ובערב חג עד 13:00.</li>
+          <li>לא בשבת ובחג.</li>
+          <li>בוואטסאפ, בקצב של בן אדם, עם הפסקה בין הודעה להודעה.</li>
+          <li>מבקר שענה: המסלול שלו נעצר, והוא עולה בתור אצלך.</li>
+          <li>מבקר שביקש להסיר: לא יקבל ממך יותר שום הודעה.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="visitor">
+    <div class="wrap">
+      <p class="eyebrow">מה המבקר מקבל</p>
+      <h2>הודעות בשמך, לא של מערכת</h2>
+      <ul class="plain">
+        <li>מייל בשמך, עם הלוגו והצבע שלך. אם חיברת וואטסאפ, ההודעות יוצאות מהמספר שלך.</li>
+        <li>תשובה של מבקר מגיעה אליך, למייל שבפרטים שלך.</li>
+        <li>בכל מייל יש קישור להסרה, ובוואטסאפ מספיק לכתוב "הסר".</li>
+        <li>הנוסחים הם שלך, ואפשר לשנות כל הודעה בכל רגע.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <p class="eyebrow">שאלות</p>
+      <h2>מה ששואלים בדרך כלל</h2>
+      <details><summary>צריך אינטרנט בדוכן?</summary><p>לא חובה. הדוכן עובד גם בלי רשת, והכל עולה לבד כשהרשת חוזרת.</p></details>
+      <details><summary>אפשר לעבוד מכמה מכשירים?</summary><p>כן. נכנסים עם אותו חשבון בטלפון, בטאבלט ובמחשב.</p></details>
+      <details><summary>אפשר לשנות את הכרטיס באמצע האקספו?</summary><p>אפשר. כשיש כבר מבקרים, המערכת שואלת אם השינוי חל גם עליהם או רק על החדשים.</p></details>
+      <details><summary>העסק שלי רגיש. מה המבקר יראה?</summary><p>בהקמה יש מתג "עסק רגיש", לשדכנות, טיפול או ייעוץ אישי. כשהוא דלוק, ההודעות יוצאות בלי שם העסק.</p></details>
+      <details><summary>ההקלטה לא עובדת בטלפון שלי</summary><p>יש טלפונים שלא מאפשרים הקלטה מהדפדפן. אפשר לכתוב הערה, או להכתיב אותה במיקרופון של המקלדת.</p></details>
+      <details><summary>כהה או בהיר?</summary><p>ב<span class="where">הגדרות › מראה ועזרה</span>. הבחירה נשמרת בכל מכשיר בנפרד.</p></details>
+      <details><summary>מה זה סימן השאלה שליד הכותרות?</summary><p>הסבר קצר על המסך שאתה נמצא בו. נוגעים בו בכל פעם שמשהו לא ברור.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="muted">יש שאלה? פונים למי ששלח לך את המדריך.</p>
+    <span class="by">אקספומקס · מבית
+      <svg viewBox="-12 -12 396 172" width="46" height="20" aria-label="YHM" role="img">
+        <path class="yhm-letters" d="M-0.44 0.00 L43.56 66.87 L64.44 53.13 L29.49 0.00 Z"/><path class="yhm-letters" d="M78.51 0.00 L43.56 53.13 L64.44 66.87 L108.44 0.00 Z"/><path class="yhm-letters" d="M41.50 40.00 L41.50 100.00 L66.50 100.00 L66.50 40.00 Z"/><path class="yhm-letters" d="M43.56 53.13 L64.44 53.13 L64.44 66.87 L43.56 66.87 Z"/><path class="yhm-letters" d="M120.00 0.00 L120.00 100.00 L145.00 100.00 L145.00 0.00 Z"/><path class="yhm-letters" d="M199.00 0.00 L199.00 100.00 L224.00 100.00 L224.00 0.00 Z"/><path class="yhm-letters" d="M242.00 0.00 L242.00 100.00 L267.00 100.00 L267.00 0.00 Z"/><path class="yhm-letters" d="M347.00 0.00 L347.00 100.00 L372.00 100.00 L372.00 0.00 Z"/><path class="yhm-letters" d="M242.30 0.00 L296.54 82.85 L317.46 69.15 L272.18 0.00 Z"/><path class="yhm-letters" d="M341.82 0.00 L296.54 69.15 L317.46 82.85 L371.70 0.00 Z"/><path class="yhm-letters" d="M296.54 69.15 L317.46 69.15 L317.46 82.85 L296.54 82.85 Z"/><path class="yhm-letters" d="M132.50 61.00 L211.50 61.00 L211.50 39.00 L132.50 39.00 Z"/>
+        <path class="yhm-loose" d="M274.55 118.15 L301.36 110.47 A8 8 0 0 1 305.77 125.85 L278.96 133.53 A8 8 0 0 1 274.55 118.15 Z"/><path class="yhm-loose" d="M337.71 118.90 L365.18 123.74 A8 8 0 0 1 362.40 139.50 L334.93 134.66 A8 8 0 0 1 337.71 118.90 Z"/>
+        <path class="yhm-line" d="M8.00 118.00 L244.22 118.00 A8 8 0 0 1 244.22 134.00 L8.00 134.00 A8 8 0 0 1 8.00 118.00 Z"/>
+      </svg>
+    </span>
+  </div>
+</footer>
+
+</div>

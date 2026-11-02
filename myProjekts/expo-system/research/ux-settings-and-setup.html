@@ -1,0 +1,485 @@
+<title>ההקמה וההגדרות מחדש</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Heebo:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: one reading column (findings, proposals, order of work); each proposal pairs its words with a drawn screen. ExpoMax tokens, forest first. */
+:root {
+  --page: #0B1A13; --raised: #12261C; --sunken: #07110C; --moss: #1D3A2C;
+  --line: #23402F; --line-strong: #557A66;
+  --ink: #F2F5EE; --ink-muted: #A9B7AE; --ink-subtle: #7F9488;
+  --lit: #F8AC00; --accent-text: #F8AC00; --on-action: #0B1A13; --accent-soft: #33270A;
+  --positive: #9BD27A; --positive-soft: #1E3317; --warn: #F2B05E; --warn-soft: #3A2A10;
+  --shadow-1: 0 1px 0 rgba(242,245,238,0.04) inset, 0 16px 32px -20px rgba(0,0,0,0.7);
+  --font-sans: Heebo, "Arial Hebrew", system-ui, sans-serif;
+  --font-wide: Archivo, Heebo, system-ui, sans-serif;
+  --r-sm: 10px; --r: 16px; --pill: 999px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --page: #EEE8DB; --raised: #FBF9F4; --sunken: #E4DCCB; --moss: #DDE2D4;
+    --line: #D9D0BD; --line-strong: #6E7E74;
+    --ink: #0B1A13; --ink-muted: #3A4A41; --ink-subtle: #4F5F56;
+    --accent-text: #9E5700; --accent-soft: #FFEBC0;
+    --positive: #3F6B12; --positive-soft: #E3F1D6; --warn: #8A4B00; --warn-soft: #FBE3C2;
+    --shadow-1: 0 1px 2px rgba(11,26,19,0.06), 0 16px 32px -22px rgba(11,26,19,0.28);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --page: #EEE8DB; --raised: #FBF9F4; --sunken: #E4DCCB; --moss: #DDE2D4;
+  --line: #D9D0BD; --line-strong: #6E7E74;
+  --ink: #0B1A13; --ink-muted: #3A4A41; --ink-subtle: #4F5F56;
+  --accent-text: #9E5700; --accent-soft: #FFEBC0;
+  --positive: #3F6B12; --positive-soft: #E3F1D6; --warn: #8A4B00; --warn-soft: #FBE3C2;
+  --shadow-1: 0 1px 2px rgba(11,26,19,0.06), 0 16px 32px -22px rgba(11,26,19,0.28);
+  color-scheme: light;
+}
+html { direction: rtl; }
+body { background: var(--page); color: var(--ink); font-family: var(--font-sans); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 72px; display: grid; gap: 56px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 26px; font-weight: 800; }
+h3 { font-size: 19px; font-weight: 700; }
+p { margin: 0; max-width: 66ch; }
+.eyebrow { font-family: var(--font-wide); font-stretch: 112%; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; color: var(--accent-text); }
+.muted { color: var(--ink-muted); }
+.small { font-size: 14px; }
+section { display: grid; gap: 20px; }
+.head { display: grid; gap: 14px; }
+.lead { font-size: 18px; color: var(--ink-muted); }
+.gist { border: 1px solid var(--line-strong); border-radius: var(--r); padding: 18px 20px; background: var(--raised); display: grid; gap: 6px; }
+.gist b { color: var(--accent-text); }
+
+/* findings */
+.finds { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.finds li { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.finds li strong { font-size: 16.5px; }
+.finds li span { color: var(--ink-muted); font-size: 15px; }
+.num { font-family: var(--font-wide); font-stretch: 115%; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* proposals */
+.prop { display: grid; gap: 14px; padding-top: 28px; border-top: 1px solid var(--line); }
+.prop-head { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.prop-head .n { font-family: var(--font-wide); font-stretch: 120%; font-weight: 800; font-size: 28px; color: var(--accent-text); line-height: 1; font-variant-numeric: tabular-nums; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: var(--pill); background: var(--moss); color: var(--ink); white-space: nowrap; }
+.tag.now { background: var(--accent-soft); color: var(--accent-text); }
+.tag.later { background: transparent; border: 1px solid var(--line-strong); color: var(--ink-muted); }
+.tag.rev { background: var(--warn-soft); color: var(--warn); }
+.tag.keep { background: var(--positive-soft); color: var(--positive); }
+.prop ul { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; max-width: 66ch; }
+.why { border-inline-start: 3px solid var(--line-strong); padding-inline-start: 14px; color: var(--ink-muted); }
+
+/* drawn screens */
+.screen { background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; overflow-x: auto; }
+.screen-cap { font-size: 13px; color: var(--ink-subtle); margin-top: 8px; }
+.ui { font-size: 14px; line-height: 1.5; min-width: 0; }
+.ui .card { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-1); }
+.ui .h { font-weight: 800; font-size: 16px; }
+.ui .sec { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-subtle); }
+.ui .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--pill); padding: 5px 12px; font-size: 13px; font-weight: 700; color: var(--ink); background: transparent; white-space: nowrap; }
+.ui .btn.pri { background: var(--lit); color: var(--on-action); border-color: transparent; }
+.ui .pill { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: var(--pill); white-space: nowrap; }
+.ui .ok { background: var(--positive-soft); color: var(--positive); }
+.ui .miss { background: var(--warn-soft); color: var(--warn); }
+.ui .opt { background: var(--moss); color: var(--ink-muted); }
+.ui .chip { display: inline-block; border: 1px solid var(--line-strong); border-radius: var(--pill); padding: 4px 11px; font-size: 13px; margin: 0 0 6px 6px; }
+.ui .chip.on { background: var(--lit); color: var(--on-action); border-color: transparent; font-weight: 700; }
+
+.ready { display: grid; gap: 10px; max-width: 560px; }
+.ready .bar { height: 8px; border-radius: var(--pill); background: var(--moss); overflow: hidden; }
+.ready .bar i { display: block; height: 100%; width: 50%; background: var(--lit); border-radius: var(--pill); }
+.rrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.rrow .t { flex: 1 1 180px; min-width: 0; }
+.rrow .t small { display: block; color: var(--ink-subtle); font-size: 12.5px; }
+
+.split { display: grid; grid-template-columns: minmax(200px, 250px) 1fr; gap: 14px; }
+.list .grp { font-size: 12px; font-weight: 700; color: var(--ink-subtle); padding: 10px 4px 4px; letter-spacing: 0.04em; }
+.list .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+.list .row.sel { background: var(--moss); font-weight: 700; }
+.list .row .v { font-size: 12px; color: var(--ink-subtle); white-space: nowrap; }
+.list .row .v.miss { color: var(--warn); font-weight: 700; }
+
+.setup-step { display: grid; grid-template-columns: 1fr minmax(220px, 280px); gap: 14px; align-items: start; }
+.booth-card { background: var(--page); border: 1px solid var(--line-strong); border-radius: 14px; padding: 12px; display: grid; gap: 8px; }
+.booth-card .who { font-weight: 800; font-size: 16px; }
+.booth-card .row3 { display: flex; flex-wrap: wrap; gap: 6px; }
+.booth-card .b { border: 1px solid var(--line-strong); border-radius: 10px; padding: 6px 10px; font-size: 13px; }
+.booth-card .b.on { background: var(--lit); color: var(--on-action); border-color: transparent; font-weight: 700; }
+.stepper { display: flex; gap: 6px; }
+.stepper i { flex: 1; height: 4px; border-radius: 4px; background: var(--moss); }
+.stepper i.on { background: var(--lit); }
+
+.mail { background: #FFFFFF; color: #1A1A1A; border-radius: 12px; overflow: hidden; max-width: 380px; border: 1px solid var(--line); }
+.mail .top { background: #1E5AA8; color: #FFFFFF; padding: 12px 14px; display: flex; gap: 10px; align-items: center; font-weight: 800; }
+.mail .top .lg { width: 30px; height: 30px; border-radius: 8px; background: #FFFFFF; color: #1E5AA8; display: grid; place-items: center; font-weight: 800; }
+.mail .body { padding: 14px; display: grid; gap: 8px; font-size: 14px; }
+.mail .sig { color: #555555; font-size: 13px; border-top: 1px solid #E5E5E5; padding-top: 8px; }
+.mail .from { background: #F3F3F3; color: #555555; font-size: 12px; padding: 7px 14px; direction: ltr; text-align: right; }
+.mail-grid { display: grid; grid-template-columns: 1fr minmax(240px, 380px); gap: 14px; align-items: start; }
+
+.tablet { position: relative; background: var(--page); border: 1px solid var(--line-strong); border-radius: 18px; overflow: hidden; max-width: 520px; min-height: 300px; display: grid; grid-template-rows: auto auto 1fr auto; }
+.tablet .trial { background: var(--accent-soft); color: var(--accent-text); font-size: 13px; font-weight: 700; padding: 6px 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tablet .top { padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 800; }
+.tablet .content { padding: 14px 12px; color: var(--ink-subtle); font-size: 13px; }
+.tablet .tbar { display: flex; justify-content: space-around; border-top: 1px solid var(--line); padding: 8px 4px; font-size: 12px; color: var(--ink-muted); }
+.tablet .fab { position: absolute; left: 14px; bottom: 58px; width: 48px; height: 48px; border-radius: 50%; background: var(--lit); box-shadow: 0 8px 20px -6px rgba(0,0,0,0.6); display: grid; place-items: center; }
+.tablet .fab svg { width: 24px; height: 24px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; color: var(--ink-subtle); font-weight: 700; }
+.tbl { overflow-x: auto; }
+
+.plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.plan > div { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+.plan ol { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; }
+.asks { margin: 0; padding-inline-start: 22px; display: grid; gap: 8px; max-width: 66ch; }
+
+.tab-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; align-items: start; }
+.tframe { margin: 0; display: grid; gap: 8px; }
+.tdev { position: relative; background: var(--page); border: 8px solid var(--moss); border-radius: 26px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; min-height: 520px; }
+.tdev .tback { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--raised); font-weight: 700; font-size: 13px; }
+.tdev .tback .t { font-weight: 800; font-size: 16px; }
+.tdev .tbody { padding: 10px 12px 64px; display: grid; gap: 4px; align-content: start; font-size: 13.5px; }
+.tdev .tgrp { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-subtle); padding: 10px 2px 2px; }
+.tdev .tli { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; background: var(--raised); border-bottom: 1px solid var(--line); }
+.tdev .tli:first-of-type { border-radius: 10px 10px 0 0; }
+.tdev .tli .v { color: var(--ink-subtle); font-size: 12px; white-space: nowrap; }
+.tdev .tli .v.miss { color: var(--warn); font-weight: 700; }
+.tdev .tready { background: var(--raised); border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px; display: grid; gap: 6px; }
+.tdev .tready .bar { height: 6px; border-radius: 999px; background: var(--moss); overflow: hidden; }
+.tdev .tready .bar i { display: block; height: 100%; width: 50%; background: var(--lit); }
+.tdev .trow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.tdev .done { color: var(--positive); font-size: 12px; font-weight: 700; }
+.tdev .tbar { display: flex; justify-content: space-around; border-top: 1px solid var(--line); padding: 8px 2px; font-size: 11px; color: var(--ink-muted); background: var(--raised); }
+.tdev .tbar b { color: var(--ink); }
+.tdev .fab { position: absolute; left: 12px; bottom: 50px; width: 42px; height: 42px; border-radius: 50%; background: var(--lit); display: grid; place-items: center; box-shadow: 0 8px 18px -6px rgba(0,0,0,0.6); }
+.tdev .fab svg { width: 21px; height: 21px; }
+.tdev .sw { width: 34px; height: 20px; border-radius: 999px; background: var(--moss); position: relative; flex: none; }
+.tdev .sw.on { background: var(--lit); }
+.tdev .sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); }
+.tdev .sw.on::after { right: auto; left: 3px; background: var(--on-action); }
+.tdev .saved { color: var(--positive); font-size: 12px; font-weight: 700; }
+.tdev .qr { width: 92px; height: 92px; border-radius: 8px; background: repeating-conic-gradient(var(--ink) 0 25%, var(--raised) 0 50%) 0 0 / 14px 14px; border: 6px solid var(--raised); }
+@media (max-width: 680px) {
+  .split, .setup-step, .mail-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <div class="eyebrow">אקספומקס · הצעת UX · 2/11</div>
+  <h1>ההקמה וההגדרות, מחדש</h1>
+  <p class="lead">עברתי על כל מה שמציג פוגש מהכניסה הראשונה ועד שהדוכן מוכן: טופס הפרטים, היועץ, שבעת שלבי ההקמה, שני חלקי ההגדרות על שבע הלשוניות שלהם, ומסך ההודעות. את רוב המסכים ראיתי מוצגים עם נתוני דוגמה, ואת מסך היועץ קראתי בקוד. ביקשת להציע בלי להתחשב בהחלטות, וכך עשיתי. ליד כל הצעה שהופכת החלטה שלך כתוב מאיזה יום היא.</p>
+  <div class="gist">
+    <p><b>בשורה אחת:</b> היום ההגדרות מסודרות לפי החלקים של המערכת. ההצעה היא לסדר אותן לפי מה שהמציג מנסה לעשות ומתי: לפני האקספו, ביום עצמו ואחריו. ולבנות עורך אחד לדוכן, שמשמש גם בהקמה וגם בהגדרות.</p>
+  </div>
+</header>
+
+<section aria-labelledby="f">
+  <h2 id="f">מה מצאתי</h2>
+  <ul class="finds">
+    <li><strong>אין מקום שעונה על "מה נשאר לי עד 16/11"</strong><span>מה שחייב לקרות לפני האקספו מפוזר בחמישה מקומות: הפרטים, ההקמה, חיבור הוואטסאפ, הניסיון, השלט ופרטים חסרים בהודעות. אף מסך לא מרכז את מה שחסר. הודעה עם פרט ריק לא יוצאת, ורק מסך ההודעות מראה את זה.</span></li>
+    <li><strong>לשונית אחת עם שבעה נושאים</strong><span>"פרטים וחיבורים › הודעות" גבוהה בערך <span class="num">3</span> מסכים במחשב. יש בה ניסיון, פנייה, הודעת הבוקר, לוגו וצבע עם כתובת השולח, הפרטים שלו, המייל של המבקר וקישור להודעות. חלק מזה בשביל המבקר, חלק בשבילו, ואחד זמני.</span></li>
+    <li><strong>החשוב ביותר קבור</strong><span>חיבור הוואטסאפ, שבלעדיו הודעות לא יוצאות לבד, נמצא בצ'יפ השלישי של החלק הראשון. היועץ נמצא רק בתוך ההגדרות, בחלק השני, והשלט בצ'יפ השני.</span></li>
+    <li><strong>שלושה עורכים לאותו דוכן</strong><span>שבעת השלבים, "התאמה אישית" עם כפתור "עריכה", ומסך ההודעות. אותו כרטיס נערך בשני ממשקים שונים, והבדיקות של ההקמה, כמו "כפתור שלא משנה כלום", לא קיימות בעורך שבהגדרות.</span></li>
+    <li><strong>לא רואים את הכרטיס בזמן שבונים אותו</strong><span>הכרטיס נערך כצ'יפים עם ✕ ו"למטרה ראשית", ואיך הוא נראה בדוכן רואים רק בדוכן. ב-17/10 עלה "להראות את הדוכן עצמו", וזה לא נבנה.</span></li>
+    <li><strong>שלוש דרכים לשמור</strong><span>מתגים וצ'יפים נשמרים מיד. טופס הפרטים דורש "שמירה". כתובת השולח נשמרת כשיוצאים מהשדה. הכרטיס דורש "עריכה" ואז "שמירת השינויים". המציג לא יכול לדעת מה נשמר.</span></li>
+    <li><strong>ההקמה ארוכה מהנדרש</strong><span>יש בה <span class="num">7</span> שלבים, ואחד מהם הוא רק שאלה על הזמן ביום. נקודת ההתחלה היא <span class="num">15</span> צ'יפים של שמות עסקים. במסך הבחירה כתוב "שישה שלבים". היועץ ניהל בבדיקה <span class="num">19</span> עד <span class="num">25</span> סבבים.</span></li>
+    <li><strong>מילים של מי שבנה, לא של מי שמשתמש</strong><span>"פרטים וחיבורים", "התאמה אישית", "הקמה וגרסאות", "חיבורים". מציג לא חושב במילים האלה. הוא חושב: "הכרטיס שלי", "הוואטסאפ", "המייל שלי".</span></li>
+  </ul>
+</section>
+
+<section aria-labelledby="p">
+  <div class="head">
+    <h2 id="p">ההצעה</h2>
+    <p class="muted">תשעה שינויים, לפי סדר החשיבות. בכל אחד: מה משתנה, למה, הערכת עבודה שלי (לא מדידה), ומתי לדעתי לעשות אותו.</p>
+  </div>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">1</span><h3>לוח "מוכן לאקספו"</h3>
+      <div class="tags"><span class="tag now">לפני ההקפאה</span><span class="tag">חצי יום</span><span class="tag">חדש</span></div></div>
+    <p>בראש ההגדרות, ובדף הבית עד 16/11: רשימה קצרה של מה שצריך כדי להיות מוכן. ליד כל שורה יש מצב ופעולה אחת. אחרי האקספו הלוח יורד.</p>
+    <div class="screen"><div class="ui ready">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="h">מוכן לאקספו · 3 מתוך 6</span><span class="muted small">עוד 14 ימים</span></div>
+      <div class="bar"><i></i></div>
+      <div class="rrow"><span class="t">הפרטים שלך</span><span class="pill ok">✓ מוכן</span></div>
+      <div class="rrow"><span class="t">הדוכן<small>הכרטיס והמסלולים, עם היועץ</small></span><span class="pill ok">✓ מוכן</span></div>
+      <div class="rrow"><span class="t">ההודעות<small>2 הודעות לא ייצאו עד שתמלא [כתובת]</small></span><span class="pill miss">חסר</span><span class="btn pri">להשלים</span></div>
+      <div class="rrow"><span class="t">הוואטסאפ שלך<small>כדי שההודעות ייצאו לבד, מהמספר שלך</small></span><span class="pill miss">לא מחובר</span><span class="btn pri">לחבר</span></div>
+      <div class="rrow"><span class="t">ניסיון<small>לקבל את ההודעות בעצמך, ולראות מה המבקר מקבל</small></span><span class="pill ok">✓ נוסה</span></div>
+      <div class="rrow"><span class="t">שלט לדוכן<small>QR להרשמה עצמית כשיש תור</small></span><span class="pill miss">עוד לא</span><span class="btn">להדפיס</span></div>
+      <div class="rrow"><span class="t">הלוגו שלך<small>בראש כל מייל ועל השלט</small></span><span class="pill opt">לא חובה</span><span class="btn">להעלות</span></div>
+    </div></div>
+    <p class="why">זה השינוי עם התועלת הגדולה ביותר ביחס לעבודה. שאלה אחת, "מה נשאר לי", מקבלת מקום אחד. סביר שהוא גם יוריד פניות לתמיכה בשבוע שלפני האקספו, והוא מחליף חלק מהמדריך.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">2</span><h3>הגדרות כרשימה אחת, לפי מה שעושים</h3>
+      <div class="tags"><span class="tag now">לפני ההקפאה</span><span class="tag">יום</span><span class="tag rev">הופך את החלוקה מ-17/10</span></div></div>
+    <p>במקום שני חלקים ובתוכם צ'יפים, רשימה אחת בחמש קבוצות. בכל שורה רואים את המצב שלה, ונגיעה פותחת את הדף שלה. במחשב הדף נפתח ליד הרשימה, ובטאבלט על כל המסך עם "חזרה". את רוב הרכיבים לא צריך לבנות מחדש, רק להעביר.</p>
+    <div class="screen"><div class="ui split">
+      <div class="list card" style="padding:8px">
+        <div class="grp">הדוכן שלי</div>
+        <div class="row"><span>הכרטיס בדוכן</span><span class="v">3 שאלות</span></div>
+        <div class="row"><span>אחרי האקספו</span><span class="v">4 מסלולים</span></div>
+        <div class="row"><span>ההודעות</span><span class="v miss">2 להשלים</span></div>
+        <div class="row"><span>להקים מחדש</span><span class="v">עם היועץ או לבד</span></div>
+        <div class="grp">לפני האקספו</div>
+        <div class="row"><span>ניסיון</span><span class="v">ההודעות אליי</span></div>
+        <div class="row"><span>שלט והרשמה עצמית</span><span class="v"></span></div>
+        <div class="grp">ביום האקספו</div>
+        <div class="row"><span>מבצע אקספו</span><span class="v">אין</span></div>
+        <div class="row"><span>הודעה בדוכן</span><span class="v">בלי</span></div>
+        <div class="grp">איך ההודעות יוצאות</div>
+        <div class="row sel"><span>וואטסאפ</span><span class="v miss">לא מחובר</span></div>
+        <div class="row"><span>המייל שלך</span><span class="v">לוי מטבחים</span></div>
+        <div class="row"><span>המייל של המבקר</span><span class="v">כשאין וואטסאפ</span></div>
+        <div class="grp">החשבון שלי</div>
+        <div class="row"><span>הפרטים שלי</span><span class="v"></span></div>
+        <div class="row"><span>הודעת הבוקר</span><span class="v">8:00 במייל</span></div>
+        <div class="row"><span>מראה ועזרה</span><span class="v">כהה</span></div>
+      </div>
+      <div class="card" style="display:grid;gap:10px;align-content:start">
+        <span class="h">וואטסאפ</span>
+        <p class="muted">סורקים קוד מהטלפון, כמו בוואטסאפ ווב. ההודעות יוצאות מהמספר שלך, אחת אחת, בקצב של אדם, בשעות 9 עד 20. הטלפון ממשיך לעבוד כרגיל, ואפשר לנתק בכל רגע.</p>
+        <div><span class="btn pri">לחבר את הוואטסאפ</span></div>
+        <div class="sec" style="margin-top:6px">אחרי החיבור</div>
+        <p class="muted small">לקרוא תשובות של מבקרים · לשמור כל מבקר באנשי הקשר</p>
+      </div>
+    </div></div>
+    <p class="screen-cap">כך זה נראה במחשב. הרשימה בצד, והדף שנבחר לידה.</p>
+    <p class="why">המציג לא צריך לזכור באיזה חלק נמצא מה. השורות מדברות במילים שלו, והמצב שליד כל שורה מראה לו מה דורש טיפול בלי שיצטרך להיכנס.</p>
+  </article>
+
+  <article class="prop" id="tablet">
+    <div class="prop-head"><span class="n">2א</span><h3>ההגדרות בטאבלט</h3>
+      <div class="tags"><span class="tag now">חלק מהצעה 2</span></div></div>
+    <p>המערכת עוברת לפריסה של מחשב מרוחב של <span class="num">1100</span> פיקסלים. ברוב הטאבלטים הנפוצים זה קורה כשהם לרוחב, ושם ההגדרות נראות כמו בציור של הצעה 2: הרשימה בצד והדף לידה. כשהטאבלט לאורך, ההגדרות עובדות בשני מסכים:</p>
+    <ul>
+      <li><b>הרשימה, על כל המסך.</b> בראש הרשימה לוח המוכנות, ובו רק מה שחסר. מה שכבר מוכן מתקפל לשורה אחת. מתחת ללוח באות חמש הקבוצות. כל שורה גבוהה מספיק לאצבע, השם שלה מימין, והמצב וחץ משמאל.</li>
+      <li><b>הדף, על כל המסך.</b> נגיעה בשורה פותחת את הדף שלה. למעלה יש "→ הגדרות" עם שם הדף, והוא נשאר גלוי גם בגלילה, כמו החזרה הצפה מ-17/10.</li>
+      <li><b>הסרגל התחתון</b> נשאר בשני המסכים, וגם העיגול של היועץ מעליו. בתחתית הרשימה יש ריווח, כך שהעיגול לא מסתיר אף שורה.</li>
+      <li><b>שמירה:</b> אין כפתורי שמירה. ליד מה ששונה מופיע "נשמר ✓" קטן לשתי שניות. הכרטיס והמסלולים נשארים עם השאלה "על מי זה חל".</li>
+    </ul>
+    <div class="screen"><div class="ui tab-pair">
+      <figure class="tframe">
+        <div class="tdev">
+          <div class="tback"><span class="t">הגדרות</span></div>
+          <div class="tbody">
+            <div class="tready">
+              <div class="trow"><b>מוכן לאקספו · 3 מתוך 6</b><span class="done">3 מוכנים ✓</span></div>
+              <div class="bar"><i></i></div>
+              <div class="trow"><span>2 הודעות מחכות לפרט</span><span class="btn pri">להשלים</span></div>
+              <div class="trow"><span>הוואטסאפ לא מחובר</span><span class="btn pri">לחבר</span></div>
+              <div class="trow"><span>שלט לדוכן</span><span class="btn">להדפיס</span></div>
+            </div>
+            <div class="tgrp">הדוכן שלי</div>
+            <div class="tli"><span>הכרטיס בדוכן</span><span class="v">3 שאלות ‹</span></div>
+            <div class="tli"><span>אחרי האקספו</span><span class="v">4 מסלולים ‹</span></div>
+            <div class="tli"><span>ההודעות</span><span class="v miss">2 להשלים ‹</span></div>
+            <div class="tli"><span>להקים מחדש</span><span class="v">‹</span></div>
+            <div class="tgrp">לפני האקספו</div>
+            <div class="tli"><span>ניסיון</span><span class="v">ההודעות אליי ‹</span></div>
+            <div class="tli"><span>שלט והרשמה עצמית</span><span class="v">‹</span></div>
+            <div class="tgrp">ביום האקספו</div>
+            <div class="tli"><span>מבצע אקספו</span><span class="v">אין ‹</span></div>
+            <div class="tgrp">איך ההודעות יוצאות</div>
+            <div class="tli"><span>וואטסאפ</span><span class="v miss">לא מחובר ‹</span></div>
+            <div class="tli"><span>המייל שלך</span><span class="v">‹</span></div>
+            <div class="tgrp">החשבון שלי</div>
+            <div class="tli"><span>הפרטים שלי · הודעת הבוקר · מראה</span><span class="v">‹</span></div>
+          </div>
+          <div class="tbar"><span>לידים</span><span>משימות</span><span>דשבורד</span><span>דף הבית</span><span>הודעות</span><span>עזרה</span><span><b>הגדרות</b></span></div>
+          <div class="fab" aria-label="היועץ"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z" fill="#0B1A13"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#0B1A13"/></svg></div>
+        </div>
+        <figcaption class="screen-cap">1. הרשימה. לוח המוכנות מראה רק מה שחסר.</figcaption>
+      </figure>
+      <figure class="tframe">
+        <div class="tdev">
+          <div class="tback"><span>→ הגדרות</span><span class="t">שלט והרשמה עצמית</span></div>
+          <div class="tbody" style="gap:10px">
+            <p class="muted" style="font-size:13px">כשיש תור, מבקר סורק את הקוד ונרשם לבד מהטלפון שלו. תוך חצי דקה הוא ברשימה של הדוכן.</p>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <div class="qr" aria-hidden="true"></div>
+              <div style="display:grid;gap:8px">
+                <span class="btn pri">להדפיס שלט לדוכן</span>
+                <span class="btn">להעתיק את הקישור</span>
+              </div>
+            </div>
+            <div class="tgrp">על השלט</div>
+            <div class="tli" style="border-radius:10px"><span>הלוגו שלך</span><span class="v">מהמייל שלך ‹</span></div>
+            <div class="tli" style="border-radius:10px"><span>לנסות בעצמך לפני האקספו</span><span class="sw on" aria-hidden="true"></span></div>
+            <div class="trow"><span class="muted small">מי שנרשם דרכך בניסיון מופיע בדוכן, ואפשר לבטל אותו משם.</span><span class="saved">נשמר ✓</span></div>
+          </div>
+          <div class="tbar"><span>לידים</span><span>משימות</span><span>דשבורד</span><span>דף הבית</span><span>הודעות</span><span>עזרה</span><span><b>הגדרות</b></span></div>
+          <div class="fab" aria-label="היועץ"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z" fill="#0B1A13"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#0B1A13"/></svg></div>
+        </div>
+        <figcaption class="screen-cap">2. נגיעה בשורה פותחת את הדף. "→ הגדרות" נשאר גלוי בגלילה.</figcaption>
+      </figure>
+    </div></div>
+    <p class="why">בטאבלט לאורך אין מקום לרשימה ולדף זה לצד זה. שני מסכים עם חזרה ברורה הם הדרך שכל מי שיש לו טלפון כבר מכיר מההגדרות של הטלפון שלו.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">3</span><h3>היועץ בכפתור הצף, כמו שסיכמנו</h3>
+      <div class="tags"><span class="tag now">לפני ההקפאה</span><span class="tag">חצי יום</span><span class="tag keep">לפי ההחלטה מ-17/10 ו-20/10</span></div></div>
+    <ul>
+      <li>בטאבלט: עיגול צף בצד שמאל מעל הסרגל, בלי מילה בתוכו, שפותח את היועץ ישר. במחשב: "סוכן AI" בתחתית התפריט, ונפתח כפאנל ליד התפריט. בדוכן הוא מוסתר.</li>
+      <li>בדוכן חדש היועץ הוא הפעולה הראשית, ו"להקים לבד" הוא קישור מתחתיו. היום אלה שני כרטיסים שווים.</li>
+      <li>בצד של השיחה, במקום רשימה של <span class="num">12</span> בדיקות, מופיע הכרטיס שנבנה. מציג מבין כרטיס, לא רשימת בדיקות.</li>
+      <li>שיחה קצרה יותר, יעד של <span class="num">10</span> עד <span class="num">12</span> סבבים: היועץ שואל רק מה שחסר ומסכם פעם אחת. בבדיקה הוא חזר על הסיכום כמה פעמים.</li>
+    </ul>
+    <div class="screen"><div class="ui tablet">
+      <div class="trial"><span>ניסיון · ההודעות אליך · יום עובר בדקה</span><span>לשנות</span></div>
+      <div class="top">לוי מטבחים · דף הבית</div>
+      <div class="content">המסך עצמו, בלי שינוי.</div>
+      <div class="tbar"><span>לידים</span><span>משימות</span><span>דשבורד</span><span><b style="color:var(--ink)">דף הבית</b></span><span>הודעות</span><span>עזרה</span><span>הגדרות</span></div>
+      <div class="fab" aria-label="היועץ"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1A13" stroke-width="2" stroke-linecap="square"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z" fill="#0B1A13"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#0B1A13"/></svg></div>
+    </div></div>
+    <p class="screen-cap">בטאבלט: העיגול הצף פותח את היועץ. הפס שבראש הוא הצעה 8.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">4</span><h3>ההקמה בארבעה שלבים</h3>
+      <div class="tags"><span class="tag now">חלקית לפני ההקפאה</span><span class="tag">יום</span><span class="tag">משנה מבנה שלי מ-30/10</span></div></div>
+    <ul>
+      <li><b>העסק והמטרה.</b> במה העסק עוסק, מה תהיה הצלחה ובמספר, ועסק רגיש. אחרי שהוא כותב במה העסק עוסק, מוצעים לו שלושה עסקים דומים כנקודת התחלה, במקום חמישה עשר צ'יפים בשלב נפרד.</li>
+      <li><b>הכרטיס</b>, עם הכרטיס עצמו לידו, כמו בהצעה 5.</li>
+      <li><b>אחרי האקספו.</b> כל כפתור כמשפט אחד, למשל "למחרת אתה מתקשר · אחרי שבוע הודעה". את הימים משנים בתוך המשפט. רשימת הדפוסים נפתחת רק בנגיעה על "לשנות".</li>
+      <li><b>ההודעות ובדיקה.</b> נפתחות רק הודעות שחסר בהן פרט. שאלת הזמן ביום עוברת לשורה אחת בבדיקה: "המסלולים ידרשו כ-6 שעות בשבועיים, ויש לך כ-5". כל "!" בבדיקה הוא כפתור שמוביל למקום שבו מתקנים.</li>
+    </ul>
+    <p class="why">כל שלב שיורד הוא מסך פחות שבו מציג יכול לעזוב באמצע. סביר שרוב ההקמות יקרו בשבוע שלפני האקספו, ולכן כל שיפור בהקמה שווה הרבה יותר לפני האקספו מאשר אחריו. לפני ההקפאה הייתי עושה רק את שני החלקים הקלים: שאלת הזמן עוברת לבדיקה, והעסקים הדומים עוברים לשלב הראשון. ואת "שישה שלבים" מתקנים בכל מקרה.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">5</span><h3>עורך אחד, עם הכרטיס לידו</h3>
+      <div class="tags"><span class="tag later">אחרי האקספו, אלא אם יש זמן</span><span class="tag">יום וחצי עד יומיים</span><span class="tag keep">ממשיך את 17/10</span></div></div>
+    <p>אותם עורכים של הכרטיס, המסלולים וההודעות משמשים בהקמה ובהגדרות. במחשב, ליד העורך מופיע הכרטיס כמו שהוא ייראה בדוכן, ומשתנה תוך כדי הקלדה. בטאבלט יש כפתור "לראות את הכרטיס".</p>
+    <div class="screen"><div class="ui">
+      <div class="stepper" style="margin-bottom:10px"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+      <div class="setup-step">
+        <div class="card" style="display:grid;gap:8px">
+          <span class="h">הכרטיס</span>
+          <div class="sec">מה הוא צריך?</div>
+          <div><span class="chip on">הרחבה ★</span><span class="chip">שיפוץ פנים</span><span class="chip">מרפסת</span><span class="chip">＋</span></div>
+          <div class="sec">מתי?</div>
+          <div><span class="chip">יש תוכנית מאדריכל</span><span class="chip">עוד לפני היתר</span><span class="chip">רק חושבים</span><span class="chip">＋</span></div>
+          <div class="sec">מי הוא?</div>
+          <div><span class="chip">משפחה</span><span class="chip">אדריכל</span><span class="chip">＋</span></div>
+          <p class="muted small">★ המטרה הראשית. נגיעה בשם משנה אותו.</p>
+        </div>
+        <div style="display:grid;gap:6px">
+          <div class="sec">כך זה ייראה בדוכן</div>
+          <div class="booth-card">
+            <span class="who">יעקב כהן</span>
+            <div class="row3"><span class="b on">הרחבה</span><span class="b">שיפוץ פנים</span><span class="b">מרפסת</span></div>
+            <div class="row3"><span class="b">יש תוכנית מאדריכל</span><span class="b">עוד לפני היתר</span><span class="b">רק חושבים</span></div>
+            <div class="row3"><span class="b">משפחה</span><span class="b">אדריכל</span></div>
+            <span class="muted small">אחרי האקספו: אתה מתקשר תוך שבוע</span>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="why">כך מה שמציג רואה כשהוא בונה הוא מה שיהיה לו בדוכן. בעורך אחד גם הבדיקות זהות בכל מקום, ותיקון אחד מגיע לשני המקומות.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">6</span><h3>כניסה ראשונה קצרה</h3>
+      <div class="tags"><span class="tag now">לפני ההקפאה</span><span class="tag">שעתיים</span><span class="tag rev">משנה את שאלת הוואטסאפ מ-20/10</span></div></div>
+    <p>שם, עסק, טלפון ומייל, ושאלה אחת על הוואטסאפ עם שלוש תשובות: "על המספר הזה", "על מספר אחר", "אין לי". השאלה "וואטסאפ רגיל או עסקי" יורדת. היא נשמרת היום אבל לא משמשת לשום דבר, לא במערכת ולא בשרת. אם החיבור יצטרך אותה פעם, שואלים בזמן החיבור.</p>
+    <p class="why">זה המסך הראשון של כל מציג. היום, אחרי "כן", נפתחות עוד שתי שורות של בחירה. כל שאלה שלא משנה כלום בכניסה הראשונה היא סיבה לעצור.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">7</span><h3>המייל שלך במקום אחד, עם תצוגה</h3>
+      <div class="tags"><span class="tag later">אם יש זמן לפני ההקפאה</span><span class="tag">חצי יום</span></div></div>
+    <p>הפנייה, הלוגו, הצבע, כתובת השולח והחתימה, בדף אחד. לידם מייל אמיתי לדוגמה שמשתנה עם כל בחירה. היום אלה שלושה כרטיסים נפרדים, והתצוגה מראה רק את ראש המייל.</p>
+    <div class="screen"><div class="ui mail-grid">
+      <div class="card" style="display:grid;gap:8px">
+        <span class="h">המייל שלך</span>
+        <div class="sec">פנייה</div><div><span class="chip on">שלום [שם]</span><span class="chip">בס"ד · לכבוד ר' [שם]</span></div>
+        <div class="sec">לוגו וצבע</div><div><span class="btn">להחליף לוגו</span></div>
+        <div class="sec">הכתובת שממנה יוצא המייל</div><div class="muted small" dir="ltr" style="text-align:right">levi-kitchens@expomax.y-h-m.com</div>
+        <div class="sec">החתימה</div><div class="muted small">משה לוי, לוי מטבחים · 052-1234567</div>
+      </div>
+      <div class="mail" aria-label="מייל לדוגמה">
+        <div class="from">levi-kitchens@expomax.y-h-m.com</div>
+        <div class="top"><span class="lg">ל</span>לוי מטבחים</div>
+        <div class="body">
+          <span>שלום יעקב,</span>
+          <span>תודה שעצרת אצלנו בדוכן באקספו. כמו שסיכמנו, מצרף את המחירון.</span>
+          <span class="sig">משה לוי, לוי מטבחים · 052-1234567</span>
+        </div>
+      </div>
+    </div></div>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">8</span><h3>ניסיון כפס, לא כהגדרה</h3>
+      <div class="tags"><span class="tag later">אם יש זמן לפני ההקפאה</span><span class="tag">שעתיים</span></div></div>
+    <p>עד האקספו, פס דק בראש הדוכן וה-CRM: "ניסיון · ההודעות אליך · יום עובר בדקה · לשנות". המציג רואה את המצב בדיוק במקום שבו הוא מנסה, ומשנה אותו בנגיעה. היום הניסיון הוא הכרטיס הראשון בלשונית ההודעות, ומי שלא נכנס לשם לא יודע שהוא קיים. הפס מופיע בציור של הצעה 3.</p>
+  </article>
+
+  <article class="prop">
+    <div class="prop-head"><span class="n">9</span><h3>שמירה אחת, ומילים של המציג</h3>
+      <div class="tags"><span class="tag now">לפני ההקפאה</span><span class="tag">חצי יום</span></div></div>
+    <p>כל שינוי נשמר מיד, עם "נשמר" קטן לידו. רק שינוי בכרטיס או במסלולים נשאר עם השאלה "גם עליהם, או רק על החדשים". והשמות מתחלפים כך:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>היום</th><th>מוצע</th></tr></thead>
+      <tbody>
+        <tr><td>פרטים וחיבורים / התאמה אישית</td><td>רשימה אחת בחמש קבוצות (הצעה 2)</td></tr>
+        <tr><td>חיבורים</td><td>וואטסאפ</td></tr>
+        <tr><td>מה קורה אחרי</td><td>אחרי האקספו</td></tr>
+        <tr><td>הקמה וגרסאות</td><td>להקים מחדש · שינויים קודמים</td></tr>
+        <tr><td>הפרטים שלך (בתוך "הודעות")</td><td>החשבון שלי › הפרטים שלי</td></tr>
+        <tr><td>הודעת הבוקר (בתוך "הודעות")</td><td>החשבון שלי › הודעת הבוקר, כי היא בשבילו ולא בשביל המבקר</td></tr>
+        <tr><td>במסך הבחירה: "שישה שלבים קצרים"</td><td>מספר השלבים האמיתי</td></tr>
+      </tbody>
+    </table></div>
+  </article>
+</section>
+
+<section aria-labelledby="k">
+  <h2 id="k">מה הייתי משאיר כמו שהוא</h2>
+  <ul class="asks" style="list-style:disc">
+    <li>השאלה "גם עליהם, או רק על החדשים" בכל שינוי בכרטיס.</li>
+    <li>"?" ליד הכותרות, במקום סיור מודרך.</li>
+    <li>פרט שכותבים פעם אחת ב"פרטים להודעות" ונכנס לכל ההודעות.</li>
+    <li>מציג בלי וואטסאפ לא רואה אותו בשום מקום. גם הרשימה של הצעה 2 מסתירה את השורה.</li>
+    <li>המראה, כהה או בהיר, נשמר לכל מכשיר.</li>
+    <li>שינויים קודמים שאפשר לחזור אליהם בנגיעה.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="o">
+  <h2 id="o">סדר עבודה</h2>
+  <p class="muted">סביר שרוב ההקמות יקרו בשבוע שלפני האקספו, ואחרי 16/11 כמעט אף אחד לא מקים. לכן מה שנוגע בהקמה ובמוכנות שווה הכי הרבה עכשיו. ההערכות הן שלי, ולא נמדדו. הן מתחרות על אותו זמן עם הגיבוי (עד 8/11), עם Turnstile ועם הבדיקות.</p>
+  <div class="plan">
+    <div><span class="eyebrow">לפני ההקפאה, 8/11</span><span class="muted small">בערך שלושה ימי עבודה</span>
+      <ol><li>לוח "מוכן לאקספו"</li><li>הגדרות כרשימה אחת</li><li>היועץ בכפתור הצף</li><li>כניסה ראשונה קצרה</li><li>שמירה אחת ומילים</li><li>מההקמה: הזמן עובר לבדיקה, עסקים דומים בשלב הראשון</li></ol></div>
+    <div><span class="eyebrow">אם נשאר זמן</span><span class="muted small">יום</span>
+      <ol><li>המייל שלך עם תצוגה</li><li>ניסיון כפס</li></ol></div>
+    <div><span class="eyebrow">אחרי האקספו</span><span class="muted small">לאקספו הבא</span>
+      <ol><li>עורך אחד עם הכרטיס לידו</li><li>שאר ההקמה בארבעה שלבים</li><li>היועץ שמכיר את המסך</li></ol></div>
+  </div>
+</section>
+
+<section aria-labelledby="q">
+  <h2 id="q">מה צריך ממך</h2>
+  <ol class="asks">
+    <li>הכיוון מתאים: לסדר לפי מה שעושים ומתי, ולא לפי חלקי המערכת?</li>
+    <li>מה עושים לפני ההקפאה: הרשימה שהצעתי, או סדר אחר?</li>
+    <li>לוותר בכניסה על השאלה "וואטסאפ רגיל או עסקי"?</li>
+    <li>ההקמה בארבעה שלבים, כן?</li>
+  </ol>
+</section>
+
+</div>

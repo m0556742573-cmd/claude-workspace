@@ -324,7 +324,7 @@ function WaOpen() {
   return (
     <section className="panel-w">
       <h2>וואטסאפ למציגים</h2>
-      <p className="muted">כשזה פתוח, כל מציג מאושר רואה בהגדרות › חיבורים את חיבור הוואטסאפ שלו. כל חשבון מחובר תופס זיכרון בשרת, ולכן יש תקרה.</p>
+      <p className="muted">כשזה פתוח, כל מציג מאושר רואה בהגדרות › וואטסאפ את חיבור הוואטסאפ שלו. כל חשבון מחובר תופס זיכרון בשרת, ולכן יש תקרה.</p>
       {stats && <p className="faint small">בשרת עכשיו: {stats.open} מחוברים מתוך {stats.sessions}, {stats.rssMb}MB זיכרון.</p>}
       {st && (
         <div className="row">

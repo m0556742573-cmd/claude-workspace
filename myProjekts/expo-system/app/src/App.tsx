@@ -10,12 +10,13 @@ import { MeForm } from './me.tsx';
 import { Join } from './join.tsx';
 import { SetupSteps } from './setup.tsx';
 import { Booth, type Stuck } from './booth/Booth.tsx';
-import { Dashboard, Home, Leads, Messages, Settings, Snapshot, Tasks, type Ctx } from './screens.tsx';
+import { Dashboard, Home, Leads, Messages, Snapshot, Tasks, type Ctx } from './screens.tsx';
+import { Settings, type Review } from './settings.tsx';
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
 import { EXPO_DAY, LIST_CLOSES, today } from './lib/words.ts';
-import { Icon, type IconName } from './ui.tsx';
+import { Icon, SavedToast, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
   activeSetup, fileUrl, flush, isAdmin, saveText, keptSession, leadContact, loadPhase, type Phase, pullSelf, startFromTemplate, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase, uploadTrouble,
@@ -90,7 +91,9 @@ function Gate({ title, children, hero }: { title: string; children?: ReactNode; 
 
 type View = 'booth' | 'snapshot' | 'home' | 'tasks' | 'leads' | 'dash' | 'messages' | 'settings';
 type Part = 'day' | 'crm';
-type Panel = 'menu' | 'help' | 'support' | null;
+/** ai: the consultant (17/10 and 20/10): a round floating button on the tablet, "סוכן AI" at the foot of the menu on a
+ *  computer, opening its panel; hidden at the booth. */
+type Panel = 'menu' | 'help' | 'support' | 'ai' | null;
 const DAY: [View, string, IconName][] = [['booth', 'הדוכן', 'search'], ['snapshot', 'תמונת מצב', 'check']];
 const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['leads', 'לידים', 'leads'], ['tasks', 'משימות', 'tasks'], ['dash', 'דשבורד', 'bars'], ['messages', 'הודעות', 'mail']];
 const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings'));
@@ -121,6 +124,8 @@ function Live() {
   const [admin, setAdmin] = useState(false);
   const [newVisitor, setNewVisitor] = useState(0);
   const [phase, setPhase] = useState<Phase>('practice');
+  // A setup the consultant built, waiting for review in the settings (2/11).
+  const [review, setReview] = useState<Review | null>(null);
 
   const go = useCallback((v: View) => { setView(v); setPanel(null); const p = partOf(v); if (p) setPart(p); scrollTo(0, 0); }, []);
   useEffect(() => { history.replaceState(null, '', location.search + '#' + view); }, [view]);
@@ -282,6 +287,7 @@ function Live() {
           <div className="side-foot">
             {nv('עזרה', 'help', panel === 'help', () => openPanel('help'), 'סרטונים')}
             {nv('תמיכה', 'phone', panel === 'support', () => openPanel('support'), 'פנייה')}
+            {nv('סוכן AI', 'spark', panel === 'ai', () => openPanel('ai'), 'היועץ')}
             {nv('הגדרות', 'gear', view === 'settings', () => go('settings'))}
             <button type="button" className="nv fold" aria-expanded={!slim} title={slim ? 'להרחיב את התפריט' : 'לכווץ את התפריט'} aria-label={slim ? 'להרחיב את התפריט' : 'לכווץ את התפריט'}
               onClick={() => { if (slim) { setFolded(false); setPanel(null); } else setFolded(true); }}>
@@ -331,7 +337,7 @@ function Live() {
         {view === 'leads' && <Leads ctx={ctx} desk={desk} />}
         {view === 'dash' && <Dashboard ctx={ctx} desk={desk} />}
         {view === 'messages' && <Messages ctx={ctx} desk={desk} />}
-        {view === 'settings' && <Settings ctx={ctx} onSignOut={leave} />}
+        {view === 'settings' && <Settings ctx={ctx} desk={desk} onSignOut={leave} review={review} onReviewed={() => setReview(null)} onConsult={() => setPanel('ai')} />}
         
       </main>
 
@@ -353,8 +359,25 @@ function Live() {
         </nav>
       )}
 
+      {!desk && view !== 'booth' && !panel && (
+        <button type="button" className="ai-fab" aria-label="היועץ" title="היועץ" onClick={() => setPanel('ai')}><Icon name="spark" size={26} stroke={1.9} /></button>
+      )}
       {panel && !desk && <button type="button" className="scrim" aria-label="סגירה" onClick={() => setPanel(null)} />}
-      {panel && <HelpPanel kind={panel} desk={desk} view={view} onPick={setPanel} onClose={() => setPanel(null)} />}
+      {panel && panel !== 'ai' && <HelpPanel kind={panel} desk={desk} view={view} onPick={setPanel} onClose={() => setPanel(null)} />}
+      {panel === 'ai' && (
+        <div className={'pnl ai-pnl ' + (desk ? 'side-p' : 'dialog')} role="dialog" aria-label="היועץ">
+          <div className="p-head">
+            {desk && <Icon name="spark" size={22} />}
+            <h2>היועץ</h2>
+            <button type="button" className="sq" aria-label="סגירה" onClick={() => setPanel(null)}><Icon name="close" /></button>
+          </div>
+          <div className="p-body">
+            {/* What it builds opens in the settings, in the steps, for him to review before it is saved. */}
+            <Consultant onBuilt={(s, texts) => { setReview({ setup: s, texts }); go('settings'); }} onSteps={() => { setReview({ setup: null }); go('settings'); }} />
+          </div>
+        </div>
+      )}
+      <SavedToast />
     </div>
   );
 }
@@ -453,12 +476,11 @@ function NewBooth({ exhibitor, onSaved }: { exhibitor: Exhibitor; onSaved: (s: S
     <div className="setup-gate">
       <div className="brand"><Logo height={26} /><span className="biz muted">בוא נקים את הדוכן</span></div>
       {mode === 'choose' && (
-        <section className="panel-w">
-          <h2>איך נקים את הדוכן?</h2>
-          <div className="phase-list">
-            <button type="button" className="opt-card" onClick={() => setMode('consult')}><b>בשיחה עם היועץ · מומלץ</b><span className="muted">יועץ חכם שואל כמה שאלות על העסק שלך, ובונה מהן את הכרטיס, המסלולים וההודעות. אחר כך אפשר לשנות כל דבר.</span></button>
-            <button type="button" className="opt-card" onClick={() => setMode('steps')}><b>לבד, שלב אחר שלב</b><span className="muted">שישה שלבים קצרים, מעסק דומה או מאפס.</span></button>
-          </div>
+        <section className="panel-w new-booth">
+          <h2>בוא נקים את הדוכן</h2>
+          <p className="muted">היועץ שואל כמה שאלות על העסק שלך, ובונה מהן את הכרטיס, המסלולים וההודעות. אחר כך עוברים על הכל, ומשנים מה שרוצים.</p>
+          <button type="button" className="btn primary tall" onClick={() => setMode('consult')}><Icon name="spark" size={20} />להקים עם היועץ</button>
+          <button type="button" className="text-btn" onClick={() => setMode('steps')}>או לבד, שלב אחר שלב: חמישה שלבים קצרים</button>
         </section>
       )}
       {mode === 'consult' && <Consultant onBuilt={(s, texts) => { setBuilt({ setup: s, texts }); setMode('steps'); }} onSteps={() => setMode('steps')} />}
