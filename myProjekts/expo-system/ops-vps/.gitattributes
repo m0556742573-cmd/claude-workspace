@@ -1,0 +1,2 @@
+# These run on the Linux server: keep them LF on every checkout.
+*.sh text eol=lf

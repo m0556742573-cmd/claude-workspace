@@ -9,7 +9,7 @@ HOST="${WA_SSH_HOST:-${GREENWALD_SSH_HOST:-}}"; KEY="${WA_SSH_KEY:-$HOME/.ssh/gr
 ssh_run() { ssh -i "$KEY" -o BatchMode=yes "$HOST" "$@"; }
 ssh_run 'mkdir -p /opt/expo-ops && chmod 700 /opt/expo-ops'
 scp -i "$KEY" -q report.sh watchdog.sh "$HOST:/opt/expo-ops/"
-ssh_run 'set -e; cd /opt/expo-ops; chmod 700 report.sh watchdog.sh
+ssh_run 'set -e; cd /opt/expo-ops; sed -i "s/$//" report.sh watchdog.sh; chmod 700 report.sh watchdog.sh
   if [ ! -s env ]; then
     umask 077
     . /opt/expo-wa/.env
