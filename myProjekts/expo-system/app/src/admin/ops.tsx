@@ -46,6 +46,8 @@ const FIELDS: Record<string, string> = {
   priority: 'עדיפות', due: 'תאריך יעד', note: 'התשובה שלך', reply: 'Claude עונה', check_how: 'איך בודקים',
 };
 const isDone = (i: OpsItem) => i.status === 'done' || i.status === 'dropped';
+/** What waits on him: his, and not waiting on someone else (the organiser, a price decision). */
+const forHim = (i: OpsItem) => i.owner === 'yitzhak' && (i.status === 'open' || i.status === 'doing');
 
 /** Today in Israel, as YYYY-MM-DD, so "late" means late where he is. */
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
@@ -65,7 +67,7 @@ export function OpsStrip({ onTasks, onStatus }: { onTasks: () => void; onStatus:
     opsItems().then(setItems).catch(() => setItems(null));
     opsChecks().then((r) => setChecks(r.checks)).catch(() => setChecks(null));
   }, []);
-  const mine = items?.filter((i) => i.owner === 'yitzhak' && !isDone(i)) ?? [];
+  const mine = items?.filter(forHim) ?? [];
   const late = mine.filter((i) => i.due && i.due < today()).length;
   const trouble = checks?.filter((c) => c.platform !== 'keys' && c.level === 'bad').length ?? 0;
   const attention = checks?.filter((c) => c.platform !== 'keys' && (c.level === 'warn' || c.level === 'unknown')).length ?? 0;
@@ -87,16 +89,17 @@ export function OpsStrip({ onTasks, onStatus }: { onTasks: () => void; onStatus:
 /** How many wait on him, for the menu. */
 export function useWaitingCount(): number {
   const [n, setN] = useState(0);
-  useEffect(() => { opsItems().then((r) => setN(r.filter((i) => i.owner === 'yitzhak' && !isDone(i)).length)).catch(() => {}); }, []);
+  useEffect(() => { opsItems().then((r) => setN(r.filter(forHim).length)).catch(() => {}); }, []);
   return n;
 }
 
 // ---------- tasks and decisions
 
-export type Filter = 'mine' | 'claude' | 'dates' | 'done' | 'all';
+export type Filter = 'mine' | 'claude' | 'blocked' | 'dates' | 'done' | 'all';
 const FILTERS: [Filter, string, (i: OpsItem) => boolean][] = [
-  ['mine', 'מחכה לך', (i) => i.owner === 'yitzhak' && !isDone(i)],
-  ['claude', 'אצל Claude', (i) => i.owner === 'claude' && !isDone(i)],
+  ['mine', 'מחכה לך', forHim],
+  ['claude', 'אצל Claude', (i) => i.owner === 'claude' && !isDone(i) && i.status !== 'blocked'],
+  ['blocked', 'מחכה למישהו אחר', (i) => i.status === 'blocked'],
   ['dates', 'לוח זמנים', (i) => !!i.due && !isDone(i)],
   ['done', 'נעשו', isDone],
   ['all', 'הכל', () => true],
@@ -125,7 +128,7 @@ export function TasksView({ initial = 'mine' }: { initial?: Filter }) {
     return rows.sort((a, b) => band(a) - band(b) || (a.due ?? '9999').localeCompare(b.due ?? '9999') || pri(a) - pri(b));
   }, [items, filter, track, q]);
   const tracks = useMemo(() => [...new Set((items ?? []).map((i) => i.track))], [items]);
-  const banded = filter !== 'done' && filter !== 'all';
+  const banded = filter === 'mine' || filter === 'claude' || filter === 'dates';
 
   const head = <PageHead title="משימות והחלטות" sub={items ? `${counts.mine} מחכים לך` : undefined}
     tip="כל מה שפתוח באקספו: מה מחכה לך, מה אצל Claude, ולוח הזמנים. כל שינוי נשמר עם תאריך, אז שום דבר לא הולך לאיבוד." />;
