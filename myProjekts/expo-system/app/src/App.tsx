@@ -15,12 +15,12 @@ import { FlowBooth, FlowDetails, FlowMessages, FlowStart, flowOf, keepFlow, type
 import { demoPeople, searchPeople, type Person } from './demo/people.ts';
 import { keep, kept } from './store/cache.ts';
 import { allLeads, allNotes, clearLocal, dropLead, dropNote, putLead, putNote, type LocalLead, type LocalNote } from './store/local.ts';
-import { EXPO_DAY, LIST_CLOSES, today } from './lib/words.ts';
+import { EXPO_DAY, today } from './lib/words.ts';
 import { Icon, SavedToast, type IconName } from './ui.tsx';
 import { Logo } from './brand.tsx';
 import {
   activeSetup, fileUrl, flush, isAdmin, keptSession, leadContact, loadPhase, type Phase, pullSelf, loadDirectory, myExhibitor, removeLead, saveLead, saveNote, searchIn, signInWithGoogle, signOut, supabase, uploadTrouble,
-  type Exhibitor, type Session,
+  LIST_OPEN, listShut, loadListState, type ListState, type Exhibitor, type Session,
 } from './lib/backend.ts';
 import { waCheck } from './lib/wa.ts';
 import { setNoWa } from './lib/messages.ts';
@@ -99,7 +99,7 @@ const CRM: [View, string, IconName][] = [['home', 'דף הבית', 'home'], ['le
 const ALL = new Set<string>([...DAY, ...CRM].map(([v]) => v).concat('settings'));
 const partOf = (v: View): Part | null => (DAY.some(([d]) => d === v) ? 'day' : CRM.some(([c]) => c === v) ? 'crm' : null);
 
-interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[]; phase?: Phase }
+interface Boot { exhibitor: Exhibitor; setup: Setup; directory: Person[]; phase?: Phase; list?: ListState }
 
 function Live() {
   const online = useOnline();
@@ -124,6 +124,8 @@ function Live() {
   const [admin, setAdmin] = useState(false);
   const [newVisitor, setNewVisitor] = useState(0);
   const [phase, setPhase] = useState<Phase>('practice');
+  // The community list, closed by the admin's button (0045, יצחק 3/11), or kept open for this exhibitor.
+  const [list, setList] = useState<ListState>(LIST_OPEN);
   // The setup's own screens, until "סיימתי להגדיר" (onboard.tsx); kept on this device.
   const [flow, setFlowState] = useState<Flow | null>(null);
   const setFlow = (f: Flow | null) => { setFlowState(f); if (exhibitor) keepFlow(exhibitor.id, f); };
@@ -170,8 +172,10 @@ function Live() {
       // would have meant sample names all day).
       const last = await kept<Boot>('boot:' + userId).catch(() => undefined);
       const ph = await loadPhase().catch(() => last?.phase ?? 'practice');
+      const ls = await loadListState().catch(() => last?.list ?? LIST_OPEN);
       const adm = await isAdmin().catch(() => false);
       setPhase(ph);
+      setList(ls);
       const dir = ph === 'practice' && !adm ? demoPeople : await loadDirectory().catch(() => null);
       // The real list failed half way: the one kept from the last load, if any.
       setDirectory(dir ?? (last?.phase === ph ? last.directory : []));
@@ -180,7 +184,7 @@ function Live() {
     }).catch(async (e) => {
       // No server: the booth opens from the copy kept on this tablet at the last load.
       const k = await kept<Boot>('boot:' + userId).catch(() => undefined);
-      if (k) { setExhibitor(k.exhibitor); setSetup(k.setup); setDirectory(k.directory); setPhase(k.phase ?? 'practice'); }
+      if (k) { setExhibitor(k.exhibitor); setSetup(k.setup); setDirectory(k.directory); setPhase(k.phase ?? 'practice'); setList(k.list ?? LIST_OPEN); }
       else setError(navigator.onLine ? String(e.message ?? e) : 'אין רשת, ועוד אין בטאבלט הזה עותק של הדוכן. צריך להיכנס פעם אחת עם רשת.');
     });
   }, [userId]);
@@ -188,8 +192,8 @@ function Live() {
   // made while it was still loading (or after it failed) would replace a good one with an empty list.
   useEffect(() => {
     if (!userId || !exhibitor || !setup || !loaded) return;
-    keep('boot:' + userId, { exhibitor, setup, directory, phase } satisfies Boot).catch(() => {});
-  }, [userId, exhibitor, setup, directory, phase, loaded]);
+    keep('boot:' + userId, { exhibitor, setup, directory, phase, list } satisfies Boot).catch(() => {});
+  }, [userId, exhibitor, setup, directory, phase, list, loaded]);
 
   useEffect(() => {
     if (!exhibitor || !setup) return;
@@ -203,15 +207,25 @@ function Live() {
         if (ph === phase) return;
         setPhase(ph);
         if (ph !== 'practice') { const dir = await loadDirectory().catch(() => null); if (dir) { setDirectory(dir); setLoaded(true); } }
+      })
+      // So does the admin's closing of the community list (0045, יצחק 3/11). Opened again for him, the list is loaded
+      // again: a tablet that started while it was closed holds only the visitors he had gathered.
+      .then(() => loadListState()).then(async (ls) => {
+        if (ls.closedAt === list.closedAt && ls.keepOpen === list.keepOpen) return;
+        setList(ls);
+        if (listShut(list) && !listShut(ls) && phase !== 'practice') { const dir = await loadDirectory().catch(() => null); if (dir) { setDirectory(dir); setLoaded(true); } }
       }).catch(() => {});
     tickRef.current = tick;
     tick();
     const t = setInterval(tick, 30000);
     addEventListener('online', tick);
     return () => { clearInterval(t); removeEventListener('online', tick); };
-  }, [exhibitor, setup, directory, refresh, phase]);
+  }, [exhibitor, setup, directory, refresh, phase, list]);
 
-  const search = useCallback((q: string) => searchIn(directory, q), [directory]);
+  // Closed, the booth searches no one, as the server (0045): the copy on the tablet may still hold the whole list, and a
+  // visitor tapped from it would reach the server with his name only. The admin keeps the list.
+  const listClosed = !admin && listShut(list);
+  const search = useCallback((q: string) => (listClosed ? [] : searchIn(directory, q)), [directory, listClosed]);
   /** Signing out: with nothing waiting, the tablet forgets the visitors, so the next account starts clean; with some
    *  waiting, they stay for this account only and go up when it signs in again (30/10). */
   const leave = async () => {
@@ -335,7 +349,7 @@ function Live() {
             trialSend={exhibitor.trial_send}
             offer={exhibitor.offer}
             ownOf={leadContact}
-            listClosed={!admin && today() >= LIST_CLOSES}
+            listClosed={listClosed}
             onTrialChange={() => setPanel('trial')}
           />
         )}

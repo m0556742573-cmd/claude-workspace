@@ -555,6 +555,37 @@ export async function loadPhase(): Promise<Phase> {
   if (error) throw error;
   return (data?.phase as Phase) ?? 'practice';
 }
+
+/** The community list (migration 0045, יצחק 3/11): closed by the admin's button from closedAt on (null: open), unless he
+ *  kept it open for this exhibitor. Read apart from the phase and from the exhibitor's row, so that an app that reaches
+ *  the booths before the migration still opens: the read fails, and the list stays as last known (open). The exhibitor's
+ *  own row is asked only once the list is closed. */
+export interface ListState { closedAt: string | null; keepOpen: boolean }
+export const LIST_OPEN: ListState = { closedAt: null, keepOpen: false };
+export const listShut = (s: ListState) => !!s.closedAt && !s.keepOpen;
+async function listClosedAt(): Promise<string | null> {
+  const { data, error } = await supabase.from('system_state').select('list_closed_at').maybeSingle();
+  if (error) throw error;
+  return (data?.list_closed_at as string | null | undefined) ?? null;
+}
+export async function loadListState(): Promise<ListState> {
+  const closedAt = await listClosedAt();
+  if (!closedAt) return LIST_OPEN;
+  const { data, error } = await supabase.from('exhibitors').select('list_keep_open').maybeSingle();
+  if (error) throw error;
+  return { closedAt, keepOpen: !!data?.list_keep_open };
+}
+/** The admin's side: when the list closed (null: open), the two buttons, and the exception for one exhibitor. */
+export const adminListClosedAt = listClosedAt;
+export async function adminSetList(closed: boolean): Promise<string | null> {
+  const { data, error } = await supabase.rpc('admin_set_list', { closed });
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
+export async function adminListKeepOpen(exhibitorId: string, keep: boolean): Promise<void> {
+  const { error } = await supabase.rpc('admin_list_keep_open', { exhibitor: exhibitorId, keep });
+  if (error) throw error;
+}
 export async function adminPhase(): Promise<{ phase: Phase; changed_at: string; changed_by: string | null; practice_leads: number; practice_booths: number }> {
   const { data, error } = await supabase.rpc('admin_phase');
   if (error) throw error;
@@ -570,7 +601,11 @@ export async function isAdmin(): Promise<boolean> {
   const { data } = await supabase.rpc('is_admin');
   return !!data;
 }
-export interface AdminExhibitor { id: string; name: string; email: string | null; business: string; approved: boolean; created_at: string; leads: number }
+export interface AdminExhibitor {
+  id: string; name: string; email: string | null; business: string; approved: boolean; created_at: string; leads: number;
+  /** The community list stays open for him after the admin closes it (0045). */
+  list_keep_open: boolean;
+}
 export async function adminExhibitors(): Promise<AdminExhibitor[]> {
   const { data, error } = await supabase.rpc('admin_exhibitors');
   if (error) throw error;

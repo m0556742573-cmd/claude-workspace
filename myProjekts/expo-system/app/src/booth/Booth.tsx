@@ -52,7 +52,7 @@ export interface BoothProps {
   wa?: boolean;
   /** A list visitor's phone and mail, from the server once his card is up (the tablet's copy of the list has none). */
   ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
-  /** The community list closed two days after the fair (1/11): a new visitor is typed. */
+  /** The admin closed the community list (0045, יצחק 3/11), and did not keep it open for him: a new visitor is typed. */
   listClosed?: boolean;
   /** Changing how the trial goes (2/11): its choice moved from the settings to the booth's own line. */
   onTrialChange?: () => void;
@@ -312,7 +312,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           {!current && !query.trim() && (
             <div className="empty">
               {listClosed
-                ? <>החיפוש ברשימת הקהילה נסגר יומיים אחרי האקספו.<br />מבקר חדש נרשם עם שם וטלפון שמקלידים.</>
+                ? <>החיפוש ברשימת הקהילה נסגר.<br />מבקר חדש נרשם עם שם וטלפון שמקלידים.</>
                 : <>כמה אותיות מהשם, ונגיעה בשם — הוא נשמר.<br />כל השאר רשות.</>}
               <div className="empty-acts">
                 {!desk && <button type="button" className="text-btn" onClick={newOne}>{listClosed ? 'להקליד את הפרטים שלו' : 'לא ברשימה? להקליד את הפרטים שלו'}</button>}

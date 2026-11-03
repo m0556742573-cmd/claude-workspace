@@ -3,7 +3,10 @@
 // for now it holds what the admin already had inside the booth: the exhibitors, their approval, and the two lists.
 // Same database and same pieces as the booth (lib/backend.ts, ui.tsx, styles.css); the server checks is_admin() on every call.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { adminApprove, adminCounts, adminExhibitors, adminPhase, adminSetPhase, adminSetWa, waOpenState, isAdmin, type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session } from '../lib/backend.ts';
+import {
+  adminApprove, adminCounts, adminExhibitors, adminListClosedAt, adminListKeepOpen, adminPhase, adminSetList, adminSetPhase, adminSetWa, waOpenState, isAdmin,
+  type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session,
+} from '../lib/backend.ts';
 import { Logo } from '../brand.tsx';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { MailCode } from '../signin.tsx';
@@ -184,12 +187,20 @@ function Exhibitors({ rows, reload }: { rows: AdminExhibitor[] | undefined; relo
   const shown = useMemo(() => (rows ?? [])
     .filter((r) => state === 'all' || (state === 'waiting' ? !r.approved : r.approved))
     .filter((r) => !q.trim() || [r.name, r.business, r.email ?? ''].some((x) => x.toLowerCase().includes(q.trim().toLowerCase()))), [rows, q, state]);
+  // Whether the community list is closed, only for the hint above the switch in each line.
+  const [closedAt, setClosedAt] = useState<string | null | undefined>(undefined);
+  useEffect(() => { adminListClosedAt().then(setClosedAt).catch(() => setClosedAt(undefined)); }, []);
   const head = <PageHead title="מציגים" sub={rows ? `${rows.length} נרשמו` : undefined} tip="כל מי שנכנס לדוכן. מי שלא ברשימת המארגן ממתין כאן לאישור." />;
   if (!rows) return <div className="page">{head}<p className="muted">טוען…</p></div>;
   const n = { all: rows.length, waiting: rows.filter((r) => !r.approved).length, approved: rows.filter((r) => r.approved).length };
   return (
     <div className="page">
       {head}
+      <p className="muted small">
+        {closedAt
+          ? <>רשימת הקהילה סגורה מ-{whenLabel(closedAt)}. רק מי שהמתג "הרשימה נשארת פתוחה לו" דולק אצלו עוד מוצא בה מבקרים.</>
+          : <>המתג "הרשימה נשארת פתוחה לו" משנה רק אחרי שסוגרים את רשימת הקהילה (במצב המערכת).</>}
+      </p>
       <div className="tb-bar">
         <input className="input tb-q" type="search" aria-label="חיפוש מציג" placeholder="חיפוש: שם, עסק, מייל" value={q} onChange={(e) => setQ(e.target.value)} />
         <nav className="tabs" aria-label="סינון">
@@ -201,7 +212,7 @@ function Exhibitors({ rows, reload }: { rows: AdminExhibitor[] | undefined; relo
       {shown.length ? (
         <div className="tb-wrap">
           <table className="tb">
-            <thead><tr><th>שם</th><th>עסק</th><th>מייל</th><th>מבקרים</th><th>נרשם</th><th>מצב</th><th /></tr></thead>
+            <thead><tr><th>שם</th><th>עסק</th><th>מייל</th><th>מבקרים</th><th>נרשם</th><th>מצב</th><th>הרשימה נשארת פתוחה לו</th><th /></tr></thead>
             <tbody>{shown.map((r) => <ExhibitorLine key={r.id} r={r} reload={reload} />)}</tbody>
           </table>
         </div>
@@ -213,6 +224,14 @@ function Exhibitors({ rows, reload }: { rows: AdminExhibitor[] | undefined; relo
 function ExhibitorLine({ r, reload }: { r: AdminExhibitor; reload: () => void }) {
   const [busy, setBusy] = useState(false);
   const set = async (ok: boolean) => { setBusy(true); try { await adminApprove(r.id, ok); reload(); } catch { alert('לא נשמר: אין חיבור כרגע.'); } finally { setBusy(false); } };
+  // The exception to the community list's closing (0045), for him alone; shown on the switch at once, kept by the server.
+  const [keep, setKeep] = useState(!!r.list_keep_open);
+  useEffect(() => { setKeep(!!r.list_keep_open); }, [r.list_keep_open]);
+  const toggleKeep = async () => {
+    const to = !keep;
+    setKeep(to); setBusy(true);
+    try { await adminListKeepOpen(r.id, to); reload(); } catch { setKeep(!to); alert('לא נשמר: אין חיבור כרגע.'); } finally { setBusy(false); }
+  };
   const d = new Date(r.created_at);
   return (
     <tr>
@@ -222,6 +241,10 @@ function ExhibitorLine({ r, reload }: { r: AdminExhibitor; reload: () => void })
       <td className="tnum">{r.leads}</td>
       <td className="tnum">{d.getDate()}/{d.getMonth() + 1}</td>
       <td>{r.approved ? 'מאושר' : <b className="late-c">ממתין</b>}</td>
+      <td>
+        <button type="button" className="switch" role="switch" aria-checked={keep} disabled={busy}
+          aria-label={`הרשימה נשארת פתוחה ל${r.name || 'מציג בלי שם'}`} onClick={toggleKeep} />
+      </td>
       <td className="adm-act">
         {r.approved
           ? <button type="button" className="btn ghost" disabled={busy} onClick={() => set(false)}>לבטל אישור</button>
@@ -301,8 +324,61 @@ function PhaseView() {
         </section>
       )}
       {done && <p className="note">{done}</p>}
+      <ListSwitch />
       <WaOpen />
     </div>
+  );
+}
+
+/** "19.11 בשעה 10:05", in this computer's time. */
+function whenLabel(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()}.${d.getMonth() + 1} בשעה ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** The community list (0045, יצחק 3/11: "בכפתור בניהול ולא לפי תאריך"): closed by a button, for all exhibitors at once,
+ *  and kept open for one from his line in "מציגים". Closing is asked in so many words before it is done; opening again
+ *  is not, since it changes nothing that was recorded. */
+function ListSwitch() {
+  const [closedAt, setClosedAt] = useState<string | null | undefined>(undefined);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = useCallback(() => { setMsg(''); adminListClosedAt().then(setClosedAt).catch(() => setMsg('לא נטען: אין חיבור כרגע.')); }, []);
+  useEffect(() => { load(); }, [load]);
+  async function set(closed: boolean) {
+    setBusy(true); setMsg('');
+    try {
+      setClosedAt(await adminSetList(closed));
+      setAsking(false);
+      setMsg(closed ? 'נסגרה. דוכן פתוח יתעדכן תוך חצי דקה.' : 'נפתחה מחדש לכל המציגים. מי שנרשם בזמן שהייתה סגורה נשאר עם הפרטים שהוקלדו.');
+    } catch (e) { setMsg('לא נשמר: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="panel-w">
+      <h2>רשימת הקהילה</h2>
+      <p className="muted">כל עוד היא פתוחה, המציגים מוצאים בה את המבקרים בחיפוש בדוכן. הסגירה היא לכולם בבת אחת. מציג שצריך אותה פתוחה: מתג בשורה שלו, ב"מציגים".</p>
+      {closedAt === undefined ? (msg ? null : <p className="muted">טוען…</p>) : (
+        <div className="switchrow">
+          <span>{closedAt ? <>סגורה מ-<b>{whenLabel(closedAt)}</b></> : <b>פתוחה</b>}</span>
+          {closedAt
+            ? <button type="button" className="btn" disabled={busy} onClick={() => set(false)}>{busy ? 'פותח…' : 'לפתוח מחדש'}</button>
+            : <button type="button" className="btn" disabled={busy || asking} onClick={() => { setAsking(true); setMsg(''); }}>לסגור עכשיו</button>}
+        </div>
+      )}
+      {asking && !closedAt && (
+        <section className="held">
+          <h2>לסגור את רשימת הקהילה עכשיו?</h2>
+          <p>מעכשיו המציגים לא ימצאו בה אף אחד. מבקר חדש יירשם רק עם שם וטלפון שהמציג מקליד. מי שכבר נאסף נשאר אצלם כמו שהוא.</p>
+          <div className="row">
+            <button type="button" className="btn primary" disabled={busy} onClick={() => set(true)}>{busy ? 'סוגר…' : 'כן, לסגור'}</button>
+            <button type="button" className="btn" disabled={busy} onClick={() => setAsking(false)}>לא</button>
+          </div>
+        </section>
+      )}
+      {msg && <p className="muted small" role="status">{msg}{closedAt === undefined && <> <button type="button" className="text-btn" onClick={load}>לנסות שוב</button></>}</p>}
+    </section>
   );
 }
 
