@@ -13,12 +13,15 @@ import { MailCode } from '../signin.tsx';
 import { ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
+import { OpsStrip, StatusView, TasksView, useWaitingCount, type Filter } from './ops.tsx';
 
 const BOOTH_URL = 'https://expomax.y-h-m.com';
 
-type View = 'overview' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
+type View = 'overview' | 'tasks' | 'status' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
 const MENU: [View, string, IconName][] = [
   ['overview', 'סקירה', 'home'],
+  ['tasks', 'משימות והחלטות', 'check'],
+  ['status', 'מצב הפלטפורמות', 'bars'],
   ['exhibitors', 'מציגים', 'leads'],
   ['lists', 'רשימות', 'tasks'],
   ['state', 'מצב המערכת', 'gear'],
@@ -88,6 +91,8 @@ function Shell({ email }: { email: string }) {
   const reload = useCallback(() => { adminExhibitors().then(setRows).catch((e) => setError(String(e.message ?? e))); }, []);
   useEffect(() => { reload(); }, [reload]);
   const waiting = rows?.filter((r) => !r.approved).length ?? 0;
+  const forYou = useWaitingCount();
+  const [taskFilter, setTaskFilter] = useState<Filter>('mine');
 
   return (
     <div className="adm">
@@ -99,6 +104,7 @@ function Shell({ email }: { email: string }) {
             <button key={v} type="button" className="nv" aria-current={view === v} onClick={() => go(v)}>
               <Icon name={icon} /><span className="nv-l">{label}</span>
               {v === 'exhibitors' && waiting > 0 && <span className="nv-s">{waiting} ממתינים</span>}
+              {v === 'tasks' && forYou > 0 && <span className="nv-s">{forYou} מחכים לך</span>}
             </button>
           ))}
         </div>
@@ -112,6 +118,8 @@ function Shell({ email }: { email: string }) {
       <main className="adm-main">
         {error && <p className="err">{error}</p>}
         {view === 'overview' && <Overview rows={rows} go={go} reload={reload} />}
+        {view === 'tasks' && <TasksView initial={taskFilter} />}
+        {view === 'status' && <StatusView onDates={() => { setTaskFilter('dates'); go('tasks'); }} />}
         {view === 'exhibitors' && <Exhibitors rows={rows} reload={reload} />}
         {view === 'lists' && (
           <div className="page narrow">
@@ -147,6 +155,7 @@ function Overview({ rows, go, reload }: { rows: AdminExhibitor[] | undefined; go
   return (
     <div className="page">
       {head}
+      <OpsStrip onTasks={() => go('tasks')} onStatus={() => go('status')} />
       <Tiles items={[[rows.length - waiting.length, 'מציגים מאושרים'], [waiting.length, 'ממתינים לאישור', waiting.length > 0], [leads, 'מבקרים שנרשמו'], [counts?.people ?? '—', 'ברשימת הקהילה']]}
         onPick={(k) => go(k === 'ברשימת הקהילה' ? 'lists' : 'exhibitors')} />
       <section>
