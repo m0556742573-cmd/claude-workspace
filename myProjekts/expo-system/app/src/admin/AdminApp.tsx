@@ -14,14 +14,16 @@ import { ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
 import { OpsStrip, StatusView, TasksView, useWaitingCount, type Filter } from './ops.tsx';
+import { RunbookView } from './runbook.tsx';
 
 const BOOTH_URL = 'https://expomax.y-h-m.com';
 
-type View = 'overview' | 'tasks' | 'status' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
+type View = 'overview' | 'tasks' | 'status' | 'runbook' | 'exhibitors' | 'lists' | 'state' | 'keys' | 'broadcast';
 const MENU: [View, string, IconName][] = [
   ['overview', 'סקירה', 'home'],
   ['tasks', 'משימות והחלטות', 'check'],
   ['status', 'מצב הפלטפורמות', 'bars'],
+  ['runbook', 'מה עושים כש…', 'help'],
   ['exhibitors', 'מציגים', 'leads'],
   ['lists', 'רשימות', 'tasks'],
   ['state', 'מצב המערכת', 'gear'],
@@ -120,6 +122,7 @@ function Shell({ email }: { email: string }) {
         {view === 'overview' && <Overview rows={rows} go={go} reload={reload} />}
         {view === 'tasks' && <TasksView initial={taskFilter} />}
         {view === 'status' && <StatusView onDates={() => { setTaskFilter('dates'); go('tasks'); }} />}
+        {view === 'runbook' && <RunbookView />}
         {view === 'exhibitors' && <Exhibitors rows={rows} reload={reload} />}
         {view === 'lists' && (
           <div className="page narrow">

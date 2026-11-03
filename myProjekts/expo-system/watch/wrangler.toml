@@ -1,0 +1,22 @@
+# The watcher: checks the booth, the admin, the WhatsApp server and the site every 5 minutes from Cloudflare, writes
+# the result to the admin's status page, and mails when something falls or comes back (src/index.js).
+# Secrets, set once with `wrangler secret put`, never in git: WATCH_KEY (its sha256 is in ops.settings as
+# reporter:watch) and ALERT_TO (where the mail goes; a verified Email Routing destination on y-h-m.com).
+name = "expomax-watch"
+main = "src/index.js"
+compatibility_date = "2025-03-01"
+workers_dev = false
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+SUPABASE_URL = "https://fooofbweajfpiedfwilw.supabase.co"
+ALERT_FROM = "watch@y-h-m.com"
+# SUPABASE_KEY is the publishable key (public by design), passed at deploy time from app/.env.
+
+[[send_email]]
+name = "ALERT"
+
+[observability]
+enabled = true
