@@ -30,13 +30,16 @@ async function probe(c) {
   }
 }
 
+class Refused extends Error {}
 async function report(env, checks) {
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/ops_report`, {
     method: 'POST',
     headers: { apikey: env.SUPABASE_KEY, 'content-type': 'application/json' },
-    body: JSON.stringify({ p_key: env.WATCH_KEY, p_checks: checks }),
+    body: JSON.stringify({ p_key: (env.WATCH_KEY ?? '').trim(), p_checks: checks }),
     signal: AbortSignal.timeout(15_000),
   });
+  // 4xx: Supabase answered and refused (a wrong key, a changed function): our setup, not an outage.
+  if (r.status >= 400 && r.status < 500) throw new Refused(`ops_report ${r.status}: ${(await r.text()).slice(0, 160)}`);
   if (!r.ok) throw new Error(`ops_report ${r.status}`);
   return (await r.json()).changed ?? [];
 }
@@ -60,24 +63,23 @@ async function mail(env, subject, lines) {
   await env.ALERT.send(new EmailMessage(env.ALERT_FROM, env.ALERT_TO, raw));
 }
 
-/** Supabase down: one mail an hour at most, remembered in the Worker's cache. */
-async function onceAnHour(tag) {
-  const cache = caches.default;
-  const k = new Request(`https://watch.internal/${tag}`);
-  if (await cache.match(k)) return false;
-  await cache.put(k, new Response('1', { headers: { 'cache-control': 'max-age=3600' } }));
-  return true;
-}
+/** Supabase down: one mail an hour at most. The Worker has no storage of its own while the database is down, so the
+ *  hour is told by the clock: only the run in the first five minutes of each hour mails. */
+const firstRunOfHour = () => new Date().getUTCMinutes() < 5;
 
 const WORD = { ok: 'חזר לעבוד', warn: 'דורש תשומת לב', bad: 'נפל', unknown: 'לא ידוע', new: 'חדש' };
 
 async function run(env) {
   const checks = await Promise.all(CHECKS.map(probe));
+  console.log('checks', checks.map((c) => `${c.key}:${c.level}`).join(' '));
   let changed;
   try {
     changed = await report(env, checks);
+    console.log('reported, changed:', changed.length);
   } catch (e) {
-    if (await onceAnHour('supabase-down')) {
+    console.log('report failed:', String(e).slice(0, 200));
+    if (e instanceof Refused) return; // our own setup: seen in the log and on the status page going stale, not mailed as an outage
+    if (firstRunOfHour()) {
       await mail(env, 'אקספומקס: Supabase לא עונה', [
         'הבדיקה מבחוץ לא הצליחה לכתוב את המצב למסד הנתונים, כנראה ש-Supabase לא עונה.',
         'הדוכנים ממשיכים לרשום מבקרים בטאבלט, והכל יעלה כשהמסד יחזור.',
