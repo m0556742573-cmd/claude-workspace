@@ -23,5 +23,5 @@ ssh_run 'set -e; cd /opt/expo-ops; sed -i "s/\r$//" report.sh watchdog.sh; chmod
 ssh_run 'mkdir -p /opt/expo-backup && chmod 700 /opt/expo-backup'
 scp -i "$KEY" -q backup.sh backup-lib.sh backup-setup.sh backup-drill.sh "$HOST:/opt/expo-backup/"
 ssh_run 'set -e; cd /opt/expo-backup; sed -i "s/\r$//" *.sh; chmod 700 *.sh
-  printf "[profile path]\ns3 =\n    addressing_style = path\n" > aws.cfg
+  printf "[default]\ns3 =\n    addressing_style = path\n" > aws.cfg
   docker pull -q postgres:17-alpine >/dev/null'

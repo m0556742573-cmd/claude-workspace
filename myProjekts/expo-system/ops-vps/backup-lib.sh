@@ -7,7 +7,8 @@ R2_URL=https://bab64a51fa322ec341fcba14de231656.r2.cloudflarestorage.com
 BUCKET=expomax-backups   # made 4/11 in his Cloudflare account; R2 deletes what is older than 30 days (rule expire-30d)
 PG_IMAGE=postgres:17-alpine
 STATE=/var/lib/expo-ops  # report.sh reads backup.json and drill.json from here
-export AWS_CONFIG_FILE=/opt/expo-backup/aws.cfg   # profile "path": path-style addressing, which Supabase's S3 needs
+export AWS_CONFIG_FILE=/opt/expo-backup/aws.cfg   # path-style addressing, which Supabase's S3 needs. No --profile:
+                                                  # a named profile makes aws ignore the keys given in the environment
 
 # The free plan's database answers only on IPv6 directly, so we go through Supabase's session pooler (IPv4).
 pgpass() {
@@ -19,9 +20,9 @@ pg() {
     -e PGHOST="$PGHOST" -e PGPORT=5432 -e PGUSER="postgres.$REF" -e PGDATABASE=postgres "$PG_IMAGE" "$@"
 }
 
-sb_s3() { AWS_ACCESS_KEY_ID="$SB_S3_ID" AWS_SECRET_ACCESS_KEY="$SB_S3_SECRET" aws --profile path --region eu-central-1 \
+sb_s3() { AWS_ACCESS_KEY_ID="$SB_S3_ID" AWS_SECRET_ACCESS_KEY="$SB_S3_SECRET" aws --region eu-central-1 \
             --endpoint-url "https://$REF.storage.supabase.co/storage/v1/s3" s3 "$@"; }
-r2() { AWS_ACCESS_KEY_ID="$R2_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws --profile path --region auto \
+r2() { AWS_ACCESS_KEY_ID="$R2_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET" aws --region auto \
          --endpoint-url "$R2_URL" s3 "$@"; }
 
 GPG=(gpg --batch --yes --quiet --no-symkey-cache --pinentry-mode loopback --passphrase-fd 3)
