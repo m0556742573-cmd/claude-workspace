@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts the server's report and watchdog on the VPS (run from this folder, after his "תעלה"). Makes the server's own
+# Puts the server's report, watchdog and backup on the VPS (run from this folder, after his "תעלה"). Makes the server's own
 # key on the server, keeps it there (root only), and prints only its sha256, which goes into ops.settings as
 # 'reporter:server'. The publishable Supabase key comes from /opt/expo-wa/.env, where deploy.sh already put it.
 set -euo pipefail
@@ -18,3 +18,10 @@ ssh_run 'set -e; cd /opt/expo-ops; sed -i "s/\r$//" report.sh watchdog.sh; chmod
   . ./env; echo "reporter:server sha256: $(printf %s "$OPS_KEY" | sha256sum | cut -d" " -f1)"
   printf "* * * * * root /opt/expo-ops/watchdog.sh\n*/5 * * * * root /opt/expo-ops/report.sh\n" > /etc/cron.d/expo-ops
   chmod 644 /etc/cron.d/expo-ops'
+
+# The backup (4/11). Its keys are not here: he pastes them once in backup-setup.sh, which also sets its cron.
+ssh_run 'mkdir -p /opt/expo-backup && chmod 700 /opt/expo-backup'
+scp -i "$KEY" -q backup.sh backup-lib.sh backup-setup.sh backup-drill.sh "$HOST:/opt/expo-backup/"
+ssh_run 'set -e; cd /opt/expo-backup; sed -i "s/\r$//" *.sh; chmod 700 *.sh
+  printf "[profile path]\ns3 =\n    addressing_style = path\n" > aws.cfg
+  docker pull -q postgres:17-alpine >/dev/null'

@@ -42,6 +42,25 @@ add('wa.server', 'שרת הוואטסאפ: זיכרון וחשבונות', 'ok' 
 restarts = sh("cat " + state + "/restarts 2>/dev/null")
 add('wa.watchdog', 'הפעלה מחדש אוטומטית', 'warn' if restarts else 'ok', restarts or 'לא היה צורך', 'השומר בודק כל דקה, ומפעיל מחדש אחרי 3 כישלונות', platform='wa')
 
+# The backup (backup.sh, every 6 hours) and the drill (backup-drill.sh) leave their outcome in a file; the age is
+# judged here, so a backup that stopped running shows as one.
+from datetime import datetime, timezone
+def outcome(name):
+    try: return json.load(open(f'{state}/{name}.json'))
+    except Exception: return None
+b = outcome('backup')
+if b is None:
+    add('vps.backup', 'גיבוי (כל 6 שעות)', 'warn', 'עוד לא הוגדר', 'מחכה למפתחות: backup-setup.sh')
+else:
+    hours = (datetime.now(timezone.utc) - datetime.fromisoformat(b['at'])).total_seconds() / 3600
+    if b['level'] == 'ok' and hours > 7:
+        add('vps.backup', 'גיבוי (כל 6 שעות)', 'bad', f'לא רץ {int(hours)} שעות', f'האחרון: {b["value"]}')
+    else:
+        add('vps.backup', 'גיבוי (כל 6 שעות)', b['level'], b['value'], b.get('detail') or None)
+d = outcome('drill')
+add('vps.drill', 'ניסוי שחזור', d['level'] if d else 'warn', d['value'] if d else 'עוד לא נעשה',
+    d.get('detail') if d else 'backup-drill.sh: לפני 11/11, ואז פעם בחודש')
+
 reboot = os.path.exists('/var/run/reboot-required')
 add('vps.reboot', 'עדכון שמחכה לאתחול', 'warn' if reboot else 'ok', 'כן' if reboot else 'לא')
 up = int(float(open('/proc/uptime').read().split()[0]) // 86400)
