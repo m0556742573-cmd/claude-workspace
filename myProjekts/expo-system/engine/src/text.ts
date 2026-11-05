@@ -4,7 +4,7 @@
 // [שעות]) the exhibitor writes once, and it is filled into every message it appears in (יצחק, 29/10). Whatever is still
 // left in square brackets is a hole: a message with a hole is not sent.
 import type { Action, AgreedStep, LocalDate, Offer, Order, Path, Setup } from './model.ts';
-import { addDays, weekday } from './calendar.ts';
+import { addDays, hebrewDate, weekday } from './calendar.ts';
 import { fixtures } from '../fixtures/businesses.ts';
 
 export interface Me {
@@ -86,7 +86,6 @@ export function orderSummary(order: Order): string {
   return [`שלום [שם],`, `תודה על ההזמנה בתערוכה${order.offer ? `, במבצע "${order.offer}"` : ''}:`, ...lines, `סה"כ: ${money(order.total)}`, SIGN].join('\n');
 }
 
-const dayMonth = (d: LocalDate) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`;
 /**
  * The expo offer to a visitor who did not order at the booth (model §14א; my choice 1/11, not yet his): the items at
  * their expo price, until when, and how to order. The reminder goes the day before it ends.
@@ -94,7 +93,7 @@ const dayMonth = (d: LocalDate) => `${Number(d.slice(8, 10))}/${Number(d.slice(5
 export function offerText(offer: Offer, reminder: boolean): string {
   const what = offer.name ? `המבצע "${offer.name}"` : 'המבצע';
   const lines = offer.items.map((i) => `• ${i.name} · ${money(i.expoPrice)}${i.price > i.expoPrice ? ` במקום ${money(i.price)}` : ''}`);
-  const head = reminder ? `להזכיר, ${what} מהתערוכה בתוקף רק עד מחר:` : `${what} מהתערוכה בתוקף עד ${dayMonth(offer.until)}:`;
+  const head = reminder ? `להזכיר, ${what} מהתערוכה בתוקף רק עד מחר:` : `${what} מהתערוכה בתוקף עד ${hebrewDate(offer.until)}:`;
   return ['שלום [שם],', head, ...lines, 'להזמנה אפשר לענות להודעה הזו.', SIGN].join('\n');
 }
 
@@ -109,12 +108,13 @@ const WEEKDAY = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי
 const PART: Record<NonNullable<AgreedStep['part']>, string> = { morning: 'בבוקר', noon: 'בצהריים', evening: 'בערב' };
 /** What was agreed, as a noun, when the path has no words of its own for it. */
 export const AGREED_NOUN: Record<Action, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'שליחה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה' };
-/** A day as the visitor reads it, from the day the message goes: היום, מחר, יום רביעי; a week or more ahead, with its date. */
+/** A day as the visitor reads it, from the day the message goes: היום, מחר, יום רביעי; a week or more ahead, with its
+ *  Hebrew date (יצחק, 5/11: "רק תאריכים עבריים"): "יום שני, כ׳ בכסלו". */
 export function dayWords(on: LocalDate, from: LocalDate): string {
   if (on === from) return 'היום';
   if (on === addDays(from, 1)) return 'מחר';
   const far = on > addDays(from, 6);
-  return `יום ${WEEKDAY[weekday(on)]}${far ? `, ${Number(on.slice(8, 10))}/${Number(on.slice(5, 7))}` : ''}`;
+  return `יום ${WEEKDAY[weekday(on)]}${far ? `, ${hebrewDate(on)}` : ''}`;
 }
 /**
  * The confirmation line: "כמו שסיכמנו: מדידה בבית ביום רביעי בערב." A sensitive business says only when, never what;

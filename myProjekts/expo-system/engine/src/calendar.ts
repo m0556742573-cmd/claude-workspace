@@ -19,6 +19,48 @@ export function weekday(d: LocalDate): number {
   return toDate(d).getDay();
 }
 
+// ---------- dates as the exhibitor and the visitor read them: Hebrew only (יצחק, 5/11: "רק תאריכים עבריים").
+// From @hebcal/core, not the browser's Intl, so an old phone and the server write the same words.
+
+/** 7 → ז׳, 16 → ט״ז, 787 → תשפ״ז: a number in Hebrew letters, the way a date or a year is written. */
+export function hebNumber(n: number): string {
+  let s = '';
+  n %= 1000;
+  while (n >= 400) { s += 'ת'; n -= 400; }
+  if (n >= 100) { s += ' קרש'[Math.floor(n / 100)]; n %= 100; }
+  s += n === 15 ? 'טו' : n === 16 ? 'טז'
+    : ['', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ'][Math.floor(n / 10)]! + ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'][n % 10]!;
+  return s.length > 1 ? `${s.slice(0, -1)}״${s.slice(-1)}` : `${s}׳`;
+}
+
+function monthName(month: number, year: number): string {
+  if (month === months.ADAR_I) return HDate.isLeapYear(year) ? 'אדר א׳' : 'אדר';
+  if (month === months.ADAR_II) return 'אדר ב׳';
+  return {
+    [months.NISAN]: 'ניסן', [months.IYYAR]: 'אייר', [months.SIVAN]: 'סיון', [months.TAMUZ]: 'תמוז', [months.AV]: 'אב',
+    [months.ELUL]: 'אלול', [months.TISHREI]: 'תשרי', [months.CHESHVAN]: 'חשוון', [months.KISLEV]: 'כסלו',
+    [months.TEVET]: 'טבת', [months.SHVAT]: 'שבט',
+  }[month]!;
+}
+
+export interface HebrewDay {
+  /** 1–30 */ day: number;
+  /** כסלו, אדר ב׳ */ month: string;
+  /** 5787 */ year: number;
+  /** The civil date of the 1st of this Hebrew month, and how many days the month has. */
+  monthStart: LocalDate; monthDays: number;
+}
+export function hebrewDay(d: LocalDate): HebrewDay {
+  const h = new HDate(toDate(d));
+  const m = h.getMonth(), y = h.getFullYear();
+  return { day: h.getDate(), month: monthName(m, y), year: y, monthStart: fromDate(new HDate(1, m, y).greg()), monthDays: HDate.daysInMonth(m, y) };
+}
+/** "ו׳ בכסלו", or with the year "ו׳ בכסלו תשפ״ז". */
+export function hebrewDate(d: LocalDate, withYear = false): string {
+  const h = hebrewDay(d);
+  return `${hebNumber(h.day)} ב${h.month}${withYear ? ` ${hebNumber(h.year)}` : ''}`;
+}
+
 const MONTH: Record<HebrewMonth, number> = {
   tishrei: months.TISHREI, cheshvan: months.CHESHVAN, kislev: months.KISLEV, tevet: months.TEVET,
   shvat: months.SHVAT, adar: months.ADAR_I, nisan: months.NISAN, iyyar: months.IYYAR,
