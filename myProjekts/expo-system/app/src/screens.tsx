@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { MINUTES, TRIED, addDays, fitDay, goOnId, nextOccurrence, nextTask, pathAhead, rankOf, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
+import { CONFIRM, MINUTES, TRIED, addDays, agreedLine, confirmText, withAgreed, fitDay, goOnId, nextOccurrence, nextTask, pathAhead, rankOf, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import * as text from './lib/describe.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { DateField, Icon, PageHead, Tiles, longDate } from './ui.tsx';
@@ -19,7 +19,7 @@ import { asFile, detailsIn, draftFor, fileValue, filesIn, fill, holes, messagesO
 import type { Person } from './demo/people.ts';
 import type { LocalLead, LocalNote } from './store/local.ts';
 import {
-  addFollowNote, addManual, moveManual, markReplied, setupVersions, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, saveLead, adminApprove, adminExhibitors, engineLead, leadContact, loadBook, markStep, myGreeting,
+  addFollowNote, addManual, moveManual, markReplied, setAgreed, setupVersions, setupOf, adminClearPeople, adminCounts, adminLoadExhibitors, adminLoadPeople, allContacts, removeLead, saveLead, adminApprove, adminExhibitors, engineLead, leadContact, loadBook, markStep, myGreeting,
   loadTexts, queueSend, queuedFor, recordSent, updateMe, uploadFile, fileUrl, uploadLogo, setBrand, mailNameFree, MAIL_DOMAIN, versionsInUse, signInMail, leadDestinations, addDestination, editOwn, setReceives, removeDestination, type Destination, removeManual, resetText, setWaOptions, saveText, setCustomerDate, unmarkStep, voiceUrl,
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
@@ -173,8 +173,16 @@ function useItems(ctx: Ctx, book: Book | undefined): Item[] {
   }, [book, ctx.setup, ctx.directory]);
 }
 const dueOf = (i: Item) => (i.next.kind === 'end' ? '9999' : i.next.dueOn);
-/** A message that goes by itself is not his to do (5/11, ב4): his lists show only what is his. */
-const goesAlone = (i: Item) => i.next.kind === 'task' && i.next.who === 'auto';
+const PART_WORD: Record<string, string> = { morning: 'בבוקר', noon: 'בצהריים', evening: 'בערב' };
+/** A message that goes by itself is not his to do (5/11, ב4): his lists show only what is his. Only while something can
+ *  send it: in practice, or when his WhatsApp is not linked (and he works with it), it stays his, to send by a tap. */
+const goesAlone = (i: Item, sending = true) => sending && i.next.kind === 'task' && i.next.who === 'auto';
+/** Whether the messages go by themselves now: live, and his WhatsApp linked and not stopped (or he works by mail). */
+function useSending(ctx: Ctx): boolean {
+  const [linked, setLinked] = useState<boolean | null>(null);
+  useEffect(() => { if (hasWa(ctx) && !ctx.exhibitor.wa_blocked_at) waOpen().then(setLinked).catch(() => setLinked(false)); }, [ctx.exhibitor.wa_blocked_at, ctx.exhibitor.whatsapp]);
+  return ctx.phase !== 'practice' && (!hasWa(ctx) || (!ctx.exhibitor.wa_blocked_at && linked === true));
+}
 /** His tasks in the order of his day (5/11, ב3): who wrote back, his star, a near date, the primary need, then the rest;
  *  within each the earlier due first, then whoever came to the booth first. */
 function inOrder(items: Item[]): Item[] {
@@ -182,17 +190,18 @@ function inOrder(items: Item[]): Item[] {
   const r = new Map(items.map((i) => [i, rankOf(i.setup, i.lead, i.next, t)]));
   return [...items].sort((a, b) => r.get(a)! - r.get(b)! || dueOf(a).localeCompare(dueOf(b)) || a.row.captured_at.localeCompare(b.row.captured_at));
 }
-function split(items: Item[]) {
-  const open = items.filter((i) => i.next.kind !== 'end' && !goesAlone(i)).sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+function split(items: Item[], sending = true) {
+  const open = items.filter((i) => i.next.kind !== 'end' && !goesAlone(i, sending)).sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
   return { open, now: inOrder(open.filter((i) => dueOf(i) <= today())), later: open.filter((i) => dueOf(i) > today()) };
 }
 /** How many messages go by themselves today. */
-const aloneToday = (items: Item[]) => items.filter((i) => goesAlone(i) && dueOf(i) <= today()).length;
+const aloneToday = (items: Item[], sending = true) => items.filter((i) => goesAlone(i, sending) && dueOf(i) <= today()).length;
 const minutesOf = (i: Item) => (i.next.kind === 'task' ? MINUTES[i.next.action] ?? 5 : 5);
 function short(n: Next): string {
   if (n.kind === 'end') return END[n.reason] ?? '';
   if (n.kind === 'askDate') return 'לברר את התאריך שלו';
   if (n.reply) return 'ענה לך · לחזור אליו';
+  if (n.agreed) return n.action === 'wait' ? 'סוכם: הוא חוזר אליך' : `סוכם בדוכן: ${n.label ?? ACT[n.action] ?? n.action}`;
   return `${ACT[n.action] ?? n.action} ${n.who === 'me' ? 'ממך' : 'אוטומטית'}`;
 }
 function greeting(): string {
@@ -205,6 +214,7 @@ function greeting(): string {
 export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const [book, reload, error] = useData(loadBook);
   const items = useItems(ctx, book);
+  const sending = useSending(ctx);
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
   const head = (
@@ -216,7 +226,7 @@ export function Home({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   );
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
-  const { now, later, open } = split(items);
+  const { now, later, open } = split(items, sending);
   const late = now.filter((i) => i.next.kind === 'task' && i.next.late).length;
   const week = open.filter((i) => dueOf(i) <= inDays(7)).length;
   const closed = items.filter((i) => i.next.kind === 'end' && i.next.reason === 'closed').length;
@@ -318,14 +328,15 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const [undo, setUndo] = useState<Undo | null>(null);
   const clearUndo = useCallback(() => setUndo(null), []);
   const [tab, setTab] = useState<'today' | 'week' | 'all'>('today');
+  const sending = useSending(ctx);
   const [q, setQ] = useState('');
   const [out, setOut] = useState<string | null>(null);
   const head = <PageHead title="משימות" eyebrow={eyebrowOf(desk)} tip="כל מה שעליך לעשות, לפי התאריך. הטלפון בסוף השורה פותח את הפעולות; נגיעה בשם פותחת את הדף שלו. אחרי כל פעולה אפשר לבטל אותה בתוך 10 שניות." />;
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
-  const { open, now } = split(items);
+  const { open, now } = split(items, sending);
   const t = today();
-  const alone = aloneToday(items);
+  const alone = aloneToday(items, sending);
   const counts = { today: now.length, week: open.filter((i) => dueOf(i) <= inDays(7)).length, all: open.length };
   const found = (i: Item) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()) || (i.row.note ?? '').includes(q.trim());
   const groups: { key: string; label: string; late?: boolean; of: Item[]; hint?: string }[] = [];
@@ -438,18 +449,23 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     setBusy(false); onChange();
   }
 
+  // What was agreed at the booth, as the visitor reads it in the message that carries it (5/11, א1).
+  const agreed = item.lead.agreed && !('deal' in item.lead.agreed) ? item.lead.agreed : undefined;
+  const confirmLine = next.kind === 'task' && next.confirm && agreed ? agreedLine(agreed, item.setup.sensitive, today()) : null;
   const isTalk = next.kind === 'task' && (next.action === 'talk' || next.action === 'meet');
   const isWait = next.kind === 'task' && next.action === 'wait';
   const isAuto = next.kind === 'task' && next.who === 'auto';
   const late = next.kind === 'task' && next.late;
-  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו' : next.reply ? (hasWa(ctx) ? 'ענה לך בוואטסאפ — לחזור אליו' : 'ענה לך — לחזור אליו') : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
+  const what = next.kind === 'askDate' ? 'לברר מתי התאריך שלו'
+    : next.agreed ? (next.action === 'wait' ? 'סוכם בדוכן שהוא חוזר אליך. לבדוק אם חזר' : `סוכם בדוכן: ${next.label ?? ACT[next.action] ?? next.action}${next.part ? ` ${PART_WORD[next.part]}` : ''}`)
+    : next.reply ? (hasWa(ctx) ? 'ענה לך בוואטסאפ — לחזור אליו' : 'ענה לך — לחזור אליו') : `${ACT[next.action] ?? next.action}${next.message ? ` · ${next.message}` : ''}`;
   const tall = held ? ' tall' : '';
 
   return (
     <Frame bare={bare} className={held ? 'held next-card' : 'task'}>
       {!bare && <div className="nc-who"><h2>{name}</h2> <span className="muted">{[item.city, owner ? 'בעל עסק' : '', row.taps.join(' · '), row.booth_order ? `הזמין · ${row.booth_order.total} ₪` : ''].filter(Boolean).join(' · ')}</span></div>}
       <div className="nc-now">
-        <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w"> באיחור</span>}
+        <span className="faint">{next.dueOn <= today() ? 'עכשיו' : dayLabel(next.dueOn)}</span> <b>{what}</b>{late && <span className="late-w">{next.kind === 'task' && next.agreed ? ` · הבטחת לו את זה ל${dayLabel(next.wasDue ?? next.dueOn)}` : ' באיחור'}</span>}
         {isAuto && (ctx.phase === 'practice'
           ? <div className="faint small">{ctx.exhibitor.trial_send ? 'בניסיון היא יוצאת אליך, לא למבקר.' : 'בניסיון לא יוצא כלום. במצב אמיתי היא תצא לבד.'}</div>
           : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} wa={hasWa(ctx)} />)}
@@ -457,8 +473,10 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
       {next.kind === 'task' && next.byHand && <div className="faint small">אין לאן לשלוח לו הודעות, אז זו שיחה: לספר לו מה כתוב בהודעה.</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
-      {next.kind === 'task' && next.message && !talk
-        ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={next.message} dests={dests} />
+      {next.kind === 'task' && next.stepId === CONFIRM && confirmLine && !talk
+        ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={CONFIRM} text={confirmText(confirmLine)} dests={dests} />
+        : next.kind === 'task' && next.message && !talk
+        ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={next.message} addLine={confirmLine ?? undefined} dests={dests} />
         : ownPhone && ctx.phase !== 'practice' && (
           <div className="row">
             <a className="btn" href={`tel:${ownPhone}`}><Icon name="phone" />{maskDestination(ownPhone)}</a>
@@ -529,11 +547,13 @@ function Frame({ bare, className, children }: { bare?: boolean; className: strin
  *  A text with a hole left in it does not go out; it sends him to fill it first. */
 /** setup: the version the lead follows (30/10: the active one showed, and sent by a tap, another text than the server's). */
 /** text: a message the system has of its own (beside "לא ענה"); his own wording of it, if he wrote one, comes first. */
-export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, text: own, dests, onSent }: { ctx: Ctx; setup?: Setup; leadId: string; name: string; messageId: string; text?: string; dests: Destination[] | null; onSent?: () => void }) {
+/** addLine: what was agreed at the booth, right after the greeting (5/11, א1). */
+export function SendRow({ ctx, setup = ctx.setup, leadId, name, messageId, text: own, addLine, dests, onSent }: { ctx: Ctx; setup?: Setup; leadId: string; name: string; messageId: string; text?: string; addLine?: string; dests: Destination[] | null; onSent?: () => void }) {
   const texts = useTexts();
   const me = useMe(ctx);
   const [shown, setShown] = useState(false);
-  const raw = own !== undefined ? (texts?.[messageId] ?? own) : textOf(setup, texts, messageId);
+  const base = own !== undefined ? (texts?.[messageId] ?? own) : textOf(setup, texts, messageId);
+  const raw = addLine ? withAgreed(base, addLine) : base;
   const body = fill(raw, me, name);
   const missing = holes(body);
   // Files go with the message from his WhatsApp; a tap can carry text only, so there they go as links.
@@ -1004,6 +1024,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
           <span className="key"><span className="faint">מצב</span><b>{stateWord || '—'}</b></span>
           <span className="key"><span className="faint">נרשם</span><b>{dayLabel(row.captured_on)}</b></span>
           {row.customer_date && <span className="key"><span className="faint">התאריך שלו</span><b>{ddmm(row.customer_date)}</b></span>}
+          {row.agreed && <span className="key"><span className="faint">סוכם בדוכן</span><b>{'deal' in row.agreed ? 'סגרנו כאן' : `${row.agreed.who === 'him' ? 'הוא חוזר אליך עד' : row.agreed.label ?? ACT[row.agreed.action]} ${dayLabel(row.agreed.on)}${row.agreed.part ? ` ${PART_WORD[row.agreed.part]}` : ''}`}</b></span>}
           <span className="key"><span className="faint">קשר אחרון</span><b>{lastTouch ? dayLabel(lastTouch) : 'עוד לא היה קשר'}</b></span>
         </div>
         {next.kind !== 'end' ? (
@@ -1015,6 +1036,12 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
             {!finished && (talk
               ? <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
               : <div className="actions"><button type="button" className="btn" onClick={() => setTalk(true)}>דיברנו — מה הלאה</button></div>)}
+          </div>
+        )}
+        {row.agreed && !('deal' in row.agreed) && !steps.some((x) => x.step_id === 'agreed') && (
+          <div className="row agreed-edit">
+            <DateField label="להזיז את מה שסוכם" value={row.agreed.on} min={today()} onChange={(v) => { if (v && row.agreed && !('deal' in row.agreed)) setAgreed(row, { ...row.agreed, on: v }, ctx.exhibitor.id, item.setup, owner, today()).then(onChange, () => alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.')); }} />
+            <button type="button" className="text-btn" onClick={() => { if (confirm('לבטל את מה שסוכם בדוכן? המסלול יחזור להיות כמו שהוא.')) setAgreed(row, null, ctx.exhibitor.id, item.setup, owner, today()).then(onChange, () => alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.')); }}>לבטל את מה שסוכם</button>
           </div>
         )}
         <div className="actions rec-acts">

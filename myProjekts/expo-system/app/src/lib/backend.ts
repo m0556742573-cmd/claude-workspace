@@ -2,7 +2,7 @@
 // without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
 import { notifySaved } from './saved.ts';
 import { createClient, type Session } from '@supabase/supabase-js';
-import { nextTask, type Action, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
+import { nextTask, type Action, type Agreed, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, getLead, nextRev, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import { destinationOf, type Typed } from './destination.ts';
 import type { FileRef } from '@expo/engine';
@@ -155,6 +155,8 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
     // The star (5/11, א2) goes up only once he touched it, so a card from before the change uploads as it did.
     ...(l.star !== undefined ? { starred: l.star } : {}),
+    // What was agreed (5/11, א1), once he touched it; taken back = null.
+    ...('agreed' in l ? { agreed: l.agreed ?? null } : {}),
     ...(l.order ? { booth_order: l.order } : {}),
     // A list phone or mail corrected on the card stops receiving; the CRM's own switch is left alone otherwise.
     ...(l.ownOff ? { own_phone_on: l.ownOff.includes('phone') ? false : null, own_email_on: l.ownOff.includes('email') ? false : null } : {}),
@@ -292,6 +294,8 @@ export interface LeadRow {
   booth_order: Order | null;
   /** The exhibitor's star at the booth (5/11, א2). */
   starred?: boolean | null;
+  /** What was agreed with him at the booth (5/11, א1, "מה סיכמנו"). */
+  agreed?: Agreed | null;
 }
 export interface TaskRow {
   lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
@@ -390,7 +394,7 @@ export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & 
     booth: row.booth_message ? { message: row.booth_message } : row.booth_none ? {} : undefined,
     history,
     manual: book.manual.filter((m) => m.lead_id === row.id).map((m): ManualStep => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
-    reach: book.reach?.[row.id], star: !!row.starred,
+    reach: book.reach?.[row.id], star: !!row.starred, ...(row.agreed ? { agreed: row.agreed } : {}),
   };
 }
 
@@ -520,6 +524,13 @@ export async function removeManual(row: LeadRow, id: string, exhibitorId: string
   const { error } = await supabase.from('manual_steps').delete().eq('id', id);
   if (error) throw error;
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
+
+/** What was agreed at the booth, changed or taken back on the lead's page (5/11, א1). */
+export async function setAgreed(row: LeadRow, agreed: Agreed | null, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('leads').update({ agreed }).eq('id', row.id);
+  if (error) throw error;
+  await recompute({ ...row, agreed }, exhibitorId, setup, businessOwner, onDay);
 }
 
 /** He found out the visitor's date (the wedding, the event): the path continues from it. */

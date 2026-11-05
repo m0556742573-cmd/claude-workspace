@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CONSENT, immediateMessage, messagesOf, nextTask, type Offer, type Order, type Setup } from '@expo/engine';
+import { AGREED_NOUN, CONSENT, addDays, agreeable, choosePath, immediateMessage, isRestDay, matches, messagesOf, nextTask, replacesFor, weekday, type Action, type AgreedStep, type Offer, type Order, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -362,12 +362,13 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </>
           )}
 
-          {messages.length > 0 && <SendLine key={current.id} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
+          {messages.length > 0 && <SendLine key={`send:${current.id}`} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
             checked={checked[current.id]} unreachable={reachOf[current.id] === false}
             onAdd={() => setAddAsk((n) => n + 1)} onHand={() => { change({ booth: {} }); say('נרשם: נתת לו ביד'); }} />}
 
-          <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, { ...current, reach: reachOf[current.id] ?? undefined }, today()))}</b></div>
+          <AgreedLine key={`agreed:${current.id}`} lead={current} setup={setup} reach={reachOf[current.id] ?? undefined} offer={!!offer && offer.items.length > 0}
+            onAgree={(agreed) => { change({ agreed }); if (agreed && 'deal' in agreed) say(`סגרתם: ${current.name}`); }} onOrder={() => setOrdering(true)} />
 
           {lastNote && <NotePeek note={lastNote} count={myNotes.length} />}
           {noteOpen && (
@@ -690,6 +691,93 @@ function HelpDot() {
 }
 
 /** The last note on the open card, in a grey strip; a recording can be heard from it. */
+// ---------- "מה סיכמנו" (יצחק, 5/11: "אוקיי מקבל", then "כן להכל"): the card's "what next" becomes a question with days
+// under it; a tap on a day means it was agreed. Checked against the 109 businesses of the lab: in about 77 the path
+// already knows what is done, and what is missing is when. With a queue nobody has to touch it: the path runs as before.
+
+const LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+const PARTS: [NonNullable<AgreedStep['part']>, string][] = [['morning', 'בבוקר'], ['noon', 'בצהריים'], ['evening', 'בערב']];
+/** Today, tomorrow, and the next four days that are not Shabbat or Yom Tov: a Friday may be chosen. */
+function dayChips(from: string): { on: string; label: string }[] {
+  const out: { on: string; label: string }[] = [];
+  for (let d = from; out.length < 6; d = addDays(d, 1)) {
+    if (isRestDay(d)) continue;
+    out.push({ on: d, label: d === from ? 'היום' : d === addDays(from, 1) ? 'מחר' : LETTER[weekday(d)]! });
+  }
+  return out;
+}
+
+function AgreedLine({ lead, setup, reach, offer, onAgree, onOrder }: { lead: LocalLead; setup: Setup; reach?: boolean; offer: boolean;
+  onAgree: (a: LocalLead['agreed']) => void; onOrder: () => void }) {
+  const t = today();
+  const a = lead.agreed;
+  const deal = !!a && 'deal' in a;
+  const step = a && !('deal' in a) ? a : undefined;
+  const suggested = agreeable(setup, lead);
+  const [what, setWhat] = useState<{ action: Action; label?: string }>(step ? { action: step.action, label: step.label } : suggested ?? { action: 'talk' });
+  const [who, setWho] = useState<AgreedStep['who']>(step?.who ?? 'me');
+  const [changing, setChanging] = useState(false);
+  // What he can agree on instead: the path's own steps of his, in its words, then the plain kinds.
+  const choices = useMemo(() => {
+    const { path } = choosePath(setup, lead);
+    const own = path.steps.filter((x) => matches(x.onlyIf, lead.taps) && x.who === 'me' && x.action !== 'wait' && x.action !== 'check')
+      .map((x) => ({ action: x.action, label: x.label }));
+    const plain = (['talk', 'meet', 'send', 'prepare'] as Action[]).map((action) => ({ action, label: undefined as string | undefined }));
+    const seen = new Set<string>();
+    return [...own, ...plain].filter((c) => { const k = c.label ?? AGREED_NOUN[c.action]; if (seen.has(k)) return false; seen.add(k); return true; });
+  }, [setup, lead]);
+  const words = (c: { action: Action; label?: string }) => c.label ?? AGREED_NOUN[c.action];
+  const agree = (on: string, w = what, by = who) =>
+    onAgree({ action: w.action, ...(w.label ? { label: w.label } : {}), on, ...(step?.part ? { part: step.part } : {}), who: by, replaces: replacesFor(setup, lead, w.action) });
+  // A day tapped again takes it back.
+  const pick = (on: string) => (step && step.on === on ? onAgree(undefined) : agree(on));
+  const next = nextTask(setup, { ...lead, reach }, t);
+
+  if (deal) {
+    return (
+      <div className="agreed">
+        <div className="agreed-q"><span className="label">מה סיכמנו?</span> <b>סגרנו כאן</b>
+          <button type="button" className="text-btn" onClick={() => onAgree(undefined)}>לבטל</button></div>
+      </div>
+    );
+  }
+  return (
+    <div className="agreed">
+      <div className="agreed-q">
+        <span className="label">מה סיכמנו?</span> <b>{who === 'him' ? 'הוא חוזר אליך עד' : words(step ?? what)}</b>
+        {step && <span className="faint small"> · {who === 'him' ? 'אם לא, ביום שאחרי תבדוק' : 'סוכם, ויופיע אצלך ראשון'}</span>}
+      </div>
+      <div className="chips">
+        {dayChips(t).map((d) => <button key={d.on} type="button" className="chip" aria-pressed={step?.on === d.on} onClick={() => pick(d.on)}>{d.label}</button>)}
+        <DateField label="תאריך" value={step?.on ?? ''} min={t} onChange={(v) => v && agree(v)} />
+        <button type="button" className="text-btn" aria-expanded={changing} onClick={() => setChanging(!changing)}>לשנות</button>
+      </div>
+      {step && step.who === 'me' && (
+        <div className="chips">
+          {PARTS.map(([p, l]) => <button key={p} type="button" className="chip" aria-pressed={step.part === p} onClick={() => onAgree({ ...step, part: step.part === p ? undefined : p })}>{l}</button>)}
+        </div>
+      )}
+      {changing && (
+        <div className="agreed-more">
+          <div className="chips">
+            {choices.map((c) => (
+              <button key={words(c)} type="button" className="chip" aria-pressed={who === 'me' && words(c) === words(step ?? what)}
+                onClick={() => { setWhat(c); setWho('me'); if (step) agree(step.on, c, 'me'); }}>{words(c)}</button>
+            ))}
+          </div>
+          <div className="chips">
+            <button type="button" className="chip" aria-pressed={who === 'me'} onClick={() => { setWho('me'); if (step) agree(step.on, what, 'me'); }}>אני חוזר אליו</button>
+            <button type="button" className="chip" aria-pressed={who === 'him'} onClick={() => { setWho('him'); if (step) agree(step.on, what, 'him'); }}>הוא חוזר אליי עד…</button>
+            {offer ? <button type="button" className="chip" onClick={onOrder}>סגרנו כאן: לבחור מהמבצע</button>
+              : <button type="button" className="chip" onClick={() => onAgree({ deal: true })}>סגרנו כאן</button>}
+          </div>
+        </div>
+      )}
+      {!step && <div className="faint small">בלי סיכום: {describe(next)}</div>}
+    </div>
+  );
+}
+
 function NotePeek({ note, count }: { note: LocalNote; count: number }) {
   const url = useMemo(() => (note.audio ? URL.createObjectURL(note.audio) : null), [note.audio]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);

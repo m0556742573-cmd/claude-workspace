@@ -193,3 +193,16 @@ test('ב4 (5/11): no way to reach him — the planner sends nothing, and the mes
   assert.equal(due(mail, FAIR, [], { wa: true, mail: true }).length, 1);
   assert.deepEqual(morningOf(mail, FAIR).tasks, []);
 });
+
+test('א1 (5/11): what was agreed rides on the visit-day message; with none that day, the confirmation goes alone', () => {
+  const agreed = { action: 'talk' as const, on: '2026-11-18', part: 'evening' as const, who: 'me' as const, replaces: ['call'] };
+  const d = due(plan({ leads: [{ ...lead, agreed }] }), FAIR, []);
+  assert.equal(d.length, 1);
+  assert.equal(d[0]!.step, 'how');
+  assert.equal(d[0]!.body.split('\n')[1], 'כמו שסיכמנו: שיחה ביום רביעי בערב.');
+  // No message that day (the booth chose none now): the confirmation by itself, once.
+  const alone = due(plan({ leads: [{ ...lead, booth_none: true, agreed }] }), FAIR, []);
+  assert.equal(alone[0]?.step, 'confirm');
+  assert.match(alone[0]!.body, /^שלום יעקב,\nכמו שסיכמנו: שיחה ביום רביעי בערב\.\nיצחק, מכולת · 050-0000000$/);
+  assert.equal(due(plan({ leads: [{ ...lead, booth_none: true, agreed }], planned: ['a|confirm'] }), FAIR, []).length, 0);
+});

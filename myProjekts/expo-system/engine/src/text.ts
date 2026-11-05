@@ -3,7 +3,8 @@
 // the exhibitor's own edit (table message_templates) replaces them. Every other detail in square brackets ([כתובת],
 // [שעות]) the exhibitor writes once, and it is filled into every message it appears in (יצחק, 29/10). Whatever is still
 // left in square brackets is a hole: a message with a hole is not sent.
-import type { LocalDate, Offer, Order, Path, Setup } from './model.ts';
+import type { Action, AgreedStep, LocalDate, Offer, Order, Path, Setup } from './model.ts';
+import { addDays, weekday } from './calendar.ts';
 import { fixtures } from '../fixtures/businesses.ts';
 
 export interface Me {
@@ -100,6 +101,40 @@ export function offerText(offer: Offer, reminder: boolean): string {
 /** A week after an order at the booth (my choice 1/11, not yet his): did it arrive, and is all well. */
 export function orderCheckText(): string {
   return ['שלום [שם],', 'רציתי לוודא שההזמנה מהתערוכה הגיעה, ושהכל בסדר. אם משהו חסר או לא מסתדר, אפשר לענות כאן.', SIGN].join('\n');
+}
+
+// ---------- the visitor's confirmation of what was agreed at the booth (5/11, א1; my wording, a default he can see)
+
+const WEEKDAY = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const PART: Record<NonNullable<AgreedStep['part']>, string> = { morning: 'בבוקר', noon: 'בצהריים', evening: 'בערב' };
+/** What was agreed, as a noun, when the path has no words of its own for it. */
+export const AGREED_NOUN: Record<Action, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'שליחה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה' };
+/** A day as the visitor reads it, from the day the message goes: היום, מחר, יום רביעי; a week or more ahead, with its date. */
+export function dayWords(on: LocalDate, from: LocalDate): string {
+  if (on === from) return 'היום';
+  if (on === addDays(from, 1)) return 'מחר';
+  const far = on > addDays(from, 6);
+  return `יום ${WEEKDAY[weekday(on)]}${far ? `, ${Number(on.slice(8, 10))}/${Number(on.slice(5, 7))}` : ''}`;
+}
+/**
+ * The confirmation line: "כמו שסיכמנו: מדידה בבית ביום רביעי בערב." A sensitive business says only when, never what;
+ * "he gets back to me": that he waits to hear by then.
+ */
+export function agreedLine(a: AgreedStep, sensitive: boolean, from: LocalDate): string {
+  const day = dayWords(a.on, from);
+  const at = `${day === 'היום' || day === 'מחר' ? day : `ב${day}`}${a.part ? ` ${PART[a.part]}` : ''}`;
+  if (a.who === 'him') return `כמו שסיכמנו, אחכה לשמוע ממך עד ${day}.`;
+  if (sensitive) return `כמו שסיכמנו, נהיה בקשר ${at}.`;
+  return `כמו שסיכמנו: ${a.label ?? AGREED_NOUN[a.action]} ${at}.`;
+}
+/** The line inside the first message of the visit day, right after its greeting: one message, never two. */
+export function withAgreed(body: string, line: string): string {
+  const [first, ...rest] = body.split('\n');
+  return /^(שלום|בס"ד|לכבוד)/.test(first ?? '') ? [first, line, ...rest].join('\n') : [line, body].join('\n');
+}
+/** The confirmation on its own, when no message goes on the visit day. */
+export function confirmText(line: string): string {
+  return ['שלום [שם],', line, SIGN].join('\n');
 }
 
 /** The template id of the message beside "לא ענה" (יצחק, 5/11), in the outbox. */

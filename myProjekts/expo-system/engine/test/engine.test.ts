@@ -356,3 +356,70 @@ test('his day: a reply first, then a star, then a near date, then the primary ne
   assert.deepEqual([day.fits.length, day.over.length], [5, 2]);
   assert.deepEqual(fitDay(['m', 'm'], () => 30, 20), { fits: ['m'], over: ['m'] });
 });
+
+// ---- א1 (5/11): "מה סיכמנו" — the agreed step takes the place of the path's, keeps its day, and the visitor is told once
+
+const visiting = setup({ needs: [{ label: 'מטבח', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [
+  { id: 'material', action: 'send', who: 'auto', message: 'תמונות', timing: { kind: 'after', days: 0 } },
+  { id: 'call', action: 'talk', who: 'me', label: 'שיחה לתיאום', timing: { kind: 'after', days: 2 } },
+  { id: 'visit', action: 'meet', who: 'me', label: 'מדידה בבית', timing: { kind: 'after', days: 4 } },
+  { id: 'quote', action: 'prepare', who: 'me', timing: { kind: 'after', days: 2 } },
+], end: { kind: 'list' } } }] }] });
+
+test('agreed at the booth: the confirmation rides on the visit-day message, then his promise, then the path after it', async () => {
+  const { agreeable, replacesFor } = await import('../src/index.ts');
+  const l = lead(['מטבח']);
+  assert.deepEqual(agreeable(visiting, l), { action: 'talk', label: 'שיחה לתיאום' });
+  // A measurement agreed for Friday 20/11: the call to set it and the measurement itself are both taken.
+  const replaces = replacesFor(visiting, l, 'meet');
+  assert.deepEqual(replaces, ['call', 'visit']);
+  l.agreed = { action: 'meet', label: 'מדידה בבית', on: '2026-11-20', part: 'evening', who: 'me', replaces };
+  const first = nextTask(visiting, l, EXPO) as { stepId: string; confirm?: boolean; who: string };
+  assert.equal(first.stepId, 'material');
+  assert.equal(first.confirm, true);
+  l.history.push(rec('material', EXPO));
+  // A Friday agreed stays Friday (a call of the path would move to Sunday).
+  assert.deepEqual(nextTask(visiting, l, EXPO), { kind: 'task', stepId: 'agreed', action: 'meet', who: 'me', dueOn: '2026-11-20', late: false, agreed: true, label: 'מדידה בבית', part: 'evening' });
+  // Done: the path goes on from what was not taken (the quote), not with another call to set the measurement.
+  l.history.push(rec('agreed', '2026-11-20'));
+  assert.equal((nextTask(visiting, l, '2026-11-20') as { stepId: string }).stepId, 'quote');
+});
+
+test('agreed: without a visit-day message the confirmation goes by itself; none from a business that sends nothing', () => {
+  const quiet = setup({ needs: [{ label: 'שידוך', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [
+    { id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 3 } }], end: { kind: 'stop' } } }] }] });
+  const a = { action: 'talk' as const, on: '2026-11-18', who: 'me' as const, replaces: ['call'] };
+  // This business sends no message at all: no confirmation, the promise is first.
+  assert.equal((nextTask(quiet, lead(['שידוך'], { agreed: a }), EXPO) as { stepId: string }).stepId, 'agreed');
+  // A business that does send, with nothing on the visit day: the confirmation alone, then the promise.
+  const sends = setup({ needs: [{ label: 'שידוך', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [
+    { id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 3 } },
+    { id: 'later', action: 'send', who: 'auto', message: 'עדכון', timing: { kind: 'after', days: 30 } }], end: { kind: 'stop' } } }] }] });
+  const l = lead(['שידוך'], { agreed: a });
+  assert.deepEqual(nextTask(sends, l, EXPO), { kind: 'task', stepId: 'confirm', action: 'send', who: 'auto', dueOn: EXPO, late: false, confirm: true });
+  l.history.push(rec('confirm', EXPO));
+  assert.equal((nextTask(sends, l, EXPO) as { stepId: string }).stepId, 'agreed');
+  // A visitor no message reaches was told in person: no confirmation.
+  assert.equal((nextTask(sends, lead(['שידוך'], { agreed: a, reach: false }), EXPO) as { stepId: string }).stepId, 'agreed');
+});
+
+test('agreed: "he gets back to me by Thursday" waits, and checks the day after; "סגרנו כאן" is a deal', async () => {
+  const { rankOf } = await import('../src/index.ts');
+  const l = lead(['מטבח'], { history: [rec('material', EXPO)], agreed: { action: 'talk', on: '2026-11-19', who: 'him', replaces: ['call'] } });
+  const n = nextTask(visiting, l, EXPO);
+  assert.deepEqual(n, { kind: 'task', stepId: 'agreed', action: 'wait', who: 'me', dueOn: '2026-11-20', late: false, agreed: true });
+  assert.equal(rankOf(visiting, l, n, EXPO), 0); // his promise is first in his day
+  assert.deepEqual(nextTask(visiting, lead(['מטבח'], { agreed: { deal: true } }), EXPO), { kind: 'end', reason: 'closed' });
+});
+
+test('the confirmation to the visitor, in his words (5/11, א1)', async () => {
+  const { agreedLine, withAgreed, confirmText } = await import('../src/index.ts');
+  const a = { action: 'meet' as const, label: 'מדידה בבית', on: '2026-11-18', part: 'evening' as const, who: 'me' as const, replaces: [] };
+  assert.equal(agreedLine(a, false, EXPO), 'כמו שסיכמנו: מדידה בבית ביום רביעי בערב.');
+  assert.equal(agreedLine({ ...a, on: '2026-11-17', part: undefined }, false, EXPO), 'כמו שסיכמנו: מדידה בבית מחר.');
+  assert.equal(agreedLine(a, true, EXPO), 'כמו שסיכמנו, נהיה בקשר ביום רביעי בערב.'); // sensitive: when, never what
+  assert.equal(agreedLine({ ...a, who: 'him' }, false, EXPO), 'כמו שסיכמנו, אחכה לשמוע ממך עד יום רביעי.');
+  assert.equal(agreedLine({ ...a, label: undefined, action: 'talk', on: '2026-11-30' }, false, EXPO), 'כמו שסיכמנו: שיחה ביום שני, 30/11 בערב.');
+  assert.equal(withAgreed('שלום [שם],\nמצורפות תמונות.\nחתימה', 'כמו שסיכמנו: X.'), 'שלום [שם],\nכמו שסיכמנו: X.\nמצורפות תמונות.\nחתימה');
+  assert.match(confirmText('כמו שסיכמנו: X.'), /^שלום \[שם\],\nכמו שסיכמנו: X\.\n\[שם המציג\]/);
+});

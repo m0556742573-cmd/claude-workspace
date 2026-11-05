@@ -6,6 +6,8 @@ import type { Action, Holiday, NeedPath, Path, Step, Timing, Who } from '@expo/e
 
 const after = (days: number): Timing => ({ kind: 'after', days });
 const s = (id: string, action: Action, who: Who, timing: Timing, message?: string): Step => ({ id, action, who, timing, ...(message ? { message } : {}) });
+/** A step with its name in plain words, offered at the booth under "מה סיכמנו?" (5/11, א1). */
+const L = (step: Step, label: string): Step => ({ ...step, label });
 
 export interface Pattern {
   id: string;
@@ -18,23 +20,23 @@ export interface Pattern {
 
 export const PATTERNS: Pattern[] = [
   { id: 'visit', name: 'ביקור או מדידה ← הצעה ← שליחה ← בדיקה', fits: 'נגר, מטבחים, שיפוצים: מה שצריך לראות במקום', relation: 'customer',
-    make: () => ({ steps: [s('call', 'talk', 'me', after(2)), s('visit', 'meet', 'me', after(4)), s('quote', 'prepare', 'me', after(2)), s('sendQuote', 'send', 'me', after(0), 'הצעת מחיר'), s('check', 'check', 'me', after(4))], end: { kind: 'list' } }) },
+    make: () => ({ steps: [L(s('call', 'talk', 'me', after(2)), 'שיחה לתיאום'), L(s('visit', 'meet', 'me', after(4)), 'ביקור או מדידה'), L(s('quote', 'prepare', 'me', after(2)), 'הכנת הצעה'), L(s('sendQuote', 'send', 'me', after(0), 'הצעת מחיר'), 'שליחת ההצעה'), s('check', 'check', 'me', after(4))], end: { kind: 'list' } }) },
   { id: 'material', name: 'חומר מיד ← שיחה', fits: 'מי שהתעניין: קטלוג או מחירון, ואחריו שיחה', relation: 'customer',
     make: () => ({ steps: [s('material', 'send', 'auto', after(0), 'חומר על העסק'), s('call', 'talk', 'me', after(3))], end: { kind: 'list' } }) },
   { id: 'materialDate', name: 'חומר מיד ← בדיקה ← תזכורת לפני התאריך שלו', fits: 'חתונה, אירוע, בר מצווה: יש לו תאריך', relation: 'customer',
     make: () => ({ steps: [s('material', 'send', 'auto', after(0), 'חומר על העסק'), s('check', 'check', 'me', after(7)), s('before', 'send', 'auto', { kind: 'customerDate', days: -30 }, 'תזכורת לפני התאריך שלך')], end: { kind: 'list' } }) },
   { id: 'meeting', name: 'פגישה ← הצעה ← שליחה ← בדיקה', fits: 'שירות לעסקים ולמוסדות', relation: 'customer',
-    make: () => ({ steps: [s('call', 'talk', 'me', after(2)), s('meet', 'meet', 'me', after(5)), s('quote', 'prepare', 'me', after(2)), s('sendQuote', 'send', 'me', after(0), 'הצעה'), s('check', 'check', 'me', after(4))], end: { kind: 'list' } }) },
+    make: () => ({ steps: [L(s('call', 'talk', 'me', after(2)), 'שיחה לתיאום'), L(s('meet', 'meet', 'me', after(5)), 'פגישה'), L(s('quote', 'prepare', 'me', after(2)), 'הכנת הצעה'), L(s('sendQuote', 'send', 'me', after(0), 'הצעה'), 'שליחת ההצעה'), s('check', 'check', 'me', after(4))], end: { kind: 'list' } }) },
   { id: 'wait', name: 'לחכות ללקוח ← להכין ← פגישה ← בדיקה', fits: 'הלקוח עוד לא מוכן: תוכנית, אישור, תקציב', relation: 'customer',
     make: () => ({ steps: [s('wait', 'wait', 'auto', after(30)), s('call', 'talk', 'me', after(0)), s('prepare', 'prepare', 'me', after(2)), s('meet', 'meet', 'me', after(5)), s('check', 'check', 'me', after(7))], end: { kind: 'list' } }) },
   { id: 'tasting', name: 'חומר ← שיחה ← טעימה או מדידה ← שריון ← בדיקה', fits: 'קייטרינג, אולמות, שמלות: מה שבודקים ושומרים תאריך', relation: 'customer',
-    make: () => ({ steps: [s('material', 'send', 'auto', after(0), 'חומר על העסק'), s('call', 'talk', 'me', after(2)), s('try', 'meet', 'me', after(5)), s('reserve', 'reserve', 'me', after(0), 'אישור שריון, עם התאריך שבו השריון משתחרר'), s('check', 'check', 'me', after(7))], end: { kind: 'list' } }) },
+    make: () => ({ steps: [s('material', 'send', 'auto', after(0), 'חומר על העסק'), L(s('call', 'talk', 'me', after(2)), 'שיחה לתיאום'), L(s('try', 'meet', 'me', after(5)), 'טעימה או מדידה'), L(s('reserve', 'reserve', 'me', after(0), 'אישור שריון, עם התאריך שבו השריון משתחרר'), 'שריון תאריך'), s('check', 'check', 'me', after(7))], end: { kind: 'list' } }) },
   { id: 'cycle', name: 'הרשמה לתאריך של העסק ← תזכורת לפני ← המחזור הבא', fits: 'חוגים, קורסים, מחזורים: התאריך הוא של העסק', relation: 'customer',
     make: () => ({ steps: [s('register', 'send', 'auto', after(0), 'פרטי המחזור הקרוב והרשמה'), s('remind', 'send', 'auto', after(10), 'תזכורת לפני שהמחזור מתחיל')], end: { kind: 'repeat', everyDays: 90, times: 3, action: 'send', who: 'auto', message: 'המחזור הבא' } }) },
   { id: 'partner', name: 'שותף: פגישת היכרות ← הסכם ← בדיקת הפניות', fits: 'מי שיכול להפנות אליך לקוחות', relation: 'partner',
-    make: () => ({ steps: [s('call', 'talk', 'me', after(3)), s('meet', 'meet', 'me', after(5)), s('terms', 'prepare', 'me', after(3)), s('referrals', 'check', 'me', after(30))], end: { kind: 'repeat', everyDays: 90, times: 3, action: 'check', who: 'me' } }) },
+    make: () => ({ steps: [L(s('call', 'talk', 'me', after(3)), 'שיחת היכרות'), L(s('meet', 'meet', 'me', after(5)), 'פגישת היכרות'), L(s('terms', 'prepare', 'me', after(3)), 'הסכם'), s('referrals', 'check', 'me', after(30))], end: { kind: 'repeat', everyDays: 90, times: 3, action: 'check', who: 'me' } }) },
   { id: 'distributor', name: 'מפיץ: דוגמה פיזית ← מסירה ← בדיקה ← הזמנה ראשונה', fits: 'חנויות ומפיצים שימכרו את המוצר שלך', relation: 'distributor',
-    make: () => ({ steps: [s('sample', 'prepare', 'me', after(3)), s('deliver', 'meet', 'me', after(3)), s('check', 'check', 'me', after(7)), s('order', 'talk', 'me', after(7))], end: { kind: 'list' } }) },
+    make: () => ({ steps: [L(s('sample', 'prepare', 'me', after(3)), 'הכנת דוגמה'), L(s('deliver', 'meet', 'me', after(3)), 'מסירת הדוגמה'), s('check', 'check', 'me', after(7)), L(s('order', 'talk', 'me', after(7)), 'שיחה על הזמנה ראשונה')], end: { kind: 'list' } }) },
   { id: 'list', name: 'רשימת תפוצה: מיד ← לפני העונה או המבצע', fits: 'מי שלא צריך עכשיו, אבל כדאי שיזכור אותך', relation: 'customer',
     make: (season = 'pesach') => ({ steps: [s('material', 'send', 'auto', after(0), 'חומר על העסק'), s('season', 'send', 'auto', { kind: 'calendar', anchor: { holiday: season }, days: -21 }, 'לפני העונה')], end: { kind: 'list' } }) },
   { id: 'trigger', name: 'יש תאריך שעוד לא ידוע: לברר מתי ← לפני התאריך', fits: 'שמחה בעתיד, מעבר דירה, פתיחת עסק', relation: 'customer',

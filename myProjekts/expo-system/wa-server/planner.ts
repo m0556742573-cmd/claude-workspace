@@ -4,7 +4,7 @@
 // days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
 // one of his destinations can get it (a number with WhatsApp when his WhatsApp is linked, a mail when mail is set on
 // the server); and the filled text has no hole left in it. The database queues it to each.
-import { EXTRA, addDays, filesIn, fill, holes, isExtra, nextTask, rankOf, offerText, orderCheckText, orderSummary, textOf, type Approved, type Lead, type LocalDate, type ManualStep, type Me, type Offer, type Order, type Setup } from '../engine/src/index.ts';
+import { CONFIRM, EXTRA, addDays, agreedLine, confirmText, filesIn, fill, holes, isExtra, nextTask, rankOf, withAgreed, type Agreed, offerText, orderCheckText, orderSummary, textOf, type Approved, type Lead, type LocalDate, type ManualStep, type Me, type Offer, type Order, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
@@ -21,6 +21,8 @@ export interface PlanLead {
   booth_order?: Order | null;
   /** The exhibitor's star at the booth (5/11, א2): first in his day after whoever wrote back. */
   starred?: boolean | null;
+  /** What was agreed with him at the booth (5/11, א1). */
+  agreed?: Agreed | null;
 }
 
 /**
@@ -80,7 +82,7 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
       manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
-      reach: reachOf(plan, l, ch.wa), star: !!l.starred,
+      reach: reachOf(plan, l, ch.wa), star: !!l.starred, ...(l.agreed ? { agreed: l.agreed } : {}),
     };
     const beside = (step: string, template: string, text: string): Due | null => {
       const body = fill(text, plan.me, l.name ?? '');
@@ -107,15 +109,19 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
     }
     // A message a day late still goes (יצחק, 30/10: a visitor registered on the fair's evening, a server down for a day);
     // more than that is left to the exhibitor.
-    if (n.kind !== 'task' || n.who !== 'auto' || !n.message || (n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) || n.dueOn > day) continue;
+    if (n.kind !== 'task' || n.who !== 'auto' || !(n.message || n.stepId === CONFIRM) || (n.late && !fast && (n.wasDue ?? n.dueOn) < addDays(day, -1)) || n.dueOn > day) continue;
     if (planned.has(`${l.id}|${n.stepId}`)) continue;
-    const text = textOf(setup, plan.texts, n.message, approved, plan.me.whatsapp === null);
+    // What was agreed at the booth (5/11, א1): its line rides on this message, or goes alone when none goes that day.
+    const line = n.confirm && lead.agreed && !('deal' in lead.agreed) ? agreedLine(lead.agreed, !!plan.me.sensitive, day) : null;
+    const own = n.message ? textOf(setup, plan.texts, n.message, approved, plan.me.whatsapp === null) : '';
+    const text = n.stepId === CONFIRM ? confirmText(line ?? '') : line ? withAgreed(own, line) : own;
+    if (n.stepId === CONFIRM && !line) continue;
     const body = fill(text, plan.me, l.name ?? '');
     if (holes(body).length) continue; // a message with a hole never goes out; the app shows what is missing
     const files = filesIn(text, plan.me).map((f) => `${f.path}#${encodeURIComponent(f.name)}`);
     const timed = [...setup.needs.flatMap((x) => x.variants.map((v) => v.path)), setup.defaults.business, setup.defaults.private]
       .flatMap((p) => p.steps).find((s) => s.id === n.stepId)?.timing.kind;
-    out.push({ lead: l.id, step: n.stepId, template: n.message, body, files, ...(fast ? { virtual: day } : {}), style: timed === 'calendar' ? 'newsletter' : 'letter' });
+    out.push({ lead: l.id, step: n.stepId, template: n.message ?? 'אישור מה שסוכם', body, files, ...(fast ? { virtual: day } : {}), style: timed === 'calendar' ? 'newsletter' : 'letter' });
   }
   return out;
 }
@@ -146,7 +152,7 @@ export function morningOf(plan: Plan, today: LocalDate): { tasks: MorningItem[];
       manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
-      reach: reachOf(plan, l), star: !!l.starred,
+      reach: reachOf(plan, l), star: !!l.starred, ...(l.agreed ? { agreed: l.agreed } : {}),
     };
     const n = nextTask(setup, lead, today);
     if (n.kind === 'task' && n.who === 'me' && n.dueOn <= today) {

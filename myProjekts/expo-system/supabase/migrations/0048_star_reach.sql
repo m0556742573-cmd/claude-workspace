@@ -1,11 +1,16 @@
 -- 0048 (5/11, his "כן להכל" to the system proposals):
 --   א2  a star at the booth, the exhibitor's own judgment of who is worth his time: no words and no number. It orders
 --       his day (ב3), in the app and in the morning message.
+--   א1  "מה סיכמנו": the step agreed with the visitor at the booth, on the lead.
 --   ב4  whether any automatic message can reach each lead: a number with WhatsApp that receives (when he works with
 --       WhatsApp), or a mail. When none can, the engine makes the path's messages his calls, instead of the server
 --       skipping the visitor in silence and his path stopping.
 
 alter table leads add column starred boolean not null default false;
+
+-- א1 "מה סיכמנו": what was agreed with the visitor at the booth, as the engine reads it (engine/src/model.ts, Agreed):
+-- {action, label?, on, part?, who: me|him, replaces: [step ids]}, or {deal: true} for "סגרנו כאן". Null = nothing agreed.
+alter table leads add column agreed jsonb;
 
 -- The app's view of reach, for every lead of his.
 create function my_reach() returns table (lead_id uuid, reach boolean)
@@ -19,7 +24,7 @@ $$;
 revoke all on function my_reach() from public, anon;
 grant execute on function my_reach() to authenticated;
 
--- The planner's view: as 0044, with the star.
+-- The planner's view: as 0044, with the star and what was agreed.
 create or replace function wa_plan(key text, exhibitor uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare since timestamptz;
@@ -43,7 +48,7 @@ begin
                 'targets', (select count(*) from wa_targets(l.id)), 'mails', (select count(*) from mail_targets(l.id)),
                 'settled', l.updated_at < now() - interval '3 minutes',
                 'booth_message', l.booth_message, 'booth_none', l.booth_none, 'booth_order', l.booth_order,
-                'starred', l.starred)), '[]'::jsonb)
+                'starred', l.starred, 'agreed', l.agreed)), '[]'::jsonb)
               from leads l left join people p on p.id = l.person_id
               where l.exhibitor_id = exhibitor and not l.opted_out
                 and case when current_phase() = 'practice' then trial_lead(l.id) else not l.practice end
