@@ -385,19 +385,11 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
     finally { setBusy(false); setMore(false); onChange(); }
   }
-  /** "לא ענה" (יצחק, 5/11): the tap already sets a try tomorrow, so nobody drops by default on a busy day; the sheet that
-   *  opens lets him pick another day or give up. The list is reloaded only when he closes it, so the card stays open. */
-  async function noAnswer(action: Action) {
-    setBusy(true);
-    try {
-      await markStep(row, stepId, 'noAnswer', ...args);
-      const due = inDays(1);
-      const retry = await addManual(row, { action, dueOn: due }, ...args);
-      const m: Missed = { stepId, retry, due, action, gaveUp: false };
-      setMissed(m);
-      onUndo(undoMissed(m, item, ctx, () => { setMissed(null); onChange(); }));
-    } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); onChange(); }
-    finally { setBusy(false); setMore(false); }
+  /** "לא ענה" (יצחק, 5/11): opens the choice, try again when or give up, and saves nothing until he chooses (no default).
+   *  The list is reloaded only when he closes it, so the card stays open meanwhile. */
+  function noAnswer(action: Action) {
+    setMore(false);
+    setMissed({ stepId, retry: null, due: null, action, gaveUp: false });
   }
   /** "ענה לי" (model §9): a reply the system did not see; the path stops, and "הוא חזר אליי" comes up as the next task. */
   async function replied() {
@@ -630,13 +622,14 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
 }
 
 // ---------- לא ענה (יצחק, 5/11): whether to keep trying is his decision, by how much the visitor is worth to him.
-// The tap itself sets "שוב מחר", so a visitor worth a call never drops just because the day was busy; giving up happens
-// only when he chooses it. Beside it, one message that leaves the visitor a way back, when there is somewhere to send it.
+// There is no default: a try tomorrow for everyone would spend his time on whoever is not worth it (יצחק, 5/11: "לנסות
+// מחר כברירת מחדל הוא ניצול לא נכון של משאבים"). Until he chooses, nothing is saved and the task stays as it was, so
+// nobody drops by itself either. Beside it, one message that leaves the visitor a way back, when there is where to send it.
 
 interface Missed {
   /** The step he did not get through on. */ stepId: string;
-  /** The try again, a step of his own (manual_steps), or null after giving up. */ retry: string | null;
-  due: string; action: Action; gaveUp: boolean;
+  /** The try again, a step of his own (manual_steps); null before he chose, or after giving up. */ retry: string | null;
+  due: string | null; action: Action; gaveUp: boolean;
 }
 const AGAIN: [string, number][] = [['מחר', 1], ['עוד 3 ימים', 3], ['שבוע', 7], ['שבועיים', 14]];
 
@@ -644,7 +637,7 @@ const AGAIN: [string, number][] = [['מחר', 1], ['עוד 3 ימים', 3], ['ש
 function undoMissed(m: Missed, item: Item, ctx: Ctx, onChange: () => void): Undo {
   const args = [ctx.exhibitor.id, item.setup, item.owner, today()] as const;
   return {
-    label: `${item.name}: ${m.gaveUp ? 'ויתרת' : `${m.action === 'wait' ? 'לבדוק שוב' : 'לנסות שוב'} ${dayLabel(m.due)}`}`,
+    label: `${item.name}: ${m.gaveUp ? 'ויתרת' : `${m.action === 'wait' ? 'לבדוק שוב' : 'לנסות שוב'} ${m.due ? dayLabel(m.due) : ''}`}`,
     run: async () => { if (m.retry) await removeManual(item.row, m.retry, ...args); await unmarkStep(item.row, m.stepId, ...args); onChange(); },
   };
 }
@@ -672,37 +665,44 @@ function MissedSheet({ item, ctx, missed, setMissed, dests, onUndo, onDone }: { 
   }
   const again = (d: string) => d && change(async () => {
     if (missed.retry) { await moveManual(row, missed.retry, d, ...args); return { ...missed, due: d }; }
-    // He gave up and changed his mind: the step is "no answer" again, with a try of its own.
+    // The first choice, or he gave up and changed his mind: the step is "no answer", with a try of its own.
     await markStep(row, missed.stepId, 'noAnswer', ...args);
     return { ...missed, retry: await addManual(row, { action: missed.action, dueOn: d }, ...args), due: d, gaveUp: false };
   });
   const giveUp = () => change(async () => {
     if (missed.retry) await removeManual(row, missed.retry, ...args);
     await markStep(row, missed.stepId, 'gaveUp', ...args);
-    return { ...missed, retry: null, gaveUp: true };
+    return { ...missed, retry: null, due: null, gaveUp: true };
   });
+  const chosen = !!missed.retry || missed.gaveUp;
   // The day it really lands on: his calls are not on Friday, nothing on Shabbat or Yom Tov.
-  const lands = settle(missed.due, missed.action, 'me');
+  const lands = missed.due ? settle(missed.due, missed.action, 'me') : null;
+  const title = missed.gaveUp ? 'ויתרת עליו'
+    : lands ? `${wait ? 'נבדוק שוב' : 'ננסה שוב'} ${dayLabel(lands)}`
+      : wait ? 'עדיין לא חזר. מה עכשיו?' : 'לא ענה. מה עכשיו?';
 
   return (
     <div className="sheet">
-      <h2>{missed.gaveUp ? 'ויתרת עליו' : wait ? `עדיין לא חזר. נבדוק שוב ${dayLabel(lands)}` : `לא ענה. ננסה שוב ${dayLabel(lands)}`}</h2>
+      <h2>{title}</h2>
+      {!chosen && <p className="muted">עד שתבחר, המשימה נשארת כמו שהיא.</p>}
       {missed.gaveUp && <p className="muted">לא יהיו עליו עוד משימות, וההודעות של המסלול שלו לא יוצאות.{keepsList ? ' הוא נשאר ברשימת התפוצה.' : ''}</p>}
       <div className="q-block">
-        <span className="sec">{missed.gaveUp ? 'בכל זאת לנסות שוב' : wait ? 'מתי לבדוק שוב' : 'מתי לנסות שוב'}</span>
+        <span className="sec">{missed.gaveUp ? 'בכל זאת לנסות שוב' : wait ? 'לבדוק שוב' : 'לנסות שוב'}</span>
         <div className="chips">
-          {AGAIN.map(([l, d]) => <button key={l} type="button" className="chip" disabled={busy} aria-pressed={!missed.gaveUp && missed.due === inDays(d)} onClick={() => again(inDays(d))}>{l}</button>)}
-          <DateField label="תאריך אחר" value={missed.gaveUp ? '' : missed.due} min={inDays(1)} onChange={(v) => v && again(v)} />
+          {AGAIN.map(([l, d]) => <button key={l} type="button" className="chip" disabled={busy} aria-pressed={missed.due === inDays(d)} onClick={() => again(inDays(d))}>{l}</button>)}
+          <DateField label="תאריך אחר" value={missed.due ?? ''} min={inDays(1)} onChange={(v) => v && again(v)} />
         </div>
       </div>
       {!missed.gaveUp && <div className="row"><button type="button" className="btn" disabled={busy} onClick={giveUp}>לוותר</button></div>}
-      {reach && (
+      {reach && !wait && (
         <div className="q-block">
           <span className="sec">אפשר גם לשלוח לו הודעה</span>
           <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={TRIED} text={triedText()} dests={dests} />
         </div>
       )}
-      <button type="button" className="btn primary tall wide" disabled={busy} onClick={onDone}>סיום</button>
+      {chosen
+        ? <button type="button" className="btn primary tall wide" disabled={busy} onClick={onDone}>סיום</button>
+        : <button type="button" className="text-btn" disabled={busy} onClick={onDone}>חזרה</button>}
     </div>
   );
 }
