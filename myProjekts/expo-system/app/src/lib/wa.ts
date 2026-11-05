@@ -2,7 +2,9 @@
 // Every call carries his own sign-in; the server checks it with Supabase. Step 1 (28/10): link, stay linked, unlink.
 import { supabase } from './backend.ts';
 
-export const WA_URL: string = import.meta.env.VITE_WA_URL ?? 'https://expo-wa.paydfb.easypanel.host';
+// Our own address (5/11), named by Cloudflare's DNS: Easypanel's own name servers failed to answer three times on 4/11.
+// The old address, expo-wa.paydfb.easypanel.host, still reaches the same server, until Easypanel goes.
+export const WA_URL: string = import.meta.env.VITE_WA_URL ?? 'https://wa.expomax.y-h-m.com';
 export interface WaState { status: 'none' | 'connecting' | 'qr' | 'open' | 'closed'; qr?: string; phone?: string }
 
 async function call<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: object): Promise<T> {

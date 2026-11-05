@@ -8,7 +8,7 @@ import { EmailMessage } from 'cloudflare:email';
 const CHECKS = [
   { key: 'app.booth', platform: 'app', label: 'הדוכן (expomax.y-h-m.com)', url: 'https://expomax.y-h-m.com/', expect: /assets\/index-[\w-]+\.js/ },
   { key: 'app.admin', platform: 'app', label: 'הניהול (expo-admin.pages.dev)', url: 'https://expo-admin.pages.dev/', expect: /assets\// },
-  { key: 'wa.health', platform: 'wa', label: 'שרת הוואטסאפ', url: 'https://expo-wa.paydfb.easypanel.host/health', expect: /"ok":true/ },
+  { key: 'wa.health', platform: 'wa', label: 'שרת הוואטסאפ', url: 'https://wa.expomax.y-h-m.com/health', expect: /"ok":true/ },
   { key: 'site.yhm', platform: 'site', label: 'האתר y-h-m.com', url: 'https://y-h-m.com/', expect: /<html/i },
 ];
 

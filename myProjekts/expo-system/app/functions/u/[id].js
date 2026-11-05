@@ -2,7 +2,7 @@
 // the same name as the sender's. The page itself, and the one-click removal mail services post here, are the
 // WhatsApp server's: this only passes the request on and brings its answer back. When that server cannot be reached,
 // the visitor gets a page that says so, and a mail service's one-click removal gets an error it will try again.
-const SERVER = 'https://expo-wa.paydfb.easypanel.host';
+const SERVER = 'https://wa.expomax.y-h-m.com'; // our own address since 5/11 (see app/src/lib/wa.ts)
 
 export async function onRequest({ request, params }) {
   if (request.method !== 'GET' && request.method !== 'POST') return new Response('', { status: 405 });
