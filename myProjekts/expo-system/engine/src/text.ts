@@ -102,6 +102,16 @@ export function orderCheckText(): string {
   return ['שלום [שם],', 'רציתי לוודא שההזמנה מהתערוכה הגיעה, ושהכל בסדר. אם משהו חסר או לא מסתדר, אפשר לענות כאן.', SIGN].join('\n');
 }
 
+/** The template id of the message beside "לא ענה" (יצחק, 5/11), in the outbox. */
+export const TRIED = 'x:tried';
+/**
+ * What the exhibitor can send after a call he did not get through (my wording, 5/11, a suggestion of mine he accepted
+ * with the rest): it leaves the visitor a way back. It does not say "reply here", since a reply is not always read.
+ */
+export function triedText(): string {
+  return ['שלום [שם],', 'ניסיתי להשיג אותך. כשיהיה נוח, אשמח לדבר.', SIGN].join('\n');
+}
+
 /** The text as the visitor gets it: his name, the exhibitor's signature and greeting. Holes stay as they are. */
 export function fill(body: string, me: Me, visitor: string): string {
   let t = body;

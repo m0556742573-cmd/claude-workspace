@@ -84,8 +84,10 @@ export interface Setup {
   template?: number;
 }
 
-/** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops. */
-export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut';
+/** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops.
+ *  'gaveUp' = after "לא ענה" the exhibitor chose to stop trying (יצחק, 5/11): it is his decision, by how much the visitor
+ *  is worth to him, and nothing else of the path follows. Trying again is a step he sets by hand (a manual step). */
+export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut' | 'gaveUp';
 
 export interface StepRecord {
   stepId: string;

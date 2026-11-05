@@ -2,7 +2,7 @@
 // It is pure, so the same code runs on the phone (offline) and on the server (the morning list, the sender).
 import { addDays, isRestDay, nextOccurrence, weekday } from './calendar.ts';
 import { BOOTH_STEP, isExtra, manualId, replyId } from './model.ts';
-import type { Action, Condition, Lead, LocalDate, NeedPath, Path, Setup, Step, Timing, Who } from './model.ts';
+import type { Action, Condition, Lead, LocalDate, NeedPath, Path, PathEnd, Setup, Step, Timing, Who } from './model.ts';
 
 /** What the path would do next if he had not answered — the likely next step to offer after a talk. */
 export function pathAhead(setup: Setup, lead: Lead): Step | undefined {
@@ -70,6 +70,9 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
     const late = lead.repliedOn < today;
     return { kind: 'task', stepId: replyId(lead.repliedOn), action: 'talk', who: 'me', dueOn: settle(late ? today : lead.repliedOn, 'talk', 'me'), late, reply: true, ...(late ? { wasDue: lead.repliedOn } : {}) };
   }
+  // He gave up on him after "לא ענה" (יצחק, 5/11): no more tasks and no more of the path's sends. A mailing list the path
+  // ends on keeps him, as it would have at its end anyway. A reply that comes after it still comes first (above).
+  if (last && last.outcome === 'gaveUp') return { kind: 'end', reason: endsOnList(setup, lead, choosePath(setup, lead).path.end) ? 'list' : 'stop' };
   // The message he chose at the booth goes out on the day of the visit, before anything else of the path.
   if (lead.booth?.message && !recorded.has(BOOTH_STEP)) {
     const late = lead.capturedOn < today;
@@ -95,13 +98,17 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
   if (step) return schedule(step, base, lead, today);
 
   const end = path.end;
-  // A sensitive business puts on the mailing list only whoever said yes at the booth (round 9).
-  if (end.kind === 'list' && setup.sensitive && !lead.taps.includes(CONSENT)) return { kind: 'end', reason: 'stop' };
+  if (end.kind === 'list') return { kind: 'end', reason: endsOnList(setup, lead, end) ? 'list' : 'stop' };
   if (end.kind !== 'repeat') return { kind: 'end', reason: end.kind };
   const repeats = lead.history.filter((h) => h.stepId.startsWith('repeat:')).length;
   if (end.times !== undefined && repeats >= end.times) return { kind: 'end', reason: 'stop' };
   const id = `repeat:${repeats + 1}`;
   return schedule({ id, action: end.action, who: end.who, message: end.message, timing: { kind: 'after', days: end.everyDays } }, base, lead, today);
+}
+
+/** A path that ends on the mailing list; a sensitive business puts on it only whoever said yes at the booth (round 9). */
+function endsOnList(setup: Setup, lead: Lead, end: PathEnd): boolean {
+  return end.kind === 'list' && !(setup.sensitive && !lead.taps.includes(CONSENT));
 }
 
 function schedule(step: Step, base: LocalDate, lead: Lead, today: LocalDate): Next {

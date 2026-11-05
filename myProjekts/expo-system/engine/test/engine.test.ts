@@ -183,6 +183,39 @@ test('a manual step that is overdue goes out today and says so', () => {
   assert.equal(n.late, true);
 });
 
+// ---- "לא ענה" (יצחק, 5/11): the exhibitor decides per visitor whether to try again; giving up ends the path
+
+test('no answer and trying again: the retry is his own step, it comes first, and the path waits for it', () => {
+  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17'), rec('call', '2026-11-23')], manual: [{ id: 'r1', action: 'talk', who: 'me', dueOn: '2026-11-24' }] });
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-23'), { kind: 'task', stepId: 'm:r1', action: 'talk', who: 'me', message: undefined, dueOn: '2026-11-24', late: false });
+  // No answer again, and he tries once more: the same way, a step of its own.
+  l.history.push(rec('m:r1', '2026-11-24'));
+  l.manual!.push({ id: 'r2', action: 'talk', who: 'me', dueOn: '2026-11-26' });
+  assert.equal((nextTask(shtreimel, l, '2026-11-24') as { stepId: string }).stepId, 'm:r2');
+});
+
+test('giving up ends the path at once; a mailing list it ends on keeps him', () => {
+  // The wedding variant: a call, again after three days, then the list. He gives up after the first call.
+  const l = lead(['שטריימל לחתן', 'יש חתונה (מתי?)'], { customerDate: '2027-01-10', history: [rec('call', '2026-11-17', 'gaveUp')] });
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-17'), { kind: 'end', reason: 'list' });
+  // A path that ends without a list, or a sensitive business without consent: nothing.
+  const stop: Setup = setup({ needs: [{ label: 'x', goal: 'primary', relation: 'customer', variants: [{ path: { steps: [
+    { id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 1 } },
+    { id: 'mail', action: 'send', who: 'auto', message: 'm', timing: { kind: 'after', days: 3 } },
+  ], end: { kind: 'stop' } } }] }] });
+  assert.deepEqual(nextTask(stop, lead(['x'], { history: [rec('call', '2026-11-17', 'gaveUp')] }), '2026-11-17'), { kind: 'end', reason: 'stop' });
+  assert.deepEqual(nextTask({ ...shtreimel, sensitive: true }, l, '2026-11-17'), { kind: 'end', reason: 'stop' });
+});
+
+test('giving up on a retry ends it too, and a reply that comes after it still comes first', () => {
+  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17'), rec('call', '2026-11-23'), rec('m:r1', '2026-11-24', 'gaveUp')], manual: [{ id: 'r1', action: 'talk', who: 'me', dueOn: '2026-11-24' }] });
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-24'), { kind: 'end', reason: 'list' });
+  l.repliedOn = '2026-11-26';
+  const n = nextTask(shtreimel, l, '2026-11-26') as { stepId: string; reply?: boolean };
+  assert.equal(n.stepId, 'reply:2026-11-26');
+  assert.equal(n.reply, true);
+});
+
 // ---- a sensitive business: the mailing list only with consent
 
 test('a sensitive business ends on the mailing list only for whoever consented at the booth', async () => {

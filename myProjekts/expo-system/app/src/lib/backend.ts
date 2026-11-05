@@ -496,6 +496,12 @@ export async function addManual(row: LeadRow, step: { action: Action; dueOn: str
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
   return data.id;
 }
+/** "לא ענה › מתי לנסות שוב" (יצחק, 5/11): the retry, a step of his own, moves to the day he chose. */
+export async function moveManual(row: LeadRow, id: string, dueOn: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('manual_steps').update({ due_on: dueOn }).eq('id', id);
+  if (error) throw error;
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
 export async function removeManual(row: LeadRow, id: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
   const { error } = await supabase.from('manual_steps').delete().eq('id', id);
   if (error) throw error;
