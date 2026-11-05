@@ -165,9 +165,9 @@ const MONTHS: HebrewMonth[] = ['tishrei', 'cheshvan', 'kislev', 'tevet', 'shvat'
 // No nullable fields (the API allows only a few): an unused field has a fixed empty value — 0, "", "none", or an empty list.
 const COND = { type: 'object', additionalProperties: false, required: ['tapped', 'mode', 'negate'],
   properties: { tapped: { type: 'array', items: { type: 'string' } }, mode: { type: 'string', enum: ['any', 'all'] }, negate: { type: 'boolean' } } };
-const STEP = { type: 'object', additionalProperties: false, required: ['id', 'action', 'who', 'timing', 'message', 'onlyIf'],
+const STEP = { type: 'object', additionalProperties: false, required: ['id', 'action', 'who', 'label', 'timing', 'message', 'onlyIf'],
   properties: {
-    id: { type: 'string' }, action: { type: 'string', enum: ACTIONS }, who: { type: 'string', enum: ['me', 'auto'] },
+    id: { type: 'string' }, action: { type: 'string', enum: ACTIONS }, who: { type: 'string', enum: ['me', 'auto'] }, label: { type: 'string' },
     timing: { type: 'object', additionalProperties: false, required: ['kind', 'days', 'holiday', 'month', 'day', 'weekday'],
       properties: { kind: { type: 'string', enum: ['after', 'customerDate', 'calendar', 'weekday'] }, days: { type: 'integer' },
         holiday: { type: 'string', enum: [...HOLIDAYS, 'none'] }, month: { type: 'string', enum: [...MONTHS, 'none'] }, day: { type: 'integer' }, weekday: { type: 'integer' } } },
@@ -199,6 +199,7 @@ const BUILD = `You turn an exhibitor's agreed setup (a structure in Hebrew words
   variants: the path for the usual case LAST with if=null; a variant "for" a profile or a tap comes before it with if={tapped:[labels of card buttons], mode:"any"|"all", negate:false}; the usual case has if={tapped:[], mode:"any", negate:false}. Labels in conditions must be exact labels of this card.
 - A path is a chain of steps. action: talk (a call or a talk), meet (meeting, visit, measuring, tasting, demo), prepare (a quote, a drawing, a sample, a menu), send (a message; who=auto when the system sends it, who=me when he sends something physical), reserve (hold a date), check (check in again), wait (wait for the customer). who: me = the exhibitor himself, auto = the system on its own (only for messages it sends).
 - timing: after = days after the previous step (the first step: days after the expo, 16/11; 0 = the same day); customerDate = days relative to the visitor's own date (negative = before); calendar = relative to a point of the Jewish year, holiday or month+day, days negative before; weekday = the next given weekday after the previous step (0 Sunday … 6 Saturday). Unused timing fields: days 0, holiday "none", month "none", day 0, weekday 0.
+- label: the step in his own words as he agreed it, two or three words a visitor would understand ("מדידה בחנות", "ביקור בבית", "טעימה", "שיחה לתיאום"); it is offered at the booth as "מה סיכמנו?". For a message the system sends, label "".
 - A step that only some visitors get (it costs time or money) has onlyIf with the buttons that qualify them; every other step has onlyIf={tapped:[], mode:"any", negate:false}. A step that sends no message has message "".
 - end: list (to the mailing list), stop, or repeat (a long-term check: everyDays, times, action, who, message). For list and stop: everyDays 0, times 0, action "check", who "me", message "".
 - Every step that sends a message names it in "message", by a short Hebrew id (e.g. "תודה שביקרת", "מחירון"), and that id appears once in "messages" with its text.
@@ -288,6 +289,8 @@ export function toSetup(r: Raw): { setup: Setup; texts: Record<string, string>; 
       const action = (ACTIONS.includes(x.action as Action) ? x.action : 'talk') as Action;
       const step: Step = { id, action, who: (x.who === 'auto' ? 'auto' : 'me') as Who, timing: timing(x.timing) };
       const msg = message(x.message); if (msg) step.message = msg;
+      // His words for the step (5/11, א1): kept for "מה סיכמנו?" at the booth; until now they were dropped here.
+      const label = str(x.label, 40).trim(); if (label && step.who === 'me') step.label = label;
       const only = cond(x.onlyIf); if (only) step.onlyIf = only;
       if (step.who === 'auto' && step.action !== 'send') problems.push(`step ${id}: only a message is sent by the system on its own`);
       return step;

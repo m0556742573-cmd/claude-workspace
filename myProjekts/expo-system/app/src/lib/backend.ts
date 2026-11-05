@@ -2,7 +2,7 @@
 // without a network it waits on the phone and goes up as soon as the network is back — the booth never waits.
 import { notifySaved } from './saved.ts';
 import { createClient, type Session } from '@supabase/supabase-js';
-import { nextTask, type Action, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
+import { nextTask, type Action, type Agreed, type Lead, type ManualStep, type Offer, type Order, type Setup, type StepRecord, type Who } from '@expo/engine';
 import { allLeads, allNotes, dropLead, dropNote, getLead, nextRev, putLead, putNote, type LocalLead, type LocalNote } from '../store/local.ts';
 import { destinationOf, type Typed } from './destination.ts';
 import type { FileRef } from '@expo/engine';
@@ -153,6 +153,10 @@ async function uploadLead(l: LocalLead, exhibitorId: string, setup: Setup): Prom
     taps: l.taps, customer_date: l.customerDate ?? null, note: l.note || null,
     captured_at: l.capturedAt, captured_on: l.capturedOn,
     booth_message: l.booth?.message ?? null, booth_none: !!l.booth && !l.booth.message,
+    // The star (5/11, א2) goes up only once he touched it, so a card from before the change uploads as it did.
+    ...(l.star !== undefined ? { starred: l.star } : {}),
+    // What was agreed (5/11, א1), once he touched it; taken back = null.
+    ...('agreed' in l ? { agreed: l.agreed ?? null } : {}),
     ...(l.order ? { booth_order: l.order } : {}),
     // A list phone or mail corrected on the card stops receiving; the CRM's own switch is left alone otherwise.
     ...(l.ownOff ? { own_phone_on: l.ownOff.includes('phone') ? false : null, own_email_on: l.ownOff.includes('email') ? false : null } : {}),
@@ -288,6 +292,10 @@ export interface LeadRow {
   booth_message: string | null; booth_none: boolean;
   /** What he ordered from the expo offer at the booth. */
   booth_order: Order | null;
+  /** The exhibitor's star at the booth (5/11, א2). */
+  starred?: boolean | null;
+  /** What was agreed with him at the booth (5/11, א1, "מה סיכמנו"). */
+  agreed?: Agreed | null;
 }
 export interface TaskRow {
   lead_id: string; kind: 'task' | 'askDate' | 'end'; step_id: string | null; action: Action | null; who: Who | null;
@@ -298,7 +306,8 @@ export interface ManualRow { id: string; lead_id: string; action: Action; who: W
 export interface NoteRow { id: string; lead_id: string; body: string | null; audio_path: string | null; transcript: string | null; created_at: string }
 
 export interface ReplyRow { lead_id: string; body: string; at: string; optout: boolean }
-export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup>; replies: ReplyRow[] }
+export interface Book { leads: LeadRow[]; tasks: TaskRow[]; steps: StepRow[]; manual: ManualRow[]; notes: NoteRow[]; versions: Record<number, Setup>; replies: ReplyRow[];
+  /** Whether any automatic message can reach each lead (5/11, ב4); a lead not in it is not known. */ reach: Record<string, boolean> }
 
 /** Every row, a thousand at a time: the server gives at most 1000 to one request, and after the fair a booth's steps and
  *  notes pass that (30/10: the CRM's lists were cut there without a word, and done steps showed as due). Each page asks
@@ -337,8 +346,16 @@ export async function loadBook(): Promise<Book> {
   return {
     leads, tasks, steps, manual, notes,
     versions: Object.fromEntries(versions.map((v) => [v.version, v.data as Setup])),
-    replies,
+    replies, reach: await myReach(),
   };
+}
+
+/** Whether any automatic message can reach each of his leads (5/11, ב4): a number with WhatsApp that receives (when he
+ *  works with WhatsApp), or a mail. Without it (an older database, no connection) nothing is known, and all is as before. */
+async function myReach(): Promise<Record<string, boolean>> {
+  const { data, error } = await supabase.rpc('my_reach');
+  if (error) return {};
+  return Object.fromEntries(((data ?? []) as { lead_id: string; reach: boolean }[]).map((r) => [r.lead_id, r.reach]));
 }
 
 /** The setup a lead follows: the active one, or the version he was left on when a change was applied to new visitors only. */
@@ -365,7 +382,7 @@ export async function pinLeads(exhibitorId: string): Promise<void> {
 /** The day in Israel of a moment the server recorded. */
 const israelDay = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(iso));
 
-export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & { replies?: ReplyRow[] }, businessOwner: boolean): Lead {
+export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & { replies?: ReplyRow[]; reach?: Book['reach'] }, businessOwner: boolean): Lead {
   const replies = (book.replies ?? []).filter((r) => r.lead_id === row.id && !r.optout);
   const history = book.steps.filter((s) => s.lead_id === row.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome }));
   // "הסר" in his reply ends everything, as "ביקש להסיר" does (model §9).
@@ -377,6 +394,7 @@ export function engineLead(row: LeadRow, book: Pick<Book, 'steps' | 'manual'> & 
     booth: row.booth_message ? { message: row.booth_message } : row.booth_none ? {} : undefined,
     history,
     manual: book.manual.filter((m) => m.lead_id === row.id).map((m): ManualStep => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
+    reach: book.reach?.[row.id], star: !!row.starred, ...(row.agreed ? { agreed: row.agreed } : {}),
   };
 }
 
@@ -496,10 +514,23 @@ export async function addManual(row: LeadRow, step: { action: Action; dueOn: str
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
   return data.id;
 }
+/** "לא ענה › מתי לנסות שוב" (יצחק, 5/11): the retry, a step of his own, moves to the day he chose. */
+export async function moveManual(row: LeadRow, id: string, dueOn: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('manual_steps').update({ due_on: dueOn }).eq('id', id);
+  if (error) throw error;
+  await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
 export async function removeManual(row: LeadRow, id: string, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
   const { error } = await supabase.from('manual_steps').delete().eq('id', id);
   if (error) throw error;
   await recompute(row, exhibitorId, setup, businessOwner, onDay);
+}
+
+/** What was agreed at the booth, changed or taken back on the lead's page (5/11, א1). */
+export async function setAgreed(row: LeadRow, agreed: Agreed | null, exhibitorId: string, setup: Setup, businessOwner: boolean, onDay: string) {
+  const { error } = await supabase.from('leads').update({ agreed }).eq('id', row.id);
+  if (error) throw error;
+  await recompute({ ...row, agreed }, exhibitorId, setup, businessOwner, onDay);
 }
 
 /** He found out the visitor's date (the wedding, the event): the path continues from it. */

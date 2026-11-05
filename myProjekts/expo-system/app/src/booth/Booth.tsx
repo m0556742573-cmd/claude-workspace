@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CONSENT, immediateMessage, messagesOf, nextTask, type Offer, type Order, type Setup } from '@expo/engine';
+import { AGREED_NOUN, CONSENT, addDays, agreeable, choosePath, immediateMessage, isRestDay, matches, messagesOf, nextTask, replacesFor, weekday, type Action, type AgreedStep, type Offer, type Order, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -78,6 +78,9 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [ordering, setOrdering] = useState(false);
   const [toast, setToast] = useState('');
   const [checked, setChecked] = useState<Record<string, Checked[]>>({});
+  // א3 (5/11): whether any message can reach each visitor, as the card's contacts show it (null = not known yet).
+  const [reachOf, setReachOf] = useState<Record<string, boolean | null>>({});
+  const [addAsk, setAddAsk] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   // Visitors cancelled while a recording of theirs was still running: the recording is dropped, not saved (30/10).
   const dropped = useRef(new Set<string>());
@@ -327,6 +330,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
         <section className="lead" aria-label={`הכרטיס של ${current.name}`}>
           <div className="lead-head">
             <div>
+              <button type="button" className="star-btn" aria-pressed={!!current.star} aria-label={current.star ? 'להוריד את הכוכב' : 'כוכב: שווה לי זמן'} title={current.star ? 'להוריד את הכוכב' : 'כוכב: שווה לי זמן'} onClick={() => change({ star: !current.star })}>{current.star ? '★' : '☆'}</button>
               <span className="nm">{current.name}</span> <span className="muted">{current.city ?? ''}</span>
               {(current.businessOwner || current.self) && (
                 <div className="faint">{[current.businessOwner ? 'בעל עסק' : '', current.self ? 'נרשם לבד' : ''].filter(Boolean).join(' · ')}</div>
@@ -338,7 +342,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </div>
           </div>
 
-          <Contacts key={current.id} lead={current} wa={wa} online={online} checked={checked[current.id]} ownOf={practice ? undefined : ownOf} onChange={setContact} />
+          <Contacts key={current.id} lead={current} wa={wa} online={online} checked={checked[current.id]} ownOf={practice ? undefined : ownOf} onChange={setContact}
+            addAsk={addAsk} onReach={(r) => setReachOf((m) => (m[current.id] === r ? m : { ...m, [current.id]: r }))} />
 
           {questions.filter(([, items]) => items.length).map(([q, items]) => (
             <div key={q}>
@@ -357,11 +362,13 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </>
           )}
 
-          {messages.length > 0 && <SendLine key={current.id} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
+          {messages.length > 0 && <SendLine key={`send:${current.id}`} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
-            checked={checked[current.id]} />}
+            checked={checked[current.id]} unreachable={reachOf[current.id] === false}
+            onAdd={() => setAddAsk((n) => n + 1)} onHand={() => { change({ booth: {} }); say('נרשם: נתת לו ביד'); }} />}
 
-          <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
+          <AgreedLine key={`agreed:${current.id}`} lead={current} setup={setup} reach={reachOf[current.id] ?? undefined} offer={!!offer && offer.items.length > 0}
+            onAgree={(agreed) => { change({ agreed }); if (agreed && 'deal' in agreed) say(`סגרתם: ${current.name}`); }} onOrder={() => setOrdering(true)} />
 
           {lastNote && <NotePeek note={lastNote} count={myNotes.length} />}
           {noteOpen && (
@@ -420,7 +427,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               return (
                 <button key={l.id} type="button" role="listitem" className="result" aria-current={current?.id === l.id ? 'true' : undefined} onClick={() => open(l)}>
                   <span>
-                    <span className="nm">{l.name}</span><span className="city">{l.city ?? ''}</span>
+                    {l.star && <span className="star-mark" aria-label="כוכב">★</span>}<span className="nm">{l.name}</span><span className="city">{l.city ?? ''}</span>
                     <span className="mt">{[...l.taps, count ? `${count} הערות` : ''].filter(Boolean).join(' · ') || 'בלי סימון'}</span>
                   </span>
                   <span className="r-side">
@@ -445,15 +452,35 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
  * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
  * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
  */
-function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked }: {
+function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked, unreachable, onAdd, onHand }: {
   lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; trialSend: boolean; picking: boolean;
   onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
   /** What the check at the visit found, when it ran. */ checked?: Checked[];
+  /** No message can reach him (5/11, א3): no number with WhatsApp, and no mail. */ unreachable?: boolean;
+  onAdd?: () => void; onHand?: () => void;
 }) {
   const auto = immediateMessage(setup, lead);
   const chosen = lead.booth;
   const def = boothDefault && messages.includes(boothDefault) ? boothDefault : null;
   const noWa = checked?.find((c) => c.own)?.wa === false;
+  if (unreachable) {
+    // Until now the card said "יוצא לו מיד" while the server skipped him in silence (5/11, א3).
+    const what = chosen?.message ?? (chosen ? null : auto ?? def);
+    return (
+      <div className="send-line">
+        <div className="send-row">
+          <span className="faint">הודעה:</span>
+          <b className="err">ההודעות לא יגיעו אליו</b>
+          <span className="faint small">אין לאן לשלוח: לא וואטסאפ ולא מייל.</span>
+        </div>
+        <div className="row">
+          <button type="button" className="btn" onClick={onAdd}>להוסיף מספר או מייל של בן משפחה</button>
+          {what ? <button type="button" className="btn" onClick={onHand}>נתתי לו ביד: {what}</button>
+            : chosen && <span className="faint small">נרשם: בלי הודעה עכשיו</span>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="send-line">
       <div className="send-row">
@@ -483,8 +510,10 @@ function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, pi
  * server once the card is up; correcting one leaves the community list as it is (other exhibitors use it): his old one
  * stops receiving for this exhibitor, and the right one is added. Everything added receives every message, as his own does.
  */
-function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
+function Contacts({ lead, wa, online, checked, ownOf, onChange, onReach, addAsk = 0 }: {
   lead: LocalLead; wa: boolean; online: boolean; checked?: Checked[];
+  /** Whether any message can reach him, once it is known (5/11, א3); null while it is not. */ onReach?: (r: boolean | null) => void;
+  /** Grows when the card's line asks to add a number or a mail. */ addAsk?: number;
   ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
   onChange: (patch: Pick<LocalLead, 'extra' | 'ownOff' | 'typedPhone' | 'typedEmail'>) => void;
 }) {
@@ -557,6 +586,19 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
   };
 
   const waiting = fromList && !listed && !!ownOf;
+  // Can any message reach him (5/11, א3)? A mail can; a phone, when he works with WhatsApp and it is not known to lack it.
+  // Known only once his list details are in (never in practice, where they are not shown) and every phone was checked.
+  const reach: boolean | null = (() => {
+    if (waiting || (fromList && !ownOf)) return null;
+    const live = [...(['phone', 'email'] as const).filter((k) => own[k] && !off.includes(k)).map((k) => ({ v: own[k] as string, own: true })), ...extra.map((v) => ({ v, own: false }))];
+    if (live.some((x) => x.v.includes('@'))) return true;
+    const phones = live.filter((x) => !x.v.includes('@'));
+    if (!wa || !phones.length) return false;
+    const was = phones.map((x) => waOf(x.v, x.own));
+    return was.some((w) => w !== false) ? (was.some((w) => w === true) ? true : was.some((w) => w === undefined || w === null) ? null : true) : false;
+  })();
+  useEffect(() => { onReach?.(reach); }, [reach, onReach]);
+  useEffect(() => { if (addAsk) { setOpen(true); setEditing({ kind: 'add', text: '' }); setBad(''); } }, [addAsk]);
   if (!open) {
     // What receives now: his own (unless replaced), then the added ones. Two shown, the rest counted.
     const live = [...(['phone', 'email'] as const).filter((k) => own[k] && !off.includes(k)).map((k) => own[k] as string), ...extra];
@@ -649,6 +691,93 @@ function HelpDot() {
 }
 
 /** The last note on the open card, in a grey strip; a recording can be heard from it. */
+// ---------- "מה סיכמנו" (יצחק, 5/11: "אוקיי מקבל", then "כן להכל"): the card's "what next" becomes a question with days
+// under it; a tap on a day means it was agreed. Checked against the 109 businesses of the lab: in about 77 the path
+// already knows what is done, and what is missing is when. With a queue nobody has to touch it: the path runs as before.
+
+const LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+const PARTS: [NonNullable<AgreedStep['part']>, string][] = [['morning', 'בבוקר'], ['noon', 'בצהריים'], ['evening', 'בערב']];
+/** Today, tomorrow, and the next four days that are not Shabbat or Yom Tov: a Friday may be chosen. */
+function dayChips(from: string): { on: string; label: string }[] {
+  const out: { on: string; label: string }[] = [];
+  for (let d = from; out.length < 6; d = addDays(d, 1)) {
+    if (isRestDay(d)) continue;
+    out.push({ on: d, label: d === from ? 'היום' : d === addDays(from, 1) ? 'מחר' : LETTER[weekday(d)]! });
+  }
+  return out;
+}
+
+function AgreedLine({ lead, setup, reach, offer, onAgree, onOrder }: { lead: LocalLead; setup: Setup; reach?: boolean; offer: boolean;
+  onAgree: (a: LocalLead['agreed']) => void; onOrder: () => void }) {
+  const t = today();
+  const a = lead.agreed;
+  const deal = !!a && 'deal' in a;
+  const step = a && !('deal' in a) ? a : undefined;
+  const suggested = agreeable(setup, lead);
+  const [what, setWhat] = useState<{ action: Action; label?: string }>(step ? { action: step.action, label: step.label } : suggested ?? { action: 'talk' });
+  const [who, setWho] = useState<AgreedStep['who']>(step?.who ?? 'me');
+  const [changing, setChanging] = useState(false);
+  // What he can agree on instead: the path's own steps of his, in its words, then the plain kinds.
+  const choices = useMemo(() => {
+    const { path } = choosePath(setup, lead);
+    const own = path.steps.filter((x) => matches(x.onlyIf, lead.taps) && x.who === 'me' && x.action !== 'wait' && x.action !== 'check')
+      .map((x) => ({ action: x.action, label: x.label }));
+    const plain = (['talk', 'meet', 'send', 'prepare'] as Action[]).map((action) => ({ action, label: undefined as string | undefined }));
+    const seen = new Set<string>();
+    return [...own, ...plain].filter((c) => { const k = c.label ?? AGREED_NOUN[c.action]; if (seen.has(k)) return false; seen.add(k); return true; });
+  }, [setup, lead]);
+  const words = (c: { action: Action; label?: string }) => c.label ?? AGREED_NOUN[c.action];
+  const agree = (on: string, w = what, by = who) =>
+    onAgree({ action: w.action, ...(w.label ? { label: w.label } : {}), on, ...(step?.part ? { part: step.part } : {}), who: by, replaces: replacesFor(setup, lead, w.action) });
+  // A day tapped again takes it back.
+  const pick = (on: string) => (step && step.on === on ? onAgree(undefined) : agree(on));
+  const next = nextTask(setup, { ...lead, reach }, t);
+
+  if (deal) {
+    return (
+      <div className="agreed">
+        <div className="agreed-q"><span className="label">מה סיכמנו?</span> <b>סגרנו כאן</b>
+          <button type="button" className="text-btn" onClick={() => onAgree(undefined)}>לבטל</button></div>
+      </div>
+    );
+  }
+  return (
+    <div className="agreed">
+      <div className="agreed-q">
+        <span className="label">מה סיכמנו?</span> <b>{who === 'him' ? 'הוא חוזר אליך עד' : words(step ?? what)}</b>
+        {step && <span className="faint small"> · {who === 'him' ? 'אם לא, ביום שאחרי תבדוק' : 'סוכם, ויופיע אצלך ראשון'}</span>}
+      </div>
+      <div className="chips">
+        {dayChips(t).map((d) => <button key={d.on} type="button" className="chip" aria-pressed={step?.on === d.on} onClick={() => pick(d.on)}>{d.label}</button>)}
+        <DateField label="תאריך" value={step?.on ?? ''} min={t} onChange={(v) => v && agree(v)} />
+        <button type="button" className="text-btn" aria-expanded={changing} onClick={() => setChanging(!changing)}>לשנות</button>
+      </div>
+      {step && step.who === 'me' && (
+        <div className="chips">
+          {PARTS.map(([p, l]) => <button key={p} type="button" className="chip" aria-pressed={step.part === p} onClick={() => onAgree({ ...step, part: step.part === p ? undefined : p })}>{l}</button>)}
+        </div>
+      )}
+      {changing && (
+        <div className="agreed-more">
+          <div className="chips">
+            {choices.map((c) => (
+              <button key={words(c)} type="button" className="chip" aria-pressed={who === 'me' && words(c) === words(step ?? what)}
+                onClick={() => { setWhat(c); setWho('me'); if (step) agree(step.on, c, 'me'); }}>{words(c)}</button>
+            ))}
+          </div>
+          <div className="chips">
+            <button type="button" className="chip" aria-pressed={who === 'me'} onClick={() => { setWho('me'); if (step) agree(step.on, what, 'me'); }}>אני חוזר אליו</button>
+            <button type="button" className="chip" aria-pressed={who === 'him'} onClick={() => { setWho('him'); if (step) agree(step.on, what, 'him'); }}>הוא חוזר אליי עד…</button>
+            {offer ? <button type="button" className="chip" onClick={onOrder}>סגרנו כאן: לבחור מהמבצע</button>
+              : <button type="button" className="chip" onClick={() => onAgree({ deal: true })}>סגרנו כאן</button>}
+          </div>
+        </div>
+      )}
+      {!step && <div className="faint small">בלי סיכום: {describe(next)}</div>}
+    </div>
+  );
+}
+
 function NotePeek({ note, count }: { note: LocalNote; count: number }) {
   const url = useMemo(() => (note.audio ? URL.createObjectURL(note.audio) : null), [note.audio]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);

@@ -35,6 +35,8 @@ export interface Step {
   action: Action;
   who: Who;
   timing: Timing;
+  /** The step in the business's own words ("ביקור בבית", "מדידה בחנות"), from the consultant or the pattern (5/11, א1). */
+  label?: string;
   /** The message this step sends, or that goes with it (a message id from the setup). */
   message?: string;
   /** A step that costs time or money goes only to visitors who fit (a free check only to an institution). */
@@ -84,8 +86,12 @@ export interface Setup {
   template?: number;
 }
 
-/** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops. */
-export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut';
+/** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops.
+ *  'gaveUp' = after "לא ענה" the exhibitor chose to stop trying (יצחק, 5/11): it is his decision, by how much the visitor
+ *  is worth to him, and nothing else of the path follows. Trying again is a step he sets by hand (a manual step). */
+export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut' | 'gaveUp' | 'missed';
+// 'missed' (5/11): he called, met or waited and did not get through, and has not chosen yet what now ("מחכה להחלטה").
+// 'noAnswer' keeps its old meaning: done, the path goes on (the server marks every message it sent so).
 
 export interface StepRecord {
   stepId: string;
@@ -123,7 +129,36 @@ export interface Lead {
   /** What the exhibitor chose at the booth: a message to send him now, or none now. Either replaces the path's own
    *  immediate message, so he never gets two at once (יצחק, 28/10). */
   booth?: { message?: string };
+  /** false when no automatic message can reach him (5/11, ב4): no number with WhatsApp that receives, and no mail. Then a
+   *  message of the path becomes a call of the exhibitor's, with what it would have said. Unknown (undefined) = as before. */
+  reach?: boolean;
+  /** The exhibitor's own star at the booth (5/11, א2): worth his time. No words and no number; it orders his day (ב3). */
+  star?: boolean;
+  /** What was agreed with him at the booth (5/11, א1, "מה סיכמנו"). */
+  agreed?: Agreed;
 }
+
+/**
+ * "מה סיכמנו" (יצחק, 5/11: "אוקיי מקבל", then "כן להכל"): the next step agreed with the visitor at the booth, by a tap on a
+ * day. It takes the place of the path's matching step and those before it, so nothing asks again for what is set; a
+ * day agreed stays that day, a Friday too. Or "סגרנו כאן": a deal at the booth.
+ */
+export type Agreed = AgreedStep | { deal: true };
+export interface AgreedStep {
+  /** What: a step of his, in the business's words when the path has them ("מדידה בחנות"). */
+  action: Action; label?: string;
+  /** The day agreed. */
+  on: LocalDate;
+  /** A word only, in the task and the visitor's confirmation; the system does not schedule by hours. */
+  part?: 'morning' | 'noon' | 'evening';
+  /** Who moves: he comes back to the visitor, or the visitor gets back to him by that day. */
+  who: 'me' | 'him';
+  /** The path's steps it takes the place of, fixed when it was agreed. */
+  replaces: string[];
+}
+/** The agreed step is recorded under this id; the confirmation to the visitor, when it went on its own, under the next. */
+export const AGREED = 'agreed';
+export const CONFIRM = 'confirm';
 
 /** A manual step is recorded in the history under this id, so the path's own steps never collide with it. */
 export const manualId = (id: string) => `m:${id}`;

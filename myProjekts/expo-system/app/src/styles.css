@@ -213,6 +213,14 @@ button.list-row:hover { background: var(--hover); }
 .result.add-row b { color: var(--ink); }
 .r-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; max-width: 45%; text-align: end; }
 .r-next { font-size: 13.5px; color: var(--muted); }
+/* א2 (5/11): the star at the head of the card, and its mark in today's list. No words, the exhibitor's own judgment. */
+.star-btn { background: none; border: 0; padding: 0 0 0 6px; font-size: 26px; line-height: 1; color: var(--muted); cursor: pointer; vertical-align: -2px; min-width: 32px; min-height: 32px; }
+.star-btn[aria-pressed="true"] { color: var(--brand-orange); }
+/* א1 (5/11): "מה סיכמנו" on the booth card — the question, the days under it, and the rest behind "לשנות". */
+.agreed { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
+.agreed-q .label { margin-inline-end: 6px; }
+.agreed-more { display: flex; flex-direction: column; gap: 8px; }
+.star-mark { color: var(--brand-orange); margin-inline-end: 4px; }
 .booth .empty { border: 1px dashed var(--line-strong); background: transparent; color: var(--faint); font-size: 14.5px; padding: 32px 12px; display: block; }
 .empty-acts { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
 .empty-acts .text-btn { color: var(--ink-2); font-size: 14.5px; }
