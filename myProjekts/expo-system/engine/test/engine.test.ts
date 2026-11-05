@@ -419,7 +419,7 @@ test('the confirmation to the visitor, in his words (5/11, א1)', async () => {
   assert.equal(agreedLine({ ...a, on: '2026-11-17', part: undefined }, false, EXPO), 'כמו שסיכמנו: מדידה בבית מחר.');
   assert.equal(agreedLine(a, true, EXPO), 'כמו שסיכמנו, נהיה בקשר ביום רביעי בערב.'); // sensitive: when, never what
   assert.equal(agreedLine({ ...a, who: 'him' }, false, EXPO), 'כמו שסיכמנו, אחכה לשמוע ממך עד יום רביעי.');
-  assert.equal(agreedLine({ ...a, label: undefined, action: 'talk', on: '2026-11-30' }, false, EXPO), 'כמו שסיכמנו: שיחה ביום שני, 30/11 בערב.');
+  assert.equal(agreedLine({ ...a, label: undefined, action: 'talk', on: '2026-11-30' }, false, EXPO), 'כמו שסיכמנו: שיחה ביום שני, כ׳ בכסלו בערב.');
   assert.equal(withAgreed('שלום [שם],\nמצורפות תמונות.\nחתימה', 'כמו שסיכמנו: X.'), 'שלום [שם],\nכמו שסיכמנו: X.\nמצורפות תמונות.\nחתימה');
   assert.match(confirmText('כמו שסיכמנו: X.'), /^שלום \[שם\],\nכמו שסיכמנו: X\.\n\[שם המציג\]/);
 });
