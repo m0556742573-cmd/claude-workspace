@@ -1,7 +1,7 @@
 // The engine against setups taken from the 109-business rounds. The expo is Monday 16/11/2026.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { choosePath, detailsIn, fileValue, filesIn, fill, holes, immediateMessage, isRestDay, nextOccurrence, nextTask, settle, withoutWa } from '../src/index.ts';
+import { choosePath, detailsIn, goOnId, undecided, fileValue, filesIn, fill, holes, immediateMessage, isRestDay, nextOccurrence, nextTask, settle, withoutWa } from '../src/index.ts';
 import type { Lead, Path, Setup, StepRecord } from '../src/index.ts';
 
 const EXPO = '2026-11-16';
@@ -58,9 +58,9 @@ const shtreimel = setup({
 test('with a wedding date: a call the next day, again after three days, then the mailing list', () => {
   const l = lead(['שטריימל לחתן', 'יש חתונה (מתי?)'], { customerDate: '2027-01-10' });
   assert.deepEqual(nextTask(shtreimel, l, EXPO), { kind: 'task', stepId: 'call', action: 'talk', who: 'me', message: undefined, dueOn: '2026-11-17', late: false });
-  l.history.push(rec('call', '2026-11-17'));
+  l.history.push(rec('call', '2026-11-17'), rec(goOnId('call'), '2026-11-17'));   // no answer, and he chose to go on
   assert.equal((nextTask(shtreimel, l, '2026-11-17') as { dueOn: string }).dueOn, '2026-11-22'); // +3 = Friday → Sunday
-  l.history.push(rec('again', '2026-11-22'));
+  l.history.push(rec('again', '2026-11-22'), rec(goOnId('again'), '2026-11-22'));
   assert.deepEqual(nextTask(shtreimel, l, '2026-11-22'), { kind: 'end', reason: 'list' });
 });
 
@@ -110,9 +110,9 @@ const ac = setup({ needs: [{ label: 'מיזוג למוסד', goal: 'primary', re
 test('after Purim, again after two weeks, and before Shavuot', () => {
   const l = lead(['מיזוג למוסד', 'לקיץ הבא']);
   assert.equal((nextTask(ac, l, EXPO) as { dueOn: string }).dueOn, '2027-03-24');
-  l.history.push(rec('purim', '2027-03-24'));
+  l.history.push(rec('purim', '2027-03-24'), rec(goOnId('purim'), '2027-03-24'));
   assert.equal((nextTask(ac, l, '2027-03-24') as { dueOn: string }).dueOn, '2027-04-07');
-  l.history.push(rec('again', '2027-04-07'));
+  l.history.push(rec('again', '2027-04-07'), rec(goOnId('again'), '2027-04-07'));
   assert.equal((nextTask(ac, l, '2027-04-07') as { dueOn: string }).dueOn, '2027-05-30'); // 14 days before 11/6
 });
 
@@ -138,7 +138,7 @@ test('a long-term check every three months, four times, then stop', () => {
     steps: [{ id: 'call', action: 'talk', who: 'me', timing: { kind: 'after', days: 7 } }],
     end: { kind: 'repeat', everyDays: 90, times: 4, action: 'check', who: 'me' },
   } }] }] });
-  const l = lead(['הרחבה'], { history: [rec('call', '2026-11-23')] });
+  const l = lead(['הרחבה'], { history: [rec('call', '2026-11-23'), rec(goOnId('call'), '2026-11-23')] });
   const n = nextTask(s, l, '2026-11-23') as { stepId: string; dueOn: string };
   assert.equal(n.stepId, 'repeat:1');
   assert.equal(n.dueOn, '2027-02-21');
@@ -192,6 +192,21 @@ test('no answer and trying again: the retry is his own step, it comes first, and
   l.history.push(rec('m:r1', '2026-11-24'));
   l.manual!.push({ id: 'r2', action: 'talk', who: 'me', dueOn: '2026-11-26' });
   assert.equal((nextTask(shtreimel, l, '2026-11-24') as { stepId: string }).stepId, 'm:r2');
+});
+
+test('no answer on a call of his: no default, he waits for a decision; a send or a "done" goes on as before', () => {
+  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17'), rec('call', '2026-11-23')] });
+  assert.deepEqual(nextTask(shtreimel, l, '2026-11-23'), { kind: 'end', reason: 'decide' });
+  assert.deepEqual(undecided(shtreimel, l), { stepId: 'call', retry: 'talk' });
+  // The automatic invite marked "noAnswer" (= sent) did not stop anything: the call came after it.
+  assert.equal(undecided(shtreimel, lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17')] })), null);
+  // A try again set by hand answers it; so does going on with the path.
+  assert.equal(undecided(shtreimel, { ...l, manual: [{ id: 'r1', action: 'talk', who: 'me', dueOn: '2026-11-25' }] }), null);
+  const on = { ...l, history: [...l.history, rec(goOnId('call'), '2026-11-24')] };
+  assert.deepEqual(nextTask(shtreimel, on, '2026-11-24'), { kind: 'end', reason: 'list' });
+  // A meeting he did not come to: the try again is a call.
+  const met = lead(['מיזוג למוסד', 'עכשיו'], { history: [rec('visit', '2026-11-17')] });
+  assert.deepEqual(undecided(ac, met), { stepId: 'visit', retry: 'talk' });
 });
 
 test('giving up ends the path at once; a mailing list it ends on keeps him', () => {

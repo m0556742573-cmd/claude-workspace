@@ -54,7 +54,42 @@ export type Next =
       /** When it was due, for a late one (its dueOn moves to today): how late it is (30/10). */ wasDue?: LocalDate }
   /** A step needs the visitor's date and he gave none: the exhibitor is asked to find out when. */
   | { kind: 'askDate'; stepId: string; dueOn: LocalDate }
-  | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' };
+  /** decide: "לא ענה" on a call of his, and he has not chosen yet what now (5/11). */
+  | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' | 'decide' };
+
+/** What "noAnswer" means "he did not get through" for, rather than "done": his calls, meetings, and waiting for him. */
+const PERSONAL: Action[] = ['talk', 'meet', 'wait'];
+/** "לא ענה › להמשיך במסלול" is recorded under this id: the path goes on from the day he chose it. */
+export const goOnId = (stepId: string) => `go:${stepId}`;
+
+/** The action of a step of his own, by its id in the history: of the path, of its repeat, or set by hand. */
+function personalAction(setup: Setup, lead: Lead, stepId: string): Action | null {
+  if (stepId.startsWith('m:')) {
+    const m = (lead.manual ?? []).find((x) => manualId(x.id) === stepId);
+    return m && m.who === 'me' && PERSONAL.includes(m.action) ? m.action : null;
+  }
+  const { path } = choosePath(setup, lead);
+  if (stepId.startsWith('repeat:')) return path.end.kind === 'repeat' && path.end.who === 'me' && PERSONAL.includes(path.end.action) ? path.end.action : null;
+  const s = path.steps.find((x) => x.id === stepId);
+  return s && s.who === 'me' && PERSONAL.includes(s.action) ? s.action : null;
+}
+function undecidedOn(setup: Setup, lead: Lead, last: { stepId: string; outcome: string }): boolean {
+  return last.outcome === 'noAnswer' && personalAction(setup, lead, last.stepId) !== null;
+}
+
+/**
+ * The step he did not get through on and has not decided about (5/11), with what a try again would be: a call, or for
+ * waiting, waiting again. Null when there is none. The screens use it to offer the choice.
+ */
+export function undecided(setup: Setup, all: Lead): { stepId: string; retry: Action } | null {
+  const lead = onPath(all);
+  const last = lead.history[lead.history.length - 1];
+  if (!last || last.outcome !== 'noAnswer') return null;
+  const recorded = new Set(lead.history.map((h) => h.stepId));
+  if ((lead.manual ?? []).some((m) => !recorded.has(manualId(m.id)))) return null;
+  const action = personalAction(setup, lead, last.stepId);
+  return action ? { stepId: last.stepId, retry: action === 'wait' ? 'wait' : 'talk' } : null;
+}
 
 /** The next thing to do for this lead, or why there is nothing. `today` is when the question is asked. */
 export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
@@ -85,6 +120,9 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
     const late = m.dueOn < today;
     return { kind: 'task', stepId: manualId(m.id), action: m.action, who: m.who, message: m.message, dueOn: settle(late ? today : m.dueOn, m.action, m.who), late, ...(late ? { wasDue: m.dueOn } : {}) };
   }
+  // He called (met, waited) and did not get through, and has not decided yet what now (יצחק, 5/11): no default, so the
+  // visitor waits for his decision, seen in the dashboard; nothing is planned for him meanwhile.
+  if (last && undecidedOn(setup, lead, last)) return { kind: 'end', reason: 'decide' };
   // He answered and nothing was set by hand: the path's ladder of attempts is over; he is in the exhibitor's hands.
   if (last && last.outcome === 'engaged') return { kind: 'end', reason: 'engaged' };
 

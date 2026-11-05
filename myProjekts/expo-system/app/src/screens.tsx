@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { TRIED, addDays, nextOccurrence, nextTask, pathAhead, settle, triedText, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
+import { TRIED, addDays, goOnId, nextOccurrence, nextTask, pathAhead, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import * as text from './lib/describe.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { DateField, Icon, PageHead, Tiles, longDate } from './ui.tsx';
@@ -29,6 +29,8 @@ const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'ל
 const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
 /** The messages sent beside the path (1/11), in his history by name. */
 const BESIDE: Record<string, string> = { 'x:offer': 'נשלח לו מבצע האקספו', 'x:offer-reminder': 'נשלחה לו תזכורת על המבצע', 'x:order-check': 'נשאל אם ההזמנה הגיעה' };
+/** In his history, a choice after "לא ענה" that is not a step of its own (5/11). */
+const besideOf = (stepId: string) => BESIDE[stepId] ?? (stepId.startsWith('go:') ? 'בחרת להמשיך במסלול' : undefined);
 /** A step of the path where "noAnswer" really means he did not answer: a call, a meeting, waiting for him (5/11). */
 function personalStep(setup: Setup, stepId: string): boolean {
   const paths = [...setup.needs.flatMap((n) => n.variants.map((v) => v.path)), setup.defaults.business, setup.defaults.private];
@@ -271,6 +273,7 @@ function Harvest({ items }: { items: Item[] }) {
       of: items.filter((i) => i.next.kind === 'task' && i.next.late && lastTouch(i) <= addDays(t, -7)) },
     { key: 'date', label: 'שהתאריך שלהם בחודשיים הקרובים', hint: 'החתונה או האירוע שלהם מתקרבים. זה הזמן שבו הם מחליטים.',
       of: items.filter((i) => i.next.kind !== 'end' && i.row.customer_date && i.row.customer_date >= t && i.row.customer_date <= addDays(t, 60)) },
+    { key: 'decide', label: 'שלא ענו, ומחכים להחלטה שלך', hint: 'ניסית ולא השגת אותם, ועוד לא החלטת מה עכשיו. בדף של כל אחד: לנסות שוב, להמשיך במסלול, או לוותר.', of: ended('decide') },
     { key: 'engaged', label: 'שדיברת איתם, ועוד לא נסגרה עסקה', hint: 'הם כבר מכירים אותך. שיחה קצרה לבדוק איפה הם עומדים, או לסמן עסקה אם נסגרה.', of: ended('engaged') },
     { key: 'stop', label: 'שלא ענו, והמעקב אחריהם נגמר', hint: 'לא הגיע מהם מענה בזמן. בעונה הבאה שלהם אפשר לנסות שוב.', of: ended('stop') },
     { key: 'list', label: 'ברשימת התפוצה', hint: `כדאי להזכיר להם לפני ${holiday.name} (${dayLabel(holiday.on)}): הודעה כללית אחת, בלי לחץ.`, of: ended('list') },
@@ -385,11 +388,16 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
     } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
     finally { setBusy(false); setMore(false); onChange(); }
   }
-  /** "לא ענה" (יצחק, 5/11): opens the choice, try again when or give up, and saves nothing until he chooses (no default).
-   *  The list is reloaded only when he closes it, so the card stays open meanwhile. */
-  function noAnswer(action: Action) {
-    setMore(false);
-    setMissed({ stepId, retry: null, due: null, action, gaveUp: false });
+  /** "לא ענה" (יצחק, 5/11): saved at once, and the visitor waits for his decision, with no default; the sheet that opens
+   *  offers it now. The list is reloaded only when he closes it, so the card stays open meanwhile. */
+  async function noAnswer(retry: Action) {
+    setBusy(true);
+    try {
+      await markStep(row, stepId, 'noAnswer', ...args);
+      setMissed(undecidedOf(stepId, retry));
+      onUndo({ label: `${name}: ${retry === 'wait' ? 'עדיין לא חזר' : 'לא ענה'}`, run: async () => { await unmarkStep(row, stepId, ...args); setMissed(null); onChange(); } });
+    } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
+    finally { setBusy(false); setMore(false); }
   }
   /** "ענה לי" (model §9): a reply the system did not see; the path stops, and "הוא חזר אליי" comes up as the next task. */
   async function replied() {
@@ -623,23 +631,25 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
 
 // ---------- לא ענה (יצחק, 5/11): whether to keep trying is his decision, by how much the visitor is worth to him.
 // There is no default: a try tomorrow for everyone would spend his time on whoever is not worth it (יצחק, 5/11: "לנסות
-// מחר כברירת מחדל הוא ניצול לא נכון של משאבים"). Until he chooses, nothing is saved and the task stays as it was, so
-// nobody drops by itself either. Beside it, one message that leaves the visitor a way back, when there is where to send it.
+// מחר כברירת מחדל הוא ניצול לא נכון של משאבים"). "לא ענה" is saved at once, and until he chooses the visitor waits for
+// his decision, a state of its own in the dashboard (יצחק, 5/11), with nothing planned for him meanwhile. The choice: try
+// again on a day, go on with the path, or give up. Beside it, one message that leaves the visitor a way back.
 
 interface Missed {
   /** The step he did not get through on. */ stepId: string;
-  /** The try again, a step of his own (manual_steps); null before he chose, or after giving up. */ retry: string | null;
-  due: string | null; action: Action; gaveUp: boolean;
+  /** What a try again is: a call, or for waiting, waiting again. */ action: Action;
+  /** The try again, a step of his own (manual_steps). */ retry: string | null;
+  due: string | null; gaveUp: boolean; goOn: boolean;
 }
 const AGAIN: [string, number][] = [['מחר', 1], ['עוד 3 ימים', 3], ['שבוע', 7], ['שבועיים', 14]];
+const undecidedOf = (stepId: string, action: Action): Missed => ({ stepId, action, retry: null, due: null, gaveUp: false, goOn: false });
 
-/** "ביטול" after any choice in the sheet: back to the task as it was before "לא ענה". */
-function undoMissed(m: Missed, item: Item, ctx: Ctx, onChange: () => void): Undo {
+/** Back from a choice to "waiting for a decision". */
+async function clearChoice(m: Missed, item: Item, ctx: Ctx) {
   const args = [ctx.exhibitor.id, item.setup, item.owner, today()] as const;
-  return {
-    label: `${item.name}: ${m.gaveUp ? 'ויתרת' : `${m.action === 'wait' ? 'לבדוק שוב' : 'לנסות שוב'} ${m.due ? dayLabel(m.due) : ''}`}`,
-    run: async () => { if (m.retry) await removeManual(item.row, m.retry, ...args); await unmarkStep(item.row, m.stepId, ...args); onChange(); },
-  };
+  if (m.retry) await removeManual(item.row, m.retry, ...args);
+  if (m.goOn) await unmarkStep(item.row, goOnId(m.stepId), ...args);
+  if (m.gaveUp) await markStep(item.row, m.stepId, 'noAnswer', ...args);
 }
 
 function MissedSheet({ item, ctx, missed, setMissed, dests, onUndo, onDone }: { item: Item; ctx: Ctx; missed: Missed; setMissed: (m: Missed) => void;
@@ -650,50 +660,65 @@ function MissedSheet({ item, ctx, missed, setMissed, dests, onUndo, onDone }: { 
   const wait = missed.action === 'wait';
   // Where the message can go: a mail, or a phone with WhatsApp when he works with it; not one that asked to be removed.
   const reach = (dests ?? []).some((d) => d.receives && !d.removed && (d.kind === 'email' || (d.kind === 'phone' && d.wa !== false && hasWa(ctx))));
-  // After giving up: does the path's mailing list keep him (it would have at its end anyway)?
-  const keepsList = useMemo(() => {
-    const n = nextTask(item.setup, { ...lead, history: [...lead.history.filter((h) => h.stepId !== missed.stepId), { stepId: missed.stepId, doneOn: today(), outcome: 'gaveUp' }] }, today());
-    return n.kind === 'end' && n.reason === 'list';
+  // What going on with the path would do, and whether giving up keeps him on the mailing list (as its end would anyway).
+  const { ahead, keepsList } = useMemo(() => {
+    const base = lead.history.filter((h) => h.stepId !== missed.stepId && h.stepId !== goOnId(missed.stepId));
+    const at = (extra: Lead['history']) => nextTask(item.setup, { ...lead, history: [...base, ...extra] }, today());
+    const on = at([{ stepId: missed.stepId, doneOn: today(), outcome: 'noAnswer' }, { stepId: goOnId(missed.stepId), doneOn: today(), outcome: 'noAnswer' }]);
+    const off = at([{ stepId: missed.stepId, doneOn: today(), outcome: 'gaveUp' }]);
+    return { ahead: on.kind === 'task' ? describe(on) : null, keepsList: off.kind === 'end' && off.reason === 'list' };
   }, [item.setup, lead, missed.stepId]);
 
-  async function change(run: () => Promise<Missed>) {
+  async function change(run: () => Promise<Missed>, label: string) {
     if (busy) return;
     setBusy(true);
-    try { const m = await run(); setMissed(m); onUndo(undoMissed(m, item, ctx, onDone)); }
-    catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
+    try {
+      const m = await run();
+      setMissed(m);
+      onUndo({ label: `${name}: ${label}`, run: async () => { await clearChoice(m, item, ctx); setMissed(undecidedOf(m.stepId, m.action)); onDone(); } });
+    } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
     finally { setBusy(false); }
   }
   const again = (d: string) => d && change(async () => {
     if (missed.retry) { await moveManual(row, missed.retry, d, ...args); return { ...missed, due: d }; }
-    // The first choice, or he gave up and changed his mind: the step is "no answer", with a try of its own.
-    await markStep(row, missed.stepId, 'noAnswer', ...args);
-    return { ...missed, retry: await addManual(row, { action: missed.action, dueOn: d }, ...args), due: d, gaveUp: false };
-  });
+    await clearChoice(missed, item, ctx);
+    return { ...undecidedOf(missed.stepId, missed.action), retry: await addManual(row, { action: missed.action, dueOn: d }, ...args), due: d };
+  }, `${wait ? 'לבדוק שוב' : 'לנסות שוב'} ${dayLabel(d)}`);
+  const goOn = () => change(async () => {
+    await clearChoice(missed, item, ctx);
+    await markStep(row, goOnId(missed.stepId), 'noAnswer', ...args);
+    return { ...undecidedOf(missed.stepId, missed.action), goOn: true };
+  }, 'ממשיכים במסלול');
   const giveUp = () => change(async () => {
-    if (missed.retry) await removeManual(row, missed.retry, ...args);
+    await clearChoice(missed, item, ctx);
     await markStep(row, missed.stepId, 'gaveUp', ...args);
-    return { ...missed, retry: null, due: null, gaveUp: true };
-  });
-  const chosen = !!missed.retry || missed.gaveUp;
+    return { ...undecidedOf(missed.stepId, missed.action), gaveUp: true };
+  }, 'ויתרת');
+  const chosen = !!missed.retry || missed.gaveUp || missed.goOn;
   // The day it really lands on: his calls are not on Friday, nothing on Shabbat or Yom Tov.
   const lands = missed.due ? settle(missed.due, missed.action, 'me') : null;
   const title = missed.gaveUp ? 'ויתרת עליו'
-    : lands ? `${wait ? 'נבדוק שוב' : 'ננסה שוב'} ${dayLabel(lands)}`
-      : wait ? 'עדיין לא חזר. מה עכשיו?' : 'לא ענה. מה עכשיו?';
+    : missed.goOn ? 'ממשיכים במסלול'
+      : lands ? `${wait ? 'נבדוק שוב' : 'ננסה שוב'} ${dayLabel(lands)}`
+        : wait ? 'עדיין לא חזר. מה עכשיו?' : 'לא ענה. מה עכשיו?';
 
   return (
     <div className="sheet">
       <h2>{title}</h2>
-      {!chosen && <p className="muted">עד שתבחר, המשימה נשארת כמו שהיא.</p>}
+      {!chosen && <p className="muted">בינתיים הוא מחכה להחלטה שלך, ושום דבר לא נקבע לו. אפשר להחליט גם אחר כך, מהדף שלו או מהדשבורד.</p>}
+      {missed.goOn && ahead && <p className="muted">הבא במסלול שלו: {ahead}.</p>}
       {missed.gaveUp && <p className="muted">לא יהיו עליו עוד משימות, וההודעות של המסלול שלו לא יוצאות.{keepsList ? ' הוא נשאר ברשימת התפוצה.' : ''}</p>}
       <div className="q-block">
-        <span className="sec">{missed.gaveUp ? 'בכל זאת לנסות שוב' : wait ? 'לבדוק שוב' : 'לנסות שוב'}</span>
+        <span className="sec">{wait ? 'לבדוק שוב' : 'לנסות שוב'}</span>
         <div className="chips">
           {AGAIN.map(([l, d]) => <button key={l} type="button" className="chip" disabled={busy} aria-pressed={missed.due === inDays(d)} onClick={() => again(inDays(d))}>{l}</button>)}
           <DateField label="תאריך אחר" value={missed.due ?? ''} min={inDays(1)} onChange={(v) => v && again(v)} />
         </div>
       </div>
-      {!missed.gaveUp && <div className="row"><button type="button" className="btn" disabled={busy} onClick={giveUp}>לוותר</button></div>}
+      <div className="row">
+        {ahead && <button type="button" className="btn" disabled={busy} aria-pressed={missed.goOn} onClick={goOn}>להמשיך במסלול · {ahead}</button>}
+        <button type="button" className="btn" disabled={busy} aria-pressed={missed.gaveUp} onClick={giveUp}>לוותר</button>
+      </div>
       {reach && !wait && (
         <div className="q-block">
           <span className="sec">אפשר גם לשלוח לו הודעה</span>
@@ -702,9 +727,19 @@ function MissedSheet({ item, ctx, missed, setMissed, dests, onUndo, onDone }: { 
       )}
       {chosen
         ? <button type="button" className="btn primary tall wide" disabled={busy} onClick={onDone}>סיום</button>
-        : <button type="button" className="text-btn" disabled={busy} onClick={onDone}>חזרה</button>}
+        : <button type="button" className="text-btn" disabled={busy} onClick={onDone}>להחליט אחר כך</button>}
     </div>
   );
+}
+
+/** On his page, a visitor waiting for a decision gets the same choice. */
+function Undecided({ item, ctx, onChange, onUndo }: { item: Item; ctx: Ctx; onChange: () => void; onUndo: (u: Undo) => void }) {
+  const u = useMemo(() => undecided(item.setup, item.lead), [item.setup, item.lead]);
+  const [missed, setMissed] = useState<Missed | null>(u ? undecidedOf(u.stepId, u.retry) : null);
+  const [dests, setDests] = useState<Destination[] | null>(null);
+  useEffect(() => { leadDestinations(item.row.id).then(setDests).catch(() => setDests(null)); }, [item.row.id]);
+  if (!missed) return null;
+  return <MissedSheet item={item} ctx={ctx} missed={missed} setMissed={setMissed} dests={dests} onUndo={onUndo} onDone={onChange} />;
 }
 
 function Notes({ note, notes }: { note: string | null; notes: NoteRow[] }) {
@@ -838,6 +873,7 @@ const STATES: [string, string, (i: Item) => boolean][] = [
   ['all', 'הכל', () => true],
   ['now', 'להיום', (i) => i.next.kind !== 'end' && i.next.dueOn <= today()],
   ['later', 'בהמשך', (i) => i.next.kind !== 'end' && i.next.dueOn > today()],
+  ['decide', 'מחכה להחלטה', (i) => i.next.kind === 'end' && i.next.reason === 'decide'],
   ['engaged', 'בטיפול שלך', (i) => i.next.kind === 'end' && i.next.reason === 'engaged'],
   ['closed', 'נסגרה עסקה', (i) => i.next.kind === 'end' && i.next.reason === 'closed'],
   ['list', 'ברשימת התפוצה', (i) => i.next.kind === 'end' && i.next.reason === 'list'],
@@ -925,7 +961,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
   const manual = book.manual.filter((m) => m.lead_id === row.id);
   const notes = book.notes.filter((n) => n.lead_id === row.id);
   const stepId = next.kind === 'end' ? null : next.stepId;
-  const finished = next.kind === 'end' && next.reason !== 'engaged' && next.reason !== 'list' && next.reason !== 'stop';
+  const finished = next.kind === 'end' && next.reason !== 'engaged' && next.reason !== 'list' && next.reason !== 'stop' && next.reason !== 'decide';
   const lastTouch = steps.reduce((d, x) => (x.done_on > d ? x.done_on : d), '');
   const stateWord = STATES.slice(1).find(([, , t]) => t(item))?.[1] ?? '';
   const ddmm = (d: string) => d.split('-').reverse().join('.');
@@ -951,6 +987,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
         ) : (
           <div className="rec-now">
             <div className="nc-now"><span className="faint">עכשיו</span> <b>{END[next.reason] ?? ''}</b></div>
+            {next.reason === 'decide' && !talk && <Undecided key={lastTouch} item={item} ctx={ctx} onChange={onChange} onUndo={onUndo} />}
             {!finished && (talk
               ? <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
               : <div className="actions"><button type="button" className="btn" onClick={() => setTalk(true)}>דיברנו — מה הלאה</button></div>)}
@@ -980,7 +1017,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
             <ul className="log timeline">
               <li><span className="when">{dayLabel(row.captured_on)}</span>ביקר בדוכן</li>
               {book.replies.filter((r) => r.lead_id === row.id).map((r) => <li key={r.at} className="tl-reply"><span className="when">{dayLabel(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(r.at)))}</span>{r.optout ? (r.body.includes('במייל') ? 'ביקש להסיר (בקישור במייל)' : hasWa(ctx) ? 'ביקש להסיר (בוואטסאפ)' : 'ביקש להסיר') : <>ענה: <b>{r.body}</b></>}</li>)}
-              {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{BESIDE[x.step_id] ?? (x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') || personalStep(item.setup, x.step_id) ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
+              {steps.map((x) => <li key={x.step_id}><span className="when">{dayLabel(x.done_on)}</span>{besideOf(x.step_id) ??(x.step_id.startsWith('m:') || x.step_id.startsWith('talk:') || personalStep(item.setup, x.step_id) ? OUTCOME : DONE)[x.outcome] ?? x.outcome}</li>)}
               {manual.filter((m) => !steps.some((x) => x.step_id === `m:${m.id}`)).map((m) => <li key={m.id}><span className="when">{dayLabel(m.due_on)}</span>נקבע: {ACT[m.action]}</li>)}
             </ul>
           </section>
@@ -1124,6 +1161,7 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           <Meters rows={[
             { key: 'now', label: 'משימה להיום', count: now.length },
             { key: 'later', label: 'משימה בהמשך', count: later.length },
+            { key: 'decide', label: END.decide!, count: ended('decide') },
             { key: 'engaged', label: END.engaged!, count: ended('engaged') },
             { key: 'list', label: END.list!, count: ended('list') },
             { key: 'closed', label: END.closed!, count: ended('closed') },
