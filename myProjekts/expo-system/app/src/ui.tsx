@@ -2,6 +2,7 @@
 // line with round caps; where the design system draws an icon (check, phone, mail, plus) its drawing is used.
 // One title per screen with a "?" beside it; small section labels.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { addDays, fromDate, hebNumber, hebrewDate, hebrewDay, weekday } from '@expo/engine';
 import { SAVED } from './lib/saved.ts';
 
 const PATHS = {
@@ -115,70 +116,35 @@ export function Tiles({ items, onPick }: { items: [number | string, string, bool
   );
 }
 
-/** 16 → ט״ז, 20 → כ׳: the day of the Hebrew month in letters. */
-function hebDay(n: number): string {
-  const tens = ['', 'י', 'כ', 'ל'][Math.floor(n / 10)]!, ones = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'][n % 10]!;
-  const s = n === 15 ? 'טו' : n === 16 ? 'טז' : tens + ones;
-  return s.length > 1 ? `${s.slice(0, -1)}״${s.slice(-1)}` : `${s}׳`;
-}
-
-/** "יום שלישי, ט״ז בחשוון (27/10)" — the Hebrew date first, the civil one after it in grey. */
+const WEEKDAY_LONG = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'שבת'];
+/** "יום שלישי, ט״ז בחשוון": Hebrew only (יצחק, 5/11: "רק תאריכים עבריים"). */
 export function longDate(d = new Date()): ReactNode {
-  let heb = '';
-  try {
-    const parts = new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' }).formatToParts(d);
-    const day = Number(parts.find((p) => p.type === 'day')?.value), month = parts.find((p) => p.type === 'month')?.value;
-    if (day && month) heb = `${hebDay(day)} ב${month.replace(/^ב/, '')}`;
-  } catch { /* old phone */ }
-  const day = new Intl.DateTimeFormat('he', { weekday: 'long' }).format(d);
-  return <>{day}{heb ? `, ${heb}` : ''} <span>({d.getDate()}/{d.getMonth() + 1})</span></>;
+  const iso = fromDate(d);
+  return <>{WEEKDAY_LONG[weekday(iso)]}, {hebrewDate(iso)}</>;
 }
 
-// ---------- the date picker (יצחק, 4/11: "תאריכים עבריים במסך של בחירת תאריך בכל מקום באקספו מקס")
-// A month of the Hebrew calendar: each day by its Hebrew letters, with the civil day small under it. The chosen date
-// reads Hebrew first and civil after it, like longDate. The value stays a civil YYYY-MM-DD, so nothing that stores,
-// sends or compares a date changes. A phone whose Intl has no Hebrew calendar keeps the browser's own picker.
-// Days are counted at noon UTC, so no time zone moves a date across midnight.
+/** Today in Israel, as YYYY-MM-DD. */
+const israelToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
 
-const DAY = 86_400_000;
-const atNoon = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y!, m! - 1, d!, 12); };
-const isoOf = (t: number) => new Date(t).toISOString().slice(0, 10);
-const HEB = (() => { try { return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch { return null; } })();
-function hebOf(t: number) {
-  const parts = HEB!.formatToParts(new Date(t)), get = (k: string) => parts.find((p) => p.type === k)?.value ?? '';
-  return { day: Number(get('day')), month: get('month'), year: Number(get('year')) };
+/** A moment in Israel time, Hebrew only: "ו׳ בכסלו בשעה 10:05", or just "ו׳ בכסלו". */
+export function hebrewAt(t: string | Date, time = true): string {
+  const d = new Date(t);
+  const day = hebrewDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d));
+  if (!time) return day;
+  return `${day} בשעה ${new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d)}`;
 }
-const HAS_HEB = (() => { try { return !!HEB && hebOf(Date.UTC(2026, 10, 5, 12)).year === 5787; } catch { return false; } })();
-const CIVIL_MONTH = new Intl.DateTimeFormat('he', { month: 'long', timeZone: 'UTC' });
 
-/** 5787 → תשפ״ז: the year in letters, without the thousands, as it is written. */
-function hebYear(y: number): string {
-  let n = y % 1000, s = '';
-  while (n >= 400) { s += 'ת'; n -= 400; }
-  if (n >= 100) { s += ' קרש'[Math.floor(n / 100)]; n %= 100; }
-  s += n === 15 ? 'טו' : n === 16 ? 'טז'
-    : ['', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ'][Math.floor(n / 10)]! + ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'][n % 10]!;
-  return s.length > 1 ? `${s.slice(0, -1)}״${s.slice(-1)}` : `${s}׳`;
-}
-const hebFull = (t: number) => { const h = hebOf(t); return `${hebDay(h.day)} ב${h.month} ${hebYear(h.year)}`; };
-const civil = (t: number) => { const d = new Date(t); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`; };
-const monthStart = (t: number) => t - (hebOf(t).day - 1) * DAY;
-const monthLength = (start: number) => (hebOf(start + 29 * DAY).day === 1 ? 29 : 30);
-/** "אוקטובר–נובמבר 2026": the civil months a Hebrew month falls in. */
-function civilSpan(start: number, end: number): string {
-  const a = new Date(start), b = new Date(end);
-  if (a.getUTCMonth() === b.getUTCMonth()) return `${CIVIL_MONTH.format(a)} ${a.getUTCFullYear()}`;
-  return a.getUTCFullYear() === b.getUTCFullYear()
-    ? `${CIVIL_MONTH.format(a)}–${CIVIL_MONTH.format(b)} ${b.getUTCFullYear()}`
-    : `${CIVIL_MONTH.format(a)} ${a.getUTCFullYear()}–${CIVIL_MONTH.format(b)} ${b.getUTCFullYear()}`;
-}
+// ---------- the date picker (יצחק, 4/11: "תאריכים עבריים במסך של בחירת תאריך בכל מקום באקספו מקס"; 5/11: "רק תאריכים עבריים")
+// A month of the Hebrew calendar, each day by its Hebrew letters; the chosen date reads "ו׳ בכסלו תשפ״ז". The calendar
+// is @hebcal/core's, through the engine, so every phone shows the same. The value stays a civil YYYY-MM-DD, so nothing
+// that stores, sends or compares a date changes.
 
 export function DateField({ value, onChange, min, disabled, id, label, clearable = false, className = '' }: {
   value: string; onChange: (iso: string) => void; min?: string; disabled?: boolean; id?: string;
   /** For a field with no visible label around it. */ label?: string; clearable?: boolean; className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [month, setMonth] = useState(0); // noon of the 1st of the Hebrew month shown
+  const [month, setMonth] = useState(''); // the civil date of the 1st of the Hebrew month shown
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -189,39 +155,35 @@ export function DateField({ value, onChange, min, disabled, id, label, clearable
     return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', esc); };
   }, [open]);
 
-  if (!HAS_HEB) {
-    return <input id={id} className={`input ${className}`} type="date" aria-label={label} value={value} min={min} disabled={disabled} onChange={(e) => onChange(e.target.value)} />;
-  }
-  const today = atNoon(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date()));
-  const minT = min ? atNoon(min) : -Infinity;
+  const today = israelToday();
   const pick = (iso: string) => { onChange(iso); setOpen(false); };
-  const len = open ? monthLength(month) : 0, head = open ? hebOf(month) : null;
+  const head = open && month ? hebrewDay(month) : null;
   return (
     <span className={`datef ${className}`} ref={box}>
       <button id={id} type="button" className="input datef-btn" aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={disabled}
-        onClick={() => { if (!open) setMonth(monthStart(value ? atNoon(value) : Math.max(today, minT))); setOpen(!open); }}>
-        {value ? <><b>{hebFull(atNoon(value))}</b><small>{civil(atNoon(value))}</small></> : <span className="datef-empty">בחירת תאריך</span>}
+        onClick={() => { if (!open) setMonth(hebrewDay(value || (min && min > today ? min : today)).monthStart); setOpen(!open); }}>
+        {value ? <b>{hebrewDate(value, true)}</b> : <span className="datef-empty">בחירת תאריך</span>}
       </button>
       {open && head && (
         // Inside a <label>, a click on the panel itself would press the button again and close it.
         <div className="datef-pop" role="dialog" aria-label={label ?? 'בחירת תאריך'} onClick={(e) => e.preventDefault()}>
           <div className="datef-head">
-            <button type="button" className="datef-nav" aria-label="החודש הקודם" onClick={() => setMonth(monthStart(month - DAY))}>›</button>
-            <div><b>{head.month} {hebYear(head.year)}</b><small>{civilSpan(month, month + (len - 1) * DAY)}</small></div>
-            <button type="button" className="datef-nav" aria-label="החודש הבא" onClick={() => setMonth(month + len * DAY)}>‹</button>
+            <button type="button" className="datef-nav" aria-label="החודש הקודם" onClick={() => setMonth(hebrewDay(addDays(month, -1)).monthStart)}>›</button>
+            <div><b>{head.month} {hebNumber(head.year)}</b></div>
+            <button type="button" className="datef-nav" aria-label="החודש הבא" onClick={() => setMonth(addDays(month, head.monthDays))}>‹</button>
           </div>
           <div className="datef-grid">
             {['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'].map((w) => <span key={w} className="datef-wd">{w}׳</span>)}
-            {Array.from({ length: new Date(month).getUTCDay() }, (_, i) => <span key={`x${i}`} />)}
-            {Array.from({ length: len }, (_, i) => month + i * DAY).map((t, i) => (
-              <button key={t} type="button" className="datef-day" disabled={t < minT} aria-pressed={value === isoOf(t)}
-                aria-current={t === today ? 'date' : undefined} aria-label={`${hebFull(t)}, ${civil(t)}`} onClick={() => pick(isoOf(t))}>
-                <b>{hebDay(i + 1)}</b><small>{new Date(t).getUTCDate()}</small>
+            {Array.from({ length: weekday(month) }, (_, i) => <span key={`x${i}`} />)}
+            {Array.from({ length: head.monthDays }, (_, i) => addDays(month, i)).map((d, i) => (
+              <button key={d} type="button" className="datef-day" disabled={!!min && d < min} aria-pressed={value === d}
+                aria-current={d === today ? 'date' : undefined} aria-label={`${WEEKDAY_LONG[weekday(d)]}, ${hebrewDate(d, true)}`} onClick={() => pick(d)}>
+                <b>{hebNumber(i + 1)}</b>
               </button>
             ))}
           </div>
           <div className="datef-foot">
-            <button type="button" className="btn" disabled={today < minT} onClick={() => pick(isoOf(today))}>היום</button>
+            <button type="button" className="btn" disabled={!!min && today < min} onClick={() => pick(today)}>היום</button>
             {clearable && value && <button type="button" className="btn ghost" onClick={() => pick('')}>בלי תאריך</button>}
           </div>
         </div>

@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CONFIRM, MINUTES, TRIED, addDays, agreedLine, confirmText, withAgreed, fitDay, goOnId, nextOccurrence, nextTask, pathAhead, rankOf, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
+import { CONFIRM, MINUTES, TRIED, addDays, agreedLine, confirmText, withAgreed, fitDay, goOnId, hebrewDate, nextOccurrence, nextTask, pathAhead, rankOf, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import * as text from './lib/describe.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { DateField, Icon, PageHead, Tiles, longDate } from './ui.tsx';
@@ -898,7 +898,7 @@ export function Leads({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
                       <td className="stick"><button type="button" className="link" onClick={(e) => { e.stopPropagation(); setOpen(i.row.id); }}><b>{i.name}</b></button> <span className="faint">{i.city}</span></td>
                       <td>{i.row.taps.join(' · ') || '—'}</td>
                       <td>{short(i.next) || '—'}</td>
-                      <td className={'tnum' + (i.next.kind === 'task' && i.next.late ? ' late-c' : '')}>{i.next.kind === 'end' ? '—' : i.next.dueOn.split('-').slice(1).reverse().map(Number).join('/')}</td>
+                      <td className={'tnum' + (i.next.kind === 'task' && i.next.late ? ' late-c' : '')}>{i.next.kind === 'end' ? '—' : hebrewDate(i.next.dueOn)}</td>
                       <td>{stateOf(i)}</td>
                     </tr>
                   ))}
@@ -935,9 +935,9 @@ async function exportLeads(items: Item[], ctx: Ctx) {
     ...items.map((i) => {
       const c = contacts.get(i.row.id);
       return [
-        i.name, i.city, c?.phone ?? '', c?.email ?? '', i.owner ? 'כן' : '', i.row.captured_on.split('-').reverse().join('/'),
-        i.row.taps.join(' · '), i.row.customer_date?.split('-').reverse().join('/') ?? '', i.row.note ?? '',
-        short(i.next), i.next.kind === 'end' ? '' : i.next.dueOn.split('-').reverse().join('/'),
+        i.name, i.city, c?.phone ?? '', c?.email ?? '', i.owner ? 'כן' : '', hebrewDate(i.row.captured_on, true),
+        i.row.taps.join(' · '), (i.row.customer_date ? hebrewDate(i.row.customer_date, true) : ''), i.row.note ?? '',
+        short(i.next), i.next.kind === 'end' ? '' : hebrewDate(i.next.dueOn, true),
       ];
     }),
   ];
@@ -1008,7 +1008,7 @@ function LeadPage({ item, ctx, book, onBack, onChange, onUndo }: { item: Item; c
   const finished = next.kind === 'end' && next.reason !== 'engaged' && next.reason !== 'list' && next.reason !== 'stop' && next.reason !== 'decide';
   const lastTouch = steps.reduce((d, x) => (x.done_on > d ? x.done_on : d), '');
   const stateWord = STATES.slice(1).find(([, , t]) => t(item))?.[1] ?? '';
-  const ddmm = (d: string) => d.split('-').reverse().join('.');
+  const ddmm = (d: string) => hebrewDate(d, true); // the visitor's own date (his event), with its year
   async function saveNote() {
     if (!noteText.trim()) return;
     try { await addFollowNote(row.id, noteText.trim(), ctx.exhibitor.id); }

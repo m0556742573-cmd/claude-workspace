@@ -8,7 +8,7 @@ import {
   type Phase, signInWithGoogle, signOut, supabase, type AdminExhibitor, type Session,
 } from '../lib/backend.ts';
 import { Logo } from '../brand.tsx';
-import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
+import { Icon, PageHead, Tiles, hebrewAt, type IconName } from '../ui.tsx';
 import { MailCode } from '../signin.tsx';
 import { ListAdd, ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
@@ -253,7 +253,7 @@ function ExhibitorLine({ r, reload }: { r: AdminExhibitor; reload: () => void })
       <td>{r.business || '—'}</td>
       <td dir="ltr" style={{ textAlign: 'right' }}>{r.email ?? '—'}</td>
       <td className="tnum">{r.leads}</td>
-      <td className="tnum">{d.getDate()}/{d.getMonth() + 1}</td>
+      <td>{hebrewAt(d, false)}</td>
       <td>{r.approved ? 'מאושר' : <b className="late-c">ממתין</b>}</td>
       <td>
         <button type="button" className="switch" role="switch" aria-checked={keep} disabled={busy}
@@ -309,7 +309,7 @@ function PhaseView() {
   }
   return (
     <div className="page narrow">
-      <PageHead title="מצב המערכת" sub={st ? `מאז ${new Date(st.changed_at).toLocaleDateString('he-IL')}${st.changed_by ? ` · ${st.changed_by}` : ''}` : undefined}
+      <PageHead title="מצב המערכת" sub={st ? `מאז ${hebrewAt(st.changed_at, false)}${st.changed_by ? ` · ${st.changed_by}` : ''}` : undefined}
         tip="מצב אחד לכל הדוכנים. בניסיון אין שמות אמיתיים, ואף מבקר לא מקבל הודעה; במעבר לאמיתי אפשר למחוק את מה שנרשם בניסיון." />
       {!st ? (failed ? <p className="muted">לא נטען: אין חיבור כרגע. <button type="button" className="text-btn" onClick={load}>לנסות שוב</button></p> : <p className="muted">טוען…</p>) : (
         <div className="phase-list">
@@ -344,11 +344,8 @@ function PhaseView() {
   );
 }
 
-/** "19.11 בשעה 10:05", in this computer's time. */
-function whenLabel(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getDate()}.${d.getMonth() + 1} בשעה ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+/** "ט׳ בכסלו בשעה 10:05", Israel time, Hebrew only (5/11). */
+const whenLabel = (iso: string) => hebrewAt(iso);
 
 /** The community list (0045, יצחק 3/11: "בכפתור בניהול ולא לפי תאריך"): closed by a button, for all exhibitors at once,
  *  and kept open for one from his line in "מציגים". Closing is asked in so many words before it is done; opening again

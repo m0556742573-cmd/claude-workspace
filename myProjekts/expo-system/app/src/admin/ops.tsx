@@ -4,7 +4,8 @@
 // most urgent first, in three bands; everything else is one tab away. The data is in the `ops` schema (migration 0046),
 // read and written only through public.ops_*, which check is_admin(); every change to an item is kept on the server.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DateField, PageHead } from '../ui.tsx';
+import { hebrewDate } from '@expo/engine';
+import { DateField, PageHead, hebrewAt } from '../ui.tsx';
 import { supabase } from '../lib/backend.ts';
 import { adminKeys } from '../lib/wa.ts';
 import './ops.css';
@@ -51,9 +52,9 @@ const forHim = (i: OpsItem) => i.owner === 'yitzhak' && (i.status === 'open' || 
 
 /** Today in Israel, as YYYY-MM-DD, so "late" means late where he is. */
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
-const dayLabel = (d: string) => { const [, m, day] = d.split('-'); return `${Number(day)}/${Number(m)}`; };
+const dayLabel = (d: string) => hebrewDate(d); // Hebrew only (יצחק, 5/11)
 const daysFrom = (d: string) => Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(today() + 'T00:00:00Z')) / 86400000);
-const clock = (t: string) => new Date(t).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+const clock = (t: string) => hebrewAt(t);
 /** Now: late, due within three days, or marked urgent. Soon: has a date further on. Later: no date. */
 const band = (i: OpsItem): 0 | 1 | 2 =>
   (i.due && daysFrom(i.due) <= 3) || (i.priority === 'high' && !i.due) ? 0 : i.due ? 1 : 2;

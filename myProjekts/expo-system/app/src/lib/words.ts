@@ -1,5 +1,6 @@
-// Dates and the engine's answer in the words the exhibitor reads: "שיחה ממך · יום ג׳ 18.11".
-import { addDays, type Next } from '@expo/engine';
+// Dates and the engine's answer in the words the exhibitor reads: "שיחה ממך · יום ד׳, ח׳ בכסלו".
+// Hebrew dates only (יצחק, 5/11: "רק תאריכים עבריים"); the values stay civil YYYY-MM-DD underneath.
+import { addDays, hebrewDate, type Next } from '@expo/engine';
 
 const DAYS = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
 export const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'הודעה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה ללקוח' };
@@ -19,7 +20,7 @@ export function dayLabel(d: string): string {
   if (d === inDays(1)) return 'מחר';
   if (d === inDays(-1)) return 'אתמול';
   const [y, m, day] = d.split('-').map(Number);
-  return `${DAYS[new Date(y!, m! - 1, day!).getDay()]} ${day}.${m}`;
+  return `${DAYS[new Date(y!, m! - 1, day!).getDay()]}, ${hebrewDate(d)}`;
 }
 
 export function describe(n: Next): string {

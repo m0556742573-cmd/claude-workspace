@@ -2,7 +2,7 @@
 // what he needs, a note, a recording. It never closes by itself; the next name you tap simply opens the next card.
 // Where the lead is stored is the caller's business (the database, or the phone alone in the demo).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AGREED_NOUN, CONSENT, addDays, agreeable, choosePath, immediateMessage, isRestDay, matches, messagesOf, nextTask, replacesFor, weekday, type Action, type AgreedStep, type Offer, type Order, type Setup } from '@expo/engine';
+import { AGREED_NOUN, CONSENT, addDays, agreeable, choosePath, immediateMessage, hebrewDate, isRestDay, matches, messagesOf, nextTask, replacesFor, weekday, type Action, type AgreedStep, type Offer, type Order, type Setup } from '@expo/engine';
 import type { Person } from '../demo/people.ts';
 import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
@@ -799,7 +799,7 @@ function OrderPick({ offer, order, onDone }: { offer: Offer; order?: Order; onDo
   const set = (id: string, n: number) => setQty({ ...qty, [id]: Math.max(0, Math.min(999, n)) });
   return (
     <div className="order-pick">
-      <p className="label">{offer.name}{offer.until ? ` · עד ${offer.until.split('-').reverse().join('.')}` : ''}</p>
+      <p className="label">{offer.name}{offer.until ? ` · עד ${hebrewDate(offer.until)}` : ''}</p>
       {offer.items.map((i) => (
         <div key={i.id} className="order-row">
           <span className="order-name">{i.name} <span className="faint">{i.price > i.expoPrice && <s>{i.price} ₪</s>} {i.expoPrice} ₪</span></span>
