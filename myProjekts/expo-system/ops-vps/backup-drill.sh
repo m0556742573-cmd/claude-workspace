@@ -5,10 +5,14 @@
 # with the counts taken at backup time; counts the users and the files; and checks that each WhatsApp session has its
 # creds.json. The outcome goes to /var/lib/expo-ops/drill.json, and from there to the status page.
 #
-# A real restore (Supabase lost or damaged) follows the same order, into a new or reset project, with psql:
-#   pg_restore --no-owner -f main.sql main.dump;  pg_restore --data-only -f auth-storage.sql auth-storage.dump
+# A real restore (Supabase lost or damaged) follows the same order as the drill, into a new or reset project, with psql.
+# The users go in FIRST: our tables point at them (exhibitors.owner), and a link to a missing user stops the restore
+# (the first drill, 5/11, showed it). A new project already has the schema public, so its CREATE is left out:
+#   pg_restore --data-only -f auth-storage.sql auth-storage.dump
+#   psql "$NEW_DB_URL" -v ON_ERROR_STOP=1 -c 'set session_replication_role = replica' -f auth-storage.sql
+#   pg_restore -l main.dump | grep -v -e ' SCHEMA - public ' -e ' COMMENT - SCHEMA public ' > main.list
+#   pg_restore --no-owner -L main.list -f main.sql main.dump
 #   psql "$NEW_DB_URL" -v ON_ERROR_STOP=1 -f main.sql
-#   psql "$NEW_DB_URL" -c 'set session_replication_role = replica' -f auth-storage.sql
 #   then the files: aws s3 sync each folder of storage/ back to its bucket. WhatsApp: untar wa.tar.zst at / on the
 #   new server before deploy.sh, and the exhibitors stay linked.
 set -uo pipefail
@@ -42,8 +46,18 @@ create function auth.role() returns text language sql stable as 'select null::te
 create function auth.email() returns text language sql stable as 'select null::text';
 create function auth.jwt() returns jsonb language sql stable as 'select null::jsonb';
 SQL
-docker exec "$DB" pg_restore -U postgres -d postgres --no-owner /w/main.dump > "$WORK/restore.log" 2>&1
+# The users first, as in a real restore: here only their ids, which is what our tables point at.
+docker exec "$DB" pg_restore --data-only -f /w/auth-storage.sql /w/auth-storage.dump || fail 'קובץ המשתמשים לא נקרא'
+awk -F'\t' '/^COPY auth\.users /{h=$0; sub(/^[^(]*\(/, "", h); sub(/\).*$/, "", h); n=split(h, c, ", ");
+              for (i = 1; i <= n; i++) if (c[i] == "id") k = i; on = 1; next}
+            on && /^\\\.$/{on = 0} on && k {print $k}' "$WORK/auth-storage.sql" > "$WORK/user-ids.txt"
+docker exec -i "$DB" psql -U postgres -q -v ON_ERROR_STOP=1 -c 'copy auth.users (id) from stdin' < "$WORK/user-ids.txt" \
+  || fail 'המשתמשים לא נטענו לניסוי'
+# Then our schemas, without the CREATE of public, which a new project already has.
+docker exec "$DB" sh -c "pg_restore -l /w/main.dump | grep -v -e ' SCHEMA - public ' -e ' COMMENT - SCHEMA public ' > /w/main.list"
+docker exec "$DB" pg_restore -U postgres -d postgres --no-owner -L /w/main.list /w/main.dump > "$WORK/restore.log" 2>&1
 errors=$(grep -c 'error:' "$WORK/restore.log")
+first_error=$(grep -m1 -A1 'ERROR:' "$WORK/restore.log" | sed -n 's/.*ERROR: *//p' | head -1 | cut -c1-160)
 
 # Every table must have at least the rows counted at backup time (the counts come a moment before the dump).
 sql=$(docker exec "$DB" psql -U postgres -At -c "$COUNT_SQL")
@@ -54,7 +68,6 @@ tables=$(wc -l < "$WORK/restored.txt")
 rows=$(awk '{s+=$2} END{print s+0}' "$WORK/restored.txt")
 
 # The users and the file records, counted inside auth-storage.dump.
-docker exec "$DB" pg_restore --data-only -f /w/auth-storage.sql /w/auth-storage.dump || fail 'קובץ המשתמשים לא נקרא'
 users=$(awk '/^COPY auth\.users /{on=1; next} on && /^\\\.$/{on=0} on{n++} END{print n+0}' "$WORK/auth-storage.sql")
 want_users=$(awk '$1=="auth.users"{print $2}' "$WORK/in/counts.txt")
 files=$(zstd -dc "$WORK/storage.tar.zst" | tar -tf - | grep -vc '/$')
@@ -66,5 +79,7 @@ echo "$summary · restore errors: $errors"
 if [ -n "$short" ] || [ "$users" -lt "${want_users:-0}" ]; then
   fail "חסרות שורות: ${short:-משתמשים} · $summary"
 fi
+# A real restore stops at the first error, so the drill does not pass with any.
+[ "$errors" -eq 0 ] || fail "$errors שגיאות בשחזור, הראשונה: $first_error"
 state drill ok "$WHEN, מגיבוי $STAMP" "$summary"
 echo "Drill OK"

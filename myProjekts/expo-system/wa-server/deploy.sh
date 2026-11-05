@@ -9,7 +9,10 @@ cd "$(dirname "$0")"
 [ -f .env.local ] && . ./.env.local
 HOST="${WA_SSH_HOST:-${GREENWALD_SSH_HOST:-}}"
 KEY="${WA_SSH_KEY:-$HOME/.ssh/greenwald_vps}"
-DOMAIN="${WA_DOMAIN:-expo-wa.paydfb.easypanel.host}"
+# Two addresses for the same server (5/11): our own, named by Cloudflare's DNS, first; Easypanel's old one until Easypanel goes.
+DOMAINS="${WA_DOMAINS:-wa.expomax.y-h-m.com expo-wa.paydfb.easypanel.host}"
+DOMAIN="${DOMAINS%% *}"
+RULE=$(printf 'Host(`%s`) || ' $DOMAINS); RULE="${RULE% || }"
 [ -n "$HOST" ] || { echo "No server address. Create wa-server/.env.local with WA_SSH_HOST=root@<server-ip>"; exit 1; }
 set -a; . ../app/.env; set +a
 ssh_run() { ssh -i "$KEY" -o ConnectTimeout=20 -o BatchMode=yes "$HOST" "$@"; }
@@ -28,7 +31,7 @@ scp -i "$KEY" -q -r "$STAGE"/. "$HOST:/opt/expo-wa/"
 printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\nSESSIONS_DIR=/data/sessions\n' "$VITE_SUPABASE_URL" "$VITE_SUPABASE_KEY" | ssh_run 'umask 077; cat > /opt/expo-wa/.env'
 # The server's own key for the send queue: made once on the server, never copied out; only its hash goes to the database.
 ssh_run '[ -s /opt/expo-wa/wa_key ] || (umask 077; openssl rand -hex 32 | tr -d "\n" > /opt/expo-wa/wa_key); echo "wa_key sha256: $(sha256sum < /opt/expo-wa/wa_key | cut -d" " -f1)"'
-printf '# Written by expo-system/wa-server/deploy.sh\nhttp:\n  routers:\n    expo-wa:\n      rule: "Host(`%s`)"\n      entryPoints: [https]\n      service: expo-wa\n      tls:\n        certResolver: letsencrypt\n  services:\n    expo-wa:\n      loadBalancer:\n        servers:\n          - url: "http://expo-wa:8080"\n' "$DOMAIN" \
+printf '# Written by expo-system/wa-server/deploy.sh\nhttp:\n  routers:\n    expo-wa:\n      rule: "%s"\n      entryPoints: [https]\n      service: expo-wa\n      tls:\n        certResolver: letsencrypt\n  services:\n    expo-wa:\n      loadBalancer:\n        servers:\n          - url: "http://expo-wa:8080"\n' "$RULE" \
   | ssh_run 'cat > /etc/easypanel/traefik/config/expo-wa.yml'
 ssh_run 'cd /opt/expo-wa && docker build -q -t expo-wa . >/dev/null && (docker stop -t 20 expo-wa >/dev/null 2>&1; docker rm -f expo-wa >/dev/null 2>&1 || true) &&
   docker run -d --name expo-wa --restart unless-stopped --network easypanel --memory 4500m --env-file .env -e WA_KEY="$(cat wa_key)" -v /opt/expo-wa/data:/data expo-wa >/dev/null &&
