@@ -24,7 +24,8 @@ $$;
 revoke all on function my_reach() from public, anon;
 grant execute on function my_reach() to authenticated;
 
--- The planner's view: as 0044, with the star and what was agreed.
+-- The planner's view: as it runs now (0042), with the star and what was agreed. Without 0044's expo offer: on 4/11 he
+-- took down "להפעיל: מבצע אחרי האקספו", and whether the offer goes to visitors waits on his answer (ops b-offer-reminder).
 create or replace function wa_plan(key text, exhibitor uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare since timestamptz;
@@ -38,7 +39,6 @@ begin
     'setups', (select coalesce(jsonb_agg(jsonb_build_object('version', s.version, 'active', s.active, 'data', s.data)), '[]'::jsonb)
                from setups s where s.exhibitor_id = exhibitor),
     'texts', (select coalesce(jsonb_object_agg(t.id, t.body), '{}'::jsonb) from message_templates t where t.exhibitor_id = exhibitor),
-    'offer', (select e.offer from exhibitors e where e.id = exhibitor),
     'leads', (select coalesce(jsonb_agg(jsonb_build_object(
                 'id', l.id, 'captured_on', l.captured_on,
                 'captured_at', case when since is not null and l.practice then greatest(l.captured_at, since) else l.captured_at end,
