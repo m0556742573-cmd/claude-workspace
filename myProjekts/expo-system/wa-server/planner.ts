@@ -110,6 +110,42 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
   return out;
 }
 
+/** One of his tasks in the morning message (the shape mail.ts draws). */
+export interface MorningItem { name: string; action: string; message: string | null; late: boolean; due: string }
+
+/**
+ * The morning message's list (5/11, the bug in ב1): his own tasks due today or late, from the engine on what the server
+ * holds now, the same way the app computes them. Until now it read the tasks table, which only the app writes: after an
+ * automatic send, the call that came next never reached the morning message. And how many visitors wait for his decision
+ * (5/11): no answer and nothing chosen yet, or a talk with no next step.
+ */
+export function morningOf(plan: Plan, today: LocalDate): { tasks: MorningItem[]; waiting: number } {
+  const active = plan.setups.find((s) => s.active)?.data;
+  if (!active) return { tasks: [], waiting: 0 };
+  const versions = new Map(plan.setups.map((s) => [s.version, s.data]));
+  const tasks: MorningItem[] = [];
+  let waiting = 0;
+  for (const l of plan.leads) {
+    const replies = plan.replies.filter((r) => r.lead_id === l.id);
+    if (replies.some((r) => r.optout)) continue;
+    const said = replies.filter((r) => !r.optout);
+    const setup = (l.setup_version !== null && versions.get(l.setup_version)) || active;
+    const lead: Lead = {
+      id: l.id, capturedOn: l.captured_on, taps: l.taps, customerDate: l.customer_date ?? undefined, businessOwner: l.business_owner,
+      history: plan.steps.filter((s) => s.lead_id === l.id).map((s) => ({ stepId: s.step_id, doneOn: s.done_on, outcome: s.outcome })),
+      manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
+      repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
+      booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
+    };
+    const n = nextTask(setup, lead, today);
+    if (n.kind === 'task' && n.who === 'me' && n.dueOn <= today) {
+      tasks.push({ name: l.name ?? '', action: n.reply ? 'talk' : n.action, message: n.message ?? null, late: n.late, due: n.wasDue ?? n.dueOn });
+    } else if (n.kind === 'end' && (n.reason === 'decide' || n.reason === 'engaged')) waiting++;
+  }
+  tasks.sort((a, b) => a.due.localeCompare(b.due) || a.name.localeCompare(b.name, 'he'));
+  return { tasks, waiting };
+}
+
 /** A message already went to him that day (by the path or beside it): one a day is enough. */
 const gotToday = (lead: Lead, day: LocalDate) => lead.history.some((h) => h.doneOn === day && h.outcome === 'noAnswer');
 

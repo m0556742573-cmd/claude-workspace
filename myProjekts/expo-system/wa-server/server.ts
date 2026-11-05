@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Browsers, DisconnectReason, fetchLatestBaileysVersion, makeWASocket, normalizeMessageContent, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { firstLeft, gapMs, restDay, sendingHours, typingMs } from './limits.ts';
-import { due, israelDay, type Plan } from './planner.ts';
+import { due, israelDay, morningOf, type Plan } from './planner.ts';
 import { buildMail, buildMorning, providerFrom, type MailRow, type MorningTask } from './mail.ts';
 import { EMPTY, GREETING, build, checks, cleanDraft, converse, stepHelp, type Draft, type StepTurn, type Turn } from './consult.ts';
 import type { Approved } from '../engine/src/index.ts';
@@ -355,7 +355,9 @@ async function morningTick(): Promise<void> {
   try {
     for (const b of (await rpc<{ exhibitor_id: string; name: string; email: string | null; tasks: MorningTask[] }[]>('morning_due', {})) ?? []) {
       try {
-        if (b.email && b.tasks.length) await provider.send(buildMorning(b.email, b.name, b.tasks, PUBLIC_URL, SYSTEM_FROM));
+        // Who is due and where it goes come from the database; what goes in it, from the engine on what is there now (5/11).
+        const { tasks, waiting } = morningOf(await rpc<Plan>('wa_plan', { exhibitor: b.exhibitor_id }), israelDay(new Date()));
+        if (b.email && tasks.length) await provider.send(buildMorning(b.email, b.name, tasks, PUBLIC_URL, SYSTEM_FROM, waiting));
         await record('morning_sent', { exhibitor: b.exhibitor_id });
       } catch (err) { logger.error({ err, booth: b.exhibitor_id }, 'morning message failed'); } // tried again next minute
       await sleep(400);

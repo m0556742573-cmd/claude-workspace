@@ -274,7 +274,7 @@ function Harvest({ items }: { items: Item[] }) {
     { key: 'date', label: 'שהתאריך שלהם בחודשיים הקרובים', hint: 'החתונה או האירוע שלהם מתקרבים. זה הזמן שבו הם מחליטים.',
       of: items.filter((i) => i.next.kind !== 'end' && i.row.customer_date && i.row.customer_date >= t && i.row.customer_date <= addDays(t, 60)) },
     { key: 'decide', label: 'שלא ענו, ומחכים להחלטה שלך', hint: 'ניסית ולא השגת אותם, ועוד לא החלטת מה עכשיו. בדף של כל אחד: לנסות שוב, להמשיך במסלול, או לוותר.', of: ended('decide') },
-    { key: 'engaged', label: 'שדיברת איתם, ועוד לא נסגרה עסקה', hint: 'הם כבר מכירים אותך. שיחה קצרה לבדוק איפה הם עומדים, או לסמן עסקה אם נסגרה.', of: ended('engaged') },
+    { key: 'engaged', label: 'שדיברת איתם, ומחכים להחלטה שלך', hint: 'דיברתם, ולא נקבע צעד הבא. בדף של כל אחד: "דיברנו — מה הלאה" כדי לקבוע אותו, או לסמן עסקה אם נסגרה.', of: ended('engaged') },
     { key: 'stop', label: 'שלא ענו, והמעקב אחריהם נגמר', hint: 'לא הגיע מהם מענה בזמן. בעונה הבאה שלהם אפשר לנסות שוב.', of: ended('stop') },
     { key: 'list', label: 'ברשימת התפוצה', hint: `כדאי להזכיר להם לפני ${holiday.name} (${dayLabel(holiday.on)}): הודעה כללית אחת, בלי לחץ.`, of: ended('list') },
   ].filter((g) => g.of.length);
@@ -873,8 +873,8 @@ const STATES: [string, string, (i: Item) => boolean][] = [
   ['all', 'הכל', () => true],
   ['now', 'להיום', (i) => i.next.kind !== 'end' && i.next.dueOn <= today()],
   ['later', 'בהמשך', (i) => i.next.kind !== 'end' && i.next.dueOn > today()],
-  ['decide', 'מחכה להחלטה', (i) => i.next.kind === 'end' && i.next.reason === 'decide'],
-  ['engaged', 'בטיפול שלך', (i) => i.next.kind === 'end' && i.next.reason === 'engaged'],
+  // No answer and nothing chosen yet, or a talk with no next step: both wait for his decision (יצחק, 5/11).
+  ['decide', 'מחכה להחלטה', (i) => i.next.kind === 'end' && (i.next.reason === 'decide' || i.next.reason === 'engaged')],
   ['closed', 'נסגרה עסקה', (i) => i.next.kind === 'end' && i.next.reason === 'closed'],
   ['list', 'ברשימת התפוצה', (i) => i.next.kind === 'end' && i.next.reason === 'list'],
   ['ended', 'הסתיים', (i) => i.next.kind === 'end' && ['stop', 'notRelevant', 'optOut'].includes(i.next.reason)],
@@ -1161,8 +1161,7 @@ export function Dashboard({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           <Meters rows={[
             { key: 'now', label: 'משימה להיום', count: now.length },
             { key: 'later', label: 'משימה בהמשך', count: later.length },
-            { key: 'decide', label: END.decide!, count: ended('decide') },
-            { key: 'engaged', label: END.engaged!, count: ended('engaged') },
+            { key: 'decide', label: END.decide!, count: ended('decide') + ended('engaged') },
             { key: 'list', label: END.list!, count: ended('list') },
             { key: 'closed', label: END.closed!, count: ended('closed') },
             { key: 'notRelevant', label: END.notRelevant!, count: ended('notRelevant') },

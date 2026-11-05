@@ -113,13 +113,16 @@ const ACT: Record<string, string> = { talk: 'שיחה', meet: 'פגישה', prep
  * The morning message (07/10, 20/10, 30/10): his tasks of the day, the late ones first, and a button straight to them.
  * From YHM to him, in YHM's own look; no removal line (it is his own system's message, switched off in his settings).
  */
-export function buildMorning(to: string, name: string, tasks: MorningTask[], appUrl: string, fromAddress: string): Mail {
+export function buildMorning(to: string, name: string, tasks: MorningTask[], appUrl: string, fromAddress: string, waiting = 0): Mail {
   const late = tasks.filter((t) => t.late), today = tasks.filter((t) => !t.late);
   const line = (t: MorningTask) => `${t.name} · ${ACT[t.action] ?? t.action}${t.message ? ` — "${t.message}"` : ''}`;
   const subject = `המשימות שלך להיום · ${tasks.length}`;
   const first = name.trim().split(/\s+/)[0] ?? '';
+  // Visitors waiting for his decision (יצחק, 5/11): one line under the tasks, to the dashboard where they are.
+  const wait = waiting === 1 ? 'מבקר אחד מחכה להחלטה שלך' : waiting > 1 ? `${waiting} מבקרים מחכים להחלטה שלך` : '';
   const text = [`בוקר טוב ${first},`, '', ...(late.length ? ['באיחור:', ...late.map((t) => '• ' + line(t)), ''] : []),
-    ...(today.length ? ['להיום:', ...today.map((t) => '• ' + line(t)), ''] : []), `לפתוח את המשימות: ${appUrl}/#tasks`, '', 'אקספומקס, מבית YHM'].join('\n');
+    ...(today.length ? ['להיום:', ...today.map((t) => '• ' + line(t)), ''] : []), ...(wait ? [`${wait}: ${appUrl}/#dash`, ''] : []),
+    `לפתוח את המשימות: ${appUrl}/#tasks`, '', 'אקספומקס, מבית YHM'].join('\n');
   // The ExpoMax look (design system, MorningMessage, 31/10): a forest strip with the logo (without "מבית"), "בוקר טוב" and
   // a short list with orange chevrons, one button, and "מבית YHM" at the foot. Here ExpoMax speaks in its own name.
   const X = { forest: '#0B1A13', orange: '#F8AC00', snow: '#F2F5EE', ink: '#0B1A13', muted: '#405247', line: '#E3E8E0', late: '#B3361B', foot: '#55625A' };
@@ -135,6 +138,7 @@ export function buildMorning(to: string, name: string, tasks: MorningTask[], app
     + `<tr><td dir="rtl" align="right" style="background:${X.forest};padding:16px 22px"><img src="${appUrl}/mail/expomax-on-dark.png" width="147" height="30" alt="אקספומקס" style="display:block;width:147px;height:30px;border:0;font-family:${FONT};font-size:18px;font-weight:bold;color:${X.snow}"></td></tr>`
     + `<tr><td dir="rtl" align="right" style="padding:22px 24px 2px;font-family:${FONT};text-align:right"><div style="font-size:22px;font-weight:bold;color:${X.ink}">בוקר טוב, ${esc(first)}</div><div style="font-size:15px;color:${X.muted};margin-top:4px">${tasks.length === 1 ? 'משימה אחת להיום, מהאקספו:' : `${tasks.length} משימות להיום, מהאקספו:`}</div></td></tr>`
     + list('באיחור', late, X.late) + list('להיום', today, X.ink)
+    + (wait ? `<tr><td dir="rtl" align="right" style="padding:14px 24px 0;font-family:${FONT};text-align:right;font-size:14px;color:${X.muted}"><a href="${appUrl}/#dash" style="color:${X.ink};font-weight:bold">${esc(wait)}</a></td></tr>` : '')
     + `<tr><td align="right" dir="rtl" style="padding:20px 24px 24px"><a href="${appUrl}/#tasks" style="display:inline-block;background:${X.forest};color:${X.orange};font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:999px">לפתוח את המשימות</a></td></tr>`
     + `<tr><td dir="rtl" align="right" style="background:${X.snow};padding:12px 24px;font-family:${FONT};font-size:12px;line-height:1.6;color:${X.foot};text-align:right">אקספומקס, מבית <a href="${YHM.url}" style="color:${X.ink};font-weight:bold;text-decoration:none">YHM</a><br>אפשר לשנות את השעה, או לכבות, בהגדרות › הודעות.</td></tr>`
     + '</table></td></tr></table></body></html>';

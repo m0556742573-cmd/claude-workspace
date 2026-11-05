@@ -163,3 +163,22 @@ test('after an order: its summary, and a week on a check, once', () => {
   assert.match(d[0]!.body, /ההזמנה מהתערוכה הגיעה/);
   assert.equal(due(plan({ offer, ...ordered, planned: ['a|order', 'a|x:order-check'] }), '2026-11-23', []).length, 0);
 });
+
+// ---- the morning message (5/11, the bug in ב1): from the engine on what the server holds, not from the app's table
+
+test('the morning list: the call after an automatic send is there, and who waits for a decision is counted', async () => {
+  const { morningOf } = await import('./planner.ts');
+  // The automatic message went on the fair's day (the server recorded it); the call is three days later.
+  const sent = plan({ steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] });
+  assert.deepEqual(morningOf(sent, '2026-11-18').tasks, []);
+  const m = morningOf(sent, '2026-11-19');
+  assert.deepEqual(m.tasks, [{ name: 'יעקב', action: 'talk', message: null, late: false, due: '2026-11-19' }]);
+  assert.equal(m.waiting, 0);
+  // A day later and not done: late, with the day it was due.
+  assert.deepEqual(morningOf(sent, '2026-11-22').tasks[0], { name: 'יעקב', action: 'talk', message: null, late: true, due: '2026-11-19' });
+  // He called and did not get through, and chose nothing yet: no task, and he is counted as waiting for a decision.
+  const missed = plan({ steps: [...sent.steps, { lead_id: 'a', step_id: 'call', done_on: '2026-11-19', outcome: 'noAnswer' }] });
+  assert.deepEqual(morningOf(missed, '2026-11-20'), { tasks: [], waiting: 1 });
+  // "הסר" ends it: nothing.
+  assert.deepEqual(morningOf(plan({ ...sent, replies: [{ lead_id: 'a', at: '2026-11-17T08:00:00Z', optout: true }] }), '2026-11-19'), { tasks: [], waiting: 0 });
+});
