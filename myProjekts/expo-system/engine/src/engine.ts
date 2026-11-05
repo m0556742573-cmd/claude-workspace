@@ -116,7 +116,7 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
   if (agreed && !recorded.has(AGREED)) {
     // The path's own message of the visit day still goes first, and carries the confirmation (one message, not two).
     const { path } = choosePath(setup, lead);
-    const first = lead.booth ? undefined : path.steps.filter((x) => matches(x.onlyIf, lead.taps)).find((x) => immediate(x) && !recorded.has(x.id) && !agreed.replaces.includes(x.id));
+    const first = lead.booth ? undefined : path.steps.filter((x) => matches(x.onlyIf, lead.taps)).find((x) => immediate(x) && !recorded.has(x.id) && !replacedBy(setup, lead, agreed).includes(x.id));
     if (first) {
       const n = schedule(first, lead.capturedOn, lead, today);
       return n.kind === 'task' && confirm ? { ...n, confirm } : n;
@@ -143,7 +143,8 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
 
   const { path } = choosePath(setup, lead);
   // A choice at the booth (a message, or none now) takes the place of the path's own immediate messages.
-  const steps = withoutImmediate(path.steps.filter((s) => matches(s.onlyIf, lead.taps)), !!lead.booth).filter((s) => !agreed?.replaces.includes(s.id));
+  const taken = agreed ? replacedBy(setup, lead, agreed) : [];
+  const steps = withoutImmediate(path.steps.filter((s) => matches(s.onlyIf, lead.taps)), !!lead.booth).filter((s) => !taken.includes(s.id));
   const done = new Set(lead.history.map((h) => h.stepId));
   const base = last ? last.doneOn : lead.capturedOn;
 
@@ -195,6 +196,11 @@ export function replacesFor(setup: Setup, lead: Lead, action: Action): string[] 
   const steps = path.steps.filter((x) => matches(x.onlyIf, lead.taps) && !done.has(x.id));
   const at = steps.findIndex((x) => x.who === 'me' && x.action === action);
   return at < 0 ? [] : steps.slice(0, at + 1).filter((x) => !immediate(x)).map((x) => x.id);
+}
+
+/** What the agreed step takes the place of: as fixed at the booth, or worked out from the path as it was at the visit. */
+function replacedBy(setup: Setup, lead: Lead, a: AgreedStep): string[] {
+  return a.replaces ?? replacesFor(setup, { ...lead, history: [] }, a.action);
 }
 
 /** What the path offers as the step to agree on at the booth: its first step of his own, in its words when it has some. */

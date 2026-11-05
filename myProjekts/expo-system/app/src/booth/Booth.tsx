@@ -696,9 +696,9 @@ function HelpDot() {
 // already knows what is done, and what is missing is when. With a queue nobody has to touch it: the path runs as before.
 
 const LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
-const PARTS: [NonNullable<AgreedStep['part']>, string][] = [['morning', 'בבוקר'], ['noon', 'בצהריים'], ['evening', 'בערב']];
+export const PARTS: [NonNullable<AgreedStep['part']>, string][] = [['morning', 'בבוקר'], ['noon', 'בצהריים'], ['evening', 'בערב']];
 /** Today, tomorrow, and the next four days that are not Shabbat or Yom Tov: a Friday may be chosen. */
-function dayChips(from: string): { on: string; label: string }[] {
+export function dayChips(from: string): { on: string; label: string }[] {
   const out: { on: string; label: string }[] = [];
   for (let d = from; out.length < 6; d = addDays(d, 1)) {
     if (isRestDay(d)) continue;
@@ -727,6 +727,8 @@ function AgreedLine({ lead, setup, reach, offer, onAgree, onOrder }: { lead: Loc
     return [...own, ...plain].filter((c) => { const k = c.label ?? AGREED_NOUN[c.action]; if (seen.has(k)) return false; seen.add(k); return true; });
   }, [setup, lead]);
   const words = (c: { action: Action; label?: string }) => c.label ?? AGREED_NOUN[c.action];
+  // He chose the day himself on his phone (6/11): the card says so.
+  const own = !!step?.asked;
   const agree = (on: string, w = what, by = who) =>
     onAgree({ action: w.action, ...(w.label ? { label: w.label } : {}), on, ...(step?.part ? { part: step.part } : {}), who: by, replaces: replacesFor(setup, lead, w.action) });
   // A day tapped again takes it back.
@@ -745,7 +747,7 @@ function AgreedLine({ lead, setup, reach, offer, onAgree, onOrder }: { lead: Loc
     <div className="agreed">
       <div className="agreed-q">
         <span className="label">מה סיכמנו?</span> <b>{who === 'him' ? 'הוא חוזר אליך עד' : words(step ?? what)}</b>
-        {step && <span className="faint small"> · {who === 'him' ? 'אם לא, ביום שאחרי תבדוק' : 'סוכם, ויופיע אצלך ראשון'}</span>}
+        {step && <span className="faint small"> · {own ? 'הוא ביקש את היום הזה בהרשמה' : who === 'him' ? 'אם לא, ביום שאחרי תבדוק' : 'סוכם, ויופיע אצלך ראשון'}</span>}
       </div>
       <div className="chips">
         {dayChips(t).map((d) => <button key={d.on} type="button" className="chip" aria-pressed={step?.on === d.on} onClick={() => pick(d.on)}>{d.label}</button>)}

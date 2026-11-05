@@ -423,9 +423,11 @@ export async function joinInfo(code: string): Promise<JoinInfo | null> {
   return (data as JoinInfo) ?? null;
 }
 
-export async function joinBooth(code: string, v: { name: string; phone: string; email: string; taps: string[]; consent: boolean; date: string | null }): Promise<{ again: boolean }> {
+export async function joinBooth(code: string, v: { name: string; phone: string; email: string; taps: string[]; consent: boolean; date: string | null;
+  /** "מתי נוח שיחזרו אליך?" (6/11): his own day for the call, and a part of the day. */ callOn?: string | null; callPart?: string | null }): Promise<{ again: boolean }> {
   const { data, error } = await supabase.rpc('join_booth', {
     code, name: v.name.trim(), phone: v.phone, email: v.email.trim() || null, taps: v.taps, consent: v.consent, on_date: v.date,
+    ...(v.callOn ? { call_on: v.callOn, call_part: v.callPart ?? null } : {}),
   });
   if (error) throw error;
   return { again: !!(data as { again?: boolean })?.again };
@@ -438,7 +440,7 @@ export async function joinBooth(code: string, v: { name: string; phone: string; 
  */
 export async function pullSelf(exhibitorId: string, setup: Setup, directory: Person[], onDay: string): Promise<boolean> {
   const [mine, tasks] = await Promise.all([
-    every((a, b) => supabase.from('leads').select('id, person_id, typed_name, typed_phone, taps, customer_date, note, captured_on, captured_at, source').eq('captured_on', onDay).order('id').range(a, b)).then((data) => ({ data, error: null })),
+    every((a, b) => supabase.from('leads').select('id, person_id, typed_name, typed_phone, taps, customer_date, note, captured_on, captured_at, source, agreed').eq('captured_on', onDay).order('id').range(a, b)).then((data) => ({ data, error: null })),
     every((a, b) => supabase.from('tasks').select('lead_id').order('lead_id').range(a, b)).then((data) => ({ data, error: null })),
   ]);
   if (mine.error) throw mine.error;
@@ -457,6 +459,7 @@ export async function pullSelf(exhibitorId: string, setup: Setup, directory: Per
         id: r.id, capturedOn: r.captured_on, capturedAt: r.captured_at, taps: r.taps, customerDate: r.customer_date ?? undefined,
         businessOwner: p?.businessOwner ?? false, history: [], name: p?.fullName ?? r.typed_name ?? '', city: p?.city,
         personId: r.person_id ?? undefined, typedPhone: r.typed_phone ?? undefined, note: r.note ?? '', synced: true, self: r.source === 'self',
+        ...(r.agreed ? { agreed: r.agreed } : {}),
         owner: exhibitorId, rev: nextRev(),
       });
       changed = true;

@@ -7,6 +7,8 @@ import qrcode from 'qrcode-generator';
 import { fileUrl, joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
 import { MailInput, mailHints, mailProblem } from './mail.tsx';
 import { DateField } from './ui.tsx';
+import { dayChips, PARTS } from './booth/Booth.tsx';
+import { dayLabel, today } from './lib/words.ts';
 
 const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 /** On the visitor's page a button reads without the "(מתי?)" the exhibitor sees; a date field opens instead. */
@@ -23,6 +25,9 @@ export function Join({ code }: { code: string }) {
   const [taps, setTaps] = useState<string[]>([]);
   const [date, setDate] = useState('');
   const [consent, setConsent] = useState(false);
+  // "מתי נוח שיחזרו אליך?" (יצחק, 6/11): his own day, and if he likes, a part of it. Not a must.
+  const [callOn, setCallOn] = useState('');
+  const [callPart, setCallPart] = useState('');
   const [state, setState] = useState<'' | 'busy' | 'done' | 'again'>('');
   const [error, setError] = useState('');
 
@@ -46,7 +51,7 @@ export function Join({ code }: { code: string }) {
   async function send() {
     setState('busy'); setError('');
     try {
-      const r = await joinBooth(code, { ...f, taps, consent, date: wantsDate && date ? date : null });
+      const r = await joinBooth(code, { ...f, taps, consent, date: wantsDate && date ? date : null, callOn: callOn || null, callPart: callOn && callPart ? callPart : null });
       setState(r.again ? 'again' : 'done');
     } catch (e) {
       const m = String((e as Error).message ?? e);
@@ -65,8 +70,8 @@ export function Join({ code }: { code: string }) {
     return (
       <JoinBox title={`תודה, ${first}`} by={who} logo={info.logo}>
         <p>{state === 'again' ? 'כבר היית רשום היום. הוספנו את מה שסימנת עכשיו.' : `נרשמת אצל ${who}.`}</p>
-        <p className="muted">{info.sensitive && !consent ? 'נחזור אליך רק אם יהיה צורך.' : 'נחזור אליך על מה שסימנת.'} אפשר לבקש להסיר בכל רגע.</p>
-        <button type="button" className="text-btn" onClick={() => { setF({ name: '', phone: '', email: '' }); setMailLeft(false); setTaps([]); setDate(''); setConsent(false); setState(''); }}>לרשום עוד מישהו</button>
+        <p className="muted">{callOn ? `נחזור אליך ${dayLabel(callOn) === 'היום' || dayLabel(callOn) === 'מחר' ? dayLabel(callOn) : `ב${dayLabel(callOn)}`}${callPart ? ` ${PARTS.find(([p]) => p === callPart)?.[1] ?? ''}` : ''}, כמו שביקשת.` : info.sensitive && !consent ? 'נחזור אליך רק אם יהיה צורך.' : 'נחזור אליך על מה שסימנת.'} אפשר לבקש להסיר בכל רגע.</p>
+        <button type="button" className="text-btn" onClick={() => { setF({ name: '', phone: '', email: '' }); setMailLeft(false); setTaps([]); setDate(''); setConsent(false); setCallOn(''); setCallPart(''); setState(''); }}>לרשום עוד מישהו</button>
       </JoinBox>
     );
   }
@@ -94,6 +99,17 @@ export function Join({ code }: { code: string }) {
         {info.sensitive && (
           <div className="chips"><button type="button" className="chip" aria-pressed={consent} onClick={() => setConsent(!consent)}>מסכים לקבל עדכונים</button></div>
         )}
+        <div className="q-block">
+          <span className="sec">מתי נוח שיחזרו אליך? (לא חובה)</span>
+          <div className="chips">
+            {dayChips(today()).map((d) => <button key={d.on} type="button" className="chip" aria-pressed={callOn === d.on} onClick={() => setCallOn(callOn === d.on ? '' : d.on)}>{d.label}</button>)}
+          </div>
+          {callOn && (
+            <div className="chips">
+              {PARTS.map(([p, l]) => <button key={p} type="button" className="chip" aria-pressed={callPart === p} onClick={() => setCallPart(callPart === p ? '' : p)}>{l}</button>)}
+            </div>
+          )}
+        </div>
         <button type="button" className="btn primary tall wide" disabled={!ready || state === 'busy'} onClick={send}>{state === 'busy' ? 'שולח…' : 'הרשמה'}</button>
         {error && <p className="err" role="alert">{error}</p>}
         <p className="faint small">{info.sensitive ? 'הפרטים נשארים אצל המציג בלבד.' : `בהרשמה ${info.name} יוכל לשלוח לך הודעות על מה שסימנת. אפשר לבקש להסיר בכל רגע.`}</p>
