@@ -3,7 +3,8 @@
 // the exhibitor's own edit (table message_templates) replaces them. Every other detail in square brackets ([כתובת],
 // [שעות]) the exhibitor writes once, and it is filled into every message it appears in (יצחק, 29/10). Whatever is still
 // left in square brackets is a hole: a message with a hole is not sent.
-import type { Order, Path, Setup } from './model.ts';
+import type { Action, AgreedStep, LocalDate, Offer, Order, Path, Setup } from './model.ts';
+import { addDays, weekday } from './calendar.ts';
 import { fixtures } from '../fixtures/businesses.ts';
 
 export interface Me {
@@ -83,6 +84,67 @@ const money = (n: number) => `${Math.round(n * 100) / 100} ₪`;
 export function orderSummary(order: Order): string {
   const lines = order.items.filter((i) => i.qty > 0).map((i) => `• ${i.qty} × ${i.name} · ${money(i.qty * i.price)}`);
   return [`שלום [שם],`, `תודה על ההזמנה בתערוכה${order.offer ? `, במבצע "${order.offer}"` : ''}:`, ...lines, `סה"כ: ${money(order.total)}`, SIGN].join('\n');
+}
+
+const dayMonth = (d: LocalDate) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`;
+/**
+ * The expo offer to a visitor who did not order at the booth (model §14א; my choice 1/11, not yet his): the items at
+ * their expo price, until when, and how to order. The reminder goes the day before it ends.
+ */
+export function offerText(offer: Offer, reminder: boolean): string {
+  const what = offer.name ? `המבצע "${offer.name}"` : 'המבצע';
+  const lines = offer.items.map((i) => `• ${i.name} · ${money(i.expoPrice)}${i.price > i.expoPrice ? ` במקום ${money(i.price)}` : ''}`);
+  const head = reminder ? `להזכיר, ${what} מהתערוכה בתוקף רק עד מחר:` : `${what} מהתערוכה בתוקף עד ${dayMonth(offer.until)}:`;
+  return ['שלום [שם],', head, ...lines, 'להזמנה אפשר לענות להודעה הזו.', SIGN].join('\n');
+}
+
+/** A week after an order at the booth (my choice 1/11, not yet his): did it arrive, and is all well. */
+export function orderCheckText(): string {
+  return ['שלום [שם],', 'רציתי לוודא שההזמנה מהתערוכה הגיעה, ושהכל בסדר. אם משהו חסר או לא מסתדר, אפשר לענות כאן.', SIGN].join('\n');
+}
+
+// ---------- the visitor's confirmation of what was agreed at the booth (5/11, א1; my wording, a default he can see)
+
+const WEEKDAY = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const PART: Record<NonNullable<AgreedStep['part']>, string> = { morning: 'בבוקר', noon: 'בצהריים', evening: 'בערב' };
+/** What was agreed, as a noun, when the path has no words of its own for it. */
+export const AGREED_NOUN: Record<Action, string> = { talk: 'שיחה', meet: 'פגישה', prepare: 'הכנה', send: 'שליחה', reserve: 'שריון', check: 'בדיקה', wait: 'המתנה' };
+/** A day as the visitor reads it, from the day the message goes: היום, מחר, יום רביעי; a week or more ahead, with its date. */
+export function dayWords(on: LocalDate, from: LocalDate): string {
+  if (on === from) return 'היום';
+  if (on === addDays(from, 1)) return 'מחר';
+  const far = on > addDays(from, 6);
+  return `יום ${WEEKDAY[weekday(on)]}${far ? `, ${Number(on.slice(8, 10))}/${Number(on.slice(5, 7))}` : ''}`;
+}
+/**
+ * The confirmation line: "כמו שסיכמנו: מדידה בבית ביום רביעי בערב." A sensitive business says only when, never what;
+ * "he gets back to me": that he waits to hear by then.
+ */
+export function agreedLine(a: AgreedStep, sensitive: boolean, from: LocalDate): string {
+  const day = dayWords(a.on, from);
+  const at = `${day === 'היום' || day === 'מחר' ? day : `ב${day}`}${a.part ? ` ${PART[a.part]}` : ''}`;
+  if (a.who === 'him') return `כמו שסיכמנו, אחכה לשמוע ממך עד ${day}.`;
+  if (sensitive) return `כמו שסיכמנו, נהיה בקשר ${at}.`;
+  return `כמו שסיכמנו: ${a.label ?? AGREED_NOUN[a.action]} ${at}.`;
+}
+/** The line inside the first message of the visit day, right after its greeting: one message, never two. */
+export function withAgreed(body: string, line: string): string {
+  const [first, ...rest] = body.split('\n');
+  return /^(שלום|בס"ד|לכבוד)/.test(first ?? '') ? [first, line, ...rest].join('\n') : [line, body].join('\n');
+}
+/** The confirmation on its own, when no message goes on the visit day. */
+export function confirmText(line: string): string {
+  return ['שלום [שם],', line, SIGN].join('\n');
+}
+
+/** The template id of the message beside "לא ענה" (יצחק, 5/11), in the outbox. */
+export const TRIED = 'x:tried';
+/**
+ * What the exhibitor can send after a call he did not get through (my wording, 5/11, a suggestion of mine he accepted
+ * with the rest): it leaves the visitor a way back. It does not say "reply here", since a reply is not always read.
+ */
+export function triedText(): string {
+  return ['שלום [שם],', 'ניסיתי להשיג אותך. כשיהיה נוח, אשמח לדבר.', SIGN].join('\n');
 }
 
 /** The text as the visitor gets it: his name, the exhibitor's signature and greeting. Holes stay as they are. */
