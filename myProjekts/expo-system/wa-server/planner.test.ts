@@ -118,7 +118,8 @@ test('the offer goes the day after the visit, not on it, and says until when', (
   const d = due(p, '2026-11-17', []);
   assert.equal(d.length, 1);
   assert.equal(d[0]!.step, 'x:offer');
-  assert.match(d[0]!.body, /^שלום יעקב,\nהמבצע "חנוכה" מהתערוכה בתוקף עד 20\/11:\n• סל שי · 80 ₪ במקום 100 ₪/);
+  // Hebrew dates only (5/11): 20/11 is י׳ בכסלו.
+  assert.match(d[0]!.body, /^שלום יעקב,\nהמבצע "חנוכה" מהתערוכה בתוקף עד י׳ בכסלו:\n• סל שי · 80 ₪ במקום 100 ₪/);
 });
 
 test('the offer waits for a day the path sends nothing', () => {
