@@ -423,3 +423,14 @@ test('the confirmation to the visitor, in his words (5/11, א1)', async () => {
   assert.equal(withAgreed('שלום [שם],\nמצורפות תמונות.\nחתימה', 'כמו שסיכמנו: X.'), 'שלום [שם],\nכמו שסיכמנו: X.\nמצורפות תמונות.\nחתימה');
   assert.match(confirmText('כמו שסיכמנו: X.'), /^שלום \[שם\],\nכמו שסיכמנו: X\.\n\[שם המציג\]/);
 });
+
+test('self-registration (6/11): "מתי נוח שיחזרו אליך?" — his own day, the call of the path taken, and "as you asked"', async () => {
+  const { agreedLine } = await import('../src/index.ts');
+  const asked = { action: 'talk' as const, on: '2026-11-18', part: 'evening' as const, who: 'me' as const, asked: true };
+  const l = lead(['מטבח'], { history: [rec('material', EXPO)], agreed: asked });
+  assert.deepEqual(nextTask(visiting, l, EXPO), { kind: 'task', stepId: 'agreed', action: 'talk', who: 'me', dueOn: '2026-11-18', late: false, agreed: true, part: 'evening' });
+  // The path's call to set things up is taken by it (worked out from the path), the measurement is not.
+  l.history.push(rec('agreed', '2026-11-18'));
+  assert.equal((nextTask(visiting, l, '2026-11-18') as { stepId: string }).stepId, 'visit');
+  assert.equal(agreedLine(asked, false, EXPO), 'כמו שביקשת, נחזור אליך ביום רביעי בערב.');
+});

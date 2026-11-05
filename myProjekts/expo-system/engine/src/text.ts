@@ -124,6 +124,8 @@ export function agreedLine(a: AgreedStep, sensitive: boolean, from: LocalDate): 
   const day = dayWords(a.on, from);
   const at = `${day === 'היום' || day === 'מחר' ? day : `ב${day}`}${a.part ? ` ${PART[a.part]}` : ''}`;
   if (a.who === 'him') return `כמו שסיכמנו, אחכה לשמוע ממך עד ${day}.`;
+  // He chose it himself at self-registration (6/11): not "as we agreed".
+  if (a.asked) return `כמו שביקשת, נחזור אליך ${at}.`;
   if (sensitive) return `כמו שסיכמנו, נהיה בקשר ${at}.`;
   return `כמו שסיכמנו: ${a.label ?? AGREED_NOUN[a.action]} ${at}.`;
 }

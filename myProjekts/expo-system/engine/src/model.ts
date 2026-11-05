@@ -153,8 +153,11 @@ export interface AgreedStep {
   part?: 'morning' | 'noon' | 'evening';
   /** Who moves: he comes back to the visitor, or the visitor gets back to him by that day. */
   who: 'me' | 'him';
-  /** The path's steps it takes the place of, fixed when it was agreed. */
-  replaces: string[];
+  /** The path's steps it takes the place of, fixed when it was agreed; worked out from the path when not given (a visitor
+   *  who asked for himself at self-registration, whose page does not know the path). */
+  replaces?: string[];
+  /** The visitor asked for it himself, at self-registration (6/11): "מתי נוח שיחזרו אליך?". */
+  asked?: boolean;
 }
 /** The agreed step is recorded under this id; the confirmation to the visitor, when it went on its own, under the next. */
 export const AGREED = 'agreed';
