@@ -10,7 +10,7 @@ import {
 import { Logo } from '../brand.tsx';
 import { Icon, PageHead, Tiles, type IconName } from '../ui.tsx';
 import { MailCode } from '../signin.tsx';
-import { ListLoad } from './lists.tsx';
+import { ListAdd, ListLoad } from './lists.tsx';
 import { KeysView } from './keys.tsx';
 import { waStats } from '../lib/wa.ts';
 import { OpsStrip, StatusView, TasksView, useWaitingCount, type Filter } from './ops.tsx';
@@ -95,6 +95,7 @@ function Shell({ email }: { email: string }) {
   const waiting = rows?.filter((r) => !r.approved).length ?? 0;
   const forYou = useWaitingCount();
   const [taskFilter, setTaskFilter] = useState<Filter>('mine');
+  const [added, setAdded] = useState(0); // mails added by hand: the file's panel counts the list again
 
   return (
     <div className="adm">
@@ -126,8 +127,9 @@ function Shell({ email }: { email: string }) {
         {view === 'exhibitors' && <Exhibitors rows={rows} reload={reload} />}
         {view === 'lists' && (
           <div className="page narrow">
-            <PageHead title="רשימות" tip="שתי הרשימות שהמערכת עובדת איתן: המציגים מהמארגן, והקהילה שהדוכן מחפש בה. נטענות מקובץ CSV." />
-            <ListLoad kind="exhibitors" onDone={reload} />
+            <PageHead title="רשימות" tip="שתי הרשימות שהמערכת עובדת איתן: המציגים מהמארגן, והקהילה שהדוכן מחפש בה. נטענות מקובץ CSV, ואת המציגים אפשר להוסיף גם ביד." />
+            <ListLoad key={added} kind="exhibitors" onDone={reload} />
+            <ListAdd onDone={() => { reload(); setAdded((n) => n + 1); }} />
             <ListLoad kind="people" onDone={reload} />
           </div>
         )}

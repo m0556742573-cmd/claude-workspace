@@ -4,7 +4,7 @@
 // most urgent first, in three bands; everything else is one tab away. The data is in the `ops` schema (migration 0046),
 // read and written only through public.ops_*, which check is_admin(); every change to an item is kept on the server.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PageHead } from '../ui.tsx';
+import { DateField, PageHead } from '../ui.tsx';
 import { supabase } from '../lib/backend.ts';
 import { adminKeys } from '../lib/wa.ts';
 import './ops.css';
@@ -221,8 +221,8 @@ function ItemBody({ i, onSaved }: { i: OpsItem; onSaved: () => void }) {
       <div className="row ops-row">
         <button type="button" className="btn primary" disabled={busy || note === (i.note ?? '')} onClick={() => save({ note }, 'התשובה נשמרה.')}>לשמור את התשובה</button>
         <label className="ops-date">תאריך יעד
-          <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)}
-            onBlur={() => { if (due !== (i.due ?? '')) save({ due: due || null }, 'התאריך נשמר.'); }} />
+          <DateField value={due} clearable
+            onChange={(v) => { setDue(v); if (v !== (i.due ?? '')) save({ due: v || null }, 'התאריך נשמר.'); }} />
         </label>
       </div>
       <div className="chips" role="group" aria-label="מצב">
@@ -282,7 +282,7 @@ function NewItem({ onDone }: { onDone: (saved: boolean) => void }) {
           <button type="button" className="chip" aria-pressed={owner === 'yitzhak'} onClick={() => setOwner('yitzhak')}>אצלי</button>
           <button type="button" className="chip" aria-pressed={owner === 'claude'} onClick={() => setOwner('claude')}>אצל Claude</button>
         </div>
-        <label className="ops-date">תאריך יעד<input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} /></label>
+        <label className="ops-date">תאריך יעד<DateField value={due} onChange={setDue} clearable /></label>
       </div>
       {err && <p className="err">{err}</p>}
       <div className="row">

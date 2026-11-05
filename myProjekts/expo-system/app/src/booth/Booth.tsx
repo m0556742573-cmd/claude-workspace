@@ -6,7 +6,7 @@ import { CONSENT, immediateMessage, messagesOf, nextTask, type Offer, type Order
 import type { Person } from '../demo/people.ts';
 import { nextRev, type LocalLead, type LocalNote } from '../store/local.ts';
 import { clock, describe, today } from '../lib/words.ts';
-import { Icon } from '../ui.tsx';
+import { DateField, Icon } from '../ui.tsx';
 import { Qr, joinUrl } from '../join.tsx';
 import { destinationOf, maskDestination } from '../lib/destination.ts';
 import { MailInput, mailHints, mailProblem } from '../mail.tsx';
@@ -353,7 +353,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
           {wantsDate && (
             <>
               <label className="label" htmlFor="customer-date">התאריך שלו</label>
-              <input id="customer-date" className="input date-in" type="date" value={current.customerDate ?? ''} onChange={(e) => change({ customerDate: e.target.value || undefined })} />
+              <DateField id="customer-date" className="date-in" value={current.customerDate ?? ''} onChange={(v) => change({ customerDate: v || undefined })} clearable />
             </>
           )}
 

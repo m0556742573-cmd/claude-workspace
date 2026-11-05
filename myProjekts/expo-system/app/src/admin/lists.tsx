@@ -1,7 +1,48 @@
-// The two lists the admin loads from a file (moved here from the exhibitor's screens, 28/10, with the admin platform).
+// The two lists the admin loads from a file (moved here from the exhibitor's screens, 28/10, with the admin platform),
+// and exhibitors added by hand (4/11).
 import { useEffect, useMemo, useState } from 'react';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from '../lib/csv.ts';
 import { adminCounts, adminLoadExhibitors, adminStagePeople, adminCommitPeople } from '../lib/backend.ts';
+import { mailProblem } from '../mail.tsx';
+
+// ---------- exhibitors by hand (יצחק, 4/11: "הוספת מיילים של מציגים לרשימת המציגים ידנית בתוך הניהול ולא רק קובץ").
+// One mail or many, pasted from anywhere. The same server function as the file: it adds, and a mail already on the list
+// stays as it was, so nothing is replaced.
+
+export function ListAdd({ onDone }: { onDone: () => void }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState('');
+  const words = text.split(/[\s,;]+/).filter(Boolean);
+  const good = [...new Set(words.filter((w) => !mailProblem(w)).map((w) => w.toLowerCase()))];
+  const bad = words.filter((w) => mailProblem(w));
+  async function add() {
+    setBusy(true);
+    setResult('');
+    try {
+      const r = await adminLoadExhibitors(good.map((email) => ({ email })));
+      setResult(`${r.rows === 1 ? 'המייל נשמר ברשימה.' : `נשמרו ${r.rows} מיילים ברשימה.`}${r.approved ? ` ${r.approved} שחיכו אושרו עכשיו.` : ''}`);
+      setText('');
+      onDone();
+    } catch (e) { setResult('לא נוסף: ' + String((e as Error).message ?? e)); }
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="panel-w">
+      <h2>להוסיף מציגים ביד</h2>
+      <p className="muted">מייל אחד או כמה: כל מייל בשורה משלו, או עם פסיק ביניהם. מי שהמייל שלו ברשימה נכנס לדוכן בלי לחכות לאישור, ומי שכבר נרשם וממתין מאושר עכשיו.</p>
+      <textarea className="area" rows={3} dir="ltr" aria-label="מיילים של מציגים" placeholder="name@example.com" value={text}
+        onChange={(e) => { setText(e.target.value); setResult(''); }} />
+      {bad.length > 0 && <p className="note">אלה לא נראים כמו מייל, ולא ייכנסו: <bdi dir="ltr">{bad.join(' · ')}</bdi></p>}
+      <div className="row">
+        <button type="button" className="btn primary" disabled={!good.length || busy} onClick={add}>
+          {busy ? 'מוסיף…' : good.length > 1 ? `להוסיף ${good.length} מיילים` : 'להוסיף מייל'}
+        </button>
+      </div>
+      {result && <p className="note">{result}</p>}
+    </section>
+  );
+}
 
 // ---------- the two lists, from a file: Excel → "שמירה בשם" → CSV. The rows go from the browser straight to the server.
 

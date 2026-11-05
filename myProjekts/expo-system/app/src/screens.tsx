@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { addDays, nextOccurrence, nextTask, pathAhead, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import * as text from './lib/describe.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
-import { Icon, PageHead, Tiles, longDate } from './ui.tsx';
+import { DateField, Icon, PageHead, Tiles, longDate } from './ui.tsx';
 import { EXHIBITOR_FIELDS, PEOPLE_FIELDS, mapColumns, parseCsv, toRecords, type Fields } from './lib/csv.ts';
 import { MeForm } from './me.tsx';
 import { markSignPrinted } from './lib/ready.ts';
@@ -425,7 +425,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
         <TalkSheet item={item} ctx={ctx} stepId={stepId} onClose={() => setTalk(false)} onChange={onChange} onUndo={onUndo} />
       ) : next.kind === 'askDate' ? (
         <div className="answers">
-          <label className="field" style={{ fontWeight: 600 }}>התאריך שלו<input type="date" disabled={busy} onChange={(e) => date(e.target.value)} /></label>
+          <label className="field" style={{ fontWeight: 600 }}>התאריך שלו<DateField value="" disabled={busy} onChange={(v) => v && date(v)} /></label>
           <button type="button" className={'btn' + tall} style={{ alignSelf: 'end' }} onClick={() => setTalk(true)}>דיברנו</button>
         </div>
       ) : (
@@ -590,7 +590,7 @@ function TalkSheet({ item, ctx, stepId, onClose, onChange, onUndo }: { item: Ite
         <span className="sec">מתי</span>
         <div className="chips">
           {QUICK.map(([l, d]) => <button key={l} type="button" className="chip" aria-pressed={due === inDays(d)} onClick={() => setDue(inDays(d))}>{l}</button>)}
-          <input type="date" aria-label="תאריך אחר" value={due} min={today()} onChange={(e) => e.target.value && setDue(e.target.value)} />
+          <DateField label="תאריך אחר" value={due} min={today()} onChange={(v) => v && setDue(v)} />
         </div>
       </div>
       <textarea className="area" rows={2} aria-label="מה סוכם" placeholder="מה סוכם (לא חובה)" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -1605,7 +1605,7 @@ export function OfferEdit({ ctx }: { ctx: Ctx }) {
       <h2>מבצע אקספו</h2>
       <p className="muted">פריטים במחיר מיוחד לאקספו. בדוכן נוגעים ב"הזמין", בוחרים כמויות, וההזמנה נשמרת אצל המבקר. הוא נחשב עסקה, ומקבל סיכום של ההזמנה{OFFER_SENDING ? ', ושבוע אחרי זה שאלה אם הכל הגיע בסדר' : ''}. תשלום, מלאי וחשבונית נשארים אצלך.{!ok && o.items.length > 0 ? ' המבצע נשמר כשלכל פריט יש שם ומחיר אקספו.' : ''}</p>
       <label className="field">שם המבצע<input className="input" value={o.name} onChange={(e) => setO({ ...o, name: e.target.value })} /></label>
-      <label className="field" style={{ maxWidth: 200 }}>עד מתי<input className="input" type="date" value={o.until} onChange={(e) => setO({ ...o, until: e.target.value })} /></label>
+      <label className="field">עד מתי<DateField value={o.until} onChange={(v) => setO({ ...o, until: v })} /></label>
       {/* After the fair, to whoever did not order (1/11, model §14א): on unless he keeps it at the booth. */}
       {OFFER_SENDING && <div className="switchrow">
         <span>לשלוח את המבצע למי שלא הזמין <span className="faint small">· יום אחרי האקספו, ותזכורת יום לפני שהמבצע נגמר. מבצע של יום האקספו בלבד לא נשלח.</span></span>

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import qrcode from 'qrcode-generator';
 import { fileUrl, joinBooth, joinInfo, type JoinInfo } from './lib/backend.ts';
 import { MailInput, mailHints, mailProblem } from './mail.tsx';
+import { DateField } from './ui.tsx';
 
 const ASKS_DATE = /\s*\(מתי\?\)\s*$/;
 /** On the visitor's page a button reads without the "(מתי?)" the exhibitor sees; a date field opens instead. */
@@ -89,7 +90,7 @@ export function Join({ code }: { code: string }) {
             </div>
           </div>
         ))}
-        {wantsDate && <label className="field" htmlFor="j-date">התאריך<input id="j-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ justifySelf: 'start' }} /></label>}
+        {wantsDate && <label className="field" htmlFor="j-date">התאריך<DateField id="j-date" value={date} onChange={setDate} clearable /></label>}
         {info.sensitive && (
           <div className="chips"><button type="button" className="chip" aria-pressed={consent} onClick={() => setConsent(!consent)}>מסכים לקבל עדכונים</button></div>
         )}
