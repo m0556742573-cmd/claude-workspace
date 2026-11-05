@@ -78,6 +78,9 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
   const [ordering, setOrdering] = useState(false);
   const [toast, setToast] = useState('');
   const [checked, setChecked] = useState<Record<string, Checked[]>>({});
+  // א3 (5/11): whether any message can reach each visitor, as the card's contacts show it (null = not known yet).
+  const [reachOf, setReachOf] = useState<Record<string, boolean | null>>({});
+  const [addAsk, setAddAsk] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   // Visitors cancelled while a recording of theirs was still running: the recording is dropped, not saved (30/10).
   const dropped = useRef(new Set<string>());
@@ -327,6 +330,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
         <section className="lead" aria-label={`הכרטיס של ${current.name}`}>
           <div className="lead-head">
             <div>
+              <button type="button" className="star-btn" aria-pressed={!!current.star} aria-label={current.star ? 'להוריד את הכוכב' : 'כוכב: שווה לי זמן'} title={current.star ? 'להוריד את הכוכב' : 'כוכב: שווה לי זמן'} onClick={() => change({ star: !current.star })}>{current.star ? '★' : '☆'}</button>
               <span className="nm">{current.name}</span> <span className="muted">{current.city ?? ''}</span>
               {(current.businessOwner || current.self) && (
                 <div className="faint">{[current.businessOwner ? 'בעל עסק' : '', current.self ? 'נרשם לבד' : ''].filter(Boolean).join(' · ')}</div>
@@ -338,7 +342,8 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
             </div>
           </div>
 
-          <Contacts key={current.id} lead={current} wa={wa} online={online} checked={checked[current.id]} ownOf={practice ? undefined : ownOf} onChange={setContact} />
+          <Contacts key={current.id} lead={current} wa={wa} online={online} checked={checked[current.id]} ownOf={practice ? undefined : ownOf} onChange={setContact}
+            addAsk={addAsk} onReach={(r) => setReachOf((m) => (m[current.id] === r ? m : { ...m, [current.id]: r }))} />
 
           {questions.filter(([, items]) => items.length).map(([q, items]) => (
             <div key={q}>
@@ -359,9 +364,10 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
 
           {messages.length > 0 && <SendLine key={current.id} lead={current} setup={setup} messages={messages} boothDefault={boothDefault ?? null} practice={practice} trialSend={!!trialSend} picking={picking}
             onPick={() => setPicking(!picking)} onChoose={(booth) => { change({ booth }); setPicking(false); }}
-            checked={checked[current.id]} />}
+            checked={checked[current.id]} unreachable={reachOf[current.id] === false}
+            onAdd={() => setAddAsk((n) => n + 1)} onHand={() => { change({ booth: {} }); say('נרשם: נתת לו ביד'); }} />}
 
-          <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, current, today()))}</b></div>
+          <div className="next-line ro"><span className="faint">מה הלאה:</span> <b>{describe(nextTask(setup, { ...current, reach: reachOf[current.id] ?? undefined }, today()))}</b></div>
 
           {lastNote && <NotePeek note={lastNote} count={myNotes.length} />}
           {noteOpen && (
@@ -420,7 +426,7 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
               return (
                 <button key={l.id} type="button" role="listitem" className="result" aria-current={current?.id === l.id ? 'true' : undefined} onClick={() => open(l)}>
                   <span>
-                    <span className="nm">{l.name}</span><span className="city">{l.city ?? ''}</span>
+                    {l.star && <span className="star-mark" aria-label="כוכב">★</span>}<span className="nm">{l.name}</span><span className="city">{l.city ?? ''}</span>
                     <span className="mt">{[...l.taps, count ? `${count} הערות` : ''].filter(Boolean).join(' · ') || 'בלי סימון'}</span>
                   </span>
                   <span className="r-side">
@@ -445,15 +451,35 @@ export function Booth({ setup, eyebrow, newVisitor, desk, search, saveLead, remo
  * choose instead: another message, or none now. A choice replaces the path's immediate message (the engine sees to it),
  * so the visitor never gets two. With nothing in the path and nothing chosen: the default in one tap, or the messages.
  */
-function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked }: {
+function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, picking, onPick, onChoose, checked, unreachable, onAdd, onHand }: {
   lead: LocalLead; setup: Setup; messages: string[]; boothDefault: string | null; practice: boolean; trialSend: boolean; picking: boolean;
   onPick: () => void; onChoose: (booth: LocalLead['booth']) => void;
   /** What the check at the visit found, when it ran. */ checked?: Checked[];
+  /** No message can reach him (5/11, א3): no number with WhatsApp, and no mail. */ unreachable?: boolean;
+  onAdd?: () => void; onHand?: () => void;
 }) {
   const auto = immediateMessage(setup, lead);
   const chosen = lead.booth;
   const def = boothDefault && messages.includes(boothDefault) ? boothDefault : null;
   const noWa = checked?.find((c) => c.own)?.wa === false;
+  if (unreachable) {
+    // Until now the card said "יוצא לו מיד" while the server skipped him in silence (5/11, א3).
+    const what = chosen?.message ?? (chosen ? null : auto ?? def);
+    return (
+      <div className="send-line">
+        <div className="send-row">
+          <span className="faint">הודעה:</span>
+          <b className="err">ההודעות לא יגיעו אליו</b>
+          <span className="faint small">אין לאן לשלוח: לא וואטסאפ ולא מייל.</span>
+        </div>
+        <div className="row">
+          <button type="button" className="btn" onClick={onAdd}>להוסיף מספר או מייל של בן משפחה</button>
+          {what ? <button type="button" className="btn" onClick={onHand}>נתתי לו ביד: {what}</button>
+            : chosen && <span className="faint small">נרשם: בלי הודעה עכשיו</span>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="send-line">
       <div className="send-row">
@@ -483,8 +509,10 @@ function SendLine({ lead, setup, messages, boothDefault, practice, trialSend, pi
  * server once the card is up; correcting one leaves the community list as it is (other exhibitors use it): his old one
  * stops receiving for this exhibitor, and the right one is added. Everything added receives every message, as his own does.
  */
-function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
+function Contacts({ lead, wa, online, checked, ownOf, onChange, onReach, addAsk = 0 }: {
   lead: LocalLead; wa: boolean; online: boolean; checked?: Checked[];
+  /** Whether any message can reach him, once it is known (5/11, א3); null while it is not. */ onReach?: (r: boolean | null) => void;
+  /** Grows when the card's line asks to add a number or a mail. */ addAsk?: number;
   ownOf?: (leadId: string) => Promise<{ phone: string | null; email: string | null } | null>;
   onChange: (patch: Pick<LocalLead, 'extra' | 'ownOff' | 'typedPhone' | 'typedEmail'>) => void;
 }) {
@@ -557,6 +585,19 @@ function Contacts({ lead, wa, online, checked, ownOf, onChange }: {
   };
 
   const waiting = fromList && !listed && !!ownOf;
+  // Can any message reach him (5/11, א3)? A mail can; a phone, when he works with WhatsApp and it is not known to lack it.
+  // Known only once his list details are in (never in practice, where they are not shown) and every phone was checked.
+  const reach: boolean | null = (() => {
+    if (waiting || (fromList && !ownOf)) return null;
+    const live = [...(['phone', 'email'] as const).filter((k) => own[k] && !off.includes(k)).map((k) => ({ v: own[k] as string, own: true })), ...extra.map((v) => ({ v, own: false }))];
+    if (live.some((x) => x.v.includes('@'))) return true;
+    const phones = live.filter((x) => !x.v.includes('@'));
+    if (!wa || !phones.length) return false;
+    const was = phones.map((x) => waOf(x.v, x.own));
+    return was.some((w) => w !== false) ? (was.some((w) => w === true) ? true : was.some((w) => w === undefined || w === null) ? null : true) : false;
+  })();
+  useEffect(() => { onReach?.(reach); }, [reach, onReach]);
+  useEffect(() => { if (addAsk) { setOpen(true); setEditing({ kind: 'add', text: '' }); setBad(''); } }, [addAsk]);
   if (!open) {
     // What receives now: his own (unless replaced), then the added ones. Two shown, the rest counted.
     const live = [...(['phone', 'email'] as const).filter((k) => own[k] && !off.includes(k)).map((k) => own[k] as string), ...extra];

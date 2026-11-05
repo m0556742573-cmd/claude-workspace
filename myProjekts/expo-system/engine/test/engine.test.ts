@@ -194,8 +194,8 @@ test('no answer and trying again: the retry is his own step, it comes first, and
   assert.equal((nextTask(shtreimel, l, '2026-11-24') as { stepId: string }).stepId, 'm:r2');
 });
 
-test('no answer on a call of his: no default, he waits for a decision; a send or a "done" goes on as before', () => {
-  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17'), rec('call', '2026-11-23')] });
+test('no answer on a call of his ("missed"): no default, he waits for a decision; a send or a "done" goes on as before', () => {
+  const l = lead(['שטריימל לחתן'], { history: [rec('invite', '2026-11-17'), rec('call', '2026-11-23', 'missed')] });
   assert.deepEqual(nextTask(shtreimel, l, '2026-11-23'), { kind: 'end', reason: 'decide' });
   assert.deepEqual(undecided(shtreimel, l), { stepId: 'call', retry: 'talk' });
   // The automatic invite marked "noAnswer" (= sent) did not stop anything: the call came after it.
@@ -205,7 +205,7 @@ test('no answer on a call of his: no default, he waits for a decision; a send or
   const on = { ...l, history: [...l.history, rec(goOnId('call'), '2026-11-24')] };
   assert.deepEqual(nextTask(shtreimel, on, '2026-11-24'), { kind: 'end', reason: 'list' });
   // A meeting he did not come to: the try again is a call.
-  const met = lead(['מיזוג למוסד', 'עכשיו'], { history: [rec('visit', '2026-11-17')] });
+  const met = lead(['מיזוג למוסד', 'עכשיו'], { history: [rec('visit', '2026-11-17', 'missed')] });
   assert.deepEqual(undecided(ac, met), { stepId: 'visit', retry: 'talk' });
 });
 
@@ -229,6 +229,18 @@ test('giving up on a retry ends it too, and a reply that comes after it still co
   const n = nextTask(shtreimel, l, '2026-11-26') as { stepId: string; reply?: boolean };
   assert.equal(n.stepId, 'reply:2026-11-26');
   assert.equal(n.reply, true);
+});
+
+// ---- ב4 (5/11): a visitor no message can reach — the path's message becomes his call, and the path does not stop
+
+test('no way to reach him: the automatic invite becomes a call on its day (not Friday), saying what it would have sent', () => {
+  const l = lead(['שטריימל לחתן'], { reach: false });
+  assert.deepEqual(nextTask(shtreimel, l, EXPO), { kind: 'task', stepId: 'invite', action: 'talk', who: 'me', message: 'הזמנה למדידה', dueOn: '2026-11-17', late: false, byHand: true });
+  // Known to be reachable, or not known: as before.
+  assert.equal((nextTask(shtreimel, lead(['שטריימל לחתן']), EXPO) as { who: string }).who, 'auto');
+  // The booth's chosen message too; a Friday call moves to Sunday.
+  const fri = lead([], { capturedOn: '2026-11-20', booth: { message: 'מחירון' }, reach: false });
+  assert.deepEqual(nextTask(setup({}), fri, '2026-11-20'), { kind: 'task', stepId: 'booth', action: 'talk', who: 'me', message: 'מחירון', dueOn: '2026-11-22', late: false, byHand: true });
 });
 
 // ---- a sensitive business: the mailing list only with consent
@@ -325,4 +337,22 @@ test('a message sent beside the path moves none of its dates', () => {
   const offered = nextTask(s, lead([], { history: [rec('hi', EXPO), rec('x:offer', '2026-11-17')] }), '2026-11-17');
   assert.deepEqual(offered, plain);
   assert.equal(offered.kind === 'task' && offered.dueOn, '2026-11-19');
+});
+
+// ---- ב3 (5/11): who comes first in his day, and how much fits in it
+
+test('his day: a reply first, then a star, then a near date, then the primary need, then the rest', async () => {
+  const { rankOf, fitDay } = await import('../src/index.ts');
+  const t = (over: Partial<Lead>) => lead(['חידוש שטריימל'], over);
+  const task = nextTask(shtreimel, t({}), EXPO);
+  assert.equal(rankOf(shtreimel, t({}), { ...(task as object), reply: true } as never, EXPO), 0);
+  assert.equal(rankOf(shtreimel, t({ star: true }), task, EXPO), 1);
+  assert.equal(rankOf(shtreimel, t({ customerDate: '2026-12-20' }), task, EXPO), 2);
+  assert.equal(rankOf(shtreimel, t({ customerDate: '2027-06-20' }), task, EXPO), 4); // too far: like the rest
+  assert.equal(rankOf(shtreimel, lead(['שטריימל לחתן']), task, EXPO), 3);           // a need of the primary goal
+  assert.equal(rankOf(shtreimel, t({}), task, EXPO), 4);
+  // Thirty minutes: five calls fit; the meeting after them does not, and the order is kept. The first always fits.
+  const day = fitDay(['c', 'c', 'c', 'c', 'c', 'm', 'c'], (x) => (x === 'm' ? 30 : 5), 30);
+  assert.deepEqual([day.fits.length, day.over.length], [5, 2]);
+  assert.deepEqual(fitDay(['m', 'm'], () => 30, 20), { fits: ['m'], over: ['m'] });
 });

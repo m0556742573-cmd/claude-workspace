@@ -51,31 +51,26 @@ export const CONSENT = 'מסכים לקבל עדכונים';
 
 export type Next =
   | { kind: 'task'; stepId: string; action: Action; who: Who; message?: string; dueOn: LocalDate; late: boolean; reply?: boolean;
-      /** When it was due, for a late one (its dueOn moves to today): how late it is (30/10). */ wasDue?: LocalDate }
+      /** When it was due, for a late one (its dueOn moves to today): how late it is (30/10). */ wasDue?: LocalDate;
+      /** A message of the path that cannot reach him, turned into a call of his: tell him what it says (5/11, ב4). */ byHand?: boolean }
   /** A step needs the visitor's date and he gave none: the exhibitor is asked to find out when. */
   | { kind: 'askDate'; stepId: string; dueOn: LocalDate }
   /** decide: "לא ענה" on a call of his, and he has not chosen yet what now (5/11). */
   | { kind: 'end'; reason: 'engaged' | 'closed' | 'notRelevant' | 'optOut' | 'list' | 'stop' | 'decide' };
 
-/** What "noAnswer" means "he did not get through" for, rather than "done": his calls, meetings, and waiting for him. */
-const PERSONAL: Action[] = ['talk', 'meet', 'wait'];
 /** "לא ענה › להמשיך במסלול" is recorded under this id: the path goes on from the day he chose it. */
 export const goOnId = (stepId: string) => `go:${stepId}`;
 
-/** The action of a step of his own, by its id in the history: of the path, of its repeat, or set by hand. */
-function personalAction(setup: Setup, lead: Lead, stepId: string): Action | null {
-  if (stepId.startsWith('m:')) {
-    const m = (lead.manual ?? []).find((x) => manualId(x.id) === stepId);
-    return m && m.who === 'me' && PERSONAL.includes(m.action) ? m.action : null;
-  }
+/** The action of the step recorded under this id: of the path, of its repeat, or set by hand. */
+function actionOf(setup: Setup, lead: Lead, stepId: string): Action | undefined {
+  if (stepId.startsWith('m:')) return (lead.manual ?? []).find((x) => manualId(x.id) === stepId)?.action;
   const { path } = choosePath(setup, lead);
-  if (stepId.startsWith('repeat:')) return path.end.kind === 'repeat' && path.end.who === 'me' && PERSONAL.includes(path.end.action) ? path.end.action : null;
-  const s = path.steps.find((x) => x.id === stepId);
-  return s && s.who === 'me' && PERSONAL.includes(s.action) ? s.action : null;
+  if (stepId.startsWith('repeat:')) return path.end.kind === 'repeat' ? path.end.action : undefined;
+  return path.steps.find((x) => x.id === stepId)?.action;
 }
-function undecidedOn(setup: Setup, lead: Lead, last: { stepId: string; outcome: string }): boolean {
-  return last.outcome === 'noAnswer' && personalAction(setup, lead, last.stepId) !== null;
-}
+/** "missed" (5/11) is what the exhibitor marks when he did not get through; until he chooses what now, he decides.
+ *  (The server marks a message it sent as "noAnswer", which only means done: the two never mix.) */
+const undecidedOn = (last: { outcome: string }) => last.outcome === 'missed';
 
 /**
  * The step he did not get through on and has not decided about (5/11), with what a try again would be: a call, or for
@@ -84,11 +79,10 @@ function undecidedOn(setup: Setup, lead: Lead, last: { stepId: string; outcome: 
 export function undecided(setup: Setup, all: Lead): { stepId: string; retry: Action } | null {
   const lead = onPath(all);
   const last = lead.history[lead.history.length - 1];
-  if (!last || last.outcome !== 'noAnswer') return null;
+  if (!last || !undecidedOn(last)) return null;
   const recorded = new Set(lead.history.map((h) => h.stepId));
   if ((lead.manual ?? []).some((m) => !recorded.has(manualId(m.id)))) return null;
-  const action = personalAction(setup, lead, last.stepId);
-  return action ? { stepId: last.stepId, retry: action === 'wait' ? 'wait' : 'talk' } : null;
+  return { stepId: last.stepId, retry: actionOf(setup, lead, last.stepId) === 'wait' ? 'wait' : 'talk' };
 }
 
 /** The next thing to do for this lead, or why there is nothing. `today` is when the question is asked. */
@@ -111,7 +105,7 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
   // The message he chose at the booth goes out on the day of the visit, before anything else of the path.
   if (lead.booth?.message && !recorded.has(BOOTH_STEP)) {
     const late = lead.capturedOn < today;
-    return { kind: 'task', stepId: BOOTH_STEP, action: 'send', who: 'auto', message: lead.booth.message, dueOn: settle(late ? today : lead.capturedOn, 'send', 'auto'), late, ...(late ? { wasDue: lead.capturedOn } : {}) };
+    return byHand(lead, { kind: 'task', stepId: BOOTH_STEP, action: 'send', who: 'auto', message: lead.booth.message, dueOn: settle(late ? today : lead.capturedOn, 'send', 'auto'), late, ...(late ? { wasDue: lead.capturedOn } : {}) });
   }
   // A step he set by hand comes next: it is what was agreed with the visitor.
   const manual = (lead.manual ?? []).filter((m) => !recorded.has(manualId(m.id))).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
@@ -122,7 +116,7 @@ export function nextTask(setup: Setup, all: Lead, today: LocalDate): Next {
   }
   // He called (met, waited) and did not get through, and has not decided yet what now (יצחק, 5/11): no default, so the
   // visitor waits for his decision, seen in the dashboard; nothing is planned for him meanwhile.
-  if (last && undecidedOn(setup, lead, last)) return { kind: 'end', reason: 'decide' };
+  if (last && undecidedOn(last)) return { kind: 'end', reason: 'decide' };
   // He answered and nothing was set by hand: the path's ladder of attempts is over; he is in the exhibitor's hands.
   if (last && last.outcome === 'engaged') return { kind: 'end', reason: 'engaged' };
 
@@ -154,7 +148,17 @@ function schedule(step: Step, base: LocalDate, lead: Lead, today: LocalDate): Ne
   const raw = rawDue(step.timing, base, lead);
   const late = raw < today;
   const dueOn = settle(late ? today : raw, step.action, step.who);
-  return { kind: 'task', stepId: step.id, action: step.action, who: step.who, message: step.message, dueOn, late, ...(late ? { wasDue: raw } : {}) };
+  return byHand(lead, { kind: 'task', stepId: step.id, action: step.action, who: step.who, message: step.message, dueOn, late, ...(late ? { wasDue: raw } : {}) });
+}
+
+/**
+ * A message the system would send, to a visitor no message can reach (5/11, ב4): it becomes a call of the exhibitor's,
+ * with what it says, on its day (a call not on Friday). Until now the server skipped him in silence and his path stopped.
+ */
+function byHand(lead: Lead, n: Extract<Next, { kind: 'task' }>): Next {
+  if (lead.reach !== false || n.who !== 'auto') return n;
+  const dueOn = settle(n.dueOn, 'talk', 'me');
+  return { ...n, action: 'talk', who: 'me', dueOn, byHand: true };
 }
 
 function rawDue(t: Timing, base: LocalDate, lead: Lead): LocalDate {
@@ -170,6 +174,39 @@ function rawDue(t: Timing, base: LocalDate, lead: Lead): LocalDate {
       return d;
     }
   }
+}
+
+// ---------- his day (5/11, ב3): who comes first, and how much fits in the time he has
+
+/** Minutes a task of his takes, as the setup's time calculator counts them (patterns.ts). */
+export const MINUTES: Record<Action, number> = { talk: 5, meet: 30, prepare: 15, send: 2, reserve: 5, check: 5, wait: 0 };
+
+/**
+ * Who comes first in his day, lower first (5/11, ב3, his "כן להכל"): whoever wrote back; whoever he starred at the booth;
+ * whose own date is within two months; whoever tapped a need of the primary goal; then everyone else. Within each, the
+ * earlier due first. Model §11 had the late first and the replies third: this puts the replies first.
+ */
+export function rankOf(setup: Setup, lead: Lead, next: Next, today: LocalDate): number {
+  if (next.kind === 'task' && next.reply) return 0;
+  if (lead.star) return 1;
+  if (lead.customerDate && lead.customerDate >= today && lead.customerDate <= addDays(today, 60)) return 2;
+  const { source } = choosePath(setup, lead);
+  if (setup.needs.some((n) => n.label === source && n.goal === 'primary')) return 3;
+  return 4;
+}
+
+/** Of his tasks for today, in order, the ones that fit in his minutes a day (the first always does), and the rest. */
+export function fitDay<T>(ordered: T[], minutes: (t: T) => number, capacity: number): { fits: T[]; over: T[] } {
+  let used = 0;
+  const fits: T[] = [];
+  let i = 0;
+  for (; i < ordered.length; i++) {
+    const m = minutes(ordered[i]!);
+    if (fits.length && used + m > capacity) break;
+    fits.push(ordered[i]!);
+    used += m;
+  }
+  return { fits, over: ordered.slice(i) };
 }
 
 /** No tasks or sends on Shabbat and Yom Tov; his calls and meetings not on Friday. */

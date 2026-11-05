@@ -169,7 +169,7 @@ test('after an order: its summary, and a week on a check, once', () => {
 test('the morning list: the call after an automatic send is there, and who waits for a decision is counted', async () => {
   const { morningOf } = await import('./planner.ts');
   // The automatic message went on the fair's day (the server recorded it); the call is three days later.
-  const sent = plan({ steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] });
+  const sent = plan({ me: { ...me, whatsapp: '050-0000000' }, steps: [{ lead_id: 'a', step_id: 'how', done_on: FAIR, outcome: 'noAnswer' }] });
   assert.deepEqual(morningOf(sent, '2026-11-18').tasks, []);
   const m = morningOf(sent, '2026-11-19');
   assert.deepEqual(m.tasks, [{ name: 'יעקב', action: 'talk', message: null, late: false, due: '2026-11-19' }]);
@@ -177,8 +177,19 @@ test('the morning list: the call after an automatic send is there, and who waits
   // A day later and not done: late, with the day it was due.
   assert.deepEqual(morningOf(sent, '2026-11-22').tasks[0], { name: 'יעקב', action: 'talk', message: null, late: true, due: '2026-11-19' });
   // He called and did not get through, and chose nothing yet: no task, and he is counted as waiting for a decision.
-  const missed = plan({ steps: [...sent.steps, { lead_id: 'a', step_id: 'call', done_on: '2026-11-19', outcome: 'noAnswer' }] });
+  const missed = plan({ ...sent, steps: [...sent.steps, { lead_id: 'a', step_id: 'call', done_on: '2026-11-19', outcome: 'missed' }] });
   assert.deepEqual(morningOf(missed, '2026-11-20'), { tasks: [], waiting: 1 });
   // "הסר" ends it: nothing.
   assert.deepEqual(morningOf(plan({ ...sent, replies: [{ lead_id: 'a', at: '2026-11-17T08:00:00Z', optout: true }] }), '2026-11-19'), { tasks: [], waiting: 0 });
+});
+
+test('ב4 (5/11): no way to reach him — the planner sends nothing, and the message is his call in the morning list', async () => {
+  const { morningOf } = await import('./planner.ts');
+  const none = plan({ me: { ...me, whatsapp: '050-0000000' }, leads: [{ ...lead, targets: 0, mails: 0 }] });
+  assert.deepEqual(due(none, FAIR, [], { wa: true, mail: true }), []);
+  assert.deepEqual(morningOf(none, FAIR).tasks, [{ name: 'יעקב', action: 'talk', message: 'איך מזמינים', late: false, due: FAIR }]);
+  // A mail is enough to reach him: the message goes by itself, and is not his.
+  const mail = plan({ me: { ...me, whatsapp: '050-0000000' }, leads: [{ ...lead, targets: 0, mails: 1 }] });
+  assert.equal(due(mail, FAIR, [], { wa: true, mail: true }).length, 1);
+  assert.deepEqual(morningOf(mail, FAIR).tasks, []);
 });

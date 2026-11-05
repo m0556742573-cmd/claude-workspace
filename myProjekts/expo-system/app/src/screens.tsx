@@ -2,7 +2,7 @@
 // the settings, and the admin's. Built on the brand book's pieces (ui.tsx): one title with a "?", tiles, white lists,
 // and one outlined object per screen, the one in hand. What is built works on the real data; what is not says what it will be.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { TRIED, addDays, goOnId, nextOccurrence, nextTask, pathAhead, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
+import { MINUTES, TRIED, addDays, fitDay, goOnId, nextOccurrence, nextTask, pathAhead, rankOf, settle, triedText, undecided, type Action, type Holiday, type Lead, type Next, type Offer, type Path, type Setup } from '@expo/engine';
 import * as text from './lib/describe.ts';
 import { ACT, END, EXPO_DAY, dayLabel, describe, inDays, today } from './lib/words.ts';
 import { DateField, Icon, PageHead, Tiles, longDate } from './ui.tsx';
@@ -24,7 +24,7 @@ import {
   type AdminExhibitor, type Book, type Exhibitor, type LeadRow, type NoteRow,
 } from './lib/backend.ts';
 
-const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר', gaveUp: 'לא ענה, ויתרת' };
+const OUTCOME: Record<string, string> = { engaged: 'דיברנו', noAnswer: 'לא ענה', closed: 'נסגרה עסקה', notRelevant: 'לא רלוונטי', optOut: 'ביקש להסיר', gaveUp: 'לא ענה, ויתרת', missed: 'לא ענה' };
 /** For a step that is not a talk, "noAnswer" means only "done, the path goes on". */
 const DONE: Record<string, string> = { ...OUTCOME, noAnswer: 'בוצע' };
 /** The messages sent beside the path (1/11), in his history by name. */
@@ -173,10 +173,22 @@ function useItems(ctx: Ctx, book: Book | undefined): Item[] {
   }, [book, ctx.setup, ctx.directory]);
 }
 const dueOf = (i: Item) => (i.next.kind === 'end' ? '9999' : i.next.dueOn);
-function split(items: Item[]) {
-  const open = items.filter((i) => i.next.kind !== 'end').sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
-  return { open, now: open.filter((i) => dueOf(i) <= today()), later: open.filter((i) => dueOf(i) > today()) };
+/** A message that goes by itself is not his to do (5/11, ב4): his lists show only what is his. */
+const goesAlone = (i: Item) => i.next.kind === 'task' && i.next.who === 'auto';
+/** His tasks in the order of his day (5/11, ב3): who wrote back, his star, a near date, the primary need, then the rest;
+ *  within each the earlier due first, then whoever came to the booth first. */
+function inOrder(items: Item[]): Item[] {
+  const t = today();
+  const r = new Map(items.map((i) => [i, rankOf(i.setup, i.lead, i.next, t)]));
+  return [...items].sort((a, b) => r.get(a)! - r.get(b)! || dueOf(a).localeCompare(dueOf(b)) || a.row.captured_at.localeCompare(b.row.captured_at));
 }
+function split(items: Item[]) {
+  const open = items.filter((i) => i.next.kind !== 'end' && !goesAlone(i)).sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+  return { open, now: inOrder(open.filter((i) => dueOf(i) <= today())), later: open.filter((i) => dueOf(i) > today()) };
+}
+/** How many messages go by themselves today. */
+const aloneToday = (items: Item[]) => items.filter((i) => goesAlone(i) && dueOf(i) <= today()).length;
+const minutesOf = (i: Item) => (i.next.kind === 'task' ? MINUTES[i.next.action] ?? 5 : 5);
 function short(n: Next): string {
   if (n.kind === 'end') return END[n.reason] ?? '';
   if (n.kind === 'askDate') return 'לברר את התאריך שלו';
@@ -311,19 +323,28 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
   const head = <PageHead title="משימות" eyebrow={eyebrowOf(desk)} tip="כל מה שעליך לעשות, לפי התאריך. הטלפון בסוף השורה פותח את הפעולות; נגיעה בשם פותחת את הדף שלו. אחרי כל פעולה אפשר לבטל אותה בתוך 10 שניות." />;
   if (error) return <div className="page">{head}<p className="err">{error}</p></div>;
   if (!book) return <div className="page">{head}<p className="muted">טוען…</p></div>;
-  const { open } = split(items);
+  const { open, now } = split(items);
   const t = today();
-  const counts = { today: open.filter((i) => dueOf(i) <= t).length, week: open.filter((i) => dueOf(i) <= inDays(7)).length, all: open.length };
-  const shown = open
-    .filter((i) => (tab === 'today' ? dueOf(i) <= t : tab === 'week' ? dueOf(i) <= inDays(7) : true))
-    .filter((i) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()) || (i.row.note ?? '').includes(q.trim()));
-  // A group heading carries the date, so the rows under it do not have to.
-  const groups: { key: string; label: string; late?: boolean; of: Item[] }[] = [];
-  const isLate = (i: Item) => dueOf(i) < t || (i.next.kind === 'task' && i.next.late);
-  const late = shown.filter(isLate);
-  if (late.length) groups.push({ key: 'late', label: 'באיחור', late: true, of: late });
-  const onTime = shown.filter((i) => !isLate(i));
-  for (const d of [...new Set(onTime.map(dueOf))]) groups.push({ key: d, label: d === t ? 'היום' : dayLabel(d), of: onTime.filter((i) => dueOf(i) === d) });
+  const alone = aloneToday(items);
+  const counts = { today: now.length, week: open.filter((i) => dueOf(i) <= inDays(7)).length, all: open.length };
+  const found = (i: Item) => !q.trim() || i.name.includes(q.trim()) || i.city.includes(q.trim()) || (i.row.note ?? '').includes(q.trim());
+  const groups: { key: string; label: string; late?: boolean; of: Item[]; hint?: string }[] = [];
+  // Today (5/11, ב3): in the order of his day, as much as fits in the minutes a day he set; the rest under "אם נשאר זמן".
+  const capacity = ctx.setup.capacity ?? 30;
+  const day = fitDay(now, minutesOf, capacity);
+  if (tab === 'today') {
+    const used = day.fits.reduce((m, i) => m + minutesOf(i), 0);
+    if (day.fits.some(found)) groups.push({ key: 'fits', label: `היום · כ-${used} דקות מתוך ${capacity}`, of: day.fits.filter(found) });
+    if (day.over.some(found)) groups.push({ key: 'over', label: 'אם נשאר זמן', of: day.over.filter(found), hint: 'מה שלא תספיק היום מחכה לך מחר, לפי אותו סדר.' });
+  } else {
+    // A group heading carries the date, so the rows under it do not have to.
+    const shown = open.filter((i) => (tab === 'week' ? dueOf(i) <= inDays(7) : true)).filter(found);
+    const isLate = (i: Item) => dueOf(i) < t || (i.next.kind === 'task' && i.next.late);
+    const late = inOrder(shown.filter(isLate));
+    if (late.length) groups.push({ key: 'late', label: 'באיחור', late: true, of: late });
+    const onTime = shown.filter((i) => !isLate(i));
+    for (const d of [...new Set(onTime.map(dueOf))]) groups.push({ key: d, label: d === t ? 'היום' : dayLabel(d), of: inOrder(onTime.filter((i) => dueOf(i) === d)) });
+  }
   return (
     <div className="page">
       <UndoBar undo={undo} onDone={clearUndo} />
@@ -335,10 +356,12 @@ export function Tasks({ ctx, desk }: { ctx: Ctx; desk: boolean }) {
           ))}
         </nav>
       </div>
+      {alone > 0 && <p className="faint small">{ctx.phase === 'practice' ? `היום היו יוצאות לבד ${alone} הודעות (בניסיון לא יוצא כלום).` : alone === 1 ? 'היום יוצאת לבד הודעה אחת. היא לא צריכה אותך.' : `היום יוצאות לבד ${alone} הודעות. הן לא צריכות אותך.`}</p>}
       {open.length > 6 && <input className="input" type="search" aria-label="חיפוש במשימות" placeholder="חיפוש: שם, עיר, הערה…" value={q} onChange={(e) => setQ(e.target.value)} />}
       {groups.length ? groups.map((g) => (
         <section key={g.key} className="group">
           <div className={'group-head' + (g.late ? ' late' : '')}><span>{g.label}</span><span className="c">{g.of.length}</span></div>
+          {g.hint && <p className="faint small">{g.hint}</p>}
           <div className="rows">
             {g.of.map((i) => (
               <div key={i.row.id} className={'row-wrap' + (out === i.row.id ? ' open' : '')}>
@@ -393,7 +416,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
   async function noAnswer(retry: Action) {
     setBusy(true);
     try {
-      await markStep(row, stepId, 'noAnswer', ...args);
+      await markStep(row, stepId, 'missed', ...args);
       setMissed(undecidedOf(stepId, retry));
       onUndo({ label: `${name}: ${retry === 'wait' ? 'עדיין לא חזר' : 'לא ענה'}`, run: async () => { await unmarkStep(row, stepId, ...args); setMissed(null); onChange(); } });
     } catch { alert('לא נשמר: אין חיבור כרגע. אפשר לנסות שוב.'); }
@@ -432,6 +455,7 @@ function TaskCard({ item, held, ctx, notes, onChange, onUndo, onOpen, bare }: { 
           : <AutoLine blocked={!!ctx.exhibitor.wa_blocked_at} wa={hasWa(ctx)} />)}
       </div>
       {next.kind === 'task' && next.reply && item.reply && <div className="note-peek reply-peek"><b>הוא כתב:</b> {item.reply}</div>}
+      {next.kind === 'task' && next.byHand && <div className="faint small">אין לאן לשלוח לו הודעות, אז זו שיחה: לספר לו מה כתוב בהודעה.</div>}
       {!bare && (row.note || notes.length > 0) && <Notes note={row.note} notes={notes} />}
       {next.kind === 'task' && next.message && !talk
         ? <SendRow ctx={ctx} setup={item.setup} leadId={row.id} name={name} messageId={next.message} dests={dests} />
@@ -649,7 +673,7 @@ async function clearChoice(m: Missed, item: Item, ctx: Ctx) {
   const args = [ctx.exhibitor.id, item.setup, item.owner, today()] as const;
   if (m.retry) await removeManual(item.row, m.retry, ...args);
   if (m.goOn) await unmarkStep(item.row, goOnId(m.stepId), ...args);
-  if (m.gaveUp) await markStep(item.row, m.stepId, 'noAnswer', ...args);
+  if (m.gaveUp) await markStep(item.row, m.stepId, 'missed', ...args);
 }
 
 function MissedSheet({ item, ctx, missed, setMissed, dests, onUndo, onDone }: { item: Item; ctx: Ctx; missed: Missed; setMissed: (m: Missed) => void;

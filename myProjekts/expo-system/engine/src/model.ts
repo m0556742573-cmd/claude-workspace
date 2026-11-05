@@ -87,7 +87,9 @@ export interface Setup {
 /** How a step ended. 'engaged' = he answered, came, or moved forward: the ladder of attempts stops.
  *  'gaveUp' = after "לא ענה" the exhibitor chose to stop trying (יצחק, 5/11): it is his decision, by how much the visitor
  *  is worth to him, and nothing else of the path follows. Trying again is a step he sets by hand (a manual step). */
-export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut' | 'gaveUp';
+export type Outcome = 'engaged' | 'noAnswer' | 'closed' | 'notRelevant' | 'optOut' | 'gaveUp' | 'missed';
+// 'missed' (5/11): he called, met or waited and did not get through, and has not chosen yet what now ("מחכה להחלטה").
+// 'noAnswer' keeps its old meaning: done, the path goes on (the server marks every message it sent so).
 
 export interface StepRecord {
   stepId: string;
@@ -125,6 +127,11 @@ export interface Lead {
   /** What the exhibitor chose at the booth: a message to send him now, or none now. Either replaces the path's own
    *  immediate message, so he never gets two at once (יצחק, 28/10). */
   booth?: { message?: string };
+  /** false when no automatic message can reach him (5/11, ב4): no number with WhatsApp that receives, and no mail. Then a
+   *  message of the path becomes a call of the exhibitor's, with what it would have said. Unknown (undefined) = as before. */
+  reach?: boolean;
+  /** The exhibitor's own star at the booth (5/11, א2): worth his time. No words and no number; it orders his day (ב3). */
+  star?: boolean;
 }
 
 /** A manual step is recorded in the history under this id, so the path's own steps never collide with it. */

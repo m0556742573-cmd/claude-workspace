@@ -4,7 +4,7 @@
 // days late is left to the exhibitor, not sent out of the blue); the visitor's card has settled at the booth; at least
 // one of his destinations can get it (a number with WhatsApp when his WhatsApp is linked, a mail when mail is set on
 // the server); and the filled text has no hole left in it. The database queues it to each.
-import { EXTRA, addDays, filesIn, fill, holes, isExtra, nextTask, offerText, orderCheckText, orderSummary, textOf, type Approved, type Lead, type LocalDate, type ManualStep, type Me, type Offer, type Order, type Setup } from '../engine/src/index.ts';
+import { EXTRA, addDays, filesIn, fill, holes, isExtra, nextTask, rankOf, offerText, orderCheckText, orderSummary, textOf, type Approved, type Lead, type LocalDate, type ManualStep, type Me, type Offer, type Order, type Setup } from '../engine/src/index.ts';
 
 export interface PlanLead {
   id: string; captured_on: string; taps: string[]; customer_date: string | null; business_owner: boolean; setup_version: number | null;
@@ -19,7 +19,16 @@ export interface PlanLead {
   booth_message: string | null; booth_none: boolean;
   /** What he ordered from the expo offer at the booth (model §14א): its summary goes to him once. */
   booth_order?: Order | null;
+  /** The exhibitor's star at the booth (5/11, א2): first in his day after whoever wrote back. */
+  starred?: boolean | null;
 }
+
+/**
+ * Whether any automatic message can reach him (5/11, ב4): a number with WhatsApp when the exhibitor works with it (or
+ * it is linked now), or a mail. When none can, the engine makes the path's messages his calls.
+ */
+export const reachOf = (plan: Pick<Plan, 'me'>, l: Pick<PlanLead, 'targets' | 'mails'>, waNow = false) =>
+  ((plan.me.whatsapp || waNow) ? l.targets : 0) + l.mails > 0;
 export interface Plan {
   /** whatsapp: his number, or null when he answered that he has none (then the suggested texts say nothing of it). */
   me: Me & { blocked: boolean; whatsapp?: string | null };
@@ -71,6 +80,7 @@ export function due(plan: Plan, today: string, approved: Approved[], ch: Channel
       manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
+      reach: reachOf(plan, l, ch.wa), star: !!l.starred,
     };
     const beside = (step: string, template: string, text: string): Due | null => {
       const body = fill(text, plan.me, l.name ?? '');
@@ -123,7 +133,7 @@ export function morningOf(plan: Plan, today: LocalDate): { tasks: MorningItem[];
   const active = plan.setups.find((s) => s.active)?.data;
   if (!active) return { tasks: [], waiting: 0 };
   const versions = new Map(plan.setups.map((s) => [s.version, s.data]));
-  const tasks: MorningItem[] = [];
+  const ranked: { rank: number; item: MorningItem }[] = [];
   let waiting = 0;
   for (const l of plan.leads) {
     const replies = plan.replies.filter((r) => r.lead_id === l.id);
@@ -136,14 +146,16 @@ export function morningOf(plan: Plan, today: LocalDate): { tasks: MorningItem[];
       manual: plan.manual.filter((m) => m.lead_id === l.id).map((m) => ({ id: m.id, action: m.action, who: m.who, dueOn: m.due_on, message: m.message ?? undefined })),
       repliedOn: said.length ? israelDay(said[said.length - 1]!.at) : undefined,
       booth: l.booth_message ? { message: l.booth_message } : l.booth_none ? {} : undefined,
+      reach: reachOf(plan, l), star: !!l.starred,
     };
     const n = nextTask(setup, lead, today);
     if (n.kind === 'task' && n.who === 'me' && n.dueOn <= today) {
-      tasks.push({ name: l.name ?? '', action: n.reply ? 'talk' : n.action, message: n.message ?? null, late: n.late, due: n.wasDue ?? n.dueOn });
+      ranked.push({ rank: rankOf(setup, lead, n, today), item: { name: l.name ?? '', action: n.reply ? 'talk' : n.action, message: n.message ?? null, late: n.late, due: n.wasDue ?? n.dueOn } });
     } else if (n.kind === 'end' && (n.reason === 'decide' || n.reason === 'engaged')) waiting++;
   }
-  tasks.sort((a, b) => a.due.localeCompare(b.due) || a.name.localeCompare(b.name, 'he'));
-  return { tasks, waiting };
+  // In the order of his day, as the app shows it (5/11, ב3): rank, then the earlier due, then the name.
+  ranked.sort((a, b) => a.rank - b.rank || a.item.due.localeCompare(b.item.due) || a.item.name.localeCompare(b.item.name, 'he'));
+  return { tasks: ranked.map((r) => r.item), waiting };
 }
 
 /** A message already went to him that day (by the path or beside it): one a day is enough. */
