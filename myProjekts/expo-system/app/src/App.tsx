@@ -26,6 +26,7 @@ import { waCheck } from './lib/wa.ts';
 import { setNoWa } from './lib/messages.ts';
 import { MailCode } from './signin.tsx';
 import { Consultant } from './consult.tsx';
+import { Landing, type Enter } from './landing.tsx';
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine);
@@ -105,6 +106,7 @@ function Live() {
   const online = useOnline();
   const desk = useDesk();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [entering, setEntering] = useState<Enter | null>(null);
   const [exhibitor, setExhibitor] = useState<Exhibitor | null | undefined>(undefined);
   const [setup, setSetup] = useState<Setup | null | undefined>(undefined);
   const [directory, setDirectory] = useState<Person[]>([]);
@@ -141,7 +143,8 @@ function Live() {
   }, []);
 
   const go = useCallback((v: View) => { setView(v); setPanel(null); const p = partOf(v); if (p) setPart(p); scrollTo(0, 0); }, []);
-  useEffect(() => { history.replaceState(null, '', location.search + '#' + view); }, [view]);
+  // The site's own address stays clean for whoever is not signed in (6/11); the screen's name joins it after sign-in.
+  useEffect(() => { if (session) history.replaceState(null, '', location.search + '#' + view); }, [view, session]);
   useEffect(() => {
     if (!panel) return;
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') setPanel(null); };
@@ -236,11 +239,15 @@ function Live() {
 
   if (session === undefined) return <Gate title="רגע…" />;
   if (!session) {
+    // Signed out: the marketing site first (6/11), and its "כניסה" / "הרשמה" open this same sign-in. Google and the
+    // code by mail sign a new exhibitor up and a returning one in alike, so only the line above them differs.
+    if (!entering) return <Landing onEnter={(how) => { setEntering(how); scrollTo(0, 0); }} />;
     return (
       <Gate title="אקספומקס" hero>
-        <p className="muted">לבעלי דוכנים באקספו. נכנסים פעם אחת, וממשיכים מכל מכשיר.</p>
+        <p className="muted">{entering === 'signup' ? 'הרשמה לדוכן באקספו: נרשמים פעם אחת, וממשיכים מכל מכשיר.' : 'לבעלי דוכנים באקספו. נכנסים פעם אחת, וממשיכים מכל מכשיר.'}</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
         <MailCode newUsers />
+        <button type="button" className="text-btn" onClick={() => setEntering(null)}>חזרה לאתר</button>
       </Gate>
     );
   }
