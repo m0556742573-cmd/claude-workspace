@@ -244,7 +244,7 @@ function Live() {
     if (!entering) return <Landing onEnter={(how) => { setEntering(how); scrollTo(0, 0); }} />;
     return (
       <Gate title="אקספומקס" hero>
-        <p className="muted">{entering === 'signup' ? 'הרשמה לדוכן באקספו: נרשמים פעם אחת, וממשיכים מכל מכשיר.' : 'לבעלי דוכנים באקספו. נכנסים פעם אחת, וממשיכים מכל מכשיר.'}</p>
+        <p className="muted">{entering === 'signup' ? 'הרשמה לאקספומקס: נרשמים פעם אחת, וממשיכים מכל מכשיר.' : 'לבעלי דוכנים באקספו. נכנסים פעם אחת, וממשיכים מכל מכשיר.'}</p>
         <button type="button" className="opt sign-opt" onClick={signInWithGoogle}><span className="g-mark" aria-hidden="true">G</span>התחברות עם Google</button>
         <MailCode newUsers />
         <button type="button" className="text-btn" onClick={() => setEntering(null)}>חזרה לאתר</button>
